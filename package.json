@@ -1,0 +1,25 @@
+{
+  "name": "osu-fresh-profile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Track an alternative osu! playstyle as a fresh profile, locally.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "node src/main.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "build:pp": "dotnet build tools/PpCalculator/PpCalculator.csproj -c Release --nologo -v q",
+    "ui": "node scripts/ui-check.mjs"
+  },
+  "dependencies": {
+    "lzma-js-simple-v2": "^1.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,46 @@
+Inspiration Project:
+https://github.com/Sheppsu/osu-score-tracker/tree/kariyu-left-hand
+https://kariyu.sheppsu.me/
+
+osu! GitHub:
+https://github.com/ppy/osu
+
+Reference for site design and layout:
+https://github.com/ppy/osu-web
+https://osu.ppy.sh/users/3119700
+
+osu! API docs:
+https://osu.ppy.sh/docs/
+
+
+Hello, can you help me build an osu! project? It will be titled "osu! fresh profile" for now. Basically this project will be inspired by the osu score tracker project on GitHub that Sheppsu made, which acts as a locally hosted webpage which emulates tracking a fresh start osu! account, with scores, plays, pp, accuracy, etc. The background of this is that osu! does not allow one person to have multiple accounts, so if someone wanted to track an alternative playstyle such as switching from tablet to mouse or changing from right to left hand, there's not really a good way to track what rank or pp they would be and their plays. I want this project to be built based on the inspiration of Sheppsu's project, but I want a fresh evaluation and reimagination of what it should be. For example, what should be the tech stack, should python even be used? I want this project to be as portable / universal as possible, like for example someone would just run a .exe or .bat (python can be required or not required - I'm not an expert so use your discretion here) and it would launch the webpage and start listening or tracking for osu! plays. The exact mechanism of how it turns on and off for now isn't 100% clear to me from the user experience perspective, I imagine that currently for Sheppsu's you start the server to begin listening, and you stop the server to stop listening for scores, while for my app I don't know if I want it as a .exe or .bat where like once you start up the applet or console window it starts listening, and once you close it then it stops, with an optional button to click to access the local webpage. That's just an idea for now.
+
+The main reason though for the freshly built project is to try to add more design and functionality compared to Sheppsu's original project. 
+
+Functionality:
+For example, the current functionality of it has total pp, rank, and top plays. Compared to the live osu profile page, there's a lot more functionality that I think (might be wrong) would be included such as global ranking, country ranking, pp (might need to be calculated on the most recent pp algorithm and also keep up to date with pp reworks), ranked score, hit accuracy, play count, total score, total hits, hits per play, maximum combo, number of silver SS, silver S, SS, S and A, level (might need to look through the internet or the github for the osu level algorithm), Recent section, Scores section including First Place scores, Historical section including play history, most play beatmaps section, and recent plays section. This would all be referencing the live osu profile page: https://osu.ppy.sh/users/3119700 . The things that could be excluded are the osu website links at the top bar (intuitive because it will be on a local host page), the modding, playlists, multiplayer, and ranked play tabs, the me! section, and every section starting from Most Watched Replays and below can be excluded, such as Beatmaps, Kudosu!, and Medals. Also it should have the top selector for gamemode like in the live osu page, such as mania, catch the beat, taiko, etc., with the gamemode that has the most recent score or play tracked on it being the default tab that the page loads on launch. Basically try to keep almost everything you see on the default live osu profile page as much as possible except for the ones that don't really make sense or as I mentioned to exclude.
+
+Design:
+For the design, I want it to match as closely to the live osu! profile page and website design as possible, I think that the design and assets should be mostly open source and accessible on their GitHub, https://github.com/ppy/osu-web, you can also design on your discretion just seeing how the user profile looks already.
+
+API usage:
+Please use your best discretion on how often the API needs to be called, or I'm not sure how listening for plays/scores work, but yeah. I still want it to be responsive though like when I submit a play or something it should be decently responsive like within a few seconds but idk.
+
+"Use the API for good. Don't overdo it. If in doubt, ask before serious long term use.
+
+Examples of good practices:
+
+Gathering initial information on a user after they login to your site.
+Tracking data of users registered on your site on an irregular polling interval.
+Implementing exponential backoff to reduce request rate during low activity periods.
+Caching retrieved data and reusing as often as possible.
+Examples of incorrect / abusive usage:
+
+Polling for new data every minute for every user.
+Polling more than once a minute for the same user/beatmap.
+Using the API to try to gain a competitive advantage.
+Using the API as if it is your database, re-requesting the same data every time it is needed.
+Harvesting mass score/user/beatmap data (consider using data.ppy.sh instead if looking for seed or sample data).
+Please limit your usage to no more than 60 requests per minute (generally 1 request per second). The internal rate limits are higher than this and allow some degree of bursting, but exceeding this specified limit may lead to your API tokens being revoked, or in serious abuse cases your access to the API being restricted.
+
+Providing this API is done for free, but it's a substantial infrastructure cost in recent times. Please consume respectfully."

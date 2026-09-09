@@ -1,0 +1,11 @@
+node_modules/
+data/
+dist/
+web/dist/
+*.log
+.DS_Store
+
+# .NET build output for the pp helper
+tools/**/bin/
+tools/**/obj/
+tools/pp/
