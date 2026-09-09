@@ -77,6 +77,45 @@ export function ppChart(input, emptyMessage = 'no ranked plays yet') {
 </div>`;
 }
 
+/**
+ * Global rank over time, which is what osu-web actually charts here.
+ *
+ * Two differences from the pp chart: the axis is inverted, because a *smaller* rank is
+ * better and belongs at the top; and it is log-scaled, because rank spans six orders of
+ * magnitude and a fresh profile lives in the long tail where a linear axis would flatten
+ * every gain to nothing.
+ */
+export function rankChart(input) {
+  if (!input || input.length === 0) return EMPTY('unranked');
+
+  const points = input.length === 1 ? [input[0], { ...input[0], at: input[0].at + 1 }] : input;
+
+  const [minX, maxX] = extent(points.map((p) => p.at));
+  const [bestRank, worstRank] = extent(points.map((p) => p.rank));
+  const spanX = maxX - minX || 1;
+  const lo = Math.log(bestRank);
+  const hi = Math.log(worstRank);
+  const spanY = hi - lo;
+
+  const coords = points.map((p) => {
+    const x = ((p.at - minX) / spanX) * 100;
+    // A flat series has no span; park it mid-chart rather than dividing by zero.
+    const y = spanY > 0 ? 4 + ((Math.log(p.rank) - lo) / spanY) * 92 : 50;
+    return [x, y];
+  });
+
+  const line = coords.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`).join(' ');
+  const from = dayLabel(minX);
+  const to = dayLabel(maxX);
+
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+  <path class="chart__line" d="${line}" vector-effect="non-scaling-stroke"/>
+</svg>
+<div class="chart__caption">
+  <span>${escapeHtml(from === to ? from : `${from} - ${to}`)}</span>
+</div>`;
+}
+
 /** Monthly play counts, the bar chart in the Historical section. */
 export function playcountChart(points) {
   if (!points || points.length === 0) return '';

@@ -20,6 +20,8 @@
       <div class="menu-wrap">
         <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
         <div class="menu" id="optionsMenu" hidden>
+          <button id="optBackfill" type="button">Import past plays&hellip;</button>
+          <div class="sep"></div>
           <button id="optReset" class="danger" type="button">Reset profile</button>
           <div class="sep"></div>
           <div class="note" id="optInfo">&nbsp;</div>
@@ -47,11 +49,12 @@
         <div class="profile-detail-stats__values">
           <div class="value-display value-display--rank">
             <div class="value-display__label">Global Ranking</div>
-            <div class="value-display__value" id="globalRank" title="Rank estimation is not implemented yet">-</div>
+            <div class="value-display__value" id="globalRank">-</div>
           </div>
           <div class="value-display value-display--rank">
             <div class="value-display__label">Country Ranking</div>
-            <div class="value-display__value" id="countryRank" title="Rank estimation is not implemented yet">-</div>
+            <div class="value-display__value" id="countryRank"
+                 title="Not shown: the offline player sample is far too thin to estimate a per-country rank">-</div>
           </div>
         </div>
       </div>
@@ -127,6 +130,44 @@
 </main>
 
 <div class="toast" id="toast"></div>
+
+<div class="backdrop" id="backfillModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">
+    <h3 id="backfillTitle">Import past plays</h3>
+    <p>
+      Plays set while this app was closed were never tracked. Choose how far back to look
+      and they will be imported from that moment onward.
+    </p>
+    <div class="warn">
+      Go back only as far as the session you played with this playstyle. Anything earlier
+      pulls in plays set with your normal one &mdash; which is exactly what a fresh profile
+      exists to keep out.
+    </div>
+
+    <div class="presets" id="backfillPresets">
+      <button type="button" data-hours="1">1 hour</button>
+      <button type="button" data-hours="3">3 hours</button>
+      <button type="button" data-hours="6">6 hours</button>
+      <button type="button" data-hours="12">12 hours</button>
+      <button type="button" data-hours="24">1 day</button>
+    </div>
+
+    <label class="field">
+      <span>Import plays since</span>
+      <input type="datetime-local" id="backfillSince">
+    </label>
+
+    <div class="backfill-summary" id="backfillSummary">
+      Pick a time, then check what would be imported.
+    </div>
+
+    <div class="actions">
+      <button id="backfillCancel" type="button">Cancel</button>
+      <button id="backfillCheck" type="button">Check</button>
+      <button id="backfillConfirm" class="primary" type="button" disabled>Import</button>
+    </div>
+  </div>
+</div>
 
 <div class="backdrop" id="resetModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">

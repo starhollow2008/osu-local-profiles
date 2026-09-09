@@ -7,7 +7,7 @@
  */
 import { MODE_NAMES, escapeHtml, fmt, pct } from './format.js';
 import { coverUrl, generatedAvatar, gradeBadge, levelBadge } from './badges.js';
-import { playcountChart, ppChart } from './charts.js';
+import { playcountChart, ppChart, rankChart } from './charts.js';
 import { activityList, beatmapPlaycountList, playList } from './sections.js';
 
 const $ = (id) => document.getElementById(id);
@@ -130,6 +130,28 @@ function renderStats(next) {
   $('levelBadge').innerHTML = levelBadge(stats.level.current);
 }
 
+/**
+ * osu! shows a global and a country rank. The global one is estimated offline from a
+ * data.ppy.sh sample; the country one is not shown at all, because a 10,000-user sample
+ * spread over ~200 countries is far too thin to interpolate per country, and a made-up
+ * number would be worse than an honest dash.
+ */
+function renderRank(data) {
+  const el = $('globalRank');
+  if (data.rank) {
+    el.textContent = `#${fmt(data.rank.rank)}`;
+    el.title =
+      `Estimated from osu!'s ${data.rankSource?.dump ?? data.rank.dump} player sample` +
+      `${data.rankSource ? ` (${fmt(data.rankSource.sampled)} users)` : ''}. ` +
+      'Approximate, and drifts as the playerbase grows.';
+  } else {
+    el.textContent = '-';
+    el.title = stats?.totalPp > 0
+      ? 'No rank curve has been built for this mode yet - see scripts/build-rank-table.mjs'
+      : 'A profile with no pp is not on the ladder yet';
+  }
+}
+
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
@@ -138,10 +160,13 @@ async function loadProfile() {
   renderStats(data.stats);
   renderCover(data.top);
 
-  $('ppChart').innerHTML = ppChart(
-    data.ppHistory,
-    data.stats.playcount > 0 ? 'no ranked plays yet' : 'unranked',
-  );
+  renderRank(data);
+
+  // osu-web charts global rank; fall back to pp when no rank curve exists for this mode.
+  const rankPoints = (data.rankHistory ?? []).filter((p) => p.rank != null);
+  $('ppChart').innerHTML = rankPoints.length
+    ? rankChart(rankPoints)
+    : ppChart(data.ppHistory, data.stats.playcount > 0 ? 'no ranked plays yet' : 'unranked');
 
   $('recentActivity').innerHTML = activityList(data.events);
 
@@ -234,7 +259,130 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   setMenuOpen(false);
   if (!$('resetModal').hidden) closeReset();
+  if (!$('backfillModal').hidden) closeBackfill();
 });
+
+/* ------------------------------------------------------ import past plays */
+
+/** `datetime-local` wants a local-time ISO string with no zone suffix. */
+function toLocalInput(ms) {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+}
+
+const sinceValue = () => new Date($('backfillSince').value).getTime();
+
+/** Any change to the cutoff invalidates the preview, so Import has to be earned again. */
+function resetBackfillPreview(message) {
+  $('backfillSummary').innerHTML = message;
+  $('backfillConfirm').disabled = true;
+  $('backfillConfirm').textContent = 'Import';
+}
+
+function openBackfill() {
+  setMenuOpen(false);
+  markPreset(3);
+  $('backfillSince').value = toLocalInput(Date.now() - 3 * 3600_000);
+  resetBackfillPreview('Pick a time, then check what would be imported.');
+  $('backfillModal').hidden = false;
+  $('backfillCancel').focus();
+}
+
+function closeBackfill() {
+  $('backfillModal').hidden = true;
+}
+
+function markPreset(hours) {
+  for (const b of $('backfillPresets').querySelectorAll('button')) {
+    b.classList.toggle('active', Number(b.dataset.hours) === hours);
+  }
+}
+
+$('optBackfill').onclick = openBackfill;
+$('backfillCancel').onclick = closeBackfill;
+$('backfillModal').onclick = (e) => {
+  if (e.target === $('backfillModal')) closeBackfill();
+};
+
+$('backfillPresets').onclick = (e) => {
+  const b = e.target.closest('[data-hours]');
+  if (!b) return;
+  const hours = Number(b.dataset.hours);
+  markPreset(hours);
+  $('backfillSince').value = toLocalInput(Date.now() - hours * 3600_000);
+  resetBackfillPreview('Cutoff changed - check again to see what would be imported.');
+};
+
+$('backfillSince').onchange = () => {
+  markPreset(null);
+  resetBackfillPreview('Cutoff changed - check again to see what would be imported.');
+};
+
+$('backfillCheck').onclick = async () => {
+  const since = sinceValue();
+  if (!Number.isFinite(since)) {
+    resetBackfillPreview('That is not a valid date and time.');
+    return;
+  }
+
+  $('backfillCheck').disabled = true;
+  $('backfillSummary').textContent = 'Scanning your osu! folders...';
+  try {
+    const r = await fetch('/api/backfill/preview', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ since }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'preview failed');
+
+    if (d.importable === 0) {
+      resetBackfillPreview(
+        d.duplicates > 0
+          ? `Nothing new. All ${fmt(d.duplicates)} play${d.duplicates === 1 ? '' : 's'} found since then are already tracked.`
+          : `No plays found since then (${fmt(d.scanned)} files checked).`,
+      );
+      return;
+    }
+
+    const span =
+      d.earliest && d.latest
+        ? ` They run from ${new Date(d.earliest).toLocaleString()} to ${new Date(d.latest).toLocaleString()}.`
+        : '';
+    const dupes = d.duplicates > 0 ? ` ${fmt(d.duplicates)} already tracked and will be left alone.` : '';
+    $('backfillSummary').innerHTML =
+      `<b>${fmt(d.importable)} play${d.importable === 1 ? '' : 's'}</b> would be imported.${escapeHtml(span)}${escapeHtml(dupes)}`;
+    $('backfillConfirm').disabled = false;
+    $('backfillConfirm').textContent = `Import ${fmt(d.importable)}`;
+  } catch (err) {
+    resetBackfillPreview(`Check failed: ${escapeHtml(err.message)}`);
+  } finally {
+    $('backfillCheck').disabled = false;
+  }
+};
+
+$('backfillConfirm').onclick = async () => {
+  const since = sinceValue();
+  $('backfillConfirm').disabled = true;
+  $('backfillCheck').disabled = true;
+  $('backfillConfirm').textContent = 'Importing...';
+  try {
+    const r = await fetch('/api/backfill', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ since, confirm: true }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'import failed');
+    toast(`Imported ${fmt(d.imported)} past play${d.imported === 1 ? '' : 's'}`);
+    closeBackfill();
+    await Promise.all([loadProfile(), loadState()]);
+  } catch (err) {
+    resetBackfillPreview(`Import failed: ${escapeHtml(err.message)}`);
+  } finally {
+    $('backfillCheck').disabled = false;
+  }
+};
 
 /* --------------------------------------------------------- reset profile */
 
@@ -303,6 +451,12 @@ es.addEventListener('score', (e) => {
 });
 es.addEventListener('tracking', (e) => setTracking(JSON.parse(e.data).tracking));
 es.addEventListener('reset', () => {
+  loadProfile();
+  loadState();
+});
+// An import can add dozens of scores at once, so it refreshes the page rather than
+// announcing each one the way a live play does.
+es.addEventListener('backfill', () => {
   loadProfile();
   loadState();
 });

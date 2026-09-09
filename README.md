@@ -11,15 +11,16 @@ Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-t
 
 ## Status
 
-Phases 1 and 2 are done: scores are tracked live, and the page is rebuilt to match
-`osu.ppy.sh`'s profile design.
+Phases 1-3 are done: scores are tracked live, the page matches `osu.ppy.sh`'s profile
+design, global rank is estimated offline, mod settings are shown, and past plays can be
+imported deliberately.
 
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout -- and
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
 handles deliberately, and what to know before changing it.
 
-Global and country rank are still unimplemented and show `-`; see Known gaps.
+Country rank still shows `-`, on purpose; see Known gaps.
 
 ## Running it
 
@@ -115,7 +116,6 @@ cross-checks, rank estimation). The app works fully without it.
 | `profileName` | `Fresh Profile` | name of the tracked playstyle |
 | `port` | `7272` | local web server port |
 | `openBrowser` | `true` | open the page on start |
-| `backfill` | `false` | reserved — importing past plays is not implemented yet (Phase 3) |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
@@ -151,11 +151,40 @@ leaving the destructive button as the only one that worked. No unit test would c
   download, which is a real tension with the single-.exe goal and is unresolved.
 - **Only osu!standard has been checked against known-correct values.** taiko, catch and
   mania go through the same osu! code and should be right, but nothing verifies them yet.
-- **Global rank is not yet estimated.** The osu! rankings API only exposes the top 10,000,
-  and a fresh profile sits well below that for a long time.
-- **Mod settings** (e.g. DT at 1.3x rather than 1.5x) are read but not yet surfaced.
+- **Global rank is an estimate, and ages.** It is interpolated from a pp->rank curve built
+  from a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase
+  grows. Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
+- **Country rank is not shown at all.** A 10,000-user sample spread over ~200 countries is
+  far too thin to estimate one, and a fabricated number would be worse than a dash.
+- **Only osu!standard ships with a rank curve.** The other modes show `-` until you build
+  their tables; the command is the same with a different mode name.
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
+
+## Importing plays you set while it was closed
+
+Scores are only tracked while the app is running, so a session played with it closed is
+missed. **Options -> Import past plays** covers that: pick how far back to look, check what
+would be imported, then confirm.
+
+It never runs by itself, and the warning in the dialog is the important part -- reach back
+further than the session you actually played with this playstyle and you will pull in plays
+set with your normal one, which is the one thing a fresh profile must not contain.
+
+## Rank estimation
+
+osu!'s rankings API only exposes the top 10,000, which never covers a fresh profile. Rank
+is instead interpolated from a small curve built from data.ppy.sh's random sample of the
+whole ladder, in which every sampled user carries their own real rank:
+
+```
+node scripts/build-rank-table.mjs osu                    # rebuild from the default dump
+node scripts/build-rank-table.mjs mania --dump 2026_09_01
+```
+
+The script streams the ~1GB archive through `bzip2` and `tar` and keeps only the user-stats
+table inside it, so nothing large is written to disk; the checked-in result is a few KB.
+`osu` ships with a curve; the other modes show `-` until you build theirs.
 
 ## Recalculating
 

@@ -93,9 +93,56 @@ const MOD_COLOUR = (() => {
   return map;
 })();
 
-export function modPill(acronym) {
-  const colour = MOD_COLOUR.get(acronym) ?? 'var(--mod-unknown)';
-  return `<span class="mod" style="--mod-colour: ${colour}">${escapeHtml(acronym)}</span>`;
+/*
+ * Setting keys lazer writes, in the names osu! itself uses. Anything not listed is still
+ * shown, just with its raw key humanised -- a new mod setting should be visible rather
+ * than silently dropped.
+ */
+const SETTING_LABELS = {
+  speed_change: 'Rate',
+  circle_size: 'CS',
+  approach_rate: 'AR',
+  drain_rate: 'HP',
+  overall_difficulty: 'OD',
+  initial_rate: 'From',
+  final_rate: 'To',
+  extended_limits: 'Extended limits',
+  adjust_pitch: 'Pitch',
+  only_fade_approach_circles: 'Fade approach circles only',
+  restart: 'Restart on fail',
+  retries: 'Retries',
+};
+
+const humanise = (key) => key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+
+function settingValue(key, value) {
+  if (typeof value === 'boolean') return value ? 'on' : 'off';
+  // Rates read as "1.3x" everywhere in osu!, so keep that form.
+  if (key === 'speed_change' || key === 'initial_rate' || key === 'final_rate') return `${value}x`;
+  return String(value);
+}
+
+function settingEntries(mod) {
+  return Object.entries(mod.settings ?? {}).map(
+    ([k, v]) => `${SETTING_LABELS[k] ?? humanise(k)} ${settingValue(k, v)}`,
+  );
+}
+
+/**
+ * One mod. A customised mod is marked so it cannot be mistaken for the default: the rate
+ * is shown inline because it changes the difficulty outright, and every setting is listed
+ * in the tooltip.
+ */
+export function modPill(mod) {
+  const m = typeof mod === 'string' ? { acronym: mod } : mod;
+  const colour = MOD_COLOUR.get(m.acronym) ?? 'var(--mod-unknown)';
+  const entries = settingEntries(m);
+  const rate = m.settings?.speed_change;
+  const label = rate == null ? m.acronym : `${m.acronym} ${rate}x`;
+  const title = entries.length > 0 ? ` title="${escapeHtml(entries.join(' · '))}"` : '';
+  const customised = entries.length > 0 ? ' mod--customised' : '';
+
+  return `<span class="mod${customised}" style="--mod-colour: ${colour}"${title}>${escapeHtml(label)}</span>`;
 }
 
 export function modList(mods) {

@@ -4,6 +4,7 @@ import type { OsuInstall } from '../clients/detect.ts';
 import { BeatmapResolver, indexOneFile } from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
 import { ingestReplayFile, type IngestedScore } from './ingest.ts';
+import { scanForReplays, type BackfillScan } from './backfill.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 
 export interface TrackerOptions {
@@ -20,6 +21,14 @@ export interface TrackerEvents {
   score: [IngestedScore];
   skip: [{ reason: string }];
   error: [Error];
+}
+
+export interface BackfillResult {
+  imported: number;
+  /** Already tracked, or rejected by the parser. */
+  skipped: number;
+  scanned: number;
+  since: number;
 }
 
 /**
@@ -82,6 +91,72 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   setTracking(on: boolean): void {
     if (on) this.start();
     else this.stop();
+  }
+
+  /** Preview what an import would bring in, without changing anything. */
+  previewBackfill(since: number): Promise<BackfillScan> {
+    return this.enqueue(() =>
+      scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since),
+    );
+  }
+
+  /**
+   * Import replays played since `since`.
+   *
+   * Runs through the same serialised queue as live ingestion, so a play landing mid-import
+   * cannot interleave its writes. Individual scores are not emitted: importing a session
+   * can add dozens at once, and a toast per score would bury the page.
+   */
+  backfill(since: number): Promise<BackfillResult> {
+    return this.enqueue(async () => {
+      const scan = await scanForReplays(
+        this.opts.db,
+        this.opts.profileId,
+        this.replayDirs(),
+        since,
+      );
+
+      let imported = 0;
+      let skipped = 0;
+      for (const candidate of scan.candidates) {
+        if (candidate.duplicate) {
+          skipped++;
+          continue;
+        }
+        const result = await ingestReplayFile(candidate.file, {
+          db: this.opts.db,
+          resolver: this.opts.resolver,
+          profileId: this.opts.profileId,
+          // The chosen cutoff replaces the profile's own, which is the whole point: these
+          // are plays from before tracking started that the user has asked for by hand.
+          trackingSince: since,
+          official: this.opts.official,
+        });
+        if (result.status === 'added') {
+          imported++;
+          this.added++;
+        } else {
+          skipped++;
+        }
+      }
+
+      return { imported, skipped, scanned: scan.scanned, since };
+    });
+  }
+
+  private replayDirs(): string[] {
+    return this.opts.installs.map((i) => i.replayDir);
+  }
+
+  /** Append to the ingest queue and hand back this task's own result. */
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task);
+    // The queue itself must survive a failed task, or every later ingest is rejected too.
+    this.queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
 
   private handleReplay(file: string): void {

@@ -72,6 +72,28 @@ store no pp and say so loudly.
 osu! computes accuracy itself during decoding and returns it; `test/official.test.ts` asserts
 our `src/calc/grade.ts` implementation agrees with it on both a lazer and a stable replay.
 
+## Global rank is estimated from a sampled curve, and says so
+
+osu!'s rankings API only exposes the top 10,000, which never covers a fresh profile. The
+rank shown instead comes from `src/calc/rank-tables/<mode>.json`, a pp->rank curve built by
+`scripts/build-rank-table.mjs` from data.ppy.sh's `performance_<mode>_random_10000` dump --
+a random sample across the whole ladder in which every user carries their own actual rank,
+so the curve needs no modelling.
+
+The script streams the ~1GB archive through `bzip2` and `tar` and keeps only the user-stats
+table, so nothing large is ever written to disk. Interpolation is linear in *log* rank:
+rank spans six orders of magnitude across the ladder while pp spans three, and a fresh
+profile sits in the long tail where a linear axis would flatten everything.
+
+This is an estimate and is labelled as one in the UI. It is allowed to exist where a second
+pp calculator is not, because pp values are ranked and weighted against each other whereas
+rank is a single derived readout -- a stale curve degrades gradually instead of corrupting
+the profile. Refresh it by re-running the script with a newer `--dump` date.
+
+**Country rank is deliberately not shown.** 10,000 sampled users spread over ~200 countries
+is far too thin to interpolate per country, and a fabricated number would be worse than the
+dash osu! itself shows for an unranked user.
+
 ## Design constraints worth preserving
 
 - **No native modules in the Node process.** `node:sqlite` is built in, `rosu-pp-js` is
@@ -79,9 +101,14 @@ our `src/calc/grade.ts` implementation agrees with it on both a lazer and a stab
   (The .NET helper is a separate process, not a native binding.)
 - **No API polling in the hot path.** Detection is local. The osu! API is optional
   enrichment only, and the app must keep working with no credentials and no network.
-- **Never scan-and-import on startup.** Only live watch events count. Backfilling would
-  retroactively import plays set with the user's normal playstyle while the app was closed,
-  which defeats the purpose of a fresh profile.
+- **Never scan-and-import on startup.** Only live watch events count. An automatic
+  backfill would retroactively import plays set with the user's normal playstyle while the
+  app was closed, which defeats the purpose of a fresh profile.
+  Importing past plays *does* exist (`src/tracker/backfill.ts`), but only as an explicit
+  action: the user picks a cutoff, sees a preview of exactly what it would bring in, and
+  confirms. Keep all three of those. The mtime pre-filter is only a filter -- the
+  authoritative timestamp is the one inside the replay, because lazer stamps imported
+  replays with the import time.
 - Ingestion is serialised through a promise queue in `src/tracker/index.ts` so simultaneous
   replays cannot interleave DB writes.
 

@@ -1,5 +1,5 @@
 import type { Db } from '../db/index.ts';
-import type { Ruleset } from '../osr.ts';
+import type { LazerMod, Ruleset } from '../osr.ts';
 import { bonusPp, weightedAccuracy, weightedTotal } from './pp.ts';
 import { levelFromScore, type Level } from './level.ts';
 import type { Grade } from './grade.ts';
@@ -17,7 +17,8 @@ export interface Play {
   title: string | null;
   version: string | null;
   creator: string | null;
-  mods: string[];
+  /** Full mod objects, not just acronyms: lazer carries settings such as DT at 1.3x. */
+  mods: LazerMod[];
   accuracy: number;
   maxCombo: number;
   totalScore: number;
@@ -73,12 +74,11 @@ const PLAY_COLUMNS = `s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.accuracy
 type Row = Record<string, string | number | null>;
 
 function toPlay(r: Row): Play {
-  let mods: string[] = [];
+  let mods: LazerMod[] = [];
   try {
-    // mods_json holds lazer mod objects; the acronym is all the page needs.
-    mods = (JSON.parse(String(r['mods_json'] ?? '[]')) as { acronym?: string }[])
-      .map((m) => m.acronym ?? '')
-      .filter(Boolean);
+    // Kept whole: lazer only writes `settings` when the player customised the mod, so a
+    // score set on DT at 1.3x is indistinguishable from a default one without them.
+    mods = (JSON.parse(String(r['mods_json'] ?? '[]')) as LazerMod[]).filter((m) => m?.acronym);
   } catch {
     /* a malformed row should not take the whole page down */
   }

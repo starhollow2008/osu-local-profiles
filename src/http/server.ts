@@ -15,6 +15,7 @@ import {
   topPlays,
 } from '../calc/stats.ts';
 import { buildHistory } from '../calc/history.ts';
+import { estimateRank, rankTable } from '../calc/rank.ts';
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
@@ -120,13 +121,22 @@ export function startServer(opts: ServerOptions): http.Server {
     if (url.pathname === '/api/profile') {
       const mode = (Number(url.searchParams.get('mode') ?? '0') || 0) as Ruleset;
       const history = buildHistory(opts.db, opts.profileId, mode);
+      const stats = computeStats(opts.db, opts.profileId, mode);
+      const table = rankTable(mode);
       return json(res, {
         mode,
-        stats: computeStats(opts.db, opts.profileId, mode),
+        stats,
+        // Estimated offline from a data.ppy.sh sample, and null when no curve has been
+        // built for this mode. Country rank has no equivalent: 10,000 users split across
+        // ~200 countries is far too thin to interpolate per country.
+        rank: estimateRank(stats.totalPp, mode),
+        rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
         top: topPlays(opts.db, opts.profileId, mode, 100),
         recent: recentPlays(opts.db, opts.profileId, mode, 25),
         mostPlayed: mostPlayed(opts.db, opts.profileId, mode, 15),
         ppHistory: history.pp,
+        // osu-web charts global rank here, so do the same wherever a curve exists.
+        rankHistory: history.pp.map((p) => ({ at: p.at, rank: estimateRank(p.pp, mode)?.rank ?? null })),
         monthlyPlaycounts: history.monthlyPlaycounts,
         events: history.events,
       });
@@ -192,6 +202,67 @@ export function startServer(opts: ServerOptions): http.Server {
         broadcast('reset', { deleted: before.n, trackingSince: now });
         console.log(`\n  profile reset -- ${before.n} score(s) erased, tracking from now\n`);
         json(res, { ok: true, deleted: before.n, trackingSince: now });
+      });
+      return;
+    }
+
+    /*
+     * Importing plays made while the app was closed. Split into a preview and a commit on
+     * purpose: the user picks a cutoff, sees exactly how many scores it would bring in,
+     * and only then confirms. Nothing here ever runs by itself.
+     */
+    const backfill = /^\/api\/backfill(\/preview)?$/.exec(url.pathname);
+    if (backfill && req.method === 'POST') {
+      const preview = backfill[1] !== undefined;
+      let body = '';
+      req.on('data', (c) => (body += c));
+      req.on('end', () => {
+        void (async () => {
+          let since: number;
+          let confirmed = false;
+          try {
+            const parsed = JSON.parse(body) as { since?: number; confirm?: boolean };
+            since = Number(parsed.since);
+            confirmed = parsed.confirm === true;
+          } catch {
+            return json(res, { error: 'expected a JSON body with a "since" timestamp' }, 400);
+          }
+
+          if (!Number.isFinite(since) || since <= 0) {
+            return json(res, { error: '"since" must be a millisecond timestamp' }, 400);
+          }
+          if (since > Date.now()) {
+            return json(res, { error: '"since" is in the future' }, 400);
+          }
+          if (!preview && !confirmed) {
+            return json(res, { error: 'importing requires an explicit confirmation' }, 400);
+          }
+
+          try {
+            if (preview) {
+              const scan = await opts.tracker.previewBackfill(since);
+              // The candidate list carries absolute paths; the page only needs the counts.
+              return json(res, {
+                since,
+                scanned: scan.scanned,
+                importable: scan.importable,
+                duplicates: scan.duplicates,
+                earliest: scan.earliest,
+                latest: scan.latest,
+              });
+            }
+
+            const result = await opts.tracker.backfill(since);
+            broadcast('backfill', result);
+            console.log(
+              `\n  imported ${result.imported} past play(s) from ` +
+                `${new Date(since).toLocaleString()}\n`,
+            );
+            return json(res, result);
+          } catch (e) {
+            return json(res, { error: (e as Error).message }, 500);
+          }
+        })();
       });
       return;
     }

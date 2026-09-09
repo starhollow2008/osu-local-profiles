@@ -161,6 +161,41 @@ await evaluate(
 );
 check('Escape closes it', await shown('resetModal'), 'none');
 
+console.log('\nimport past plays dialog');
+check('import dialog is hidden on load', await shown('backfillModal'), 'none');
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optBackfill').click()");
+check('import dialog opens', await shown('backfillModal'), 'grid');
+check('options menu closed behind it', await shown('optionsMenu'), 'none');
+check(
+  'Import is disabled until a preview has run',
+  await evaluate("document.getElementById('backfillConfirm').disabled"),
+  true,
+);
+await evaluate("document.getElementById('backfillCancel').click()");
+check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
+
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optBackfill').click()");
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes the import dialog', await shown('backfillModal'), 'none');
+
+console.log('\nmod settings are surfaced');
+const pill = await evaluate(
+  "import('/js/badges.js').then((m) => m.modPill({ acronym: 'DT', settings: { speed_change: 1.3 } }))",
+);
+check('a customised rate is shown on the pill', pill.includes('DT 1.3x'), true);
+check('a customised mod is marked', pill.includes('mod--customised'), true);
+check(
+  'the settings are in the tooltip',
+  pill.includes('Rate 1.3x'),
+  true,
+);
+const plain = await evaluate("import('/js/badges.js').then((m) => m.modPill({ acronym: 'HD' }))");
+check('a default mod is not marked', plain.includes('mod--customised'), false);
+
 /*
  * The token layer. A mistyped custom property (--hsl-b4 -> --hsl-b44) makes the whole
  * declaration invalid at computed-value time, so the element falls back to transparent --

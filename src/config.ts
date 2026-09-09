@@ -7,12 +7,6 @@ export interface Config {
   port: number;
   /** Open the page in the default browser on start. */
   openBrowser: boolean;
-  /**
-   * Reserved for Phase 3, not yet honoured. Would import plays that already existed before
-   * the app first ran. It stays off by default: the point of a fresh profile is that it
-   * starts empty, and existing replays were set with the user's normal playstyle.
-   */
-  backfill: boolean;
   /** Explicit osu! install paths, when auto-detection needs help. */
   installRoots: string[];
   /**
@@ -28,7 +22,6 @@ const DEFAULTS: Config = {
   profileName: 'Fresh Profile',
   port: 7272,
   openBrowser: true,
-  backfill: false,
   installRoots: [],
   country: '',
   tagline: '',

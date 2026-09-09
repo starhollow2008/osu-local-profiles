@@ -35,7 +35,7 @@ export type IngestOutcome =
   | { status: 'skipped'; reason: 'too-old' | 'duplicate' | 'unparseable' | 'not-passed' };
 
 /** A replay identifies itself; fall back to map+time for stable replays with no hash. */
-function dedupeKey(score: ReplayScore): string {
+export function dedupeKey(score: ReplayScore): string {
   return score.replayMD5 ?? `${score.beatmapMD5}:${score.playedAt.getTime()}`;
 }
 
