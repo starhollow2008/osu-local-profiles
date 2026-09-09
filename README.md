@@ -156,8 +156,8 @@ leaving the destructive button as the only one that worked. No unit test would c
   grows. Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
 - **Country rank is not shown at all.** A 10,000-user sample spread over ~200 countries is
   far too thin to estimate one, and a fabricated number would be worse than a dash.
-- **Only osu!standard ships with a rank curve.** The other modes show `-` until you build
-  their tables; the command is the same with a different mode name.
+- **The rank curves cover all four modes**, but only osu!standard's pp is verified against
+  known-correct values, so the other three inherit that caveat.
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
 
@@ -183,8 +183,8 @@ node scripts/build-rank-table.mjs mania --dump 2026_09_01
 ```
 
 The script streams the ~1GB archive through `bzip2` and `tar` and keeps only the user-stats
-table inside it, so nothing large is written to disk; the checked-in result is a few KB.
-`osu` ships with a curve; the other modes show `-` until you build theirs.
+table inside it, so nothing large is written to disk; the checked-in result is a few KB per
+mode. All four modes ship with a curve, built from the 2026_09_01 dump.
 
 ## Recalculating
 

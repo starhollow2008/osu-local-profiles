@@ -57,15 +57,33 @@ const fromFile = args.includes('--from') ? args[args.indexOf('--from') + 1] : nu
 
 /* ------------------------------------------------------------------ fetch */
 
+/** `C:\dir` -> `/c/dir`, which is what the tar bundled with Git for Windows understands. */
+function toPosixPath(p) {
+  const win = /^([A-Za-z]):[\\/](.*)$/.exec(p);
+  if (!win) return p.replace(/\\/g, '/');
+  return `/${win[1].toLowerCase()}/${win[2].replace(/\\/g, '/')}`;
+}
+
 function streamTable(url, dir) {
-  // One pipeline: download, decompress, and extract only the member we need. tar reads to
-  // the end of the stream, so this pays the whole archive once and keeps nothing else.
-  const pipeline = `curl -sL --fail "${url}" | bzip2 -dc | tar -x --wildcards --strip-components=1 -C "${dir}" "*user_stats*"`;
+  /*
+   * One pipeline: download, decompress, and extract only the member we need. tar reads to
+   * the end of the stream, so this pays the whole archive once and keeps nothing else.
+   *
+   * Both the URL and the output directory are passed as *arguments* to bash rather than
+   * pasted into the command string, because the shell strips the backslashes out of a
+   * Windows path. The directory is also rewritten to the /c/... form the bundled tar
+   * expects. Using it as the child's cwd instead would work, but then Windows refuses to
+   * delete it afterwards -- it is a running process's working directory.
+   */
+  const pipeline =
+    'curl -sL --fail "$0" | bzip2 -dc | tar -x --wildcards --strip-components=1 -C "$1" "*user_stats*"';
   console.log(`  streaming ${url}`);
   console.log('  (this reads the whole archive; nothing large is written to disk)');
 
   return new Promise((resolve, reject) => {
-    const child = spawn('bash', ['-c', pipeline], { stdio: ['ignore', 'inherit', 'inherit'] });
+    const child = spawn('bash', ['-c', pipeline, url, toPosixPath(dir)], {
+      stdio: ['ignore', 'inherit', 'inherit'],
+    });
     child.on('error', reject);
     child.on('exit', (code) => {
       const found = fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith('.sql')) : [];

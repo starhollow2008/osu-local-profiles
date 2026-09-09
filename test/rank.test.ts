@@ -47,20 +47,32 @@ test('a degenerate curve is refused rather than guessed at', () => {
   assert.equal(interpolateRank([[100, 1000]], 500), null);
 });
 
-test('a built rank table is well formed', (t) => {
-  const table = rankTable(0);
-  if (!table) return t.skip('no osu! rank table built -- run scripts/build-rank-table.mjs');
+const MODE_NAMES = ['osu!', 'taiko', 'catch', 'mania'] as const;
 
-  assert.ok(table.points.length >= 2);
-  assert.match(table.dump, /^\d{4}_\d{2}_\d{2}$/);
+for (let mode = 0; mode < 4; mode++) {
+  test(`the ${MODE_NAMES[mode]} rank table is well formed`, (t) => {
+    const table = rankTable(mode as 0 | 1 | 2 | 3);
+    if (!table) {
+      return t.skip(`no ${MODE_NAMES[mode]} rank table -- run scripts/build-rank-table.mjs`);
+    }
 
-  let lastPp = -Infinity;
-  let lastRank = Infinity;
-  for (const [pp, rank] of table.points) {
-    assert.ok(pp > lastPp, `pp must ascend: ${pp} after ${lastPp}`);
-    assert.ok(rank <= lastRank, `rank must not worsen as pp rises: ${rank} after ${lastRank}`);
-    assert.ok(rank >= 1, 'rank must be at least 1');
-    lastPp = pp;
-    lastRank = rank;
-  }
-});
+    assert.ok(table.points.length >= 2);
+    assert.match(table.dump, /^\d{4}_\d{2}_\d{2}$/);
+
+    let lastPp = -Infinity;
+    let lastRank = Infinity;
+    for (const [pp, rank] of table.points) {
+      assert.ok(pp > lastPp, `pp must ascend: ${pp} after ${lastPp}`);
+      assert.ok(rank <= lastRank, `rank must not worsen as pp rises: ${rank} after ${lastRank}`);
+      assert.ok(rank >= 1, 'rank must be at least 1');
+      lastPp = pp;
+      lastRank = rank;
+    }
+
+    // A curve that collapsed -- every rank the same -- is well formed JSON but useless,
+    // and is exactly how the first build of this went wrong.
+    const first = table.points[0]!;
+    const last = table.points[table.points.length - 1]!;
+    assert.ok(first[1] > last[1] * 10, `curve spans too little: #${first[1]} to #${last[1]}`);
+  });
+}
