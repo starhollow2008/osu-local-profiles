@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
     "build:pp": "dotnet build tools/PpCalculator/PpCalculator.csproj -c Release --nologo -v q",
-    "ui": "node scripts/ui-check.mjs"
+    "ui": "node scripts/ui-check.mjs",
+    "rank:refresh": "node scripts/build-rank-table.mjs all --latest"
   },
   "dependencies": {
     "lzma-js-simple-v2": "^1.2.3"

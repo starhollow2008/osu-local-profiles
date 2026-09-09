@@ -8,14 +8,18 @@
  * the curve -- no modelling, no assumption that the sample is representative, because
  * every point states its own rank.
  *
- *   node scripts/build-rank-table.mjs osu
+ *   npm run rank:refresh                                all four modes, newest dump
+ *   node scripts/build-rank-table.mjs osu --latest      one mode, newest dump
  *   node scripts/build-rank-table.mjs osu --dump 2026_09_01
  *   node scripts/build-rank-table.mjs osu --from path/to/osu_user_stats.sql
  *
  * Without `--from` the archive is streamed straight through `bzip2` and `tar`, so the
  * ~1 GB never lands on disk: only the one table inside it is kept, and only for as long
- * as it takes to reduce it to a few KB of curve. Needs curl, bzip2 and tar on PATH (all
- * three ship with Git for Windows).
+ * as it takes to reduce it to a few KB of curve, after which it is deleted. Needs curl,
+ * bzip2 and tar on PATH (all three ship with Git for Windows).
+ *
+ * This is deliberately manual and nothing in the app ever triggers it. Refreshing means a
+ * multi-gigabyte download, which should happen when the owner decides, not on a timer.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -44,16 +48,42 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(here, '..', 'src', 'calc', 'rank-tables');
 
 function usage(message) {
-  console.error(`${message}\n\n  node scripts/build-rank-table.mjs <${MODES.join('|')}> [--dump YYYY_MM_DD] [--from file.sql]`);
+  console.error(
+    `${message}\n\n` +
+      `  node scripts/build-rank-table.mjs <${MODES.join('|')}|all> ` +
+      '[--latest | --dump YYYY_MM_DD] [--from file.sql]\n' +
+      '  npm run rank:refresh        all four modes, newest published dump',
+  );
   process.exit(1);
 }
 
-const args = process.argv.slice(2);
-const mode = args[0];
-if (!MODES.includes(mode)) usage(`unknown mode ${JSON.stringify(mode ?? '')}`);
+/** The newest dump date data.ppy.sh is currently publishing. */
+async function latestDump() {
+  const index = await fetch('https://data.ppy.sh/').then((r) => {
+    if (!r.ok) throw new Error(`data.ppy.sh returned ${r.status}`);
+    return r.text();
+  });
+  const pattern = /(\d{4}_\d{2}_\d{2})_performance_osu_random_10000\.tar\.bz2/g;
+  const dates = [...new Set([...index.matchAll(pattern)].map((m) => m[1]))].sort();
+  if (dates.length === 0) throw new Error('no performance dumps found on data.ppy.sh');
+  return dates[dates.length - 1];
+}
 
-const dumpDate = args.includes('--dump') ? args[args.indexOf('--dump') + 1] : DEFAULT_DUMP;
+const args = process.argv.slice(2);
+const requested = args[0];
+if (requested !== 'all' && !MODES.includes(requested)) {
+  usage(`unknown mode ${JSON.stringify(requested ?? '')}`);
+}
+
+const modes = requested === 'all' ? MODES : [requested];
 const fromFile = args.includes('--from') ? args[args.indexOf('--from') + 1] : null;
+if (fromFile && modes.length > 1) usage('--from builds one mode, not "all"');
+
+const dumpDate = args.includes('--dump')
+  ? args[args.indexOf('--dump') + 1]
+  : args.includes('--latest')
+    ? await latestDump()
+    : DEFAULT_DUMP;
 
 /* ------------------------------------------------------------------ fetch */
 
@@ -214,6 +244,7 @@ function buildCurve(pairs) {
 
 /* ------------------------------------------------------------------- main */
 
+async function buildMode(mode) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `rank-${mode}-`));
 try {
   let files;
@@ -260,5 +291,30 @@ try {
   }
   console.log(`  wrote ${path.relative(process.cwd(), out)} (${fs.statSync(out).size} bytes)`);
 } finally {
+  // The extracted table is the only part of the dump that ever touched disk, and it is
+  // of no further use once the curve exists. Say so, rather than leaving the user to
+  // wonder whether a gigabyte is sitting in their temp directory.
   fs.rmSync(tmp, { recursive: true, force: true });
+  if (fs.existsSync(tmp)) {
+    console.warn(`  WARNING: could not delete ${tmp} -- remove it by hand`);
+  } else if (!fromFile) {
+    console.log('  extracted dump data deleted');
+  }
 }
+}
+
+let failed = 0;
+for (const mode of modes) {
+  if (modes.length > 1) console.log(`\n===== ${mode} =====`);
+  try {
+    await buildMode(mode);
+  } catch (e) {
+    failed++;
+    console.error(`  FAILED (${mode}): ${e.message}`);
+  }
+}
+
+if (modes.length > 1) {
+  console.log(`\n  ${modes.length - failed}/${modes.length} curves built from the ${dumpDate} dump`);
+}
+process.exit(failed === 0 ? 0 : 1);

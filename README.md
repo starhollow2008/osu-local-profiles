@@ -104,8 +104,19 @@ even after you reconnect. In lazer you can only play offline as a guest, so thos
 exist solely on disk. Reading local files is the only approach that covers them, and it is
 also instant and costs the API nothing.
 
-The API will be used later only for optional enrichment (cover art, official pp
-cross-checks, rank estimation). The app works fully without it.
+**No osu! API credentials are needed, and none are used.** There is no OAuth application,
+no client id, no secret and no login anywhere in this project. Nothing polls the API.
+
+Two hosts are contacted, both public and unauthenticated, and both optional:
+
+| host | what for | if it fails |
+|---|---|---|
+| `assets.ppy.sh` | beatmap cover art, keyed by the beatmapset id already resolved offline | the placeholder colour shows instead |
+| `data.ppy.sh` | the rank-curve dumps, only when you run `npm run rank:refresh` by hand | nothing; the checked-in curves keep working |
+
+Rank estimation was the one feature that looked like it would need the API, and it does not:
+the rankings endpoint only exposes the top 10,000 anyway, which never covers a fresh
+profile, so the curve comes from the public dumps instead.
 
 ## Configuration
 
@@ -178,13 +189,33 @@ is instead interpolated from a small curve built from data.ppy.sh's random sampl
 whole ladder, in which every sampled user carries their own real rank:
 
 ```
-node scripts/build-rank-table.mjs osu                    # rebuild from the default dump
-node scripts/build-rank-table.mjs mania --dump 2026_09_01
+npm run rank:refresh                                # all four modes, newest dump
+node scripts/build-rank-table.mjs osu --latest      # one mode
+node scripts/build-rank-table.mjs osu --dump 2026_09_01
 ```
 
-The script streams the ~1GB archive through `bzip2` and `tar` and keeps only the user-stats
-table inside it, so nothing large is written to disk; the checked-in result is a few KB per
-mode. All four modes ship with a curve, built from the 2026_09_01 dump.
+The script streams each ~1GB archive through `bzip2` and `tar` and keeps only the
+user-stats table inside it, so nothing large is written to disk. That table is deleted as
+soon as the curve is written, and the script says so; the checked-in result is ~3KB per
+mode. All four modes ship with a curve built from the 2026_09_01 dump.
+
+### When to refresh
+
+**Never automatically.** Nothing in the app triggers this, on a timer or otherwise -- it is
+a multi-gigabyte download and it is the owner's call. Run it by hand when:
+
+- **osu! reworks pp.** The curve maps pp to rank, so a rework moves both sides at once and
+  the old curve becomes wrong immediately. Do this in the same pass as bumping
+  `PpCalculator.csproj` and running `reingest.mjs`.
+- **Every few months otherwise.** Ranks drift as the playerbase plays on: the same pp buys
+  a slightly worse rank over time. It degrades gradually, so this is not urgent.
+
+data.ppy.sh publishes monthly. `--latest` picks the newest automatically, and re-running
+against a dump you already built from just rewrites the same curve, so it is safe to run
+whenever you are unsure.
+
+Budget roughly 15-30 minutes per mode, depending on your connection -- the bottleneck is
+the download, not the decompression.
 
 ## Recalculating
 
