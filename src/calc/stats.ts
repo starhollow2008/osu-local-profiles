@@ -7,24 +7,40 @@ import type { Grade } from './grade.ts';
 /** osu! weights only the top 100 plays. */
 const TOP_PLAY_LIMIT = 100;
 
-export interface TopPlay {
+/** One score as the profile page renders it. Shared by Top Ranks and Recent Plays. */
+export interface Play {
   id: number;
   beatmapMd5: string;
   beatmapId: number | null;
+  beatmapsetId: number | null;
   artist: string | null;
   title: string | null;
   version: string | null;
   creator: string | null;
-  modsLabel: string;
+  mods: string[];
   accuracy: number;
   maxCombo: number;
+  totalScore: number;
   grade: Grade;
   stars: number | null;
-  pp: number;
-  /** 0.95^index -- how much of this play's pp actually counts. */
-  weight: number;
-  weightedPp: number;
+  pp: number | null;
+  ranked: boolean;
+  passed: boolean;
   playedAt: number;
+  /** 0.95^index -- only set for Top Ranks, where the play's pp is weighted. */
+  weight: number | null;
+  weightedPp: number | null;
+}
+
+export interface MostPlayed {
+  beatmapMd5: string;
+  beatmapId: number | null;
+  beatmapsetId: number | null;
+  artist: string | null;
+  title: string | null;
+  version: string | null;
+  creator: string | null;
+  count: number;
 }
 
 export interface ProfileStats {
@@ -48,6 +64,48 @@ export interface ProfileStats {
 const EMPTY_GRADES = (): Record<Grade, number> => ({
   XH: 0, X: 0, SH: 0, S: 0, A: 0, B: 0, C: 0, D: 0, F: 0,
 });
+
+/** The columns every play row needs, joined to its beatmap. */
+const PLAY_COLUMNS = `s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.accuracy, s.max_combo,
+        s.total_score, s.grade, s.stars, s.ranked, s.passed, s.played_at,
+        b.beatmapset_id, b.artist, b.title, b.version, b.creator`;
+
+type Row = Record<string, string | number | null>;
+
+function toPlay(r: Row): Play {
+  let mods: string[] = [];
+  try {
+    // mods_json holds lazer mod objects; the acronym is all the page needs.
+    mods = (JSON.parse(String(r['mods_json'] ?? '[]')) as { acronym?: string }[])
+      .map((m) => m.acronym ?? '')
+      .filter(Boolean);
+  } catch {
+    /* a malformed row should not take the whole page down */
+  }
+
+  return {
+    id: r['id'] as number,
+    beatmapMd5: r['beatmap_md5'] as string,
+    beatmapId: (r['beatmap_id'] as number | null) ?? null,
+    beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
+    artist: (r['artist'] as string | null) ?? null,
+    title: (r['title'] as string | null) ?? null,
+    version: (r['version'] as string | null) ?? null,
+    creator: (r['creator'] as string | null) ?? null,
+    mods,
+    accuracy: r['accuracy'] as number,
+    maxCombo: r['max_combo'] as number,
+    totalScore: r['total_score'] as number,
+    grade: r['grade'] as Grade,
+    stars: (r['stars'] as number | null) ?? null,
+    pp: (r['pp'] as number | null) ?? null,
+    ranked: r['ranked'] === 1,
+    passed: r['passed'] === 1,
+    playedAt: r['played_at'] as number,
+    weight: null,
+    weightedPp: null,
+  };
+}
 
 /**
  * The best pp score on each distinct beatmap. osu! only ever counts one score per map
@@ -113,7 +171,8 @@ export function computeStats(db: Db, profileId: number, mode: Ruleset): ProfileS
     totalScore: totals.total_score,
     rankedScore: ranked.ranked_score,
     totalHits: totals.total_hits,
-    hitsPerPlay: totals.playcount > 0 ? totals.total_hits / totals.playcount : 0,
+    // osu-web floors this rather than rounding (Stats.getHitsPerPlay).
+    hitsPerPlay: totals.playcount > 0 ? Math.floor(totals.total_hits / totals.playcount) : 0,
     maxCombo: totals.max_combo,
     level: levelFromScore(totals.total_score),
     grades,
@@ -121,12 +180,10 @@ export function computeStats(db: Db, profileId: number, mode: Ruleset): ProfileS
   };
 }
 
-export function topPlays(db: Db, profileId: number, mode: Ruleset, limit = TOP_PLAY_LIMIT): TopPlay[] {
+export function topPlays(db: Db, profileId: number, mode: Ruleset, limit = TOP_PLAY_LIMIT): Play[] {
   const rows = db
     .prepare(
-      `SELECT s.id, s.beatmap_md5, s.beatmap_id, s.mods_label, s.accuracy, s.max_combo,
-              s.grade, s.stars, MAX(s.pp) AS pp, s.played_at,
-              b.artist, b.title, b.version, b.creator
+      `SELECT ${PLAY_COLUMNS}, MAX(s.pp) AS pp
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.mode = ? AND s.ranked = 1 AND s.passed = 1 AND s.pp IS NOT NULL
@@ -134,41 +191,56 @@ export function topPlays(db: Db, profileId: number, mode: Ruleset, limit = TOP_P
         ORDER BY pp DESC
         LIMIT ?`,
     )
-    .all(profileId, mode, limit) as Record<string, string | number | null>[];
+    .all(profileId, mode, limit) as Row[];
 
-  return rows.map((r, i) => ({
-    id: r['id'] as number,
-    beatmapMd5: r['beatmap_md5'] as string,
-    beatmapId: (r['beatmap_id'] as number | null) ?? null,
-    artist: (r['artist'] as string | null) ?? null,
-    title: (r['title'] as string | null) ?? null,
-    version: (r['version'] as string | null) ?? null,
-    creator: (r['creator'] as string | null) ?? null,
-    modsLabel: r['mods_label'] as string,
-    accuracy: r['accuracy'] as number,
-    maxCombo: r['max_combo'] as number,
-    grade: r['grade'] as Grade,
-    stars: (r['stars'] as number | null) ?? null,
-    pp: r['pp'] as number,
-    weight: 0.95 ** i,
-    weightedPp: (r['pp'] as number) * 0.95 ** i,
-    playedAt: r['played_at'] as number,
-  }));
+  return rows.map((r, i) => {
+    const play = toPlay(r);
+    play.weight = 0.95 ** i;
+    play.weightedPp = (play.pp ?? 0) * play.weight;
+    return play;
+  });
 }
 
-export function recentPlays(db: Db, profileId: number, mode: Ruleset, limit = 25) {
-  return db
+export function recentPlays(db: Db, profileId: number, mode: Ruleset, limit = 25): Play[] {
+  const rows = db
     .prepare(
-      `SELECT s.id, s.beatmap_md5, s.beatmap_id, s.mods_label, s.accuracy, s.max_combo,
-              s.grade, s.stars, s.pp, s.played_at, s.passed, s.ranked, s.total_score,
-              b.artist, b.title, b.version, b.creator
+      `SELECT ${PLAY_COLUMNS}, s.pp
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.mode = ?
         ORDER BY s.played_at DESC
         LIMIT ?`,
     )
-    .all(profileId, mode, limit);
+    .all(profileId, mode, limit) as Row[];
+
+  return rows.map(toPlay);
+}
+
+/** osu-web's "Most Played Beatmaps": every attempt counts, passed or not. */
+export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15): MostPlayed[] {
+  const rows = db
+    .prepare(
+      `SELECT s.beatmap_md5, s.beatmap_id, COUNT(*) AS count, MAX(s.played_at) AS last_played,
+              b.beatmapset_id, b.artist, b.title, b.version, b.creator
+         FROM scores s
+         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE s.profile_id = ? AND s.mode = ?
+        GROUP BY s.beatmap_md5
+        ORDER BY count DESC, last_played DESC
+        LIMIT ?`,
+    )
+    .all(profileId, mode, limit) as Row[];
+
+  return rows.map((r) => ({
+    beatmapMd5: r['beatmap_md5'] as string,
+    beatmapId: (r['beatmap_id'] as number | null) ?? null,
+    beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
+    artist: (r['artist'] as string | null) ?? null,
+    title: (r['title'] as string | null) ?? null,
+    version: (r['version'] as string | null) ?? null,
+    creator: (r['creator'] as string | null) ?? null,
+    count: r['count'] as number,
+  }));
 }
 
 /** Which mode to show on load: whichever the most recent tracked play was set on. */
@@ -177,4 +249,12 @@ export function mostRecentMode(db: Db, profileId: number): Ruleset {
     .prepare('SELECT mode FROM scores WHERE profile_id = ? ORDER BY played_at DESC LIMIT 1')
     .get(profileId) as { mode: number } | undefined;
   return ((row?.mode ?? 0) as Ruleset);
+}
+
+/** Modes with at least one tracked play, so the tab bar can mark which are in use. */
+export function modesWithPlays(db: Db, profileId: number): Ruleset[] {
+  const rows = db
+    .prepare('SELECT DISTINCT mode FROM scores WHERE profile_id = ? ORDER BY mode')
+    .all(profileId) as { mode: number }[];
+  return rows.map((r) => r.mode as Ruleset);
 }

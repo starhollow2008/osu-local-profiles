@@ -11,8 +11,13 @@ Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-t
 
 ## Status
 
-Phase 1 — the tracking pipeline works end to end. The web page is functional but plain;
-the osu-web-faithful design is Phase 2.
+Phase 1 — the tracking pipeline works end to end.
+
+Phase 2 (the osu-web-faithful page) is underway: the data the profile page needs is served,
+but the page itself is still the plain Phase 1 one. See
+[docs/phase-2-handoff.md](docs/phase-2-handoff.md) for where it stands and what is next,
+and [docs/osu-web-reference.md](docs/osu-web-reference.md) for the design system it is
+being rebuilt against.
 
 ## Running it
 
@@ -110,6 +115,11 @@ cross-checks, rank estimation). The app works fully without it.
 | `openBrowser` | `true` | open the page on start |
 | `backfill` | `false` | reserved — importing past plays is not implemented yet (Phase 3) |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
+| `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
+| `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
+
+Drop an image at `data/avatar.png` or `data/cover.jpg` (`.jpg`/`.jpeg`/`.png`/`.webp` all
+work) to use it on the profile. Neither is required.
 
 Scores set before the profile was created are never imported — otherwise switching the app
 on would pull in the plays you set with your normal playstyle earlier that day.

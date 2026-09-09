@@ -15,6 +15,13 @@ export interface Config {
   backfill: boolean;
   /** Explicit osu! install paths, when auto-detection needs help. */
   installRoots: string[];
+  /**
+   * Shown beside the profile name, the way osu! shows a country. Two-letter ISO code;
+   * empty means the profile has no country, which is how a fresh profile starts.
+   */
+  country: string;
+  /** What to call the playstyle under the profile name, e.g. "left hand, mouse only". */
+  tagline: string;
 }
 
 const DEFAULTS: Config = {
@@ -23,6 +30,8 @@ const DEFAULTS: Config = {
   openBrowser: true,
   backfill: false,
   installRoots: [],
+  country: '',
+  tagline: '',
 };
 
 export function dataDir(): string {

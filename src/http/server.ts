@@ -6,7 +6,15 @@ import type { Db } from '../db/index.ts';
 import type { Tracker } from '../tracker/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
 import type { Ruleset } from '../osr.ts';
-import { computeStats, mostRecentMode, recentPlays, topPlays } from '../calc/stats.ts';
+import {
+  computeStats,
+  modesWithPlays,
+  mostPlayed,
+  mostRecentMode,
+  recentPlays,
+  topPlays,
+} from '../calc/stats.ts';
+import { buildHistory } from '../calc/history.ts';
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
@@ -16,7 +24,21 @@ const MIME: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
+
+/**
+ * Images the user can drop into `data/` to personalise the profile, in preference order.
+ * Nothing is required: without them the page draws its own avatar and uses the cover of
+ * the profile's best play.
+ */
+const LOCAL_IMAGES: Record<string, string[]> = {
+  avatar: ['avatar.png', 'avatar.jpg', 'avatar.jpeg', 'avatar.webp'],
+  cover: ['cover.jpg', 'cover.png', 'cover.jpeg', 'cover.webp'],
 };
 
 export interface ServerOptions {
@@ -25,11 +47,22 @@ export interface ServerOptions {
   installs: OsuInstall[];
   profileId: number;
   profileName: string;
+  country: string;
+  tagline: string;
+  dataDir: string;
   port: number;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
   const sseClients = new Set<http.ServerResponse>();
+
+  const localImage = (kind: string): string | null => {
+    for (const name of LOCAL_IMAGES[kind] ?? []) {
+      const file = path.join(opts.dataDir, name);
+      if (fs.existsSync(file)) return file;
+    }
+    return null;
+  };
 
   const broadcast = (event: string, data: unknown) => {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -59,10 +92,23 @@ export function startServer(opts: ServerOptions): http.Server {
 
     if (url.pathname === '/api/state') {
       return json(res, {
-        profile: { id: opts.profileId, name: opts.profileName },
+        profile: {
+          id: opts.profileId,
+          name: opts.profileName,
+          country: opts.country,
+          tagline: opts.tagline,
+          createdAt: (
+            opts.db
+              .prepare('SELECT created_at FROM profiles WHERE id = ?')
+              .get(opts.profileId) as { created_at: number }
+          ).created_at,
+          hasAvatar: localImage('avatar') !== null,
+          hasCover: localImage('cover') !== null,
+        },
         tracking: opts.tracker.isTracking,
         scoresThisSession: opts.tracker.scoresAdded,
         defaultMode: mostRecentMode(opts.db, opts.profileId),
+        modesWithPlays: modesWithPlays(opts.db, opts.profileId),
         installs: opts.installs.map((i) => ({
           kind: i.kind,
           root: i.root,
@@ -73,12 +119,39 @@ export function startServer(opts: ServerOptions): http.Server {
 
     if (url.pathname === '/api/profile') {
       const mode = (Number(url.searchParams.get('mode') ?? '0') || 0) as Ruleset;
+      const history = buildHistory(opts.db, opts.profileId, mode);
       return json(res, {
         mode,
         stats: computeStats(opts.db, opts.profileId, mode),
         top: topPlays(opts.db, opts.profileId, mode, 100),
         recent: recentPlays(opts.db, opts.profileId, mode, 25),
+        mostPlayed: mostPlayed(opts.db, opts.profileId, mode, 15),
+        ppHistory: history.pp,
+        monthlyPlaycounts: history.monthlyPlaycounts,
+        events: history.events,
       });
+    }
+
+    // data/avatar.* and data/cover.*, served only if the user put one there.
+    const image = /^\/api\/image\/(avatar|cover)$/.exec(url.pathname);
+    if (image) {
+      const file = localImage(image[1]!);
+      if (!file) {
+        res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
+        return;
+      }
+      fs.readFile(file, (err, buf) => {
+        if (err) {
+          res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
+          return;
+        }
+        res.writeHead(200, {
+          'content-type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
+          'cache-control': 'no-cache',
+        });
+        res.end(buf);
+      });
+      return;
     }
 
     if (url.pathname === '/api/profile/reset' && req.method === 'POST') {
@@ -174,7 +247,9 @@ export function startServer(opts: ServerOptions): http.Server {
         res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
         return;
       }
-      res.writeHead(200, { 'content-type': MIME[path.extname(file)] ?? 'application/octet-stream' });
+      res.writeHead(200, {
+        'content-type': MIME[path.extname(file).toLowerCase()] ?? 'application/octet-stream',
+      });
       res.end(buf);
     });
   });

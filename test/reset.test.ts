@@ -47,6 +47,9 @@ function harness(): Harness {
     installs: [],
     profileId,
     profileName: 'Reset Test',
+    country: '',
+    tagline: '',
+    dataDir: tmp,
     port: 0, // ephemeral
   });
   const { port } = server.address() as AddressInfo;

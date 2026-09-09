@@ -109,6 +109,9 @@ async function main(): Promise<void> {
     installs,
     profileId,
     profileName: config.profileName,
+    country: config.country,
+    tagline: config.tagline,
+    dataDir: dataDir(),
     port: config.port,
   });
 
