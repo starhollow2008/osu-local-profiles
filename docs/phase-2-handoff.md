@@ -1,116 +1,89 @@
-# Phase 2 handoff — the osu-web-faithful profile page
+# Phase 2 — the osu-web-faithful profile page
 
-*Written 2026-09-09, mid-phase. Backend work is done and green; the frontend rebuild has
-not started. Read `docs/osu-web-reference.md` first — it holds the design facts, and
-re-deriving them costs a dozen network round trips.*
+*Status: built. `npm run check` → 21 tests; `npm run ui` → 19 checks. See
+`docs/osu-web-reference.md` for the design system it implements.*
 
 ## Decisions settled with the user
 
-These close the open questions the plan flagged. They are settled; do not reopen them.
+1. **Vanilla ES modules, no build step** — not Vite + React. `npm run dev` stays instant,
+   Phase 4's single-`.exe` packaging is unaffected, and `npm run ui` keeps working. The
+   page is data-in/DOM-out with SSE triggering a refetch, so React bought little.
+2. **Local-first assets, CDN when online.** Grade badges, mod pills, the level hexagon and
+   the avatar are generated inline SVG. Beatmap covers come from `assets.ppy.sh` keyed by
+   the `beatmapset_id` resolved offline, and are set as backgrounds so a failed request
+   leaves the placeholder colour rather than a broken image. Covers cannot come from
+   lazer's local store: it names files by SHA-256 and the mapping lives in its Realm DB.
+3. **First Place Ranks is omitted** — a local profile has no leaderboard to be #1 on.
 
-1. **Frontend stays hand-written — vanilla ES modules, no build step.** Not Vite + React.
-   Reasoning: `npm run dev` stays instant, Phase 4's single-`.exe` packaging is unaffected,
-   the page is data-in/DOM-out with SSE triggering a refetch, and `npm run ui` keeps
-   working unchanged. Split `web/` into real `.css` and `.js` module files rather than one
-   monolithic `index.html`.
+## What is there
 
-2. **Assets are local-first, CDN when online.** Grade badges, mod pills, the level
-   hexagon and the country flag are generated inline SVG so they always render. Beatmap
-   cover art comes from `assets.ppy.sh` keyed by the `beatmapset_id` we already resolve
-   offline, and **must** fall back to a generated gradient card on `error`. Note that
-   covers cannot be pulled from lazer's local store — it names files by SHA-256 and the
-   filename mapping lives in its Realm DB — so this is the only source for lazer users.
+### Backend
 
-3. **First Place Ranks is omitted.** A local fresh profile has no leaderboard to be #1 on.
-   Top Ranks shows Best Performance only.
-
-## What is already done (uncommitted, on `phase-1-tracking`)
-
-`npm run check` → **21 tests, 0 failures**. The old `web/index.html` still works against
-the new API, so the tree is in a runnable state.
-
-| file | change |
+| file | role |
 |---|---|
-| `src/calc/stats.ts` | rewritten. One normalised `Play` shape shared by Top Ranks and Recent Plays (camelCase, mods parsed to acronym arrays, `beatmapset_id` joined in for cover art). Added `mostPlayed()` and `modesWithPlays()`. `hitsPerPlay` now floors, matching osu-web. |
-| `src/calc/history.ts` | **new.** One chronological pass over the profile's scores yields three things the page needs: a daily total-pp series for the chart, monthly play counts for the Historical bar chart, and an activity feed (`first` / `level` / `best` events) for the Recent section. Replayed from scores rather than read from `snapshots`, because snapshots would be wrong after a reingest. |
-| `src/http/server.ts` | `/api/profile` now also returns `mostPlayed`, `ppHistory`, `monthlyPlaycounts`, `events`. `/api/state` returns `country`, `tagline`, `createdAt`, `hasAvatar`, `hasCover`, `modesWithPlays`. New `/api/image/{avatar,cover}` serves an optional user-supplied image from `data/`. MIME map gained jpg/jpeg/webp/woff2. |
-| `src/config.ts` | added `country` (2-letter ISO, empty by default) and `tagline` (what to call the playstyle). |
-| `src/main.ts` | passes the new options through to `startServer`. |
-| `test/reset.test.ts` | updated for the widened `ServerOptions`. |
-| `docs/osu-web-reference.md` | **new.** The extracted design system. |
+| `src/calc/stats.ts` | one normalised `Play` shape shared by Top Ranks and Recent Plays (mod acronyms, `beatmapset_id` for cover art), plus `mostPlayed()` and `modesWithPlays()`. `hitsPerPlay` floors, matching osu-web. |
+| `src/calc/history.ts` | one chronological pass over the profile's scores yielding the daily pp series, monthly play counts, and the activity feed. Replayed from scores rather than read from `snapshots`, which would be wrong after a reingest. |
+| `src/http/server.ts` | `/api/profile` adds `mostPlayed`, `ppHistory`, `monthlyPlaycounts`, `events`. `/api/state` adds `country`, `tagline`, `createdAt`, `hasAvatar`, `hasCover`, `modesWithPlays`. `/api/image/{avatar,cover}` serves an optional user image from `data/`. |
+| `src/config.ts` | `country` (two-letter ISO) and `tagline`. |
 
-## Next steps, in order
-
-### 1. Write the CSS token layer
-
-`web/css/tokens.css` — the full `--hsl-*` table from the reference doc, driven by
-`--base-hue: 333`. **Phase 1's page used the `d*` family; the profile page is built on
-`b*`.** Fixing that is most of what makes it stop looking "off".
-
-Also carry over, unchanged, the fix that `npm run ui` exists to protect:
-
-```css
-[hidden] { display: none !important; }
-```
-
-A shipped bug once cost a user their tracked scores because `.backdrop { display: grid }`
-outranked the browser's low-specificity `[hidden]`. Keep the global rule, keep the check.
-
-### 2. Build the page as ES modules
-
-Planned layout — nothing here is written yet:
+### Frontend
 
 ```
-web/index.html          shell markup only
-web/css/tokens.css      the --hsl-* system + named colours + font sizes
-web/css/base.css        reset, font stack, page container
-web/css/profile.css     the BEM-ish components below
-web/js/format.js        number / percent / relative-time formatting, escapeHtml
-web/js/badges.js        grade badge SVG, mod pills, level hexagon, cover URLs
-web/js/charts.js        inline-SVG line chart (pp) + bar chart (monthly playcounts)
-web/js/sections.js      play row, most-played row, section builders
-web/js/main.js          state, mode tabs, SSE wiring, options menu, reset dialog
+web/index.html          shell markup; JS fills it by id
+web/css/tokens.css      the --hsl-* system, named colours, metrics, font sizes
+web/css/base.css        reset, font stack, [hidden] rule, small utilities
+web/css/profile.css     the components, named after osu-web's so the two read side by side
+web/js/format.js        number / percent / relative-time formatting
+web/js/badges.js        grade badges, mod pills, level hexagon, avatar, cover URLs
+web/js/charts.js        inline-SVG pp line chart and monthly playcount bars
+web/js/sections.js      score row, most-played row, activity row
+web/js/main.js          state, mode tabs, SSE, options menu, reset dialog
 ```
 
-The server already serves subdirectories and the right MIME types.
+Sections, in page order: header (cover, avatar, name, mode tabs) · ranking panel (global
+and country rank, pp chart, pp / ranked beatmaps / bonus pp, grade badges, stats box) ·
+level bar · Recent · Top Ranks → Best Performance · Historical → Monthly Playcounts, Most
+Played Beatmaps, Recent Plays.
 
-Font stack: keep `Torus` first so a locally installed copy is used, then a geometric sans
-fallback. Torus is commercially licensed and must not be bundled.
+## Things worth knowing before changing it
 
-### 3. Sections to build, matching the reference doc's skeleton
+- **`--hsl-b*`, not `--hsl-d*`.** Two dark families exist and they are not
+  interchangeable. Getting this wrong is the single most likely fidelity regression, so
+  `npm run ui` asserts four surfaces resolve to their literal token colours. A mistyped
+  custom property makes the whole declaration invalid at computed-value time and the
+  element silently falls back to transparent, which reads as a slightly-off shade rather
+  than as an error.
+- **`var()` does not work in SVG presentation attributes.** `stop-color="hsl(var(--x))"`
+  is silently dropped; `style="stop-color: hsl(var(--x))"` works, because inline style is
+  parsed as CSS. The pp chart's gradient depends on this.
+- **The charts stretch with `preserveAspectRatio="none"`**, so anything round would come
+  out elliptical and any text sheared. Axis labels are HTML siblings, strokes use
+  `vector-effect="non-scaling-stroke"`, and there are no dots.
+- **Section headings must stay block-level.** They were `inline-block` at first, which
+  flowed "Top Ranks" and "Best Performance" onto the same line, overlapping. `npm run ui`
+  asserts they stack.
+- **Keep `[hidden] { display: none !important }`** in `base.css` and keep the dialog
+  checks. That rule exists because a `display: grid` backdrop once outranked the browser's
+  low-specificity `[hidden]`, leaving the reset dialog open on load with Cancel, Escape
+  and backdrop-click all apparently dead — so the destructive button was the only one that
+  worked, and it cost a user their tracked scores.
+- **Torus stays first in the font stack** so a locally installed copy is picked up. It is
+  commercially licensed and must never be bundled.
 
-- **Header** — cover, avatar, name, country pill, tagline. Cover falls back to the
-  beatmapset cover of the profile's best play, then to a gradient. Avatar is generated
-  unless `data/avatar.*` exists. Keep the existing tracking dot / pause button and the
-  options menu (they are ours, not osu-web's, but they have to live somewhere).
-- **Gamemode tabs** — bottom-right of the cover, defaulting to `defaultMode` from
-  `/api/state`. Mode glyphs come from osu-web's icon font, which we cannot ship: use text
-  labels.
-- **Ranking panel** — Global / Country Ranking both render `-` (rank estimation is
-  Phase 3), pp, the chart slot, and the grade badge row.
-- **Chart** — osu-web plots global rank over 90 days. We have no rank, so plot
-  `ppHistory` and label it accordingly; use osu-web's `__empty-chart` "unranked" empty
-  state when there is no data.
-- **Stats box** — the `.profile-stats` dl, minus `play_time` (v1 omits it, and we do not
-  track it) and minus `replays_watched_by_others` (not applicable).
-- **Level bar** — `.profile-detail-bar`, bar plus hexagon.
-- **Recent** — the activity feed from `events`.
-- **Top Ranks** — Best Performance, from `top`, with pp weighting shown.
-- **Historical** — monthly playcount bar chart, Most Played Beatmaps, Recent Plays.
+## Deliberate gaps, and how the page handles them
 
-### 4. Verify in a real browser
+| gap | on screen |
+|---|---|
+| Global and country rank (Phase 3 — osu!'s rankings API only exposes the top 10k) | `-`, with a tooltip |
+| No rank history to plot | the chart shows total pp instead, which a fresh profile does have |
+| Play time is not tracked | omitted from the stats box, which osu-web's v1 layout also does |
+| Replays watched by others | omitted; not applicable to a local profile |
+| Mod settings, e.g. DT at 1.3x | parsed and stored, shown only as the mod acronym |
+| A beatmap that was never downloaded has no local `.osu` | the pp cell shows `-` with a tooltip saying why |
 
-`npm run dev` in one terminal, then `npm run ui`. Extend `scripts/ui-check.mjs` with
-computed-style assertions for anything new that toggles visibility, and for the token
-layer actually resolving (e.g. that `.page-extra` computes to the `b4` background rather
-than a fallback, which is how a typo'd `--hsl-*` var shows up).
+## Ideas not taken
 
-There are two real tracked scores in `data/profiles.db` to render against — enough to
-exercise every section but not enough to judge list density.
-
-## Still deferred to Phase 3, so the page must degrade gracefully
-
-- Global and country rank (osu!'s rankings API only exposes the top 10k).
-- Mod settings, e.g. DT at 1.3× — parsed and stored, not surfaced.
-- Play time — not tracked at all.
-- A beatmap that was never downloaded has no local `.osu`, so it has no pp or stars.
+- Real country flags from osu!'s flag CDN. The two-letter code pill is offline-safe and
+  needs no per-country asset; wire the image in behind it if it turns out to matter.
+- Hover tooltips on the pp chart. It would need real coordinates, which the
+  stretch-to-fit approach deliberately gives up.

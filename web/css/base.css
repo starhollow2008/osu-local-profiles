@@ -1,0 +1,88 @@
+* {
+  box-sizing: border-box;
+}
+
+/*
+ * The browser hides [hidden] elements with a very low-specificity `display: none`, so any
+ * class that sets its own display (a `display: grid` backdrop, say) silently defeats it.
+ * This makes the attribute authoritative, which is what all the toggling code assumes.
+ *
+ * This is not a nicety. A shipped bug where `.backdrop` set `display: grid` on the element
+ * it also toggled with [hidden] left the reset dialog visible on load with Cancel, Escape
+ * and backdrop-click all apparently dead -- so the destructive button was the only one
+ * that worked, and it cost a user their tracked scores. `npm run ui` checks this.
+ */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  font-family: var(--font-default);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 80ms linear;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 400;
+  margin: 0;
+}
+
+dl,
+dd,
+dt {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* --- shared utilities --------------------------------------------------- */
+
+.u-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.u-page {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+}
+
+.u-gutter {
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.u-text-shadow {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+.u-empty {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-title-small);
+  padding: 10px 0 4px;
+}

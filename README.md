@@ -11,13 +11,15 @@ Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-t
 
 ## Status
 
-Phase 1 — the tracking pipeline works end to end.
+Phases 1 and 2 are done: scores are tracked live, and the page is rebuilt to match
+`osu.ppy.sh`'s profile design.
 
-Phase 2 (the osu-web-faithful page) is underway: the data the profile page needs is served,
-but the page itself is still the plain Phase 1 one. See
-[docs/phase-2-handoff.md](docs/phase-2-handoff.md) for where it stands and what is next,
-and [docs/osu-web-reference.md](docs/osu-web-reference.md) for the design system it is
-being rebuilt against.
+[docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
+built on -- osu-web's colour tokens, metrics and layout -- and
+[docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
+handles deliberately, and what to know before changing it.
+
+Global and country rank are still unimplemented and show `-`; see Known gaps.
 
 ## Running it
 
@@ -132,6 +134,10 @@ npm test
 npm run check        # both
 npm run ui           # drives the real page in headless Chrome (app must be running)
 ```
+
+The page is plain HTML, CSS and ES modules with **no build step** -- edit `web/` and
+reload. `npm run ui` covers both the dialog behaviour below and the design tokens actually
+resolving, since a mistyped custom property fails silently as a slightly-off shade.
 
 `npm run ui` exists because some bugs only show up in computed style. The reset dialog once
 set `display: grid` on the element it also toggled with the `hidden` attribute; `hidden`

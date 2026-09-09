@@ -161,6 +161,55 @@ await evaluate(
 );
 check('Escape closes it', await shown('resetModal'), 'none');
 
+/*
+ * The token layer. A mistyped custom property (--hsl-b4 -> --hsl-b44) makes the whole
+ * declaration invalid at computed-value time, so the element falls back to transparent --
+ * which reads as a slightly-off shade rather than as an error. Comparing the computed
+ * background against the literal colour it is supposed to resolve to catches that.
+ */
+const literal = (colour) => evaluate(`(() => {
+  const d = document.createElement('div');
+  d.style.backgroundColor = ${JSON.stringify(colour)};
+  document.body.appendChild(d);
+  const v = getComputedStyle(d).backgroundColor;
+  d.remove();
+  return v;
+})()`);
+
+const bg = (sel) =>
+  evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(sel)})).backgroundColor`);
+
+console.log('\nosu-web colour tokens resolve');
+check('page background is b6', await bg('body'), await literal('hsl(333, 10%, 10%)'));
+check('header is b3', await bg('.profile-info'), await literal('hsl(333, 10%, 25%)'));
+check('section panel is b4', await bg('.page-extra'), await literal('hsl(333, 10%, 20%)'));
+check('stats box is b4', await bg('.profile-stats'), await literal('hsl(333, 10%, 20%)'));
+
+console.log('\nthe page rendered');
+check('four game modes', await evaluate("document.querySelectorAll('#modes a').length"), 4);
+check(
+  'five grade counts',
+  await evaluate("document.querySelectorAll('.profile-rank-count__item').length"),
+  5,
+);
+check(
+  'stats box filled in',
+  await evaluate("document.querySelectorAll('#profileStats .profile-stats__entry').length"),
+  7,
+);
+check('three sections', await evaluate("document.querySelectorAll('.page-extra').length"), 3);
+// Consecutive headings must stack: they were inline-block once, which overlapped
+// "Top Ranks" with "Best Performance".
+check(
+  'section headings stack',
+  await evaluate(`(() => {
+    const t = document.querySelector('#section-top_ranks .title');
+    const s = document.querySelector('#section-top_ranks .title--sub');
+    return s.getBoundingClientRect().top >= t.getBoundingClientRect().bottom;
+  })()`),
+  true,
+);
+
 const failed = checks.filter((c) => !c).length;
 console.log(`\n${checks.length - failed}/${checks.length} checks passed`);
 

@@ -4,282 +4,127 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>osu! fresh profile</title>
-<style>
-/*
- * osu-web builds its palette from a single base hue (osu! pink = 333) with fixed
- * saturation/lightness steps. Reproducing that system here keeps the colour
- * relationships identical without copying any of their (AGPL) stylesheets.
- */
-:root {
-  --hue: 333;
-  --p:  hsl(var(--hue) 100% 50%);
-  --h1: hsl(var(--hue) 100% 70%);
-  --c1: hsl(var(--hue)  40% 100%);
-  --l1: hsl(var(--hue)  40% 80%);
-  --l3: hsl(var(--hue)  40% 70%);
-  --l4: hsl(var(--hue)  40% 50%);
-  --d1: hsl(var(--hue)  20% 35%);
-  --d2: hsl(var(--hue)  20% 30%);
-  --d3: hsl(var(--hue)  20% 25%);
-  --d4: hsl(var(--hue)  20% 20%);
-  --d5: hsl(var(--hue)  20% 15%);
-  --d6: hsl(var(--hue)  20% 11%);
-
-  --grade-x:  #ffd966;
-  --grade-xh: #e0e0e0;
-  --grade-s:  #ffd966;
-  --grade-sh: #e0e0e0;
-  --grade-a:  #88da20;
-  --grade-b:  #66ccff;
-  --grade-c:  #ff9966;
-  --grade-d:  #ff6666;
-  --grade-f:  #888888;
-}
-
-* { box-sizing: border-box; }
-
-/*
- * The browser hides [hidden] elements with a very low-specificity `display: none`, so any
- * class that sets its own display (`.backdrop` uses grid) silently defeats it. This makes
- * the attribute authoritative, which is what the toggling code assumes.
- */
-[hidden] { display: none !important; }
-
-body {
-  margin: 0;
-  background: var(--d6);
-  color: var(--c1);
-  font: 14px/1.5 "Inter", "Nunito Sans", "Segoe UI", system-ui, sans-serif;
-}
-a { color: var(--h1); }
-
-.wrap { max-width: 1100px; margin: 0 auto; padding: 0 16px 64px; }
-
-/* --- header ------------------------------------------------------------ */
-.cover {
-  position: relative;
-  background: linear-gradient(hsl(var(--hue) 30% 18% / .85), hsl(var(--hue) 20% 11% / .95)),
-              linear-gradient(135deg, var(--d3), var(--d5));
-  border-bottom: 1px solid hsl(var(--hue) 20% 25%);
-}
-.cover-inner { max-width: 1100px; margin: 0 auto; padding: 28px 16px 0; }
-.identity { display: flex; align-items: center; gap: 16px; }
-.avatar {
-  width: 88px; height: 88px; border-radius: 12px;
-  background: var(--d3) center/cover;
-  display: grid; place-items: center;
-  font-size: 30px; color: var(--l4);
-}
-.who h1 { margin: 0; font-size: 26px; font-weight: 700; }
-.who .sub { color: var(--d1); font-size: 13px; }
-
-.status { margin-left: auto; text-align: right; }
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-.dot.on  { background: #88da20; box-shadow: 0 0 8px #88da20; }
-.dot.off { background: #ff6666; }
-.status button {
-  margin-top: 8px; display: block; margin-left: auto;
-  background: var(--d3); color: var(--c1); border: 1px solid var(--d2);
-  border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit;
-}
-.status button:hover { background: var(--d2); }
-
-/* --- options menu ------------------------------------------------------ */
-.topbar { position: absolute; top: 14px; right: 16px; }
-.menu-wrap { position: relative; }
-.menu-wrap > button {
-  background: var(--d4); color: var(--c1); border: 1px solid var(--d3);
-  border-radius: 6px; padding: 7px 13px; cursor: pointer; font: inherit;
-}
-.menu-wrap > button:hover { background: var(--d3); }
-.menu {
-  position: absolute; right: 0; top: calc(100% + 6px); min-width: 210px;
-  background: var(--d4); border: 1px solid var(--d3); border-radius: 8px;
-  padding: 5px; box-shadow: 0 10px 30px #000a; z-index: 40;
-}
-.menu button {
-  display: block; width: 100%; text-align: left; background: none; border: 0;
-  color: var(--c1); font: inherit; padding: 9px 11px; border-radius: 5px; cursor: pointer;
-}
-.menu button:hover { background: var(--d3); }
-.menu button.danger { color: var(--grade-d); }
-.menu button.danger:hover { background: hsl(0 40% 24%); }
-.menu .sep { height: 1px; background: var(--d3); margin: 5px 3px; }
-.menu .note { padding: 6px 11px 8px; color: var(--d1); font-size: 12px; }
-
-/* --- modal -------------------------------------------------------------- */
-.backdrop {
-  position: fixed; inset: 0; background: #000b; z-index: 50;
-  display: grid; place-items: center; padding: 20px;
-}
-.modal {
-  background: var(--d5); border: 1px solid var(--d3); border-radius: 10px;
-  padding: 22px; max-width: 460px; width: 100%;
-  box-shadow: 0 20px 60px #000c;
-}
-.modal h3 { margin: 0 0 10px; font-size: 17px; }
-.modal p { margin: 0 0 12px; color: var(--l1); }
-.modal .warn {
-  background: hsl(0 35% 18%); border-left: 3px solid var(--grade-d);
-  border-radius: 5px; padding: 10px 12px; color: var(--c1); font-size: 13px;
-}
-.modal ul { margin: 8px 0 0; padding-left: 18px; color: var(--l1); font-size: 13px; }
-.modal .actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 18px; }
-.modal .actions button {
-  border: 1px solid var(--d2); background: var(--d3); color: var(--c1);
-  border-radius: 6px; padding: 9px 15px; cursor: pointer; font: inherit;
-}
-.modal .actions button:hover { background: var(--d2); }
-.modal .actions button.danger {
-  background: #a11; border-color: #c33; color: #fff; font-weight: 600;
-}
-.modal .actions button.danger:hover { background: #c22; }
-.modal .actions button:disabled { opacity: .5; cursor: default; }
-
-/* --- mode tabs --------------------------------------------------------- */
-.modes { display: flex; gap: 4px; margin-top: 20px; }
-.modes button {
-  background: none; border: 0; border-bottom: 3px solid transparent;
-  color: var(--d1); font: inherit; padding: 10px 16px; cursor: pointer;
-}
-.modes button.active { color: var(--c1); border-bottom-color: var(--p); }
-.modes button:hover { color: var(--l1); }
-
-/* --- panels ------------------------------------------------------------ */
-.panel { background: var(--d5); border-radius: 8px; padding: 20px; margin-top: 20px; }
-.panel > h2 {
-  margin: 0 0 16px; font-size: 13px; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .06em; color: var(--d1);
-}
-
-.headline { display: flex; flex-wrap: wrap; gap: 32px; align-items: baseline; }
-.headline .big { font-size: 34px; font-weight: 700; line-height: 1; }
-.headline .big small { font-size: 15px; color: var(--d1); font-weight: 400; margin-left: 3px; }
-.headline .label { color: var(--d1); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
-
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 24px; }
-.stat { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0;
-        border-bottom: 1px solid hsl(var(--hue) 20% 18%); }
-.stat span:first-child { color: var(--d1); }
-.stat span:last-child { font-weight: 600; }
-
-/* level bar */
-.level { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
-.level .badge {
-  min-width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
-  background: var(--d3); font-weight: 700; font-size: 13px;
-}
-.level .bar { flex: 1; height: 6px; background: var(--d4); border-radius: 3px; overflow: hidden; }
-.level .bar i { display: block; height: 100%; background: var(--p); }
-
-/* grades */
-.grades { display: flex; flex-wrap: wrap; gap: 22px; }
-.grades div { text-align: center; }
-.grades .g { font-weight: 800; font-size: 17px; letter-spacing: .02em; }
-.grades .n { color: var(--d1); font-size: 13px; }
-
-/* --- score rows -------------------------------------------------------- */
-.rows { display: flex; flex-direction: column; }
-.row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 9px 10px; border-radius: 6px;
-}
-.row:nth-child(odd) { background: hsl(var(--hue) 20% 13%); }
-.row .grade { width: 26px; font-weight: 800; text-align: center; flex: none; }
-.row .name { flex: 1; min-width: 0; }
-.row .name b { font-weight: 600; }
-.row .name .diff { color: var(--d1); }
-.row .name div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.row .meta { color: var(--d1); font-size: 12px; }
-.row .mods { color: var(--h1); font-weight: 600; font-size: 12px; flex: none; }
-.row .acc { width: 66px; text-align: right; color: var(--l3); flex: none; }
-.row .pp  { width: 92px; text-align: right; flex: none; }
-.row .pp b { font-size: 15px; font-weight: 700; }
-.row .pp small { color: var(--d1); display: block; font-size: 11px; }
-
-.empty { color: var(--d1); padding: 22px 4px; }
-.toast {
-  position: fixed; right: 18px; bottom: 18px; background: var(--d3);
-  border-left: 3px solid var(--p); border-radius: 6px; padding: 10px 14px;
-  box-shadow: 0 6px 24px #0008; opacity: 0; transform: translateY(8px);
-  transition: opacity .2s, transform .2s;
-}
-.toast.show { opacity: 1; transform: none; }
-</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23ff66ab' stroke-width='5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/profile.css">
 </head>
 <body>
 
-<div class="cover">
-  <div class="topbar">
-    <div class="menu-wrap">
-      <button id="optionsBtn" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
-      <div class="menu" id="optionsMenu" hidden>
-        <button id="optReset" class="danger">Reset profile</button>
-        <div class="sep"></div>
-        <div class="note" id="optInfo">&nbsp;</div>
+<header class="profile-info">
+  <div class="profile-info__bg" id="cover">
+    <div class="profile-info__bg-actions">
+      <button class="tracking-pill" id="toggle" type="button">
+        <span class="tracking-pill__dot"></span><span id="tracklabel">not tracking</span>
+      </button>
+      <div class="menu-wrap">
+        <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
+        <div class="menu" id="optionsMenu" hidden>
+          <button id="optReset" class="danger" type="button">Reset profile</button>
+          <div class="sep"></div>
+          <div class="note" id="optInfo">&nbsp;</div>
+        </div>
       </div>
     </div>
   </div>
-  <div class="cover-inner">
-    <div class="identity">
-      <div class="avatar">?</div>
-      <div class="who">
-        <h1 id="pname">Fresh Profile</h1>
-        <div class="sub" id="psub">starting from zero</div>
+
+  <div class="profile-info__details band">
+    <div class="band__inner profile-info__details-inner">
+      <div class="profile-info__avatar" id="avatar"></div>
+      <div class="profile-info__info">
+        <h1 class="profile-info__name u-ellipsis u-text-shadow" id="pname">Fresh Profile</h1>
+        <div class="profile-info__flags u-text-shadow" id="pflags"></div>
       </div>
-      <div class="status">
-        <div><span class="dot off" id="dot"></span><span id="tracklabel">not tracking</span></div>
-        <button id="toggle">Pause tracking</button>
+      <nav class="game-mode" id="modes" aria-label="Game mode"></nav>
+    </div>
+  </div>
+</header>
+
+<section class="profile-detail band">
+  <div class="band__inner profile-detail-stats">
+    <div>
+      <div class="profile-detail-stats__chart-numbers profile-detail-stats__chart-numbers--top">
+        <div class="profile-detail-stats__values">
+          <div class="value-display value-display--rank">
+            <div class="value-display__label">Global Ranking</div>
+            <div class="value-display__value" id="globalRank" title="Rank estimation is not implemented yet">-</div>
+          </div>
+          <div class="value-display value-display--rank">
+            <div class="value-display__label">Country Ranking</div>
+            <div class="value-display__value" id="countryRank" title="Rank estimation is not implemented yet">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-detail-stats__chart" id="ppChart"></div>
+
+      <div class="profile-detail-stats__chart-numbers">
+        <div class="profile-detail-stats__values profile-detail-stats__values--grid">
+          <div class="value-display value-display--plain">
+            <div class="value-display__label">pp</div>
+            <div class="value-display__value" id="totalPp">0</div>
+          </div>
+          <div class="value-display value-display--plain">
+            <div class="value-display__label">Ranked Beatmaps</div>
+            <div class="value-display__value" id="rankedMaps">0</div>
+          </div>
+          <div class="value-display value-display--plain">
+            <div class="value-display__label">Bonus pp</div>
+            <div class="value-display__value" id="bonusPp">0</div>
+          </div>
+        </div>
+        <div class="profile-detail-stats__values">
+          <div class="profile-rank-count" id="gradeCounts"></div>
+        </div>
       </div>
     </div>
-    <div class="modes" id="modes"></div>
+
+    <div class="profile-detail-stats__separator"></div>
+
+    <dl class="profile-stats" id="profileStats"></dl>
+  </div>
+</section>
+
+<div class="profile-detail-bar band">
+  <div class="band__inner profile-detail-bar__inner">
+    <div class="profile-detail-bar__level">
+      <div class="profile-detail-bar__level-bar">
+        <div class="bar">
+          <div class="bar__fill" id="levelFill"></div>
+          <div class="bar__text" id="levelText">0%</div>
+        </div>
+      </div>
+      <div id="levelBadge"></div>
+    </div>
   </div>
 </div>
 
-<div class="wrap">
-  <div class="panel">
-    <div class="headline">
-      <div>
-        <div class="big"><span id="rank">#--</span></div>
-        <div class="label">Global Ranking</div>
-      </div>
-      <div>
-        <div class="big"><span id="pp">0</span><small>pp</small></div>
-        <div class="label">Performance</div>
-      </div>
-      <div>
-        <div class="big"><span id="acc">0.00</span><small>%</small></div>
-        <div class="label">Hit Accuracy</div>
-      </div>
-      <div>
-        <div class="big"><span id="plays">0</span></div>
-        <div class="label">Play Count</div>
-      </div>
-    </div>
+<nav class="page-mode band" aria-label="Profile sections">
+  <div class="band__inner page-mode__inner" id="sectionTabs"></div>
+</nav>
 
-    <div class="level">
-      <div class="badge" id="lvl">1</div>
-      <div class="bar"><i id="lvlbar" style="width:0%"></i></div>
-      <div class="meta" id="lvlpct">0%</div>
-    </div>
-  </div>
+<main class="user-profile-pages">
+  <section class="page-extra" id="section-recent">
+    <h2 class="title">Recent</h2>
+    <div id="recentActivity"></div>
+  </section>
 
-  <div class="panel">
-    <h2>Statistics</h2>
-    <div class="grid" id="stats"></div>
-    <div class="grades" id="grades" style="margin-top:18px"></div>
-  </div>
+  <section class="page-extra" id="section-top_ranks">
+    <h2 class="title">Top Ranks</h2>
+    <h3 class="title title--sub">Best Performance<span class="title__count" id="topCount">0</span></h3>
+    <div id="topRanks"></div>
+  </section>
 
-  <div class="panel">
-    <h2>Top Ranks</h2>
-    <div class="rows" id="top"><div class="empty">No ranked plays tracked yet.</div></div>
-  </div>
-
-  <div class="panel">
-    <h2>Recent Plays</h2>
-    <div class="rows" id="recent"><div class="empty">Nothing yet - go set a play.</div></div>
-  </div>
-</div>
+  <section class="page-extra" id="section-historical">
+    <h2 class="title">Historical</h2>
+    <h3 class="title title--sub title--sub-first">Monthly Playcounts</h3>
+    <div class="page-extra__chart" id="playcountChart"></div>
+    <h3 class="title title--sub">Most Played Beatmaps<span class="title__count" id="mostPlayedCount">0</span></h3>
+    <div id="mostPlayed"></div>
+    <h3 class="title title--sub">Recent Plays<span class="title__count" id="recentCount">0</span></h3>
+    <div id="recentPlays"></div>
+  </section>
+</main>
 
 <div class="toast" id="toast"></div>
 
@@ -297,224 +142,12 @@ a { color: var(--h1); }
       <li>Your osu! account and your replay files are not touched</li>
     </ul>
     <div class="actions">
-      <button id="resetCancel">Cancel</button>
-      <button id="resetConfirm" class="danger">Erase and start fresh</button>
+      <button id="resetCancel" type="button">Cancel</button>
+      <button id="resetConfirm" class="danger" type="button">Erase and start fresh</button>
     </div>
   </div>
 </div>
 
-<script>
-const MODES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
-const $ = (id) => document.getElementById(id);
-let mode = 0;
-let tracking = false;
-
-const fmt = (n, d = 0) => Number(n ?? 0).toLocaleString(undefined, {
-  minimumFractionDigits: d, maximumFractionDigits: d,
-});
-
-function gradeColor(g) {
-  const key = String(g || 'F').toLowerCase();
-  return `var(--grade-${key in { xh:1, x:1, sh:1, s:1, a:1, b:1, c:1, d:1, f:1 } ? key : 'f'})`;
-}
-
-function scoreRow(s, showPp) {
-  const el = document.createElement('div');
-  el.className = 'row';
-  const title = [s.artist, s.title].filter(Boolean).join(' - ') || s.beatmap_md5?.slice(0, 12) || '(unknown map)';
-  const when = new Date(s.played_at ?? s.playedAt).toLocaleString();
-  const pp = s.pp == null ? '' : `<b>${fmt(s.pp, 0)}pp</b>`;
-  const weighted = s.weightedPp != null
-    ? `<small>weighted ${fmt(s.weightedPp, 0)}pp (${Math.round((s.weight ?? 0) * 100)}%)</small>` : '';
-
-  el.innerHTML = `
-    <div class="grade" style="color:${gradeColor(s.grade)}">${s.grade ?? ''}</div>
-    <div class="name">
-      <div><b>${escapeHtml(title)}</b> <span class="diff">${escapeHtml(s.version ?? '')}</span></div>
-      <div class="meta">${when}${s.stars != null ? ` &middot; ${fmt(s.stars, 2)}&#9733;` : ''}</div>
-    </div>
-    <div class="mods">${s.mods_label === 'None' ? '' : escapeHtml(s.mods_label ?? s.modsLabel ?? '')}</div>
-    <div class="acc">${fmt((s.accuracy ?? 0) * 100, 2)}%</div>
-    <div class="pp">${showPp ? pp + weighted : (s.ranked ? pp : '<small>unranked</small>')}</div>`;
-  return el;
-}
-
-function escapeHtml(s) {
-  return String(s ?? '').replace(/[&<>"']/g, (c) =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-}
-
-function renderModes() {
-  const box = $('modes');
-  box.innerHTML = '';
-  MODES.forEach((name, i) => {
-    const b = document.createElement('button');
-    b.textContent = name;
-    b.className = i === mode ? 'active' : '';
-    b.onclick = () => { mode = i; renderModes(); load(); };
-    box.appendChild(b);
-  });
-}
-
-async function load() {
-  const data = await (await fetch(`/api/profile?mode=${mode}`)).json();
-  const st = data.stats;
-
-  $('pp').textContent = fmt(st.totalPp, 0);
-  $('acc').textContent = fmt(st.accuracy * 100, 2);
-  $('plays').textContent = fmt(st.playcount);
-  $('rank').textContent = st.totalPp > 0 ? 'unranked*' : '#--';
-  $('lvl').textContent = st.level.current;
-  $('lvlbar').style.width = `${(st.level.progress * 100).toFixed(1)}%`;
-  $('lvlpct').textContent = `${Math.round(st.level.progress * 100)}%`;
-
-  const rows = [
-    ['Ranked Score', fmt(st.rankedScore)],
-    ['Total Score', fmt(st.totalScore)],
-    ['Total Hits', fmt(st.totalHits)],
-    ['Hits / Play', fmt(st.hitsPerPlay, 1)],
-    ['Maximum Combo', `${fmt(st.maxCombo)}x`],
-    ['Ranked Beatmaps', fmt(st.distinctRankedBeatmaps)],
-    ['Weighted pp', `${fmt(st.weightedPp, 0)}pp`],
-    ['Bonus pp', `${fmt(st.bonusPp, 0)}pp`],
-  ];
-  $('stats').innerHTML = rows
-    .map(([k, v]) => `<div class="stat"><span>${k}</span><span>${v}</span></div>`).join('');
-
-  $('grades').innerHTML = ['XH', 'X', 'SH', 'S', 'A']
-    .map((g) => `<div><div class="g" style="color:${gradeColor(g)}">${g === 'XH' ? 'SS' : g === 'X' ? 'SS' : g === 'SH' ? 'S' : g}</div>
-                 <div class="n">${st.grades[g] ?? 0}</div></div>`).join('');
-
-  const top = $('top');
-  top.innerHTML = '';
-  if (!data.top.length) top.innerHTML = '<div class="empty">No ranked plays tracked yet.</div>';
-  else data.top.forEach((s) => top.appendChild(scoreRow(s, true)));
-
-  const recent = $('recent');
-  recent.innerHTML = '';
-  if (!data.recent.length) recent.innerHTML = '<div class="empty">Nothing yet - go set a play.</div>';
-  else data.recent.forEach((s) => recent.appendChild(scoreRow(s, false)));
-}
-
-async function loadState() {
-  const s = await (await fetch('/api/state')).json();
-  $('pname').textContent = s.profile.name;
-  const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
-  $('psub').textContent = `watching ${kinds} - ${s.scoresThisSession} scores this session`;
-  $('optInfo').textContent = `Profile: ${s.profile.name}`;
-  setTracking(s.tracking);
-  if (!window.__modeInit) { window.__modeInit = true; mode = s.defaultMode ?? 0; renderModes(); }
-}
-
-function setTracking(on) {
-  tracking = on;
-  $('dot').className = `dot ${on ? 'on' : 'off'}`;
-  $('tracklabel').textContent = on ? 'tracking' : 'paused';
-  $('toggle').textContent = on ? 'Pause tracking' : 'Resume tracking';
-}
-
-$('toggle').onclick = async () => {
-  const r = await (await fetch('/api/tracking', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ enabled: !tracking }),
-  })).json();
-  setTracking(r.tracking);
-};
-
-let toastTimer;
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
-}
-
-/* --- options menu ------------------------------------------------------- */
-function setMenuOpen(open) {
-  $('optionsMenu').hidden = !open;
-  $('optionsBtn').setAttribute('aria-expanded', String(open));
-}
-
-$('optionsBtn').onclick = (e) => {
-  e.stopPropagation();
-  setMenuOpen($('optionsMenu').hidden);
-};
-
-// Clicking anywhere else, or Escape, closes the menu.
-document.addEventListener('click', () => setMenuOpen(false));
-$('optionsMenu').onclick = (e) => e.stopPropagation();
-document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  setMenuOpen(false);
-  if (!$('resetModal').hidden) closeReset();
-});
-
-/* --- reset profile ------------------------------------------------------- */
-let resetting = false;
-
-function openReset() {
-  setMenuOpen(false);
-  const plays = Number($('plays').textContent.replace(/[^0-9]/g, '')) || 0;
-  $('resetSummary').textContent = plays > 0
-    ? `${plays} tracked play${plays === 1 ? '' : 's'} will be erased and this profile will start from zero.`
-    : 'Nothing has been tracked yet, so this only restarts tracking from now.';
-  $('resetModal').hidden = false;
-  $('resetCancel').focus();
-}
-
-function closeReset() {
-  if (resetting) return;
-  $('resetModal').hidden = true;
-}
-
-$('optReset').onclick = openReset;
-$('resetCancel').onclick = closeReset;
-// Clicking the dimmed background cancels; clicking inside the dialog does not.
-$('resetModal').onclick = (e) => { if (e.target === $('resetModal')) closeReset(); };
-
-$('resetConfirm').onclick = async () => {
-  if (resetting) return;
-  resetting = true;
-  $('resetConfirm').disabled = true;
-  $('resetCancel').disabled = true;
-  $('resetConfirm').textContent = 'Erasing...';
-  try {
-    const r = await fetch('/api/profile/reset', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ confirm: true }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error ?? 'reset failed');
-    toast(`Profile reset - ${data.deleted} score${data.deleted === 1 ? '' : 's'} erased`);
-  } catch (err) {
-    toast(`Reset failed: ${err.message}`);
-  } finally {
-    resetting = false;
-    $('resetConfirm').disabled = false;
-    $('resetCancel').disabled = false;
-    $('resetConfirm').textContent = 'Erase and start fresh';
-    $('resetModal').hidden = true;
-    await Promise.all([load(), loadState()]);
-  }
-};
-
-const es = new EventSource('/api/events');
-es.addEventListener('score', (e) => {
-  const s = JSON.parse(e.data);
-  toast(`${s.grade} ${(s.accuracy * 100).toFixed(2)}% ${s.pp != null ? `${s.pp.toFixed(0)}pp` : ''} - ${s.title}`);
-  if (s.mode === mode) load();
-  loadState();
-});
-es.addEventListener('tracking', (e) => setTracking(JSON.parse(e.data).tracking));
-es.addEventListener('reset', () => { load(); loadState(); });
-
-renderModes();
-loadState();
-load();
-setInterval(loadState, 15000);
-</script>
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>

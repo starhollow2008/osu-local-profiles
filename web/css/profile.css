@@ -1,0 +1,1226 @@
+/*
+ * The profile page, rebuilt to match osu.ppy.sh/users/{id}.
+ *
+ * Class names follow osu-web's so this file can be read side by side with
+ * docs/osu-web-reference.md, which records the structure and metrics it implements.
+ * Mobile-first, with the desktop layout at osu-web's 900px breakpoint.
+ */
+
+/*
+ * osu-web is a full-width site whose gutters do the centring. This page has a max width,
+ * so every full-bleed band paints edge to edge and centres a fixed-width inner element.
+ */
+.band {
+  padding-left: var(--gutter);
+  padding-right: var(--gutter);
+}
+
+.band__inner {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+}
+
+/* ======================================================================== */
+/* Header: cover, avatar, name                                              */
+/* ======================================================================== */
+
+.profile-info {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.profile-info__bg {
+  position: relative;
+  height: 100px;
+  background-color: hsl(var(--hsl-b5));
+  background-image: var(--cover, none);
+  background-size: cover;
+  background-position: center;
+}
+
+/* Keeps the name and the buttons legible over an arbitrary beatmap background. */
+.profile-info__bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.55));
+}
+
+.profile-info__bg-actions {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px var(--gutter);
+  pointer-events: none;
+}
+
+.profile-info__bg-actions > * {
+  pointer-events: auto;
+}
+
+.profile-info__details {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  position: relative;
+}
+
+.profile-info__details-inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Narrow screens drop the mode switcher onto its own line rather than squeezing the
+     username down to an ellipsis. */
+  flex-wrap: wrap;
+}
+
+.profile-info__avatar {
+  flex: none;
+  width: 65px;
+  height: 65px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--box-shadow);
+  background-color: hsl(var(--hsl-b5));
+}
+
+.profile-info__avatar img,
+.profile-info__avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-info__info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-info__name {
+  font-size: var(--fs-large);
+  line-height: normal;
+  max-width: 100%;
+}
+
+.profile-info__flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: var(--fs-title-small);
+  color: hsl(var(--hsl-c1));
+}
+
+.profile-info__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-info__flag img {
+  width: 21px;
+  height: 15px;
+  border-radius: 2px;
+  object-fit: cover;
+  display: block;
+}
+
+.profile-info__flag-code {
+  font-size: var(--fs-small-2);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  background-color: hsla(var(--hsl-b6), 0.6);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.profile-info__tagline {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal-2);
+}
+
+@media (min-width: 900px) {
+  .profile-info__bg {
+    height: 250px;
+  }
+
+  .profile-info__details {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .profile-info__details-inner {
+    height: 85px;
+    flex-wrap: nowrap;
+  }
+
+  .profile-info__avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 40px;
+    align-self: flex-end;
+    margin-bottom: 10px;
+  }
+
+  .profile-info__info {
+    margin-left: 20px;
+  }
+
+  .profile-info__name {
+    font-size: var(--fs-title);
+  }
+}
+
+/* --- tracking indicator (ours, not osu-web's) --------------------------- */
+
+.tracking-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10000px;
+  background-color: hsla(var(--hsl-b6), 0.75);
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  padding: 5px 14px 5px 11px;
+}
+
+.tracking-pill:hover {
+  background-color: hsla(var(--hsl-b5), 0.9);
+}
+
+.tracking-pill__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background-color: var(--red);
+}
+
+.tracking-pill--on .tracking-pill__dot {
+  background-color: var(--green-light);
+  box-shadow: 0 0 8px var(--green-light);
+}
+
+/* --- gamemode switcher -------------------------------------------------- */
+
+.game-mode {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  align-self: flex-end;
+  margin-left: auto;
+  font-size: var(--fs-normal);
+}
+
+.game-mode__link {
+  color: hsl(var(--hsl-l1));
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.game-mode__link:hover {
+  color: hsl(var(--hsl-c1));
+  text-decoration: none;
+}
+
+.game-mode__link--active {
+  color: hsl(var(--hsl-c1));
+  border-bottom-color: hsl(var(--hsl-h1));
+  font-weight: 700;
+}
+
+/* A mode with no tracked plays is still selectable, just visibly idle. */
+.game-mode__link--empty {
+  opacity: 0.45;
+}
+
+@media (min-width: 900px) {
+  .game-mode {
+    font-size: var(--fs-title-small);
+    gap: 22px;
+  }
+}
+
+/* ======================================================================== */
+/* Detail block: ranks, chart, grade counts, stats                          */
+/* ======================================================================== */
+
+.profile-detail {
+  padding-top: 10px;
+  padding-bottom: 10px;
+  background-color: hsl(var(--hsl-b3));
+  box-shadow: inset 0 2px 3px -1px rgba(0, 0, 0, 0.25);
+}
+
+.profile-detail-stats {
+  display: grid;
+  align-items: start;
+  gap: 15px;
+}
+
+.profile-detail-stats__chart {
+  height: 90px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: var(--fs-normal);
+}
+
+.profile-detail-stats__chart svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: block;
+}
+
+.profile-detail-stats__empty-chart {
+  margin: auto;
+  color: hsl(var(--hsl-f1));
+}
+
+.profile-detail-stats__chart-numbers {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;
+  --align-items-desktop: flex-end;
+}
+
+.profile-detail-stats__chart-numbers--top {
+  --align-items-desktop: flex-start;
+}
+
+.profile-detail-stats__separator {
+  background-color: hsl(var(--hsl-b6));
+  height: 2px;
+  width: 100%;
+}
+
+.profile-detail-stats__values {
+  display: flex;
+  gap: 20px;
+}
+
+.profile-detail-stats__values--grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, max-content));
+  gap: 20px;
+  flex: 1;
+}
+
+@media (min-width: 900px) {
+  .profile-detail-stats {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .profile-detail-stats__chart-numbers {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: var(--align-items-desktop);
+  }
+
+  .profile-detail-stats__separator {
+    height: 100%;
+    width: 2px;
+  }
+}
+
+/* --- value-display ------------------------------------------------------ */
+
+.value-display {
+  display: flex;
+  flex-direction: column;
+  min-width: 60px;
+  flex: 1;
+  --label-font-size: var(--fs-title-small-3);
+  --value-font-size: var(--fs-title);
+  --value-color: hsl(var(--hsl-c1));
+  --label-font-weight: 700;
+  --value-margin-top: 0;
+}
+
+.value-display__label {
+  font-weight: var(--label-font-weight);
+  font-size: var(--label-font-size);
+}
+
+.value-display__value {
+  color: var(--value-color);
+  font-size: var(--value-font-size);
+  font-weight: 300;
+  margin-top: var(--value-margin-top);
+  line-height: 1.15;
+}
+
+.value-display--rank {
+  --label-font-size: var(--fs-small);
+  --label-font-weight: 400;
+  --value-color: hsl(var(--hsl-c2));
+  --value-font-size: var(--fs-large);
+  --value-margin-top: -0.1em;
+}
+
+.value-display--plain {
+  --label-font-size: var(--fs-normal);
+  --label-font-weight: 400;
+  --value-color: hsl(var(--hsl-c2));
+  --value-font-size: var(--fs-title-small-3);
+  min-width: auto;
+}
+
+@media (min-width: 900px) {
+  .value-display {
+    --label-font-size: var(--fs-normal);
+    --value-font-size: var(--fs-title-small-4);
+  }
+
+  .value-display--rank {
+    --label-font-size: var(--fs-normal);
+    --value-font-size: var(--fs-new-header-title);
+    flex: none;
+  }
+
+  .value-display--plain {
+    --value-font-size: var(--fs-title-small-3);
+  }
+}
+
+/* --- grade counts ------------------------------------------------------- */
+
+.profile-rank-count {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  font-weight: 700;
+  font-size: var(--fs-normal);
+  gap: 4px;
+  justify-content: center;
+  margin: auto;
+}
+
+.profile-rank-count__item {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+}
+
+.profile-rank-count__rank svg {
+  display: block;
+  height: 22px;
+  width: 44px;
+}
+
+/* --- the key/value stats box -------------------------------------------- */
+
+.profile-stats {
+  font-size: var(--fs-normal);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 20px;
+  align-self: center;
+  background-color: hsl(var(--hsl-b4));
+  border-radius: var(--radius-large);
+  padding: 18px 12px;
+}
+
+.profile-stats__entry {
+  display: contents;
+}
+
+.profile-stats__key {
+  font-weight: 400;
+  color: hsl(var(--hsl-c1));
+}
+
+.profile-stats__value {
+  color: hsl(var(--hsl-c2));
+  font-weight: 700;
+  text-align: right;
+}
+
+@media (min-width: 900px) {
+  .profile-stats {
+    min-width: 300px;
+  }
+}
+
+/* ======================================================================== */
+/* Level bar                                                                */
+/* ======================================================================== */
+
+.profile-detail-bar {
+  width: 100%;
+  background-color: hsl(var(--hsl-b3));
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.profile-detail-bar__inner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-detail-bar__level {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-normal);
+  font-weight: 700;
+  height: 40px;
+}
+
+.profile-detail-bar__level-bar {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .profile-detail-bar__level-bar {
+    display: flex;
+    width: 200px;
+  }
+}
+
+.bar {
+  --fill: 0%;
+  display: block;
+  width: 100%;
+  position: relative;
+  border-radius: 10000px;
+  height: 6px;
+  background-color: hsl(var(--hsl-b6));
+}
+
+.bar__fill {
+  height: 100%;
+  width: var(--fill);
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-h1));
+  transition: width 0.25s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+.bar__text {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 2px;
+  font-size: var(--fs-small);
+  font-weight: 400;
+  color: hsl(var(--hsl-f1));
+}
+
+.user-level {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 50px;
+  height: 50px;
+  font-size: var(--fs-large);
+  position: relative;
+  flex: none;
+}
+
+.user-level svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.user-level__level {
+  position: relative;
+  color: hsl(var(--hsl-b6));
+  font-weight: 700;
+  font-size: var(--fs-title-small-3);
+}
+
+/* ======================================================================== */
+/* Section tabs and section panels                                          */
+/* ======================================================================== */
+
+.page-mode {
+  background-color: hsl(var(--hsl-b5));
+  color: #ccc;
+  font-size: var(--fs-title-small);
+  overflow-x: auto;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.page-mode__inner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.page-mode__item {
+  line-height: 1;
+  white-space: nowrap;
+  color: #ccc;
+}
+
+.page-mode__item:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+.page-mode__item--active {
+  color: #fff;
+  font-weight: 700;
+}
+
+.user-profile-pages {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 10px 0;
+  max-width: calc(var(--container) + 20px);
+  margin: 0 auto;
+}
+
+.page-extra {
+  box-shadow: var(--box-shadow);
+  padding: 20px 8px;
+  margin: 0 2px;
+  position: relative;
+  background-color: hsl(var(--hsl-b4));
+  font-size: var(--fs-title-small);
+  border-radius: var(--radius-large);
+}
+
+.page-extra__chart {
+  height: 200px;
+  width: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.page-extra__chart svg {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  display: block;
+}
+
+@media (min-width: 900px) {
+  .page-extra {
+    padding: 20px 40px;
+    margin: 0 10px;
+  }
+}
+
+.title {
+  width: max-content;
+  max-width: 100%;
+  margin: 0 0 20px;
+  padding-bottom: 5px;
+  font-size: var(--fs-title-small-3);
+  font-weight: 700;
+  color: hsl(var(--hsl-c1));
+  border-bottom: 2px solid hsl(var(--hsl-h1));
+  /* Block, so consecutive headings stack; max-content keeps the rule under the text. */
+  display: block;
+}
+
+.title__count {
+  color: hsl(var(--hsl-f1));
+  background-color: hsl(var(--hsl-b6));
+  margin-left: 10px;
+  padding: 2px 10px;
+  border-radius: 10000px;
+  font-size: 0.8em;
+}
+
+.title--sub {
+  font-size: var(--fs-title-small);
+  border-bottom: none;
+  margin: 0 0 6px;
+  padding: 10px 0 0;
+  position: relative;
+}
+
+.title--sub-first {
+  padding-top: 0;
+}
+
+/* The little pink tick osu-web puts beside its second-level headings. */
+.title--sub::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 1.05em;
+  height: 0.65em;
+  width: 3px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-h1));
+}
+
+/* ======================================================================== */
+/* Score row                                                                */
+/* ======================================================================== */
+
+.play-detail-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.play-detail {
+  --border-radius: 10px;
+  --bg: hsl(var(--hsl-b3));
+  --bg-main: hsl(var(--hsl-b2));
+  border-radius: var(--border-radius);
+  background-color: var(--bg);
+  line-height: normal;
+  color: #fff;
+  font-size: var(--fs-normal);
+  min-height: 60px;
+  position: relative;
+  margin: 2px 0;
+}
+
+.play-detail__group {
+  padding: 10px 20px;
+  position: relative;
+}
+
+.play-detail__group--top {
+  border-radius: var(--border-radius);
+  background-color: var(--bg-main);
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 10px;
+}
+
+.play-detail__icon {
+  flex: none;
+  position: relative;
+}
+
+.play-detail__icon svg {
+  display: block;
+  width: 40px;
+  height: 20px;
+}
+
+.play-detail__detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.play-detail__title {
+  font-size: var(--fs-title-small);
+  display: block;
+  max-width: 100%;
+  color: #fff;
+}
+
+.play-detail__artist {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal);
+}
+
+.play-detail__beatmap-and-time {
+  margin-top: 2px;
+  white-space: nowrap;
+  display: flex;
+  gap: 15px;
+  min-width: 0;
+}
+
+.play-detail__beatmap {
+  color: var(--yellow-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-detail__time {
+  color: hsl(var(--hsl-f1));
+  flex: none;
+}
+
+.play-detail__group--bottom {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.play-detail__score-detail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.play-detail__accuracy {
+  color: var(--yellow);
+  display: inline-block;
+  min-width: 60px;
+}
+
+.play-detail__accuracy-and-weighted-pp {
+  font-size: var(--fs-title-small);
+  font-weight: 600;
+}
+
+.play-detail__weighted-pp {
+  display: inline-block;
+  min-width: 60px;
+  margin-left: 10px;
+}
+
+.play-detail__pp-weight {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.play-detail__mods-pp {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+}
+
+.play-detail__mods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.play-detail__pp {
+  flex: none;
+  font-size: var(--fs-title-small-3);
+  font-weight: 700;
+  color: hsl(var(--hsl-h1));
+  white-space: nowrap;
+}
+
+.play-detail__pp--none {
+  color: hsl(var(--hsl-f1));
+  font-weight: 400;
+}
+
+.play-detail__pp-unit {
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-l3));
+}
+
+@media (min-width: 900px) {
+  .play-detail {
+    display: flex;
+    min-height: auto;
+    background-color: transparent;
+  }
+
+  .play-detail:hover {
+    --bg: hsl(var(--hsl-b2));
+    --bg-main: hsl(var(--hsl-b1));
+  }
+
+  .play-detail__group--top {
+    flex: 1;
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
+    padding: 5px 20px 5px 20px;
+  }
+
+  .play-detail__group--bottom {
+    padding: 0;
+    flex-wrap: nowrap;
+    gap: 0;
+    align-items: stretch;
+  }
+
+  .play-detail__score-detail {
+    padding: 5px 10px;
+    background-color: var(--bg-main);
+    align-items: baseline;
+  }
+
+  .play-detail__mods {
+    max-width: 400px;
+    padding: 5px 10px;
+    order: -1;
+    background-color: var(--bg-main);
+  }
+
+  .play-detail__mods-pp {
+    display: contents;
+  }
+
+  /*
+   * The pp block sits in the lighter --bg with a chevron notch cut from --bg-main,
+   * which is what gives the row its arrow-into-the-score shape.
+   */
+  .play-detail__pp {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 5px 20px 5px 30px;
+    min-width: 110px;
+    background: var(--bg);
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
+  }
+
+  .play-detail__pp::before {
+    content: "";
+    width: 10px;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+    background-color: var(--bg-main);
+    clip-path: polygon(0% 0%, 100% 50%, 0% 100%);
+  }
+}
+
+/* --- mod pills ---------------------------------------------------------- */
+
+.mod {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: var(--fs-small-2);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: hsl(var(--hsl-b6));
+  background-color: var(--mod-colour, var(--mod-unknown));
+}
+
+/* ======================================================================== */
+/* Most played beatmaps                                                     */
+/* ======================================================================== */
+
+.beatmap-playcount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: hsl(var(--hsl-b3));
+  border-radius: var(--radius-large);
+  margin: 2px 0;
+  padding: 5px 10px;
+  min-height: 50px;
+}
+
+.beatmap-playcount:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.beatmap-playcount__cover {
+  flex: none;
+  width: 60px;
+  height: 40px;
+  border-radius: var(--radius-base);
+  overflow: hidden;
+  background-color: hsl(var(--hsl-b5));
+  background-size: cover;
+  background-position: center;
+}
+
+.beatmap-playcount__detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.beatmap-playcount__title {
+  font-size: var(--fs-title-small);
+  color: #fff;
+}
+
+.beatmap-playcount__artist {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal);
+}
+
+.beatmap-playcount__version {
+  color: var(--yellow-dark);
+  font-size: var(--fs-normal);
+  margin-top: 2px;
+}
+
+.beatmap-playcount__count {
+  flex: none;
+  font-size: var(--fs-title-small);
+  color: hsl(var(--hsl-c2));
+  white-space: nowrap;
+}
+
+.beatmap-playcount__count b {
+  font-weight: 700;
+}
+
+/* ======================================================================== */
+/* Recent activity feed                                                     */
+/* ======================================================================== */
+
+.activity {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid hsla(var(--hsl-b6), 0.6);
+  font-size: var(--fs-title-small);
+}
+
+.activity:last-child {
+  border-bottom: 0;
+}
+
+.activity__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity__highlight {
+  color: hsl(var(--hsl-h1));
+  font-weight: 700;
+}
+
+.activity__map {
+  color: var(--yellow-dark);
+}
+
+.activity__time {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+  flex: none;
+}
+
+/* ======================================================================== */
+/* Charts                                                                   */
+/* ======================================================================== */
+
+.chart__line {
+  fill: none;
+  stroke: hsl(var(--hsl-h1));
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart__dot {
+  fill: hsl(var(--hsl-c1));
+}
+
+.chart__bar {
+  fill: hsl(var(--hsl-h1));
+}
+
+/*
+ * Axis labels are HTML rather than SVG text: the charts stretch with
+ * preserveAspectRatio="none", which would shear anything drawn inside them.
+ */
+.chart__caption {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--fs-small);
+  color: hsl(var(--hsl-f1));
+  padding-top: 3px;
+}
+
+.chart__months {
+  position: relative;
+  height: 14px;
+  margin-top: 4px;
+  font-size: var(--fs-small);
+  color: hsl(var(--hsl-f1));
+}
+
+.chart__months span {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.chart__peak {
+  font-size: var(--fs-small);
+  color: hsl(var(--hsl-f1));
+  text-align: right;
+}
+
+/* ======================================================================== */
+/* Options menu, reset dialog, toast (this app's own, not osu-web's)        */
+/* ======================================================================== */
+
+.menu-wrap {
+  position: relative;
+}
+
+.menu-wrap > button {
+  background-color: hsla(var(--hsl-b6), 0.75);
+  color: hsl(var(--hsl-c1));
+  border-radius: 10000px;
+  padding: 5px 16px;
+  font-size: var(--fs-normal);
+}
+
+.menu-wrap > button:hover {
+  background-color: hsla(var(--hsl-b5), 0.9);
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 220px;
+  background-color: hsl(var(--hsl-b4));
+  border-radius: var(--radius-large);
+  padding: 5px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 40;
+  text-align: left;
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px;
+  border-radius: 5px;
+  font-size: var(--fs-title-small);
+}
+
+.menu button:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.menu button.danger {
+  color: var(--rank-d);
+}
+
+.menu button.danger:hover {
+  background-color: hsl(0, 40%, 24%);
+}
+
+.menu .sep {
+  height: 1px;
+  background-color: hsl(var(--hsl-b3));
+  margin: 5px 3px;
+}
+
+.menu .note {
+  padding: 6px 11px 8px;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal {
+  background-color: hsl(var(--hsl-b4));
+  border-radius: var(--radius-large);
+  padding: 22px;
+  max-width: 460px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+}
+
+.modal h3 {
+  margin: 0 0 10px;
+  font-size: var(--fs-title-small-4);
+  font-weight: 700;
+}
+
+.modal p {
+  margin: 0 0 12px;
+  color: hsl(var(--hsl-l1));
+}
+
+.modal .warn {
+  background-color: hsl(0, 35%, 18%);
+  border-left: 3px solid var(--rank-d);
+  border-radius: 5px;
+  padding: 10px 12px;
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal-2);
+}
+
+.modal ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal-2);
+}
+
+.modal .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 18px;
+}
+
+.modal .actions button {
+  background-color: hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 9px 15px;
+}
+
+.modal .actions button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.modal .actions button.danger {
+  background-color: #a11;
+  color: #fff;
+  font-weight: 600;
+}
+
+.modal .actions button.danger:hover {
+  background-color: #c22;
+}
+
+.modal .actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  background-color: hsl(var(--hsl-b3));
+  border-left: 3px solid hsl(var(--hsl-h1));
+  border-radius: var(--radius-base);
+  padding: 10px 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: none;
+}
