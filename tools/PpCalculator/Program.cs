@@ -1,0 +1,170 @@
+// A thin wrapper around osu!'s own difficulty and performance calculators.
+//
+// Every reimplementation of osu!'s pp algorithm lags its reworks, so this references the
+// official ppy.osu.Game.Rulesets.* packages instead. Keeping current with a rework is a
+// version bump in PpCalculator.csproj and nothing else.
+//
+// The replay is decoded by osu!'s own LegacyScoreDecoder rather than by us. That matters:
+// it sets IsLegacyScore from the replay version, populates MaximumStatistics from the
+// beatmap, fills LegacyTotalScore, and reads lazer's extended block (mods with their
+// settings). osu!stable and osu!lazer replays therefore both come out exactly as osu!
+// itself would interpret them, with no branching on our side.
+//
+// Protocol: one JSON request per line on stdin, one JSON response per line on stdout.
+// Staying resident avoids paying ~150ms of runtime startup for every score.
+
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using osu.Game.Beatmaps;
+using osu.Game.Beatmaps.Formats;
+using osu.Game.IO;
+using osu.Game.Rulesets;
+using osu.Game.Rulesets.Catch;
+using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Osu;
+using osu.Game.Rulesets.Taiko;
+using osu.Game.Scoring;
+using osu.Game.Scoring.Legacy;
+
+namespace OsuFreshProfile.PpCalculator;
+
+public sealed class Request
+{
+    /// <summary>The .osr replay to score. lazer stores these without a file extension.</summary>
+    [JsonPropertyName("replayPath")] public string ReplayPath { get; set; } = string.Empty;
+
+    /// <summary>The .osu file the replay was set on, located by its MD5.</summary>
+    [JsonPropertyName("beatmapPath")] public string BeatmapPath { get; set; } = string.Empty;
+}
+
+public static class Program
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    public static int Main()
+    {
+        // Announce readiness so the caller does not race the first request.
+        Console.Out.WriteLine("""{"ready":true}""");
+        Console.Out.Flush();
+
+        string? line;
+        while ((line = Console.In.ReadLine()) != null)
+        {
+            if (line.Length == 0) continue;
+
+            string response;
+            try
+            {
+                var request = JsonSerializer.Deserialize<Request>(line, JsonOptions)
+                              ?? throw new InvalidOperationException("empty request");
+                response = JsonSerializer.Serialize(Calculate(request), JsonOptions);
+            }
+            catch (Exception ex)
+            {
+                response = JsonSerializer.Serialize(new { ok = false, error = ex.Message }, JsonOptions);
+            }
+
+            Console.Out.WriteLine(response);
+            Console.Out.Flush();
+        }
+
+        return 0;
+    }
+
+    private static object Calculate(Request request)
+    {
+        var working = new ProcessorWorkingBeatmap(request.BeatmapPath);
+
+        Score score;
+        using (var stream = File.OpenRead(request.ReplayPath))
+            score = new HelperScoreDecoder(working).Parse(stream);
+
+        var scoreInfo = score.ScoreInfo;
+        var ruleset = RulesetFor(scoreInfo.Ruleset.OnlineID);
+
+        var difficulty = ruleset.CreateDifficultyCalculator(working).Calculate(scoreInfo.Mods);
+        var performance = ruleset.CreatePerformanceCalculator()?.Calculate(scoreInfo, difficulty);
+
+        return new
+        {
+            ok = true,
+            stars = difficulty.StarRating,
+            maxCombo = difficulty.MaxCombo,
+            // osu!'s own values, so they can be cross-checked against ours.
+            accuracy = scoreInfo.Accuracy,
+            combo = scoreInfo.MaxCombo,
+            rank = scoreInfo.Rank.ToString(),
+            isLegacy = scoreInfo.IsLegacyScore,
+            mods = scoreInfo.Mods.Select(m => m.Acronym).ToArray(),
+            pp = performance?.Total,
+        };
+    }
+
+    private static Ruleset RulesetFor(int legacyId) => legacyId switch
+    {
+        0 => new OsuRuleset(),
+        1 => new TaikoRuleset(),
+        2 => new CatchRuleset(),
+        3 => new ManiaRuleset(),
+        _ => throw new ArgumentException($"unsupported ruleset id {legacyId}"),
+    };
+}
+
+/// <summary>
+/// A <see cref="LegacyScoreDecoder"/> pinned to one already-loaded beatmap, so decoding
+/// never needs a beatmap database to look the map up by hash.
+/// </summary>
+public sealed class HelperScoreDecoder : LegacyScoreDecoder
+{
+    private readonly WorkingBeatmap beatmap;
+
+    public HelperScoreDecoder(WorkingBeatmap beatmap)
+    {
+        this.beatmap = beatmap;
+    }
+
+    protected override Ruleset GetRuleset(int rulesetId) => rulesetId switch
+    {
+        0 => new OsuRuleset(),
+        1 => new TaikoRuleset(),
+        2 => new CatchRuleset(),
+        3 => new ManiaRuleset(),
+        _ => throw new ArgumentException($"unsupported ruleset id {rulesetId}"),
+    };
+
+    protected override WorkingBeatmap GetBeatmap(string md5Hash) => beatmap;
+}
+
+/// <summary>A <see cref="WorkingBeatmap"/> backed by a .osu file on disk.</summary>
+public sealed class ProcessorWorkingBeatmap : WorkingBeatmap
+{
+    private readonly Beatmap beatmap;
+
+    public ProcessorWorkingBeatmap(string file)
+        : this(ReadFromFile(file))
+    {
+    }
+
+    private ProcessorWorkingBeatmap(Beatmap beatmap)
+        : base(beatmap.BeatmapInfo, null)
+    {
+        this.beatmap = beatmap;
+    }
+
+    private static Beatmap ReadFromFile(string filename)
+    {
+        using var stream = File.OpenRead(filename);
+        using var reader = new LineBufferedReader(stream);
+        return Decoder.GetDecoder<Beatmap>(reader).Decode(reader);
+    }
+
+    protected override osu.Game.Skinning.ISkin GetSkin() => null!;
+    public override Stream GetStream(string storagePath) => null!;
+    protected override IBeatmap GetBeatmap() => beatmap;
+    public override osu.Framework.Graphics.Textures.Texture GetBackground() => null!;
+    protected override osu.Framework.Audio.Track.Track GetBeatmapTrack() => null!;
+}

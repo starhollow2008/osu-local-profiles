@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>osu-pp</AssemblyName>
+    <RootNamespace>OsuFreshProfile.PpCalculator</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ppy.osu.Game" Version="2026.730.0" />
+    <PackageReference Include="ppy.osu.Game.Rulesets.Osu" Version="2026.730.0" />
+    <PackageReference Include="ppy.osu.Game.Rulesets.Taiko" Version="2026.730.0" />
+    <PackageReference Include="ppy.osu.Game.Rulesets.Catch" Version="2026.730.0" />
+    <PackageReference Include="ppy.osu.Game.Rulesets.Mania" Version="2026.730.0" />
+  </ItemGroup>
+</Project>
