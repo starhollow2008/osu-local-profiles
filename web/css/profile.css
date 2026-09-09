@@ -1390,6 +1390,37 @@
   accent-color: hsl(var(--hsl-h2));
 }
 
+/*
+ * A group of choices cannot sit in `.field`'s right-hand column -- there are six of them and
+ * the labels are words, not values -- so that field stacks instead.
+ */
+.field--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.checkgroup {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 2px 10px;
+  margin-top: 6px;
+}
+
+.checkgroup__item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.checkgroup__item input {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  accent-color: hsl(var(--hsl-h2));
+}
+
 /* A setting whose enabling toggle is off: still readable, visibly not in play. */
 .setting--inactive {
   opacity: 0.45;

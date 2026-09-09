@@ -218,6 +218,21 @@ check(
   await evaluate("document.getElementById('set-includeUnrankedMods').type"),
   'checkbox',
 );
+// Six beatmap states, each its own box: they are separate decisions, not one switch.
+check(
+  'every unranked beatmap state has its own box',
+  await evaluate(
+    "document.querySelectorAll('#set-includeUnrankedMaps input[type=checkbox]').length",
+  ),
+  6,
+);
+check(
+  'and that field stacks instead of squeezing into a row',
+  await evaluate(`getComputedStyle(
+    document.getElementById('set-includeUnrankedMaps').closest('.field')
+  ).flexDirection`),
+  'column',
+);
 /*
  * The relax pricing choice only means anything while unranked mods are being counted, so it
  * follows the toggle. Dimmed rather than hidden: its hint is most of the reason to open
@@ -314,9 +329,18 @@ const stripped = await noteFor({ includeUnrankedMods: true, preferStrippedPp: tr
 check('it says the profile is not comparable', stripped.includes('not comparable'), true);
 check('and names the stripped-mod pricing', stripped.includes('as if the mod had been off'), true);
 check('and points at the asterisk on the rows', stripped.includes('marked with *'), true);
+check('and says which of the two rules is on', stripped.includes('plays on mods osu! does not rank'), true);
+
 const asPlayed = await noteFor({ includeUnrankedMods: true, preferStrippedPp: false });
 check('the as-played wording differs', asPlayed.includes('as played'), true);
 check('and does not claim mods were removed', asPlayed.includes('as if the mod'), false);
+
+// Unranked beatmaps are a separate rule and must be disclosed on their own.
+const mapsOnly = await noteFor({ includeUnrankedMods: false, extraMapStatuses: [4] });
+check('unranked beatmaps alone are disclosed', mapsOnly.includes('beatmaps osu! does not rank'), true);
+check('without mentioning relax', mapsOnly.includes('Relax'), false);
+const both = await noteFor({ includeUnrankedMods: true, preferStrippedPp: true, extraMapStatuses: [4] });
+check('both rules together name both', both.includes('mods and beatmaps'), true);
 
 console.log('\npp cells say when a value is not osu!s');
 const ppCellFor = (play) =>

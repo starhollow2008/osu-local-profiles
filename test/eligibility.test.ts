@@ -285,3 +285,108 @@ test('scores predating the eligibility columns still count', () => {
     h.cleanup();
   }
 });
+
+/* ------------------------------------------------------------ unranked maps */
+
+test('each unranked beatmap state is included independently', () => {
+  const h = harness();
+  try {
+    h.add({ md5: 'loved', pp: 10, mapStatus: Status.LOVED });
+    h.add({ md5: 'qualified', pp: 20, mapStatus: Status.QUALIFIED });
+    h.add({ md5: 'pending', pp: 30, mapStatus: Status.PENDING });
+    h.add({ md5: 'wip', pp: 40, mapStatus: Status.WIP });
+    h.add({ md5: 'graveyard', pp: 50, mapStatus: Status.GRAVEYARD });
+    h.add({ md5: 'unsubmitted', pp: 60, mapStatus: UNRESOLVED_STATUS });
+    h.add({ md5: 'ranked', pp: 70 });
+
+    const counted = (maps: string[]) =>
+      topPlays(h.db, h.profileId, 0, 100, rules({ includeUnrankedMaps: maps as never }))
+        .map((p) => p.beatmapMd5)
+        .sort();
+
+    assert.deepEqual(counted([]), ['ranked']);
+    assert.deepEqual(counted(['loved']), ['loved', 'ranked']);
+    assert.deepEqual(counted(['graveyard']), ['graveyard', 'ranked']);
+    assert.deepEqual(counted(['unsubmitted']), ['ranked', 'unsubmitted']);
+    assert.deepEqual(counted(['wip', 'pending']), ['pending', 'ranked', 'wip']);
+    assert.deepEqual(
+      counted(['loved', 'qualified', 'pending', 'wip', 'graveyard', 'unsubmitted']),
+      ['graveyard', 'loved', 'pending', 'qualified', 'ranked', 'unsubmitted', 'wip'],
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * The two settings are independent: a loved map played with relax needs both before it
+ * counts, and neither one on its own may let it through.
+ */
+test('map and mod rules are both required, not either', () => {
+  const h = harness();
+  try {
+    h.add({
+      md5: 'loved-relax',
+      pp: 10,
+      ppNomod: 200,
+      mapStatus: Status.LOVED,
+      modsRanked: false,
+      mods: '[{"acronym":"RX"}]',
+    });
+
+    const counted = (patch: Parameters<typeof rules>[0]) =>
+      topPlays(h.db, h.profileId, 0, 100, rules(patch)).length;
+
+    assert.equal(counted({}), 0);
+    assert.equal(counted({ includeUnrankedMods: true }), 0);
+    assert.equal(counted({ includeUnrankedMaps: ['loved'] as never }), 0);
+    assert.equal(
+      counted({ includeUnrankedMods: true, includeUnrankedMaps: ['loved'] as never }),
+      1,
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('including a beatmap state moves ranked score, bonus pp and the grade counts too', () => {
+  const h = harness();
+  try {
+    h.add({ md5: 'ranked', pp: 100 });
+    h.add({ md5: 'loved', pp: 100, mapStatus: Status.LOVED });
+
+    const before = computeStats(h.db, h.profileId, 0, VANILLA);
+    const after = computeStats(
+      h.db,
+      h.profileId,
+      0,
+      rules({ includeUnrankedMaps: ['loved'] as never }),
+    );
+
+    assert.equal(before.distinctRankedBeatmaps, 1);
+    assert.equal(after.distinctRankedBeatmaps, 2);
+    assert.ok(after.bonusPp > before.bonusPp);
+    assert.ok(after.rankedScore > before.rankedScore);
+    assert.equal(after.grades.S, before.grades.S + 1);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('an unrecognised beatmap state in stored settings is dropped, not trusted', () => {
+  const h = harness();
+  try {
+    h.add({ md5: 'ranked', pp: 100 });
+    h.add({ md5: 'loved', pp: 999, mapStatus: Status.LOVED });
+
+    // As if a newer version had written a state this one does not know about.
+    const e = eligibilityOf({
+      ...defaultSettings(),
+      includeUnrankedMaps: ['loved', 'nonsense', 'loved'] as never,
+    });
+    assert.deepEqual(e.extraMapStatuses, [Status.LOVED]);
+    assert.equal(topPlays(h.db, h.profileId, 0, 100, e).length, 2);
+  } finally {
+    h.cleanup();
+  }
+});

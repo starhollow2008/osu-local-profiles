@@ -68,6 +68,25 @@ const SETTINGS_FIELDS = [
       'score, because a relax run reaches accuracy and combo the player could not by hand. ' +
       'Both numbers come from osu! itself and both are stored, so switching is instant.',
   },
+  {
+    key: 'includeUnrankedMaps',
+    type: 'checkboxes',
+    label: 'Include pp for unranked beatmaps',
+    // Roughly osu!'s own ordering, most-established first.
+    options: [
+      ['loved', 'Loved'],
+      ['qualified', 'Qualified'],
+      ['pending', 'Pending'],
+      ['wip', 'Work in progress'],
+      ['graveyard', 'Graveyarded'],
+      ['unsubmitted', 'Never submitted'],
+    ],
+    hint:
+      'None by default. These are separate choices because they are not the same thing: a ' +
+      'Loved map is played competitively, a graveyarded one may be a draft nobody finished, ' +
+      'and a never-submitted one exists only on your machine. pp still comes from osu!, ' +
+      'which will happily price any beatmap it is given.',
+  },
 ];
 
 let mode = 0;
@@ -241,9 +260,10 @@ async function loadProfile() {
   $('topCount').textContent = fmt(data.top.length);
   $('topRanks').innerHTML = playList(data.top, {
     showWeight: true,
-    empty: settings.includeUnrankedMods
-      ? 'No plays with a pp value tracked yet.'
-      : 'No ranked plays tracked yet.',
+    empty:
+      settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
+        ? 'No plays with a pp value tracked yet.'
+        : 'No ranked plays tracked yet.',
   });
 
   const chart = playcountChart(data.monthlyPlaycounts);
@@ -351,6 +371,18 @@ function settingControl(f) {
   if (f.type === 'toggle') {
     return `<input type="checkbox" id="${id}"${settings[f.key] ? ' checked' : ''}>`;
   }
+  if (f.type === 'checkboxes') {
+    const chosen = new Set(settings[f.key] ?? []);
+    return `<div class="checkgroup" id="${id}">${f.options
+      .map(
+        ([value, label]) =>
+          `<label class="checkgroup__item">
+            <input type="checkbox" value="${escapeHtml(value)}"${chosen.has(value) ? ' checked' : ''}>
+            <span>${escapeHtml(label)}</span>
+          </label>`,
+      )
+      .join('')}</div>`;
+  }
   if (f.type === 'choice') {
     return `<select id="${id}">${f.options
       .map(
@@ -367,7 +399,11 @@ function settingControl(f) {
 
 function readSettingControl(f) {
   const el = $(`set-${f.key}`);
-  return f.type === 'toggle' ? el.checked : el.value;
+  if (f.type === 'toggle') return el.checked;
+  if (f.type === 'checkboxes') {
+    return [...el.querySelectorAll('input:checked')].map((i) => i.value);
+  }
+  return el.value;
 }
 
 /**
@@ -387,7 +423,7 @@ function applySettingDependencies() {
 function renderSettingsFields() {
   $('settingsFields').innerHTML = SETTINGS_FIELDS.map(
     (f) => `<div class="setting">
-      <label class="field">
+      <label class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
         <span>${escapeHtml(f.label)}</span>
         ${settingControl(f)}
       </label>

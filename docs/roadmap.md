@@ -15,8 +15,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.0  | Retire `prompt.txt`, keep the reference links | done   |
 | 5.1  | Settings store and Settings dialog            | done   |
 | 5.2  | Include pp for unranked **mods**              | done   |
-| 5.3  | Include pp for unranked **maps**              | in progress |
-| 5.4  | Score actions: pin, reorder, hide             | todo   |
+| 5.3  | Include pp for unranked **maps**              | done   |
+| 5.4  | Score actions: pin, reorder, hide             | in progress |
 | 5.5  | Editable identity + linked osu! account       | todo   |
 | 5.6  | `me!` section                                 | todo   |
 | 5.7  | Draggable section order                       | todo   |
@@ -181,7 +181,7 @@ toggle back removes them with no reingest.
 
 ## 5.3 — Include pp for unranked maps
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** A second toggle, *"Include pp for unranked beatmaps"*, covering pending, WIP,
 graveyard, qualified, loved and never-submitted maps.
@@ -204,7 +204,7 @@ all follow, and the toggle is instant.
 
 ## 5.4 — Score actions: pin, reorder, hide
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** osu!'s three-dot menu on a score row, plus one thing osu! does not have: removing a
 score from the profile entirely.

@@ -34,6 +34,14 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   rank. The Settings dialog offers to recalculate them from their replay files. Rows are
   updated in place, and a score whose replay has been deleted is left alone.
 
+### Counting unranked beatmaps
+
+- **Include pp for unranked beatmaps**, none by default. Loved, Qualified, Pending, Work in
+  progress, Graveyarded and Never submitted are each a separate choice, because they are not
+  the same proposition -- a Loved map is played competitively, a graveyarded one may be a
+  draft nobody finished, and a never-submitted one exists only on your machine.
+- Independent of the mod setting: a Loved map played with Relax needs both before it counts.
+
 ### Development
 
 - `npm run build:pp:local` refreshes `tools/pp/`, which `src/calc/official.ts` prefers over

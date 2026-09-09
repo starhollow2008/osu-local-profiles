@@ -29,6 +29,25 @@ export function awardsPp(status: number | null | undefined): boolean {
   return status === Status.RANKED || status === Status.APPROVED;
 }
 
+/**
+ * The beatmap states a profile can choose to count, keyed by the name the setting uses.
+ *
+ * Offered separately rather than as one "unranked maps" switch, because they are not one
+ * proposition: a Loved map has been through mapping and is played competitively, while a
+ * graveyarded one may be a draft nobody ever finished. `unsubmitted` covers a beatmap with
+ * no `online.db` row at all -- it still has a local `.osu`, so it can still be scored.
+ */
+export const UNRANKED_MAP_STATUSES = {
+  loved: Status.LOVED,
+  qualified: Status.QUALIFIED,
+  pending: Status.PENDING,
+  wip: Status.WIP,
+  graveyard: Status.GRAVEYARD,
+  unsubmitted: UNRESOLVED_STATUS,
+} as const;
+
+export type UnrankedMapStatus = keyof typeof UNRANKED_MAP_STATUSES;
+
 export interface ResolvedBeatmap {
   md5: string;
   osuPath: string | null;

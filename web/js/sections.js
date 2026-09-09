@@ -27,13 +27,19 @@ function maybeLink(href, inner, className) {
  * profile is configured.
  */
 export function countingNoteText(counting) {
-  if (!counting?.includeUnrankedMods) return '';
-  return counting.preferStrippedPp
-    ? 'This profile counts plays osu! does not rank. Relax and Autopilot plays are priced ' +
-        'as if the mod had been off, which osu! never awards - those are marked with *. ' +
-        'The pp and rank here are not comparable with a real osu! account.'
-    : 'This profile counts plays osu! does not rank, using osu!’s own pp for the mods ' +
-        'as played. The pp and rank here are not comparable with a real osu! account.';
+  const included = [];
+  if (counting?.includeUnrankedMods) included.push('mods');
+  if (counting?.extraMapStatuses?.length) included.push('beatmaps');
+  if (included.length === 0) return '';
+
+  let text = `This profile counts plays on ${included.join(' and ')} osu! does not rank. `;
+  if (counting.includeUnrankedMods) {
+    text += counting.preferStrippedPp
+      ? 'Relax and Autopilot plays are priced as if the mod had been off, which osu! never ' +
+        'awards - those are marked with *. '
+      : 'Relax and Autopilot plays use osu!’s own pp for the mods as played. ';
+  }
+  return `${text}The pp and rank here are not comparable with a real osu! account.`;
 }
 
 /**

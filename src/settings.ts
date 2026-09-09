@@ -1,4 +1,5 @@
 import type { Db } from './db/index.ts';
+import { UNRANKED_MAP_STATUSES, type UnrankedMapStatus } from './clients/beatmaps.ts';
 
 /**
  * Per-profile settings, edited from the page.
@@ -38,6 +39,15 @@ export interface Settings {
    * what the same player could reach by hand.
    */
   unrankedModPp: 'without-the-mod' | 'as-played';
+  /**
+   * Beatmap states to count besides ranked and approved: `loved`, `qualified`, `pending`,
+   * `wip`, `graveyard`, `unsubmitted`. Empty by default.
+   *
+   * A list rather than one switch, because these are not one proposition -- a Loved map is
+   * played competitively, a graveyarded one may be a draft nobody finished, and an
+   * unsubmitted one exists only on this machine.
+   */
+  includeUnrankedMaps: UnrankedMapStatus[];
 }
 
 /**
@@ -88,6 +98,21 @@ const DEFS: Defs = {
   unrankedModPp: {
     default: 'without-the-mod',
     coerce: (raw) => (raw === 'as-played' ? 'as-played' : 'without-the-mod'),
+  },
+  includeUnrankedMaps: {
+    default: [],
+    coerce: (raw) => {
+      if (!Array.isArray(raw)) return [];
+      // Filtered against the known set and de-duplicated, so a stored list written by a
+      // different version cannot widen what counts.
+      const seen = new Set<string>();
+      return raw.filter((value): value is UnrankedMapStatus => {
+        if (typeof value !== 'string' || !(value in UNRANKED_MAP_STATUSES)) return false;
+        if (seen.has(value)) return false;
+        seen.add(value);
+        return true;
+      });
+    },
   },
 };
 

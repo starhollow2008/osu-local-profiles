@@ -226,6 +226,22 @@ Both values are stored for every score, so switching between them is instant.
 Whenever a profile is counting something osu! would not, the page says so above Best
 Performance, and every affected row is marked.
 
+### Include pp for unranked beatmaps
+
+None by default. Six states, each its own choice, because they are not one proposition:
+
+| state | what it is |
+|---|---|
+| Loved | community-voted, played competitively, no pp in osu! |
+| Qualified | ranked-pending, will usually become ranked |
+| Pending | submitted, awaiting nomination |
+| Work in progress | submitted, explicitly unfinished |
+| Graveyarded | submitted, then abandoned |
+| Never submitted | not in lazer's `online.db` at all -- it exists only on your machine |
+
+pp still comes from osu!'s own calculator, which will price any beatmap it is handed. The
+two settings are independent: a Loved map played with Relax needs both before it counts.
+
 ### Recalculating older scores
 
 Scores tracked before this existed have no pp for anything osu! would not rank -- there was

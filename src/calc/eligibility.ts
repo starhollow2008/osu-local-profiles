@@ -1,4 +1,4 @@
-import { Status } from '../clients/beatmaps.ts';
+import { Status, UNRANKED_MAP_STATUSES } from '../clients/beatmaps.ts';
 import type { Settings } from '../settings.ts';
 
 /**
@@ -21,12 +21,15 @@ export interface Eligibility {
   includeUnrankedMods: boolean;
   /** Score relax/autopilot plays as if the mod were off, rather than as osu! prices them. */
   preferStrippedPp: boolean;
+  /** Beatmap `approved` values to count beyond ranked and approved. Empty by default. */
+  extraMapStatuses: number[];
 }
 
 /** osu!'s own rules: ranked and approved maps, default settings on ranked mods, nothing else. */
 export const VANILLA: Eligibility = {
   includeUnrankedMods: false,
   preferStrippedPp: false,
+  extraMapStatuses: [],
 };
 
 export function eligibilityOf(settings: Settings): Eligibility {
@@ -35,11 +38,30 @@ export function eligibilityOf(settings: Settings): Eligibility {
     includeUnrankedMods,
     // Only meaningful while unranked mods are being counted at all.
     preferStrippedPp: includeUnrankedMods && settings.unrankedModPp === 'without-the-mod',
+    extraMapStatuses: mapStatuses(settings.includeUnrankedMaps),
   };
 }
 
-/** Statuses that award pp in osu!, as SQL. */
-const RANKED_STATUSES = `(${Status.RANKED}, ${Status.APPROVED})`;
+/**
+ * Turn the setting's status names into osu!'s numeric values.
+ *
+ * `getSettings` already validates, but this is the one place where a stored setting reaches
+ * generated SQL, so it validates again rather than trusting its caller. Anything unknown is
+ * dropped; duplicates are collapsed; the result is sorted so the SQL is stable and prepared
+ * statements stay cacheable rather than varying with the order the boxes were ticked.
+ */
+function mapStatuses(names: readonly string[] | undefined): number[] {
+  if (!Array.isArray(names)) return [];
+  const out = new Set<number>();
+  for (const name of names) {
+    const status = UNRANKED_MAP_STATUSES[name as keyof typeof UNRANKED_MAP_STATUSES];
+    if (typeof status === 'number') out.add(status);
+  }
+  return [...out].sort((a, b) => a - b);
+}
+
+/** Statuses that award pp in osu!. */
+const RANKED_STATUSES = [Status.RANKED, Status.APPROVED];
 
 /**
  * The pp column to rank and weight by.
@@ -65,8 +87,11 @@ export function starsColumn(e: Eligibility, alias = 's'): string {
  * column is the only evidence available, so it stands in. `/api/recompute` replaces the
  * guess with the real status.
  */
-function mapSql(alias: string): string {
-  return `(${alias}.map_status IN ${RANKED_STATUSES}
+function mapSql(e: Eligibility, alias: string): string {
+  // Numbers from a closed set -- osu!'s own enum plus the unresolved sentinel -- so there
+  // is nothing here to parameterise.
+  const allowed = [...RANKED_STATUSES, ...e.extraMapStatuses].join(', ');
+  return `(${alias}.map_status IN (${allowed})
            OR (${alias}.map_status IS NULL AND ${alias}.ranked = 1))`;
 }
 
@@ -87,7 +112,7 @@ function modsSql(e: Eligibility, alias: string): string {
  */
 export function countsSql(e: Eligibility, alias = 's'): string {
   return `(${alias}.passed = 1
-           AND ${mapSql(alias)}
+           AND ${mapSql(e, alias)}
            AND ${modsSql(e, alias)}
            AND ${ppColumn(e, alias)} IS NOT NULL)`;
 }
