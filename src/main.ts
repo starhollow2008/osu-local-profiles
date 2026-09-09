@@ -8,6 +8,8 @@ import { activeProfileId, getProfile } from './profiles.ts';
 import { Tracker } from './tracker/index.ts';
 import { startServer } from './http/server.ts';
 import { OfficialCalculator } from './calc/official.ts';
+import { computeStats } from './calc/stats.ts';
+import { estimateRank } from './calc/rank.ts';
 
 const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
 
@@ -127,6 +129,18 @@ async function main(): Promise<void> {
       `  [${time}] ${pp}  ${s.grade.padEnd(2)} ${(s.accuracy * 100).toFixed(2)}%  ` +
         `${s.modsLabel.padEnd(6)}${stars}  ${s.title}`,
     );
+
+    // Where that play left the profile. The point of the whole app is the running total,
+    // and reading it off the console beats switching to the browser for every score.
+    if (s.pp !== null) {
+      const totals = computeStats(db, tracker.profileId, s.mode);
+      const rank = estimateRank(totals.totalPp, s.mode);
+      console.log(
+        `            -> ${totals.totalPp.toFixed(0)}pp` +
+          `${rank ? `  #${rank.rank.toLocaleString()}` : ''}` +
+          `  ${(totals.accuracy * 100).toFixed(2)}%  lv${totals.level.current}`,
+      );
+    }
   });
   tracker.on('error', (e) => console.error(`  watcher error: ${e.message}`));
 
@@ -142,7 +156,15 @@ async function main(): Promise<void> {
   });
 
   const url = `http://localhost:${config.port}`;
+  // The banner reports osu!standard; other modes are a click away on the page.
+  const standing = computeStats(db, profileId, 0);
+  const standingRank = estimateRank(standing.totalPp, 0);
   banner(`Tracking "${profileName}" -> ${url}`);
+  console.log(
+    `  ${standing.playcount} play(s), ${standing.totalPp.toFixed(0)}pp` +
+      `${standingRank ? `, around #${standingRank.rank.toLocaleString()}` : ', unranked'}` +
+      `, level ${standing.level.current}`,
+  );
   console.log('  Play osu! (online or offline) and scores will appear below.');
   console.log('  Close this window or press Ctrl+C to stop tracking.\n');
 

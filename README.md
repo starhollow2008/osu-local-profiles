@@ -11,9 +11,10 @@ Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-t
 
 ## Status
 
-Phases 1-3 are done: scores are tracked live, the page matches `osu.ppy.sh`'s profile
-design, global rank is estimated offline, mod settings are shown, and past plays can be
-imported deliberately.
+**All four phases are done.** Scores are tracked live, the page matches `osu.ppy.sh`'s
+profile design, global rank is estimated offline, past plays can be imported deliberately,
+several playstyles can be tracked side by side, and `npm run package` produces a portable
+build that needs nothing installed.
 
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout -- and
@@ -24,10 +25,16 @@ Country rank still shows `-`, on purpose; see Known gaps.
 
 ## Running it
 
+**If you have a packaged build**, unzip it anywhere and double-click
+`Start osu! fresh profile.bat`. Nothing needs installing.
+
+**From source:**
+
 ```
 npm install
 npm run build:pp     # builds the osu! pp helper (needs the .NET 8 SDK)
 npm run dev          # or double-click start.bat
+npm run check:app    # verify the install without starting to track
 ```
 
 `build:pp` is required for pp. Without it the app still tracks scores, but records no pp or
@@ -237,6 +244,29 @@ whenever you are unsure.
 
 Budget roughly 15-30 minutes per mode, depending on your connection -- the bottleneck is
 the download, not the decompression.
+
+## Building a release
+
+```
+npm run package
+```
+
+Produces `dist/osu-fresh-profile-<version>-win-x64/` and a zip beside it: **205MB on disk,
+84MB to download**, containing Node, osu!'s pp calculator and the app. The user extracts it
+and double-clicks the launcher; there is nothing to install and no admin rights needed, and
+because `data/` lives beside the app the whole folder can be moved or carried on a stick.
+
+Most of that script is *removal*. osu!'s NuGet packages carry the entire game -- fonts,
+textures, audio samples, ffmpeg, SDL, a shader compiler -- and a self-contained publish is
+272MB, of which 125MB is `osu.Game.Resources.dll` alone. A pp calculator needs none of it.
+Each exclusion was found by deleting it and re-running `test/official.test.ts`, which
+asserts pp against known-correct values, so if a future osu! version starts needing one of
+them the tests fail rather than the app quietly losing pp.
+
+The script also starts the packaged app from an unrelated directory and **refuses to finish
+unless it reports finding its pp calculator**. An early build looked perfectly fine and
+silently recorded no pp, because the helper's path was resolved from the working directory
+-- which, for a double-clicked process, is whatever Explorer decides.
 
 ## Recalculating
 
