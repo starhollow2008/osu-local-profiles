@@ -16,7 +16,7 @@ import { detectInstalls } from '../src/clients/detect.ts';
 import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { looksLikeReplay } from '../src/osr.ts';
 import { ingestReplayFile } from '../src/tracker/ingest.ts';
-import { loadConfig } from '../src/config.ts';
+import { loadConfig, dataDir } from '../src/config.ts';
 import { OfficialCalculator } from '../src/calc/official.ts';
 
 const config = loadConfig();
@@ -28,7 +28,7 @@ if (installs.length === 0) {
   process.exit(1);
 }
 
-const db = openDb(path.join(process.cwd(), 'data', 'profiles.db'));
+const db = openDb(path.join(dataDir(), 'profiles.db'));
 const profileId = getOrCreateProfile(db, profileName);
 const { tracking_since: since } = db
   .prepare('SELECT tracking_since FROM profiles WHERE id = ?')

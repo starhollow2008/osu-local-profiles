@@ -2,6 +2,7 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
 
 /**
@@ -59,9 +60,15 @@ interface Response {
 const STARTUP_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 30_000;
 
-/** Where the helper might live, most preferred first. */
+/**
+ * Where the helper might live, most preferred first.
+ *
+ * Resolved from this module's location, not the working directory: a packaged build is
+ * started by double-clicking, so the process can begin in any directory at all. Getting
+ * this wrong is quiet -- the app runs, tracks scores, and simply records no pp.
+ */
 function candidates(): Array<{ command: string; args: string[] }> {
-  const root = process.cwd();
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const selfContained = path.join(root, 'tools', 'pp', process.platform === 'win32' ? 'osu-pp.exe' : 'osu-pp');
   const built = path.join(root, 'tools', 'PpCalculator', 'bin', 'Release', 'net8.0');
   const exe = path.join(built, process.platform === 'win32' ? 'osu-pp.exe' : 'osu-pp');

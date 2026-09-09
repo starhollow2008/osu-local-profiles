@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export interface Config {
   /** Name of the fresh profile being tracked (one per alternative playstyle). */
@@ -27,8 +28,16 @@ const DEFAULTS: Config = {
   tagline: '',
 };
 
+/**
+ * Where the profile database, config and any user-supplied images live.
+ *
+ * Resolved from this module's own location rather than the working directory, so the app
+ * finds its data however it was started -- double-clicked from Explorer, launched by a
+ * shortcut, or run from a shell somewhere else entirely. In a portable build that means
+ * `data/` sits beside the app, and the whole folder can be moved or carried on a stick.
+ */
 export function dataDir(): string {
-  return path.join(process.cwd(), 'data');
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
 }
 
 export function loadConfig(): Config {

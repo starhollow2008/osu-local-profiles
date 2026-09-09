@@ -10,6 +10,9 @@ import { OfficialCalculator } from './calc/official.ts';
 
 const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
 
+/** Verify the install and exit, rather than starting to track. */
+const checkOnly = process.argv.includes('--check-only');
+
 function banner(text: string): void {
   console.log(`\n  ${text}`);
 }
@@ -53,6 +56,26 @@ async function main(): Promise<void> {
   const profile = db
     .prepare('SELECT tracking_since FROM profiles WHERE id = ?')
     .get(profileId) as { tracking_since: number };
+
+  /*
+   * `--check-only` verifies the install and exits: does it find osu!, and does it find the
+   * pp calculator? It skips the beatmap index, which is slow and irrelevant to that
+   * question. `npm run package` uses it to prove a packaged build works before shipping,
+   * and it doubles as the first thing to run when something looks wrong.
+   */
+  if (checkOnly) {
+    const official = await OfficialCalculator.create();
+    if (official) {
+      console.log("\n  pp: osu!'s official calculator");
+      official.dispose();
+    } else {
+      console.log('\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating');
+    }
+    console.log(`  data: ${dataDir()}`);
+    db.close();
+    process.exitCode = official ? 0 : 1;
+    return;
+  }
 
   // The MD5 -> path index is what lets a score be matched to its beatmap offline.
   banner('Indexing local beatmaps (first run takes a minute)...');
