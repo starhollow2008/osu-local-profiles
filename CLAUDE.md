@@ -1,5 +1,15 @@
 # Notes for working in this repo
 
+## Current work
+
+v1.0.0 shipped. Ongoing work is **Phase 5**, planned in [docs/roadmap.md](docs/roadmap.md) —
+read it before starting anything new. It holds one entry per feature with its design
+decisions, the files it touches, and a status column that is the resume point if a session
+is interrupted mid-feature. Update the status as you go.
+
+Reference links (osu-web, ppy/osu, the API docs) are in
+[docs/reference-links.md](docs/reference-links.md).
+
 ## TypeScript runs unbuilt — strip-only mode
 
 `node src/main.ts` runs TypeScript directly via Node's type stripping. Types are *erased*,

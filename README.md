@@ -11,15 +11,21 @@ Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-t
 
 ## Status
 
-**All four phases are done.** Scores are tracked live, the page matches `osu.ppy.sh`'s
-profile design, global rank is estimated offline, past plays can be imported deliberately,
-several playstyles can be tracked side by side, and `npm run package` produces a portable
-build that needs nothing installed.
+**All four phases are done** and released as v1.0.0. Scores are tracked live, the page
+matches `osu.ppy.sh`'s profile design, global rank is estimated offline, past plays can be
+imported deliberately, several playstyles can be tracked side by side, and
+`npm run package` produces a portable build that needs nothing installed.
+
+Work in progress is **Phase 5** -- profile customisation, pinned scores, medals, sharing,
+and macOS/Linux support -- planned feature by feature in
+[docs/roadmap.md](docs/roadmap.md).
 
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
-built on -- osu-web's colour tokens, metrics and layout -- and
+built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
-handles deliberately, and what to know before changing it.
+handles deliberately, and what to know before changing it, and
+[docs/reference-links.md](docs/reference-links.md) lists the upstream sources all of it is
+built against.
 
 Country rank still shows `-`, on purpose; see Known gaps.
 

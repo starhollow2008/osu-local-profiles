@@ -1328,6 +1328,26 @@
   color-scheme: dark;
 }
 
+/*
+ * One setting in the Settings dialog: the control keeps `.field`'s single-row layout, with
+ * an explanation underneath it rather than beside it -- the hints are full sentences and
+ * would otherwise squeeze the input to nothing.
+ */
+.setting + .setting {
+  margin-top: 4px;
+}
+
+.setting__hint {
+  margin-top: 4px;
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+}
+
+.setting .field input {
+  flex: 0 1 240px;
+  min-width: 0;
+}
+
 .backfill-summary {
   margin-top: 12px;
   padding: 10px 12px;

@@ -20,6 +20,7 @@
       <div class="menu-wrap">
         <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
         <div class="menu" id="optionsMenu" hidden>
+          <button id="optSettings" type="button">Settings&hellip;</button>
           <button id="optProfiles" type="button">Profiles&hellip;</button>
           <button id="optBackfill" type="button">Import past plays&hellip;</button>
           <div class="sep"></div>
@@ -134,6 +135,25 @@
 </main>
 
 <div class="toast" id="toast"></div>
+
+<div class="backdrop" id="settingsModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <h3 id="settingsTitle">Settings</h3>
+    <p>
+      These belong to <b id="settingsProfileName">this profile</b>. Every profile keeps its
+      own, so a setting changed here does not follow you to another playstyle.
+    </p>
+
+    <div id="settingsFields"></div>
+
+    <div class="profile-hint" id="settingsHint">&nbsp;</div>
+
+    <div class="actions">
+      <button id="settingsCancel" type="button">Cancel</button>
+      <button id="settingsSave" class="primary" type="button">Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="backdrop" id="profilesModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profilesTitle">

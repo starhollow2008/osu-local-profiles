@@ -25,6 +25,7 @@ import {
   renameProfile,
   setActiveProfile,
 } from '../profiles.ts';
+import { getSettings, updateSettings, type Settings } from '../settings.ts';
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
@@ -70,6 +71,14 @@ export function startServer(opts: ServerOptions): http.Server {
    * would leave the API answering about a profile the user has already left.
    */
   const current = () => activeProfileId(opts.db);
+
+  /*
+   * config.json's country and tagline are the *fallback* for a profile that has never
+   * edited them, not the value. Anything the user saves from the page is stored per
+   * profile and wins from then on, empty included.
+   */
+  const configFallbacks: Partial<Settings> = { country: opts.country, tagline: opts.tagline };
+  const settingsFor = (profileId: number) => getSettings(opts.db, profileId, configFallbacks);
 
   const localImage = (kind: string): string | null => {
     for (const name of LOCAL_IMAGES[kind] ?? []) {
@@ -128,12 +137,14 @@ export function startServer(opts: ServerOptions): http.Server {
 
     if (url.pathname === '/api/state') {
       const profile = getProfile(opts.db, current())!;
+      const settings = settingsFor(profile.id);
       return json(res, {
+        settings,
         profile: {
           id: profile.id,
           name: profile.name,
-          country: opts.country,
-          tagline: opts.tagline,
+          country: settings.country,
+          tagline: settings.tagline,
           createdAt: profile.createdAt,
           trackingSince: profile.trackingSince,
           hasAvatar: localImage('avatar') !== null,
@@ -196,6 +207,22 @@ export function startServer(opts: ServerOptions): http.Server {
         res.end(buf);
       });
       return;
+    }
+
+    /*
+     * Settings the page edits directly. A GET is only needed by anything that did not come
+     * through /api/state; the page itself already has them from there.
+     */
+    if (url.pathname === '/api/settings') {
+      if (req.method !== 'POST') return json(res, { settings: settingsFor(current()) });
+
+      return readBody(req, res, (body) => {
+        // The whole body is the patch. Keys that are not settings are ignored, so the page
+        // can post a form's worth of fields without filtering them first.
+        const settings = updateSettings(opts.db, current(), body, configFallbacks);
+        broadcast('settings', settings);
+        return json(res, { ok: true, settings });
+      });
     }
 
     if (url.pathname === '/api/profile/reset' && req.method === 'POST') {
@@ -368,6 +395,7 @@ export function startServer(opts: ServerOptions): http.Server {
     if (url.pathname === '/api/export') {
       const id = current();
       const profile = getProfile(opts.db, id)!;
+      const settings = settingsFor(id);
       const modes = [0, 1, 2, 3] as Ruleset[];
       const payload = {
         exportedAt: new Date().toISOString(),
@@ -376,8 +404,8 @@ export function startServer(opts: ServerOptions): http.Server {
           name: profile.name,
           createdAt: profile.createdAt,
           trackingSince: profile.trackingSince,
-          country: opts.country,
-          tagline: opts.tagline,
+          country: settings.country,
+          tagline: settings.tagline,
         },
         modes: modes.map((mode) => ({
           mode,

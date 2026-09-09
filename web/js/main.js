@@ -21,11 +21,37 @@ const SECTIONS = [
 /* The five grades osu! counts on a profile. XH/X and SH/S are the silver variants. */
 const GRADE_ORDER = ['XH', 'X', 'SH', 'S', 'A'];
 
+/**
+ * The Settings dialog is generated from this list, so adding a setting is one entry here
+ * plus one entry in `DEFS` in src/settings.ts. `key` matches the setting name exactly --
+ * the dialog posts the whole field set as a patch and the server ignores anything it does
+ * not recognise.
+ */
+const SETTINGS_FIELDS = [
+  {
+    key: 'country',
+    type: 'text',
+    label: 'Country',
+    maxlength: 2,
+    placeholder: 'e.g. US',
+    hint: 'Two-letter code, shown beside the profile name. Leave empty for none.',
+  },
+  {
+    key: 'tagline',
+    type: 'text',
+    label: 'Playstyle',
+    maxlength: 120,
+    placeholder: 'e.g. left hand, mouse only',
+    hint: 'What this profile is tracking. Shown under the name.',
+  },
+];
+
 let mode = 0;
 let tracking = false;
 let modesWithPlays = [];
 let profile = null;
 let stats = null;
+let settings = {};
 
 /* ---------------------------------------------------------------- header */
 
@@ -193,6 +219,7 @@ async function loadState() {
   const s = await (await fetch('/api/state')).json();
   profile = s.profile;
   profiles = s.profiles ?? [];
+  settings = s.settings ?? {};
   modesWithPlays = s.modesWithPlays ?? [];
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -262,7 +289,83 @@ document.addEventListener('keydown', (e) => {
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
   if (!$('profilesModal').hidden) closeProfiles();
+  if (!$('settingsModal').hidden) closeSettings();
 });
+
+/* ---------------------------------------------------------------- settings */
+
+function settingsHint(message, isError = false) {
+  const el = $('settingsHint');
+  el.textContent = message;
+  el.classList.toggle('profile-hint--error', isError);
+}
+
+function renderSettingsFields() {
+  $('settingsFields').innerHTML = SETTINGS_FIELDS.map((f) => {
+    const value = escapeHtml(String(settings[f.key] ?? ''));
+    const control = `<input type="text" id="set-${f.key}" value="${value}"
+        maxlength="${f.maxlength}" placeholder="${escapeHtml(f.placeholder ?? '')}">`;
+    return `<div class="setting">
+      <label class="field">
+        <span>${escapeHtml(f.label)}</span>
+        ${control}
+      </label>
+      <div class="setting__hint">${escapeHtml(f.hint ?? '')}</div>
+    </div>`;
+  }).join('');
+}
+
+function openSettings() {
+  setMenuOpen(false);
+  $('settingsProfileName').textContent = profile?.name ?? 'this profile';
+  renderSettingsFields();
+  settingsHint(' ');
+  $('settingsModal').hidden = false;
+  $('settingsCancel').focus();
+}
+
+const closeSettings = () => { $('settingsModal').hidden = true; };
+
+$('optSettings').onclick = openSettings;
+$('settingsCancel').onclick = closeSettings;
+$('settingsModal').onclick = (e) => {
+  if (e.target === $('settingsModal')) closeSettings();
+};
+
+$('settingsSave').onclick = async () => {
+  // The whole field set goes up as one patch: the server coerces each value and hands the
+  // cleaned result back, which is what gets rendered -- so a rejected country code shows
+  // as empty here rather than appearing to have saved.
+  const patch = {};
+  for (const f of SETTINGS_FIELDS) patch[f.key] = $(`set-${f.key}`).value;
+
+  $('settingsSave').disabled = true;
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'saving failed');
+
+    const rejected = SETTINGS_FIELDS.filter(
+      (f) => String(patch[f.key]).trim() !== '' && String(d.settings[f.key] ?? '') === '',
+    );
+    settings = d.settings;
+    await loadState();
+    closeSettings();
+    toast(
+      rejected.length
+        ? `Saved - ${rejected.map((f) => f.label.toLowerCase()).join(' and ')} was not valid and was cleared`
+        : 'Settings saved',
+    );
+  } catch (err) {
+    settingsHint(err.message, true);
+  } finally {
+    $('settingsSave').disabled = false;
+  }
+};
 
 /* ---------------------------------------------------------------- profiles */
 
@@ -615,6 +718,9 @@ es.addEventListener('profiles', () => {
   loadProfile();
   loadState();
 });
+// Settings only change the header, but a second tab open on the same profile should not
+// be left showing the old country.
+es.addEventListener('settings', () => loadState());
 
 /* ------------------------------------------------------------------ boot */
 

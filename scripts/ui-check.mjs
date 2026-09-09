@@ -182,6 +182,47 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nsettings dialog');
+check('settings dialog is hidden on load', await shown('settingsModal'), 'none');
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optSettings').click()");
+check('settings dialog opens', await shown('settingsModal'), 'grid');
+check('options menu closed behind it', await shown('optionsMenu'), 'none');
+// The fields are generated from SETTINGS_FIELDS, so an empty list means the render broke.
+check(
+  'every setting has a control and a hint',
+  await evaluate(`(() => {
+    const settings = document.querySelectorAll('#settingsFields .setting');
+    if (settings.length === 0) return 'no settings rendered';
+    return [...settings].every(
+      (s) => s.querySelector('input') && s.querySelector('.setting__hint').textContent.trim(),
+    );
+  })()`),
+  true,
+);
+check(
+  'the dialog names the profile it applies to',
+  await evaluate("document.getElementById('settingsProfileName').textContent.trim().length > 0"),
+  true,
+);
+await evaluate("document.getElementById('settingsCancel').click()");
+check('Cancel closes the settings dialog', await shown('settingsModal'), 'none');
+
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optSettings').click()");
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes the settings dialog', await shown('settingsModal'), 'none');
+
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optSettings').click()");
+await evaluate(`(() => {
+  const el = document.getElementById('settingsModal');
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+})()`);
+check('backdrop click closes the settings dialog', await shown('settingsModal'), 'none');
+
 console.log('\nprofiles dialog');
 check('profiles dialog is hidden on load', await shown('profilesModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");

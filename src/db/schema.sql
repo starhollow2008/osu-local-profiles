@@ -12,6 +12,15 @@ CREATE TABLE IF NOT EXISTS profiles (
   default_mode   INTEGER NOT NULL DEFAULT 0
 );
 
+-- Settings the user edits from the page, one row per key so that adding a setting later
+-- never needs a migration. Values are JSON; see src/settings.ts for the key list.
+CREATE TABLE IF NOT EXISTS profile_settings (
+  profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  key        TEXT    NOT NULL,
+  value      TEXT    NOT NULL,
+  PRIMARY KEY (profile_id, key)
+);
+
 CREATE TABLE IF NOT EXISTS scores (
   id              INTEGER PRIMARY KEY,
   profile_id      INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
