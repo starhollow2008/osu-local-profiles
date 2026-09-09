@@ -1,6 +1,6 @@
 {
   "name": "osu-fresh-profile",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Track an alternative osu! playstyle as a fresh profile, locally.",
   "type": "module",
@@ -24,5 +24,10 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "typescript": "^5.7.0"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jonathant09/osu-fresh-profile.git"
   }
 }

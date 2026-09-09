@@ -251,17 +251,21 @@ the download, not the decompression.
 npm run package
 ```
 
-Produces `dist/osu-fresh-profile-<version>-win-x64/` and a zip beside it: **205MB on disk,
-84MB to download**, containing Node, osu!'s pp calculator and the app. The user extracts it
+Produces `dist/osu-fresh-profile-<version>-win-x64/` and a zip beside it: **203MB on disk,
+83MB to download**, containing Node, osu!'s pp calculator and the app. The user extracts it
 and double-clicks the launcher; there is nothing to install and no admin rights needed, and
 because `data/` lives beside the app the whole folder can be moved or carried on a stick.
 
 Most of that script is *removal*. osu!'s NuGet packages carry the entire game -- fonts,
 textures, audio samples, ffmpeg, SDL, a shader compiler -- and a self-contained publish is
-272MB, of which 125MB is `osu.Game.Resources.dll` alone. A pp calculator needs none of it.
-Each exclusion was found by deleting it and re-running `test/official.test.ts`, which
-asserts pp against known-correct values, so if a future osu! version starts needing one of
-them the tests fail rather than the app quietly losing pp.
+273MB, of which 125MB is `osu.Game.Resources.dll` alone.
+
+Less can go than you would think. osu.Framework's `Logger` static constructor pulls in
+nearly the whole managed assembly graph, so what is safe to delete is only what loads
+lazily: the resources assembly, localisation satellites, and native libraries reached by
+P/Invoke. One of those is worth calling out -- the native BASS audio binaries are
+commercially licensed and this app never plays a sound, so they are excluded (see
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)).
 
 The script also starts the packaged app from an unrelated directory and **refuses to finish
 unless it reports finding its pp calculator**. An early build looked perfectly fine and
@@ -281,5 +285,18 @@ This rebuilds every tracked score from its replay file.
 
 ## Licence
 
-MIT. This project reimplements osu-web's visual design from its published design tokens
-rather than copying its stylesheets, which are AGPL-3.0.
+MIT — see [LICENSE](LICENSE).
+
+The visual design is reimplemented from osu-web's *published design tokens* rather than
+copied from its stylesheets, which are AGPL-3.0. No osu-web CSS or image asset is included;
+the token table it was rebuilt from is recorded in
+[docs/osu-web-reference.md](docs/osu-web-reference.md).
+
+A packaged build bundles other people's software — osu!'s own pp code, the .NET runtime,
+Node.js and their dependencies. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists
+what, and what is deliberately excluded — notably the commercially-licensed BASS audio
+library, which this app has no use for.
+
+**What this does not do:** it never contacts osu!'s game servers, never logs in, uses no
+API credentials, and only reads replay and beatmap files already on your disk. It does not
+automate or assist play in any way.

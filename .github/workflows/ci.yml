@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - run: npm ci
+
+      # pp comes from osu!'s own code, so the calculator has to exist before the tests
+      # that assert pp against known-correct values can mean anything.
+      - name: Build the pp calculator
+        run: npm run build:pp
+
+      - run: npm run typecheck
+
+      # Several tests need a real osu! installation and a replay corpus, which a CI runner
+      # does not have; those skip themselves. What still runs everywhere is the part that
+      # can silently rot: accuracy, level, pp weighting, the rank curves' shape, profile
+      # lifecycle and the backfill cutoff logic.
+      - name: Test
+        run: npm test

@@ -117,7 +117,20 @@ export class OfficialCalculator {
 
   /** Returns null when the helper is not built or cannot start. */
   static async create(): Promise<OfficialCalculator | null> {
+    /*
+     * The candidate list is a convenience for development, where a packaged helper and a
+     * plain `dotnet build` output can both exist. It is also a trap: a broken packaged
+     * helper falls through to the working one, so the tests pass while the thing that
+     * would actually ship is dead. That happened -- pruning removed an assembly osu!
+     * loads from a module initializer, and three pp tests kept passing against the
+     * fallback. So say when a candidate was there and failed, rather than moving on
+     * silently.
+     */
+    let attempt = 0;
     for (const { command, args } of candidates()) {
+      if (attempt++ > 0) {
+        console.warn(`  note: falling back to ${path.basename(path.dirname(command))} -- the preferred pp helper failed to start`);
+      }
       try {
         const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
         const lines = readline.createInterface({ input: child.stdout });
