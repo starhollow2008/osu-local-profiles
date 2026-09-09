@@ -22,6 +22,15 @@ export function openDb(file: string): Db {
 const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: string }> = [
   { table: 'scores', column: 'max_statistics_json', definition: 'TEXT' },
   { table: 'scores', column: 'replay_path', definition: 'TEXT' },
+  // Added with the unranked-mods setting. These stay NULL on rows ingested before it,
+  // which is why every query that reads them falls back to `ranked`; `/api/recompute`
+  // fills them in from the replays.
+  { table: 'scores', column: 'pp_nomod', definition: 'REAL' },
+  { table: 'scores', column: 'stars_nomod', definition: 'REAL' },
+  { table: 'scores', column: 'beatmap_max_combo', definition: 'INTEGER' },
+  { table: 'scores', column: 'map_status', definition: 'INTEGER' },
+  { table: 'scores', column: 'mods_ranked', definition: 'INTEGER' },
+  { table: 'scores', column: 'mods_countable', definition: 'INTEGER' },
 ];
 
 function migrate(db: Db): void {

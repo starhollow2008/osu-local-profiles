@@ -21,6 +21,23 @@ export interface Settings {
   country: string;
   /** What to call the playstyle under the profile name, e.g. "left hand, mouse only". */
   tagline: string;
+  /**
+   * Count scores osu! refuses to rank because of their mods -- Relax, Autopilot, a
+   * customised rate such as DT at 1.45x. Off by default: on, the profile stops being
+   * comparable with a real osu! account, which is the whole point of it.
+   */
+  includeUnrankedMods: boolean;
+  /**
+   * How to price a Relax or Autopilot play once they are being counted.
+   *
+   * `without-the-mod` scores the play's hits as if the mod had been off, which is what
+   * makes "relax counts as nomod, relax + DT counts as DT" true. `as-played` uses osu!'s
+   * own relax-aware difficulty and performance calculation instead. Both come from osu!'s
+   * code and both are stored, so switching is instant -- but they are far apart (111pp
+   * against 239pp on one real replay), because a relax play's accuracy and combo are not
+   * what the same player could reach by hand.
+   */
+  unrankedModPp: 'without-the-mod' | 'as-played';
 }
 
 /**
@@ -62,6 +79,15 @@ const DEFS: Defs = {
   tagline: {
     default: '',
     coerce: (raw) => cleanText(raw, 120),
+  },
+  includeUnrankedMods: {
+    default: false,
+    // Checkboxes post strings, and JSON round-trips booleans, so accept both shapes.
+    coerce: (raw) => raw === true || raw === 'true' || raw === 1 || raw === '1',
+  },
+  unrankedModPp: {
+    default: 'without-the-mod',
+    coerce: (raw) => (raw === 'as-played' ? 'as-played' : 'without-the-mod'),
   },
 };
 

@@ -8,7 +8,7 @@
 import { MODE_NAMES, escapeHtml, fmt, pct } from './format.js';
 import { coverUrl, generatedAvatar, gradeBadge, levelBadge } from './badges.js';
 import { playcountChart, ppChart, rankChart } from './charts.js';
-import { activityList, beatmapPlaycountList, playList } from './sections.js';
+import { activityList, beatmapPlaycountList, countingNoteText, playList } from './sections.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -44,6 +44,30 @@ const SETTINGS_FIELDS = [
     placeholder: 'e.g. left hand, mouse only',
     hint: 'What this profile is tracking. Shown under the name.',
   },
+  {
+    key: 'includeUnrankedMods',
+    type: 'toggle',
+    label: 'Include pp for unranked mods',
+    hint:
+      'Count plays osu! refuses to rank because of their mods - Relax, Autopilot, or a ' +
+      'customised rate such as DT at 1.45x. Off by default: with this on, the profile is ' +
+      'no longer comparable with a real osu! account.',
+  },
+  {
+    key: 'unrankedModPp',
+    type: 'choice',
+    label: 'Price relax plays',
+    dependsOn: 'includeUnrankedMods',
+    options: [
+      ['without-the-mod', 'as if the mod were off'],
+      ['as-played', 'as osu! scores them'],
+    ],
+    hint:
+      'Relax and Autopilot only. "As if the mod were off" makes relax count as nomod and ' +
+      'relax + DT count as DT, which is usually what people mean - but it flatters the ' +
+      'score, because a relax run reaches accuracy and combo the player could not by hand. ' +
+      'Both numbers come from osu! itself and both are stored, so switching is instant.',
+  },
 ];
 
 let mode = 0;
@@ -52,6 +76,8 @@ let modesWithPlays = [];
 let profile = null;
 let stats = null;
 let settings = {};
+let counting = null;
+let staleScores = 0;
 
 /* ---------------------------------------------------------------- header */
 
@@ -178,6 +204,20 @@ function renderRank(data) {
   }
 }
 
+/**
+ * Says, once, that this profile is not being scored the way osu! would.
+ *
+ * The individual rows are marked too, but a total on its own gives the reader no reason to
+ * go looking at the rows it came from -- so the section that carries the total has to admit
+ * it. The wording lives in sections.js; this only decides whether it is on screen.
+ */
+function renderCountingNote(next) {
+  counting = next ?? null;
+  const text = countingNoteText(counting);
+  $('countingNote').textContent = text;
+  $('countingNote').hidden = text === '';
+}
+
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
@@ -196,10 +236,14 @@ async function loadProfile() {
 
   $('recentActivity').innerHTML = activityList(data.events);
 
+  renderCountingNote(data.counting);
+
   $('topCount').textContent = fmt(data.top.length);
   $('topRanks').innerHTML = playList(data.top, {
     showWeight: true,
-    empty: 'No ranked plays tracked yet.',
+    empty: settings.includeUnrankedMods
+      ? 'No plays with a pp value tracked yet.'
+      : 'No ranked plays tracked yet.',
   });
 
   const chart = playcountChart(data.monthlyPlaycounts);
@@ -220,6 +264,7 @@ async function loadState() {
   profile = s.profile;
   profiles = s.profiles ?? [];
   settings = s.settings ?? {};
+  staleScores = s.staleScores ?? 0;
   modesWithPlays = s.modesWithPlays ?? [];
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -300,19 +345,58 @@ function settingsHint(message, isError = false) {
   el.classList.toggle('profile-hint--error', isError);
 }
 
+/** The control for one field. `settings` holds the cleaned values the server handed back. */
+function settingControl(f) {
+  const id = `set-${f.key}`;
+  if (f.type === 'toggle') {
+    return `<input type="checkbox" id="${id}"${settings[f.key] ? ' checked' : ''}>`;
+  }
+  if (f.type === 'choice') {
+    return `<select id="${id}">${f.options
+      .map(
+        ([value, label]) =>
+          `<option value="${escapeHtml(value)}"${
+            settings[f.key] === value ? ' selected' : ''
+          }>${escapeHtml(label)}</option>`,
+      )
+      .join('')}</select>`;
+  }
+  return `<input type="text" id="${id}" value="${escapeHtml(String(settings[f.key] ?? ''))}"
+      maxlength="${f.maxlength}" placeholder="${escapeHtml(f.placeholder ?? '')}">`;
+}
+
+function readSettingControl(f) {
+  const el = $(`set-${f.key}`);
+  return f.type === 'toggle' ? el.checked : el.value;
+}
+
+/**
+ * A field whose `dependsOn` toggle is off is dimmed rather than hidden: it still explains
+ * what turning the toggle on would do, which is most of why someone opens this dialog.
+ */
+function applySettingDependencies() {
+  for (const f of SETTINGS_FIELDS) {
+    if (!f.dependsOn) continue;
+    const enabled = Boolean($(`set-${f.dependsOn}`)?.checked);
+    const el = $(`set-${f.key}`);
+    el.disabled = !enabled;
+    el.closest('.setting').classList.toggle('setting--inactive', !enabled);
+  }
+}
+
 function renderSettingsFields() {
-  $('settingsFields').innerHTML = SETTINGS_FIELDS.map((f) => {
-    const value = escapeHtml(String(settings[f.key] ?? ''));
-    const control = `<input type="text" id="set-${f.key}" value="${value}"
-        maxlength="${f.maxlength}" placeholder="${escapeHtml(f.placeholder ?? '')}">`;
-    return `<div class="setting">
+  $('settingsFields').innerHTML = SETTINGS_FIELDS.map(
+    (f) => `<div class="setting">
       <label class="field">
         <span>${escapeHtml(f.label)}</span>
-        ${control}
+        ${settingControl(f)}
       </label>
       <div class="setting__hint">${escapeHtml(f.hint ?? '')}</div>
-    </div>`;
-  }).join('');
+    </div>`,
+  ).join('');
+
+  applySettingDependencies();
+  $('settingsFields').onchange = applySettingDependencies;
 }
 
 function openSettings() {
@@ -337,7 +421,7 @@ $('settingsSave').onclick = async () => {
   // cleaned result back, which is what gets rendered -- so a rejected country code shows
   // as empty here rather than appearing to have saved.
   const patch = {};
-  for (const f of SETTINGS_FIELDS) patch[f.key] = $(`set-${f.key}`).value;
+  for (const f of SETTINGS_FIELDS) patch[f.key] = readSettingControl(f);
 
   $('settingsSave').disabled = true;
   try {
@@ -349,23 +433,82 @@ $('settingsSave').onclick = async () => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error ?? 'saving failed');
 
+    // Only free text can be rejected; a checkbox or a select cannot hold a bad value.
     const rejected = SETTINGS_FIELDS.filter(
-      (f) => String(patch[f.key]).trim() !== '' && String(d.settings[f.key] ?? '') === '',
+      (f) =>
+        (f.type ?? 'text') === 'text' &&
+        String(patch[f.key]).trim() !== '' &&
+        String(d.settings[f.key] ?? '') === '',
     );
     settings = d.settings;
-    await loadState();
     closeSettings();
+    // The eligibility settings change every number on the page, not just the header.
+    await Promise.all([loadState(), loadProfile()]);
     toast(
       rejected.length
         ? `Saved - ${rejected.map((f) => f.label.toLowerCase()).join(' and ')} was not valid and was cleared`
         : 'Settings saved',
     );
+    offerRecompute();
   } catch (err) {
     settingsHint(err.message, true);
   } finally {
     $('settingsSave').disabled = false;
   }
 };
+
+/* --------------------------------------------------------------- recompute */
+
+/*
+ * Scores tracked before the eligibility settings existed were never given a pp value for
+ * anything osu! would not rank -- there was no reason to calculate one. So turning a
+ * setting on can leave older plays missing from a section they now belong in, which looks
+ * like a bug rather than a gap. Offer the fix at the moment it becomes relevant, and only
+ * when there is actually something to fix.
+ */
+let recomputing = false;
+
+function offerRecompute() {
+  if (recomputing || staleScores === 0) return;
+  if (!settings.includeUnrankedMods) return;
+
+  const n = fmt(staleScores);
+  const ok = confirm(
+    `${n} tracked play${staleScores === 1 ? '' : 's'} ${
+      staleScores === 1 ? 'was' : 'were'
+    } recorded before this setting existed, so ${
+      staleScores === 1 ? 'it has' : 'they have'
+    } no pp for unranked mods yet.\n\n` +
+      'Recalculate them from their replay files now?\n\n' +
+      'Nothing is deleted. Plays whose replay is no longer on disk are left as they are.',
+  );
+  if (!ok) return;
+  void runRecompute();
+}
+
+async function runRecompute() {
+  recomputing = true;
+  toast('Recalculating stored scores from their replays...');
+  try {
+    const r = await fetch('/api/recompute', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirm: true }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'recompute failed');
+    toast(
+      `Recalculated ${fmt(d.updated)} play${d.updated === 1 ? '' : 's'}` +
+        (d.gainedPp > 0 ? ` - ${fmt(d.gainedPp)} gained a pp value` : '') +
+        (d.skipped > 0 ? ` (${fmt(d.skipped)} skipped, no replay or beatmap on disk)` : ''),
+    );
+  } catch (err) {
+    toast(`Recalculating failed: ${err.message}`);
+  } finally {
+    recomputing = false;
+    await Promise.all([loadState(), loadProfile()]);
+  }
+}
 
 /* ---------------------------------------------------------------- profiles */
 
@@ -697,9 +840,12 @@ $('resetConfirm').onclick = async () => {
 const es = new EventSource('/api/events');
 es.addEventListener('score', (e) => {
   const s = JSON.parse(e.data);
-  toast(
-    `${s.grade} ${pct(s.accuracy)} ${s.pp != null ? `${fmt(s.pp, 0)}pp` : ''} - ${s.title}`.replace(/\s+/g, ' '),
-  );
+  // A play can now carry pp without counting toward the profile. Saying which keeps the
+  // toast from reading as "+120pp" when the total underneath it has not moved.
+  const counted = s.ranked || (settings.includeUnrankedMods && s.mapRanked);
+  const shownPp = counting?.preferStrippedPp && s.ppNomod != null ? s.ppNomod : s.pp;
+  const pp = shownPp == null ? '' : `${fmt(shownPp, 0)}pp${counted ? '' : ' (not counted)'}`;
+  toast(`${s.grade} ${pct(s.accuracy)} ${pp} - ${s.title}`.replace(/\s+/g, ' '));
   if (s.mode === mode) loadProfile();
   loadState();
 });
@@ -721,6 +867,12 @@ es.addEventListener('profiles', () => {
 // Settings only change the header, but a second tab open on the same profile should not
 // be left showing the old country.
 es.addEventListener('settings', () => loadState());
+// A recompute can run for a while on a large profile; report progress rather than looking
+// frozen. The final `recompute` event is handled by whoever started it.
+es.addEventListener('recompute-progress', (e) => {
+  const p = JSON.parse(e.data);
+  if (p.percent < 100) toast(`Recalculating stored scores... ${p.percent}%`);
+});
 
 /* ------------------------------------------------------------------ boot */
 

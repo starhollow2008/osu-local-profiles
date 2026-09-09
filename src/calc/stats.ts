@@ -3,6 +3,7 @@ import type { LazerMod, Ruleset } from '../osr.ts';
 import { bonusPp, weightedAccuracy, weightedTotal } from './pp.ts';
 import { levelFromScore, type Level } from './level.ts';
 import type { Grade } from './grade.ts';
+import { countsSql, ppColumn, starsColumn, VANILLA, type Eligibility } from './eligibility.ts';
 
 /** osu! weights only the top 100 plays. */
 const TOP_PLAY_LIMIT = 100;
@@ -31,6 +32,16 @@ export interface Play {
   /** 0.95^index -- only set for Top Ranks, where the play's pp is weighted. */
   weight: number | null;
   weightedPp: number | null;
+  /**
+   * Whether this score counts toward *this profile's* pp, which is not the same question as
+   * `ranked`: with unranked mods included, a relax play counts while osu! would not rank it.
+   */
+  counted: boolean;
+  /**
+   * Where the pp figure came from. `without-unranked-mods` means the play was priced with
+   * Relax or Autopilot removed, so it must be shown as the estimate it is.
+   */
+  ppBasis: 'as-played' | 'without-unranked-mods' | null;
 }
 
 export interface MostPlayed {
@@ -66,14 +77,25 @@ const EMPTY_GRADES = (): Record<Grade, number> => ({
   XH: 0, X: 0, SH: 0, S: 0, A: 0, B: 0, C: 0, D: 0, F: 0,
 });
 
-/** The columns every play row needs, joined to its beatmap. */
-const PLAY_COLUMNS = `s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.accuracy, s.max_combo,
-        s.total_score, s.grade, s.stars, s.ranked, s.passed, s.played_at,
+/**
+ * The columns every play row needs, joined to its beatmap.
+ *
+ * `stars` and `counts` depend on the settings, so they are built per query: `stars` may be
+ * the stripped-mod rating, and `counts` is the same predicate the totals use, selected
+ * rather than filtered on so a row can say why it is or is not counting.
+ */
+function playColumns(e: Eligibility): string {
+  return `s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.accuracy, s.max_combo,
+        s.total_score, s.grade, s.ranked, s.passed, s.played_at,
+        ${starsColumn(e)} AS stars,
+        ${countsSql(e)} AS counts,
+        s.pp_nomod IS NOT NULL AS has_nomod,
         b.beatmapset_id, b.artist, b.title, b.version, b.creator`;
+}
 
 type Row = Record<string, string | number | null>;
 
-function toPlay(r: Row): Play {
+function toPlay(r: Row, e: Eligibility): Play {
   let mods: LazerMod[] = [];
   try {
     // Kept whole: lazer only writes `settings` when the player customised the mod, so a
@@ -104,6 +126,13 @@ function toPlay(r: Row): Play {
     playedAt: r['played_at'] as number,
     weight: null,
     weightedPp: null,
+    counted: r['counts'] === 1,
+    ppBasis:
+      r['pp'] === null
+        ? null
+        : e.preferStrippedPp && r['has_nomod'] === 1
+          ? 'without-unranked-mods'
+          : 'as-played',
   };
 }
 
@@ -111,20 +140,25 @@ function toPlay(r: Row): Play {
  * The best pp score on each distinct beatmap. osu! only ever counts one score per map
  * toward pp, so everything downstream works from this set.
  */
-function bestPerBeatmap(db: Db, profileId: number, mode: Ruleset) {
+function bestPerBeatmap(db: Db, profileId: number, mode: Ruleset, e: Eligibility) {
   return db
     .prepare(
-      `SELECT beatmap_md5, MAX(pp) AS pp, accuracy, grade
-         FROM scores
-        WHERE profile_id = ? AND mode = ? AND ranked = 1 AND passed = 1 AND pp IS NOT NULL
-        GROUP BY beatmap_md5
+      `SELECT s.beatmap_md5, MAX(${ppColumn(e)}) AS pp, s.accuracy, s.grade
+         FROM scores s
+        WHERE s.profile_id = ? AND s.mode = ? AND ${countsSql(e)}
+        GROUP BY s.beatmap_md5
         ORDER BY pp DESC`,
     )
     .all(profileId, mode) as { beatmap_md5: string; pp: number; accuracy: number; grade: Grade }[];
 }
 
-export function computeStats(db: Db, profileId: number, mode: Ruleset): ProfileStats {
-  const best = bestPerBeatmap(db, profileId, mode);
+export function computeStats(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  e: Eligibility = VANILLA,
+): ProfileStats {
+  const best = bestPerBeatmap(db, profileId, mode, e);
 
   const top = best.slice(0, TOP_PLAY_LIMIT);
   const weighted = weightedTotal(top.map((r) => r.pp));
@@ -151,10 +185,10 @@ export function computeStats(db: Db, profileId: number, mode: Ruleset): ProfileS
   const ranked = db
     .prepare(
       `SELECT COALESCE(SUM(best), 0) AS ranked_score FROM (
-         SELECT MAX(total_score) AS best
-           FROM scores
-          WHERE profile_id = ? AND mode = ? AND ranked = 1 AND passed = 1
-          GROUP BY beatmap_md5)`,
+         SELECT MAX(s.total_score) AS best
+           FROM scores s
+          WHERE s.profile_id = ? AND s.mode = ? AND ${countsSql(e)}
+          GROUP BY s.beatmap_md5)`,
     )
     .get(profileId, mode) as { ranked_score: number };
 
@@ -180,13 +214,19 @@ export function computeStats(db: Db, profileId: number, mode: Ruleset): ProfileS
   };
 }
 
-export function topPlays(db: Db, profileId: number, mode: Ruleset, limit = TOP_PLAY_LIMIT): Play[] {
+export function topPlays(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  limit = TOP_PLAY_LIMIT,
+  e: Eligibility = VANILLA,
+): Play[] {
   const rows = db
     .prepare(
-      `SELECT ${PLAY_COLUMNS}, MAX(s.pp) AS pp
+      `SELECT ${playColumns(e)}, MAX(${ppColumn(e)}) AS pp
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ? AND s.ranked = 1 AND s.passed = 1 AND s.pp IS NOT NULL
+        WHERE s.profile_id = ? AND s.mode = ? AND ${countsSql(e)}
         GROUP BY s.beatmap_md5
         ORDER BY pp DESC
         LIMIT ?`,
@@ -194,17 +234,28 @@ export function topPlays(db: Db, profileId: number, mode: Ruleset, limit = TOP_P
     .all(profileId, mode, limit) as Row[];
 
   return rows.map((r, i) => {
-    const play = toPlay(r);
+    const play = toPlay(r, e);
     play.weight = 0.95 ** i;
     play.weightedPp = (play.pp ?? 0) * play.weight;
     return play;
   });
 }
 
-export function recentPlays(db: Db, profileId: number, mode: Ruleset, limit = 25): Play[] {
+/**
+ * Every recent play, counting or not -- this is a log of what was played, so an unranked
+ * map or a relax attempt belongs in it. Each row carries `counted` so the page can say
+ * which of them reached Best Performance.
+ */
+export function recentPlays(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  limit = 25,
+  e: Eligibility = VANILLA,
+): Play[] {
   const rows = db
     .prepare(
-      `SELECT ${PLAY_COLUMNS}, s.pp
+      `SELECT ${playColumns(e)}, ${ppColumn(e)} AS pp
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.mode = ?
@@ -213,7 +264,7 @@ export function recentPlays(db: Db, profileId: number, mode: Ruleset, limit = 25
     )
     .all(profileId, mode, limit) as Row[];
 
-  return rows.map(toPlay);
+  return rows.map((r) => toPlay(r, e));
 }
 
 /** osu-web's "Most Played Beatmaps": every attempt counts, passed or not. */

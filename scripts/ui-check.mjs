@@ -101,10 +101,17 @@ async function evaluate(expression) {
   return r.result?.result?.value;
 }
 
-// Wait for the page's own scripts to have wired everything up.
+/*
+ * Wait for the page's own scripts to have wired everything up.
+ *
+ * Waiting for the static elements is not enough -- they are in index.html and exist before
+ * main.js has run, so a click can land before its handler is attached and the menu silently
+ * fails to open. The mode tabs are rendered by main.js after its first fetch, so their
+ * presence means the module has finished booting.
+ */
 for (let i = 0; i < 40; i++) {
   const ready = await evaluate(
-    "!!(document.getElementById('optionsBtn') && document.getElementById('resetModal'))",
+    "!!(document.querySelector('#modes a') && document.getElementById('optionsBtn'))",
   );
   if (ready) break;
   await sleep(250);
@@ -195,7 +202,8 @@ check(
     const settings = document.querySelectorAll('#settingsFields .setting');
     if (settings.length === 0) return 'no settings rendered';
     return [...settings].every(
-      (s) => s.querySelector('input') && s.querySelector('.setting__hint').textContent.trim(),
+      (s) =>
+        s.querySelector('input, select') && s.querySelector('.setting__hint').textContent.trim(),
     );
   })()`),
   true,
@@ -204,6 +212,32 @@ check(
   'the dialog names the profile it applies to',
   await evaluate("document.getElementById('settingsProfileName').textContent.trim().length > 0"),
   true,
+);
+check(
+  'the unranked-mods toggle is a checkbox',
+  await evaluate("document.getElementById('set-includeUnrankedMods').type"),
+  'checkbox',
+);
+/*
+ * The relax pricing choice only means anything while unranked mods are being counted, so it
+ * follows the toggle. Dimmed rather than hidden: its hint is most of the reason to open
+ * this dialog at all.
+ */
+check(
+  'the relax pricing choice follows the toggle',
+  await evaluate(`(() => {
+    const toggle = document.getElementById('set-includeUnrankedMods');
+    const choice = document.getElementById('set-unrankedModPp');
+    const setTo = (on) => {
+      toggle.checked = on;
+      toggle.dispatchEvent(new Event('change', { bubbles: true }));
+      return [choice.disabled, choice.closest('.setting').classList.contains('setting--inactive')];
+    };
+    const off = setTo(false);
+    const on = setTo(true);
+    return JSON.stringify({ off, on });
+  })()`),
+  JSON.stringify({ off: [true, true], on: [false, false] }),
 );
 await evaluate("document.getElementById('settingsCancel').click()");
 check('Cancel closes the settings dialog', await shown('settingsModal'), 'none');
@@ -259,6 +293,54 @@ await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
 check('Escape closes the profiles dialog', await shown('profilesModal'), 'none');
+
+/*
+ * A profile counting things osu! does not must say so where the total is, not only on the
+ * rows. This drives the renderer directly rather than saving a setting, so the check does
+ * not depend on -- or change -- how the running profile is configured.
+ */
+console.log('\nunofficial scoring is disclosed');
+// The element is hidden via the `hidden` attribute on a styled div -- the same shape as the
+// bug this whole script exists for -- so check computed display, not just the attribute.
+check('nothing is said while the profile matches osu!', await shown('countingNote'), 'none');
+
+const noteFor = (counting) =>
+  evaluate(
+    `import('/js/sections.js').then((m) => m.countingNoteText(${JSON.stringify(counting)}))`,
+  );
+
+check('no note for an official profile', await noteFor({ includeUnrankedMods: false }), '');
+const stripped = await noteFor({ includeUnrankedMods: true, preferStrippedPp: true });
+check('it says the profile is not comparable', stripped.includes('not comparable'), true);
+check('and names the stripped-mod pricing', stripped.includes('as if the mod had been off'), true);
+check('and points at the asterisk on the rows', stripped.includes('marked with *'), true);
+const asPlayed = await noteFor({ includeUnrankedMods: true, preferStrippedPp: false });
+check('the as-played wording differs', asPlayed.includes('as played'), true);
+check('and does not claim mods were removed', asPlayed.includes('as if the mod'), false);
+
+console.log('\npp cells say when a value is not osu!s');
+const ppCellFor = (play) =>
+  evaluate(
+    `import('/js/sections.js').then((m) => m.playRow(Object.assign(
+      { title: 'x', version: 'y', mods: [], accuracy: 0.99, grade: 'S', playedAt: Date.now(),
+        counted: true, ranked: true, passed: true, pp: 100, ppBasis: 'as-played' },
+      ${JSON.stringify(play)},
+    )))`,
+  );
+
+const officialPp = await ppCellFor({});
+check('an official value is unmarked', officialPp.includes('play-detail__pp--unofficial'), false);
+check('and carries no asterisk', officialPp.includes('play-detail__pp-mark'), false);
+
+const unofficial = await ppCellFor({ ppBasis: 'without-unranked-mods', ranked: false });
+check('a stripped-mod value is marked', unofficial.includes('play-detail__pp--unofficial'), true);
+check('with an asterisk beside it', unofficial.includes('play-detail__pp-mark'), true);
+check('and says osu! never awards it', unofficial.includes('never awards'), true);
+
+const uncounted = await ppCellFor({ counted: false, ranked: false });
+check('a value that does not count is dimmed', uncounted.includes('play-detail__pp--uncounted'), true);
+const failedPlay = await ppCellFor({ counted: false, passed: false });
+check('a failed play says so', failedPlay.includes('failed play never counts'), true);
 
 console.log('\nmod settings are surfaced');
 const pill = await evaluate(

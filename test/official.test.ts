@@ -6,6 +6,7 @@ import { openReadOnly, type Db } from '../src/db/index.ts';
 import { OfficialCalculator } from '../src/calc/official.ts';
 import { parseReplay, looksLikeReplay, type ReplayScore } from '../src/osr.ts';
 import { accuracy } from '../src/calc/grade.ts';
+import { scoreMods } from '../src/calc/pp.ts';
 
 const REAL_DB = path.join(process.cwd(), 'data', 'profiles.db');
 
@@ -174,6 +175,81 @@ test('our accuracy agrees with osu! on both clients', { timeout: 180_000 }, asyn
         `${client}: ours ${(ours * 100).toFixed(4)}% vs osu! ${(result.accuracy * 100).toFixed(4)}%`,
       );
     }
+  } finally {
+    calc.dispose();
+    db.close();
+  }
+});
+
+/*
+ * The strip-mods path, end to end through osu!'s own calculators.
+ *
+ * Verified against this machine's corpus while it was written: RX scored 6.26 stars /
+ * 110.93pp as played and 7.83 / 238.54 with the mod removed, so osu!'s *difficulty*
+ * calculation is relax-aware too, not only its performance calculation. That is why both
+ * values are stored rather than one being derived from the other.
+ */
+test('removing relax or autopilot rescores the play as osu! would without it', { timeout: 600_000 }, async (t) => {
+  const db = openReadOnly(REAL_DB);
+  if (!db) return t.skip('run the app once to build the beatmap index');
+
+  const calc = await OfficialCalculator.create();
+  if (!calc) {
+    db.close();
+    return t.skip('osu-pp helper not built (run: npm run build:pp)');
+  }
+
+  try {
+    // scoreMods, not `extras.mods`: an osu!stable replay carries its mods only in the
+    // legacy bitmask, and relax is common enough there to be the one we find.
+    // The wide limit is deliberate -- these replays are rare, and the scan is a head read
+    // per file over an index the app has already built.
+    const found = await findReplay(
+      db,
+      (s) => scoreMods(s).some((m) => m.acronym === 'RX' || m.acronym === 'AP'),
+      100_000,
+    );
+    if (!found) return t.skip('no relax or autopilot replay available');
+
+    const asPlayed = await calc.calculate({
+      replayPath: found.replayPath,
+      beatmapPath: found.beatmapPath,
+    });
+    const stripped = await calc.calculate({
+      replayPath: found.replayPath,
+      beatmapPath: found.beatmapPath,
+      stripMods: ['RX', 'AP'],
+    });
+
+    assert.ok(asPlayed && stripped, `calculator failed: ${calc.lastError ?? 'no result'}`);
+    assert.equal(asPlayed.stripped, false, 'the unmodified request must not report stripping');
+    assert.equal(stripped.stripped, true, 'stripping a present mod must be reported');
+
+    assert.ok(
+      !stripped.mods.includes('RX') && !stripped.mods.includes('AP'),
+      `the mod survived stripping: [${stripped.mods.join(', ')}]`,
+    );
+    assert.ok(stripped.pp !== null && stripped.pp > 0);
+    // Relax lowers osu!'s own star rating, so removing it must raise both numbers. If this
+    // ever comes out equal, the mod list is no longer reaching the calculators.
+    assert.ok(
+      stripped.stars > asPlayed.stars,
+      `stripping did not change the difficulty: ${asPlayed.stars} vs ${stripped.stars}`,
+    );
+    assert.ok(
+      stripped.pp! > asPlayed.pp!,
+      `stripping did not change the pp: ${asPlayed.pp} vs ${stripped.pp}`,
+    );
+
+    // Asking to strip a mod the score does not have must leave it entirely alone.
+    const noop = await calc.calculate({
+      replayPath: found.replayPath,
+      beatmapPath: found.beatmapPath,
+      stripMods: ['EZ'],
+    });
+    assert.ok(noop);
+    assert.equal(noop.stripped, false);
+    assert.equal(noop.pp, asPlayed.pp);
   } finally {
     calc.dispose();
     db.close();

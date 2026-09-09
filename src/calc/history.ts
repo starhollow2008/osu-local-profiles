@@ -2,6 +2,7 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { bonusPp, weightedTotal } from './pp.ts';
 import { levelFromScore } from './level.ts';
+import { countsSql, ppColumn, VANILLA, type Eligibility } from './eligibility.ts';
 
 /**
  * The time-series and activity feed behind the profile page's chart, the Historical
@@ -65,10 +66,20 @@ function totalPp(bests: number[]): number {
   return weightedTotal(sorted.slice(0, 100)) + bonusPp(sorted.length);
 }
 
-export function buildHistory(db: Db, profileId: number, mode: Ruleset, maxEvents = 15): History {
+export function buildHistory(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  maxEvents = 15,
+  e: Eligibility = VANILLA,
+): History {
   const rows = db
     .prepare(
-      `SELECT s.played_at, s.pp, s.total_score, s.beatmap_md5, s.ranked, s.passed,
+      // `counts` is the same predicate the totals use, selected rather than filtered on:
+      // level and monthly play counts are about everything played, pp only about what
+      // counts, and both come out of this one chronological pass.
+      `SELECT s.played_at, ${ppColumn(e)} AS pp, s.total_score, s.beatmap_md5,
+              ${countsSql(e)} AS counts,
               b.title, b.artist, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
@@ -80,8 +91,7 @@ export function buildHistory(db: Db, profileId: number, mode: Ruleset, maxEvents
     pp: number | null;
     total_score: number;
     beatmap_md5: string;
-    ranked: number;
-    passed: number;
+    counts: number;
     title: string | null;
     artist: string | null;
     version: string | null;
@@ -120,7 +130,7 @@ export function buildHistory(db: Db, profileId: number, mode: Ruleset, maxEvents
       events.push({ type: 'level', at: row.played_at, level });
     }
 
-    if (row.ranked !== 1 || row.passed !== 1 || row.pp === null) continue;
+    if (row.counts !== 1 || row.pp === null) continue;
 
     const previous = bestByMap.get(row.beatmap_md5);
     if (previous === undefined || row.pp > previous) bestByMap.set(row.beatmap_md5, row.pp);

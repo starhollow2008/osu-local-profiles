@@ -26,6 +26,7 @@ import {
   setActiveProfile,
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
+import { eligibilityOf } from '../calc/eligibility.ts';
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
@@ -79,6 +80,8 @@ export function startServer(opts: ServerOptions): http.Server {
    */
   const configFallbacks: Partial<Settings> = { country: opts.country, tagline: opts.tagline };
   const settingsFor = (profileId: number) => getSettings(opts.db, profileId, configFallbacks);
+  /** How this profile counts scores right now. Read per request, never captured. */
+  const rules = () => eligibilityOf(settingsFor(current()));
 
   const localImage = (kind: string): string | null => {
     for (const name of LOCAL_IMAGES[kind] ?? []) {
@@ -153,6 +156,9 @@ export function startServer(opts: ServerOptions): http.Server {
         profiles: listProfiles(opts.db),
         tracking: opts.tracker.isTracking,
         scoresThisSession: opts.tracker.scoresAdded,
+        // Scores ingested before the eligibility columns existed. Non-zero means the
+        // Settings dialog should offer a recompute rather than silently under-reporting.
+        staleScores: opts.tracker.staleScores,
         defaultMode: mostRecentMode(opts.db, current()),
         modesWithPlays: modesWithPlays(opts.db, current()),
         installs: opts.installs.map((i) => ({
@@ -165,19 +171,23 @@ export function startServer(opts: ServerOptions): http.Server {
 
     if (url.pathname === '/api/profile') {
       const mode = (Number(url.searchParams.get('mode') ?? '0') || 0) as Ruleset;
-      const history = buildHistory(opts.db, current(), mode);
-      const stats = computeStats(opts.db, current(), mode);
+      const e = rules();
+      const history = buildHistory(opts.db, current(), mode, 15, e);
+      const stats = computeStats(opts.db, current(), mode, e);
       const table = rankTable(mode);
       return json(res, {
         mode,
         stats,
+        // What the profile is counting, so the page can say when it is not scoring the way
+        // osu! would rather than quietly showing an inflated number.
+        counting: e,
         // Estimated offline from a data.ppy.sh sample, and null when no curve has been
         // built for this mode. Country rank has no equivalent: 10,000 users split across
         // ~200 countries is far too thin to interpolate per country.
         rank: estimateRank(stats.totalPp, mode),
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
-        top: topPlays(opts.db, current(), mode, 100),
-        recent: recentPlays(opts.db, current(), mode, 25),
+        top: topPlays(opts.db, current(), mode, 100, e),
+        recent: recentPlays(opts.db, current(), mode, 25, e),
         mostPlayed: mostPlayed(opts.db, current(), mode, 15),
         ppHistory: history.pp,
         // osu-web charts global rank here, so do the same wherever a curve exists.
@@ -222,6 +232,43 @@ export function startServer(opts: ServerOptions): http.Server {
         const settings = updateSettings(opts.db, current(), body, configFallbacks);
         broadcast('settings', settings);
         return json(res, { ok: true, settings });
+      });
+    }
+
+    /*
+     * Recalculate stored scores from their replays.
+     *
+     * Needed because scores ingested before the eligibility settings existed were never
+     * given a pp value for anything osu! would not rank -- there was no reason to calculate
+     * one. Turning "include unranked mods" on without this would show an empty section.
+     *
+     * Explicit and confirmed, like every other operation that rewrites stored scores.
+     */
+    if (url.pathname === '/api/recompute' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        if (body['confirm'] !== true) {
+          return json(res, { error: 'recomputing requires an explicit confirmation' }, 400);
+        }
+        const onlyMissing = body['all'] !== true;
+        try {
+          let lastReported = -1;
+          const result = await opts.tracker.recompute(onlyMissing, (done, total) => {
+            // One event per percent: a 2,000-score recompute would otherwise flood the SSE
+            // stream with updates the page cannot draw fast enough anyway.
+            const percent = total === 0 ? 100 : Math.floor((done / total) * 100);
+            if (percent === lastReported) return;
+            lastReported = percent;
+            broadcast('recompute-progress', { done, total, percent });
+          });
+          broadcast('recompute', result);
+          console.log(
+            `\n  recomputed ${result.updated} score(s) from their replays` +
+              `${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}\n`,
+          );
+          return json(res, { ok: true, ...result });
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 500);
+        }
       });
     }
 
@@ -407,10 +454,11 @@ export function startServer(opts: ServerOptions): http.Server {
           country: settings.country,
           tagline: settings.tagline,
         },
+        settings,
         modes: modes.map((mode) => ({
           mode,
-          stats: computeStats(opts.db, id, mode),
-          rank: estimateRank(computeStats(opts.db, id, mode).totalPp, mode),
+          stats: computeStats(opts.db, id, mode, eligibilityOf(settings)),
+          rank: estimateRank(computeStats(opts.db, id, mode, eligibilityOf(settings)).totalPp, mode),
           scores: opts.db
             .prepare(
               `SELECT s.*, b.artist, b.title, b.version, b.creator, b.beatmapset_id

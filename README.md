@@ -144,6 +144,10 @@ profile, so the curve comes from the public dumps instead.
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
 
+`country` and `tagline` are only the starting point. Both are editable from **Options ->
+Settings** and are stored per profile from then on, so two playstyles can carry different
+descriptions and clearing one stays cleared.
+
 Drop an image at `data/avatar.png` or `data/cover.jpg` (`.jpg`/`.jpeg`/`.png`/`.webp` all
 work) to use it on the profile. Neither is required.
 
@@ -158,6 +162,11 @@ npm test
 npm run check        # both
 npm run ui           # drives the real page in headless Chrome (app must be running)
 ```
+
+After changing `tools/PpCalculator/Program.cs`, run **`npm run build:pp:local`** rather than
+`npm run build:pp`. `tools/pp/` holds a self-contained build that the app prefers over the
+plain output, and a stale copy there does not fail loudly -- it answers the old protocol and
+quietly returns values calculated the old way.
 
 The page is plain HTML, CSS and ES modules with **no build step** -- edit `web/` and
 reload. `npm run ui` covers both the dialog behaviour below and the design tokens actually
@@ -184,6 +193,45 @@ leaving the destructive button as the only one that worked. No unit test would c
   known-correct values, so the other three inherit that caveat.
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
+
+## Settings
+
+**Options -> Settings**, and everything there belongs to the profile you are on -- two
+playstyles are two profiles and should not share a description or how their scores count.
+
+### Include pp for unranked mods
+
+Off by default. On, it counts plays osu! refuses to rank because of their mods:
+
+- **Relax and Autopilot.**
+- **Customised rates** -- DT at 1.45x, HT at 0.5x, and so on.
+
+Autoplay and Cinema are never counted whatever this is set to: they are not plays.
+
+Relax and Autopilot can be priced two ways, and they are far apart:
+
+| | one real RX replay | one real AP replay |
+|---|---|---|
+| **As if the mod were off** (default) | 7.83 stars, 239pp | 4.45 stars, 101pp |
+| **As osu! scores them** | 6.26 stars, 111pp | 3.14 stars, 57pp |
+
+Both numbers come from osu!'s own difficulty and performance calculators -- osu!'s
+difficulty calculation is relax-aware, which is why the two disagree by more than 2x. The
+default is the first, because "relax counts as nomod, relax + DT counts as DT" is usually
+what people mean. It does flatter the score: a relax run reaches accuracy and combo the
+same player could not reach by hand.
+
+Both values are stored for every score, so switching between them is instant.
+
+Whenever a profile is counting something osu! would not, the page says so above Best
+Performance, and every affected row is marked.
+
+### Recalculating older scores
+
+Scores tracked before this existed have no pp for anything osu! would not rank -- there was
+no reason to calculate one at the time. Turning the setting on offers to recalculate them
+from their replay files. Nothing is deleted, and a score whose replay is no longer on disk
+is left exactly as it is.
 
 ## Profiles
 
@@ -288,6 +336,10 @@ node scripts/reingest.mjs
 ```
 
 This rebuilds every tracked score from its replay file.
+
+To fill in values on existing scores *without* replacing them -- keeping their ids, which
+is what you want in normal use -- the page's **Options -> Settings** offers a recalculation
+instead, and the app can stay running.
 
 ## Licence
 

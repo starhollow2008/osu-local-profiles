@@ -35,6 +35,22 @@ public sealed class Request
 
     /// <summary>The .osu file the replay was set on, located by its MD5.</summary>
     [JsonPropertyName("beatmapPath")] public string BeatmapPath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Acronyms to remove from the decoded score before calculating, so the play is scored
+    /// as if those mods had not been on.
+    /// </summary>
+    /// <remarks>
+    /// Used for Relax and Autopilot, which osu! never awards pp for. Removing the mod and
+    /// letting osu!'s own calculators score what is left produces a real osu! pp value for
+    /// a mod set the play did not literally use -- which the app labels as such. It is not
+    /// a second pp implementation: everything below this line is still osu!'s code.
+    ///
+    /// Only the mod list changes. The hit statistics, the beatmap, and the legacy handling
+    /// the decoder applied (including the Classic mod added to osu!stable replays) are all
+    /// left exactly as decoded.
+    /// </remarks>
+    [JsonPropertyName("stripMods")] public string[]? StripMods { get; set; }
 }
 
 public static class Program
@@ -86,12 +102,24 @@ public static class Program
         var scoreInfo = score.ScoreInfo;
         var ruleset = RulesetFor(scoreInfo.Ruleset.OnlineID);
 
+        var stripped = false;
+        if (request.StripMods is { Length: > 0 })
+        {
+            var strip = new HashSet<string>(request.StripMods, StringComparer.OrdinalIgnoreCase);
+            var kept = scoreInfo.Mods.Where(m => !strip.Contains(m.Acronym)).ToArray();
+            stripped = kept.Length != scoreInfo.Mods.Length;
+            // Assigning always would rewrite the mod list even when nothing was removed,
+            // which is a needless round trip through APIMods.
+            if (stripped) scoreInfo.Mods = kept;
+        }
+
         var difficulty = ruleset.CreateDifficultyCalculator(working).Calculate(scoreInfo.Mods);
         var performance = ruleset.CreatePerformanceCalculator()?.Calculate(scoreInfo, difficulty);
 
         return new
         {
             ok = true,
+            stripped,
             stars = difficulty.StarRating,
             maxCombo = difficulty.MaxCombo,
             // osu!'s own values, so they can be cross-checked against ours.

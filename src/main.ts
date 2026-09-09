@@ -10,6 +10,8 @@ import { startServer } from './http/server.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
+import { eligibilityOf } from './calc/eligibility.ts';
+import { getSettings } from './settings.ts';
 
 const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
 
@@ -122,24 +124,40 @@ async function main(): Promise<void> {
   });
 
   tracker.on('score', (s) => {
-    const pp = s.pp === null ? (s.ranked ? '  --  ' : ' unrkd') : `${s.pp.toFixed(0).padStart(4)}pp`;
+    // Read per score rather than captured: the page can change these while this is running.
+    const rules = eligibilityOf(getSettings(db, tracker.profileId));
+
+    // A score can now carry pp without counting -- an unranked map, or unranked mods the
+    // settings have not opted into. The console has to say which, or the running total
+    // underneath it looks broken.
+    const counted = s.ranked || (rules.includeUnrankedMods && s.mapRanked);
+    const shownPp = rules.preferStrippedPp && s.ppNomod !== null ? s.ppNomod : s.pp;
+
+    const pp =
+      shownPp === null
+        ? s.mapRanked
+          ? '  --  '
+          : ' unrkd'
+        : `${shownPp.toFixed(0).padStart(4)}pp${counted ? ' ' : '*'}`;
     const stars = s.stars === null ? '' : ` ${s.stars.toFixed(2)}*`;
     const time = new Date(s.playedAt).toLocaleTimeString();
     console.log(
-      `  [${time}] ${pp}  ${s.grade.padEnd(2)} ${(s.accuracy * 100).toFixed(2)}%  ` +
+      `  [${time}] ${pp} ${s.grade.padEnd(2)} ${(s.accuracy * 100).toFixed(2)}%  ` +
         `${s.modsLabel.padEnd(6)}${stars}  ${s.title}`,
     );
 
     // Where that play left the profile. The point of the whole app is the running total,
     // and reading it off the console beats switching to the browser for every score.
-    if (s.pp !== null) {
-      const totals = computeStats(db, tracker.profileId, s.mode);
+    if (counted && shownPp !== null) {
+      const totals = computeStats(db, tracker.profileId, s.mode, rules);
       const rank = estimateRank(totals.totalPp, s.mode);
       console.log(
         `            -> ${totals.totalPp.toFixed(0)}pp` +
           `${rank ? `  #${rank.rank.toLocaleString()}` : ''}` +
           `  ${(totals.accuracy * 100).toFixed(2)}%  lv${totals.level.current}`,
       );
+    } else if (shownPp !== null) {
+      console.log('            -> does not count toward this profile');
     }
   });
   tracker.on('error', (e) => console.error(`  watcher error: ${e.message}`));
@@ -157,7 +175,7 @@ async function main(): Promise<void> {
 
   const url = `http://localhost:${config.port}`;
   // The banner reports osu!standard; other modes are a click away on the page.
-  const standing = computeStats(db, profileId, 0);
+  const standing = computeStats(db, profileId, 0, eligibilityOf(getSettings(db, profileId)));
   const standingRank = estimateRank(standing.totalPp, 0);
   banner(`Tracking "${profileName}" -> ${url}`);
   console.log(

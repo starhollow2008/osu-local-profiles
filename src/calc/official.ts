@@ -28,6 +28,11 @@ export interface OfficialRequest {
   replayPath: string;
   /** The .osu the replay was set on, located by its MD5. */
   beatmapPath: string;
+  /**
+   * Mod acronyms to remove from the decoded score before scoring it, so the play is priced
+   * as if those mods had not been on. Used for Relax and Autopilot; see src/calc/pp.ts.
+   */
+  stripMods?: string[];
 }
 
 export interface OfficialResult {
@@ -42,6 +47,8 @@ export interface OfficialResult {
   isLegacy: boolean;
   mods: string[];
   pp: number | null;
+  /** True when `stripMods` actually removed something, so the result is not "as played". */
+  stripped: boolean;
 }
 
 interface Response {
@@ -55,6 +62,7 @@ interface Response {
   isLegacy?: boolean;
   mods?: string[];
   pp?: number | null;
+  stripped?: boolean;
 }
 
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -193,6 +201,7 @@ export class OfficialCalculator {
         isLegacy: response.isLegacy ?? false,
         mods: response.mods ?? [],
         pp: response.pp ?? null,
+        stripped: response.stripped ?? false,
       };
     };
 

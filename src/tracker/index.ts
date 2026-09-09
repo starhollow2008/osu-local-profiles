@@ -5,6 +5,7 @@ import { BeatmapResolver, indexOneFile } from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
 import { ingestReplayFile, type IngestedScore } from './ingest.ts';
 import { scanForReplays, type BackfillScan } from './backfill.ts';
+import { countStale, recomputeScores, type RecomputeResult } from './recompute.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 
 export interface TrackerOptions {
@@ -159,6 +160,38 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       }
 
       return { imported, skipped, scanned: scan.scanned, since };
+    });
+  }
+
+  /**
+   * How many stored scores predate the eligibility columns, so the page can offer a
+   * recompute only when there is something to gain from it.
+   */
+  get staleScores(): number {
+    return countStale(this.opts.db, this.opts.profileId);
+  }
+
+  /**
+   * Recalculate stored scores from their replays. Queued like everything else, so a play
+   * landing mid-recompute is ingested before or after it, never during.
+   */
+  recompute(
+    onlyMissing: boolean,
+    onProgress?: (done: number, total: number) => void,
+  ): Promise<RecomputeResult> {
+    return this.enqueue(async () => {
+      if (!this.opts.official) {
+        // Without the calculator this would blank every pp value it touched.
+        throw new Error('the pp calculator is not available -- run: npm run build:pp');
+      }
+      return await recomputeScores({
+        db: this.opts.db,
+        resolver: this.opts.resolver,
+        profileId: this.opts.profileId,
+        official: this.opts.official,
+        onlyMissing,
+        onProgress,
+      });
     });
   }
 

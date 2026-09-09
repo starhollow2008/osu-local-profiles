@@ -69,6 +69,32 @@ classic slider accuracy and legacy miss estimation in `OsuPerformanceCalculator`
 version that built the ScoreInfo from parsed statistics would have scored stable plays as
 lazer.
 
+**osu!'s difficulty calculator is Relax-aware, not just its performance calculator.**
+Measured on this corpus: the same RX replay is 6.26 stars / 110.93pp scored as played, and
+7.83 / 238.54 with the mod removed. AP is 3.14 / 57.44 against 4.45 / 101.09. So "what is
+this relax play worth" has two legitimate osu!-produced answers that differ by more than
+2x, and the setting `unrankedModPp` picks between them. Both are stored at ingest
+(`pp`/`stars` and `pp_nomod`/`stars_nomod`), so switching never needs a recompute.
+
+The helper's `stripMods` request field removes acronyms from the decoded score's mod list
+before calling the calculators. That is the *only* deviation, and it is still osu!'s code
+doing the arithmetic -- it does not create a second implementation. Any value derived this
+way must be labelled in the UI, because osu! itself would never award it.
+
+**pp is calculated for every score, not only the ranked ones.** Eligibility is a query-time
+decision (`src/calc/eligibility.ts`), never a stored verdict, so a settings change is
+instant instead of a reingest. `scores` stores the *facts* -- `map_status`, `mods_ranked`,
+`mods_countable`, both pp values -- and `countsSql()` turns settings into the predicate.
+There is exactly one definition of "counts"; do not write `ranked = 1` in a new query.
+Rows ingested before those columns existed have NULL in them and fall back to `ranked`;
+`POST /api/recompute` fills them in from the replays.
+
+**`tools/pp/` shadows the plain build.** `src/calc/official.ts` prefers it, and a stale copy
+there does not fail loudly -- it answers the *old* protocol and quietly returns values
+calculated the old way. After changing `Program.cs`, run `npm run build:pp:local`, not just
+`npm run build:pp`. `scripts/build-pp-helper.mjs` is shared with `npm run package` so the
+shipped helper and the development one cannot diverge.
+
 **Do not add a fallback calculator.** `rosu-pp` was removed on purpose. Every reimplementation
 lags osu!'s reworks: rosu-pp 4.0.1 (its latest release, and the latest of the underlying Rust
 crate) implements the 2025-10-29 algorithm, so after osu!'s 2026-07-03 rework it reported
@@ -143,6 +169,9 @@ src/clients/           install detection, beatmap MD5 index, online.db resolutio
 src/tracker/           recursive fs.watch, settle-on-write, ingest + dedupe
 src/calc/              pp (official helper only), level, grades, aggregation
 src/calc/official.ts   JSON-lines client for the .NET calculator
+src/calc/eligibility.ts  the single definition of "this score counts toward pp"
+src/settings.ts        per-profile settings, stored one row per key
+src/tracker/recompute.ts  recalculate stored scores in place from their replays
 tools/PpCalculator/    .NET helper wrapping osu!'s real difficulty/pp code
 src/http/              JSON API + SSE
 web/index.html         Phase 1 UI (plain; Vite + React planned for Phase 2)

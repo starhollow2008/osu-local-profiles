@@ -47,6 +47,24 @@ CREATE TABLE IF NOT EXISTS scores (
   stars           REAL,
   pp              REAL,
   pp_source       TEXT,
+  -- pp and star rating with Relax/Autopilot removed, so the play can be priced as if the
+  -- mod had not been on. Only set when the score actually carries one; both values come
+  -- from osu!'s own calculators, given a different mod list. See src/calc/pp.ts.
+  pp_nomod        REAL,
+  stars_nomod     REAL,
+  -- The beatmap's own maximum combo, as osu!'s difficulty calculator reports it. Needed to
+  -- tell a full combo from a dropped-slider-end run.
+  beatmap_max_combo INTEGER,
+  -- The three facts that decide whether a score counts, kept separately so that changing a
+  -- setting is a query and not a reingest:
+  --   map_status     osu!'s `approved` enum, or -3 when the beatmap is not in online.db at
+  --                  all (never submitted). NULL means the row predates these columns.
+  --   mods_ranked    would osu! itself rank this mod combination, settings included?
+  --   mods_countable could it ever count -- false only for Autoplay and Cinema.
+  map_status      INTEGER,
+  mods_ranked     INTEGER,
+  mods_countable  INTEGER,
+  -- Whether osu! itself would rank this score: the map and the mods both allow it.
   ranked          INTEGER NOT NULL DEFAULT 0,
   played_at       INTEGER NOT NULL,
   online_score_id TEXT,

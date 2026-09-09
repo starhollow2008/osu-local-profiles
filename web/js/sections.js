@@ -19,6 +19,67 @@ function maybeLink(href, inner, className) {
 }
 
 /**
+ * What to say, once, above a total that was not calculated the way osu! would calculate it.
+ * Empty string when the profile is scoring officially, which is the default.
+ *
+ * A pure function so the wording is testable without a running profile: the alternative is
+ * saving a setting to see it, which means the check would have to change how the user's
+ * profile is configured.
+ */
+export function countingNoteText(counting) {
+  if (!counting?.includeUnrankedMods) return '';
+  return counting.preferStrippedPp
+    ? 'This profile counts plays osu! does not rank. Relax and Autopilot plays are priced ' +
+        'as if the mod had been off, which osu! never awards - those are marked with *. ' +
+        'The pp and rank here are not comparable with a real osu! account.'
+    : 'This profile counts plays osu! does not rank, using osu!’s own pp for the mods ' +
+        'as played. The pp and rank here are not comparable with a real osu! account.';
+}
+
+/**
+ * The pp figure for one play, and why it is what it is.
+ *
+ * There are more cases here than on osu!, because this profile can be configured to count
+ * things osu! does not. Every departure has to be visible on the row itself -- a number
+ * that osu! would never award, shown the same way as one it would, is the one thing this
+ * page must not do.
+ */
+function ppCell(play) {
+  // No pp at all: an unranked map or mod combination before the settings allowed it, or a
+  // beatmap that was never downloaded so there is no local .osu to calculate from.
+  if (play.pp == null) {
+    return `<div class="play-detail__pp play-detail__pp--none" title="${
+      play.ranked ? 'no pp -- the beatmap file was not found locally' : 'unranked'
+    }">-</div>`;
+  }
+
+  const classes = ['play-detail__pp'];
+  const notes = [];
+  let marker = '';
+
+  if (play.counted === false) {
+    classes.push('play-detail__pp--uncounted');
+    notes.push(
+      play.passed === false
+        ? 'A failed play never counts toward pp.'
+        : 'This does not count toward the profile: osu! would not rank it, and the settings do not include it.',
+    );
+  }
+
+  if (play.ppBasis === 'without-unranked-mods') {
+    classes.push('play-detail__pp--unofficial');
+    marker = '<span class="play-detail__pp-mark" aria-hidden="true">*</span>';
+    notes.push(
+      'Priced with Relax or Autopilot removed, as if the mod had not been on. ' +
+        'osu! never awards this, and it flatters the score.',
+    );
+  }
+
+  const title = notes.length ? ` title="${escapeHtml(notes.join(' '))}"` : '';
+  return `<div class="${classes.join(' ')}"${title}>${fmt(play.pp, 0)}${marker}<span class="play-detail__pp-unit">pp</span></div>`;
+}
+
+/**
  * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
  * accuracy, mods and pp stepping right.
  */
@@ -39,14 +100,7 @@ export function playRow(play, { showWeight = false } = {}) {
       ? `<div class="play-detail__pp-weight">weighted ${Math.round(play.weight * 100)}%</div>`
       : '';
 
-  // A play can legitimately have no pp: an unranked map, an unranked mod combination, or
-  // a beatmap that was never downloaded so there is no local .osu to calculate from.
-  const pp =
-    play.pp != null
-      ? `<div class="play-detail__pp">${fmt(play.pp, 0)}<span class="play-detail__pp-unit">pp</span></div>`
-      : `<div class="play-detail__pp play-detail__pp--none" title="${
-          play.ranked ? 'no pp -- the beatmap file was not found locally' : 'unranked'
-        }">-</div>`;
+  const pp = ppCell(play);
 
   const stars = play.stars != null ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
 

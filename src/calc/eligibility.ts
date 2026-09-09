@@ -1,0 +1,93 @@
+import { Status } from '../clients/beatmaps.ts';
+import type { Settings } from '../settings.ts';
+
+/**
+ * Which stored scores count toward this profile's pp, and which pp value to count.
+ *
+ * There is exactly one definition of "counts", and it lives here. It used to be the
+ * `scores.ranked` column, which was decided once at ingest -- fine while the answer was
+ * always osu!'s answer, but the moment the user can opt into relax plays or unranked maps,
+ * baking the verdict into the row means every change of mind is a reingest. So the row now
+ * stores the *facts* (`map_status`, `mods_ranked`, `mods_countable`, both pp values) and
+ * this module turns settings into the SQL that reads them.
+ *
+ * Everything below returns a fragment with the values already inlined. They are booleans
+ * and integers derived from a closed set of settings, never user text, so there is nothing
+ * to parameterise and prepared statements stay cacheable per setting combination.
+ */
+
+export interface Eligibility {
+  /** Count scores whose mods osu! refuses to rank (relax, a customised rate, ...). */
+  includeUnrankedMods: boolean;
+  /** Score relax/autopilot plays as if the mod were off, rather than as osu! prices them. */
+  preferStrippedPp: boolean;
+}
+
+/** osu!'s own rules: ranked and approved maps, default settings on ranked mods, nothing else. */
+export const VANILLA: Eligibility = {
+  includeUnrankedMods: false,
+  preferStrippedPp: false,
+};
+
+export function eligibilityOf(settings: Settings): Eligibility {
+  const includeUnrankedMods = settings.includeUnrankedMods;
+  return {
+    includeUnrankedMods,
+    // Only meaningful while unranked mods are being counted at all.
+    preferStrippedPp: includeUnrankedMods && settings.unrankedModPp === 'without-the-mod',
+  };
+}
+
+/** Statuses that award pp in osu!, as SQL. */
+const RANKED_STATUSES = `(${Status.RANKED}, ${Status.APPROVED})`;
+
+/**
+ * The pp column to rank and weight by.
+ *
+ * `COALESCE` is safe in both directions: `pp_nomod` is only ever set on a score carrying
+ * Relax or Autopilot, and such a score is filtered out entirely unless unranked mods are
+ * being counted -- so the fallback can never quietly substitute a stripped value into an
+ * otherwise-official profile.
+ */
+export function ppColumn(e: Eligibility, alias = 's'): string {
+  return e.preferStrippedPp ? `COALESCE(${alias}.pp_nomod, ${alias}.pp)` : `${alias}.pp`;
+}
+
+/** The matching star rating, so a stripped-pp play does not show its as-played difficulty. */
+export function starsColumn(e: Eligibility, alias = 's'): string {
+  return e.preferStrippedPp ? `COALESCE(${alias}.stars_nomod, ${alias}.stars)` : `${alias}.stars`;
+}
+
+/**
+ * Whether the beatmap allows pp.
+ *
+ * Rows ingested before `map_status` existed have NULL there; for those the old `ranked`
+ * column is the only evidence available, so it stands in. `/api/recompute` replaces the
+ * guess with the real status.
+ */
+function mapSql(alias: string): string {
+  return `(${alias}.map_status IN ${RANKED_STATUSES}
+           OR (${alias}.map_status IS NULL AND ${alias}.ranked = 1))`;
+}
+
+/** Whether the mod combination allows pp, under these settings. */
+function modsSql(e: Eligibility, alias: string): string {
+  const official = `COALESCE(${alias}.mods_ranked, ${alias}.ranked) = 1`;
+  if (!e.includeUnrankedMods) return `(${official})`;
+  // Autoplay and Cinema are excluded even here: they are not plays. Legacy rows have no
+  // mods_countable, and a score old enough to predate the column is not an autoplay.
+  return `(${official} OR COALESCE(${alias}.mods_countable, 1) = 1)`;
+}
+
+/**
+ * The full `WHERE` fragment for "this score counts toward pp": a passed score, on a map and
+ * with mods these settings allow, that actually has a pp value.
+ *
+ * Returned without a leading `AND` so callers read as `WHERE ... AND ${countsSql(e)}`.
+ */
+export function countsSql(e: Eligibility, alias = 's'): string {
+  return `(${alias}.passed = 1
+           AND ${mapSql(alias)}
+           AND ${modsSql(e, alias)}
+           AND ${ppColumn(e, alias)} IS NOT NULL)`;
+}

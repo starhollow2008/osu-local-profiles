@@ -816,6 +816,30 @@
   font-weight: 400;
 }
 
+/*
+ * A pp value that exists but does not count toward this profile -- an unranked map or mod
+ * combination the settings have not opted into. Dimmed rather than hidden: it is still the
+ * honest answer to "what would this be worth", and Recent Plays lists everything played.
+ */
+.play-detail__pp--uncounted {
+  color: hsl(var(--hsl-f1));
+}
+
+/*
+ * A pp value osu! itself would never award: a Relax or Autopilot play priced as if the mod
+ * had not been on. It must not look like an official number, hence its own colour and the
+ * asterisk beside it.
+ */
+.play-detail__pp--unofficial {
+  color: var(--rank-b);
+}
+
+.play-detail__pp-mark {
+  font-size: var(--fs-normal);
+  vertical-align: super;
+  margin-left: 1px;
+}
+
 .play-detail__pp-unit {
   font-size: var(--fs-normal);
   color: hsl(var(--hsl-l3));
@@ -1343,9 +1367,47 @@
   color: hsl(var(--hsl-f1));
 }
 
-.setting .field input {
+.setting .field input[type="text"],
+.setting .field select {
   flex: 0 1 240px;
   min-width: 0;
+}
+
+.setting .field select {
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 6px 8px;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.setting .field input[type="checkbox"] {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  accent-color: hsl(var(--hsl-h2));
+}
+
+/* A setting whose enabling toggle is off: still readable, visibly not in play. */
+.setting--inactive {
+  opacity: 0.45;
+}
+
+/*
+ * Said once, above Best Performance, when the profile is counting things osu! does not.
+ * Every affected row is marked too, but the section as a whole needs to say it: someone
+ * reading a total has no reason to inspect the rows it came from.
+ */
+.counting-note {
+  margin: 0 0 10px;
+  padding: 8px 11px;
+  border-left: 3px solid var(--rank-b);
+  border-radius: 5px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal-2);
 }
 
 .backfill-summary {

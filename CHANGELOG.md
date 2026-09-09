@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased
+
+Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
+
+### Settings
+
+- A Settings dialog, reached from Options. Settings belong to a profile, not to the app:
+  two playstyles are two profiles and should not share a country, a description, or how
+  their scores are counted.
+- Country and playstyle are editable from the page. They previously needed `config.json`
+  edited by hand and the app restarted. `config.json` is now the fallback for a profile
+  that has never set them; once a profile sets one, clearing it stays cleared.
+
+### Counting unranked mods
+
+- **Include pp for unranked mods**, off by default. Counts plays osu! refuses to rank
+  because of their mods: Relax, Autopilot, and customised rates such as DT at 1.45x.
+- Relax and Autopilot can be priced either **as if the mod were off** (the default -- relax
+  counts as nomod, relax + DT counts as DT) or **as osu! scores them**. Both numbers come
+  from osu!'s own calculators, and both are stored, so switching between them is instant.
+  They are far apart: 111pp against 239pp on one real replay, because a relax run reaches
+  accuracy and combo the player could not by hand.
+- Wherever the profile is not scoring the way osu! would, it says so -- once above Best
+  Performance, and on every affected row.
+- **Fixed:** a mod with customised settings was stored as ranked because only its acronym
+  was checked. A score set on DT at 1.45x, or HT at 0.5x, counted as if it were the default
+  mod. Both exist in a real replay corpus, so this was not hypothetical.
+- pp is now calculated for every score that can be calculated, not only ranked ones, and
+  whether a score counts is decided when the profile is read. Changing a setting is
+  instant and reversible rather than a reingest.
+- **Recompute**: scores tracked before this release have no pp for anything osu! would not
+  rank. The Settings dialog offers to recalculate them from their replay files. Rows are
+  updated in place, and a score whose replay has been deleted is left alone.
+
+### Development
+
+- `npm run build:pp:local` refreshes `tools/pp/`, which `src/calc/official.ts` prefers over
+  the plain build output. A stale copy there does not fail loudly -- it answers the old
+  protocol -- so the publish-and-prune step is now shared with `npm run package` rather
+  than duplicated.
+
 ## 1.0.0
 
 First complete release. Tracks an alternative osu! playstyle as a brand new profile,

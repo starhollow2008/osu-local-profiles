@@ -14,8 +14,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | ---- | --------------------------------------------- | ------ |
 | 5.0  | Retire `prompt.txt`, keep the reference links | done   |
 | 5.1  | Settings store and Settings dialog            | done   |
-| 5.2  | Include pp for unranked **mods**              | in progress |
-| 5.3  | Include pp for unranked **maps**              | todo   |
+| 5.2  | Include pp for unranked **mods**              | done   |
+| 5.3  | Include pp for unranked **maps**              | in progress |
 | 5.4  | Score actions: pin, reorder, hide             | todo   |
 | 5.5  | Editable identity + linked osu! account       | todo   |
 | 5.6  | `me!` section                                 | todo   |
@@ -107,7 +107,7 @@ one. Reached from the existing Options menu.
 
 ## 5.2 — Include pp for unranked mods
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** An opt-in toggle, *"Include pp for unranked mods"*, that lets scores osu! would
 never rank still count toward Best Performance:
@@ -117,12 +117,25 @@ never rank still count toward Best Performance:
 - **Rate-changed DT/NC/HT/DC** (1.45×, 1.55×, 1.6× …) count, scored at their actual rate.
 
 **Decisions.**
-- *Why strip RX/AP rather than let osu!'s calculator score them?*
-  `OsuPerformanceCalculator` does have Relax-specific handling, so it would return a number
-  — but that number is not what was asked for, and osu! never awards it, so it has no
-  ground truth to be checked against. Stripping the mod produces a value that *is* an
-  official osu! pp value, just for a mod set the play did not literally use. That is a
-  smaller lie and an explainable one. **It must be labelled in the UI** wherever it appears.
+- *Verified against the corpus (2,412 replays), and it matters:* osu!'s **difficulty**
+  calculator is Relax-aware too, not just the performance calculator. Real numbers from
+  this machine's replays:
+
+  | mods | as played | with the mod stripped |
+  | ---- | --------- | --------------------- |
+  | `RX` | 6.26★ / 110.93pp | 7.83★ / **238.54pp** |
+  | `AP` | 3.14★ / 57.44pp  | 4.45★ / 101.09pp |
+
+  So *both* readings are genuine osu! output, and they are more than twice apart. The
+  stripped value is inflated in a way worth understanding: a relax play's accuracy and
+  combo are not what the player could reach by hand, so scoring those statistics as if the
+  mod were off flatters the score. That is inherent to what was asked for.
+- Therefore: **store both**, default to the stripped value the user asked for, and expose
+  the choice as a second setting. Both numbers come out of osu!'s own code, so neither is a
+  reimplementation, and storing both means changing the choice never needs a recompute.
+  **The stripped basis must be labelled in the UI** wherever it appears.
+- The corpus also contains real `HT` at `speed_change: 0.5` and `DA` scores, both of which
+  today are stored as `ranked = 1`. The bug is not hypothetical.
 - *Why not just compute pp lazily when the toggle is flipped?* Because the toggle would then
   take minutes and need the pp helper running. Instead: **always compute pp at ingest**
   whenever a local `.osu` exists, and make eligibility a query-time decision. Flipping the
@@ -168,7 +181,7 @@ toggle back removes them with no reingest.
 
 ## 5.3 — Include pp for unranked maps
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** A second toggle, *"Include pp for unranked beatmaps"*, covering pending, WIP,
 graveyard, qualified, loved and never-submitted maps.

@@ -16,6 +16,15 @@ export const Status = {
   LOVED: 4,
 } as const;
 
+/**
+ * Stored in `scores.map_status` when the beatmap is not in `online.db` at all -- it was
+ * never submitted, or the local copy is newer than lazer's cache.
+ *
+ * A distinct value rather than NULL, because NULL in that column means the row was
+ * ingested before the column existed. Outside osu!'s own enum range on purpose.
+ */
+export const UNRESOLVED_STATUS = -3;
+
 export function awardsPp(status: number | null | undefined): boolean {
   return status === Status.RANKED || status === Status.APPROVED;
 }
