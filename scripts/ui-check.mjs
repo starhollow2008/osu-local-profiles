@@ -182,6 +182,43 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nprofiles dialog');
+check('profiles dialog is hidden on load', await shown('profilesModal'), 'none');
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optProfiles').click()");
+check('profiles dialog opens', await shown('profilesModal'), 'grid');
+check(
+  'the active profile is listed and marked',
+  await evaluate("document.querySelectorAll('.profile-row--active').length"),
+  1,
+);
+// The only profile must not be deletable: the app needs somewhere to write the next score.
+check(
+  'Delete is disabled when there is only one profile',
+  await evaluate(`(() => {
+    const rows = document.querySelectorAll('.profile-row');
+    if (rows.length !== 1) return 'skipped';
+    return document.querySelector('.profile-row [data-act="delete"]').disabled;
+  })()`),
+  true,
+);
+check(
+  'the active profile offers no "Switch to"',
+  await evaluate(
+    "document.querySelector('.profile-row--active [data-act=\"switch\"]') === null",
+  ),
+  true,
+);
+await evaluate("document.getElementById('profilesClose').click()");
+check('Close closes the profiles dialog', await shown('profilesModal'), 'none');
+
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optProfiles').click()");
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes the profiles dialog', await shown('profilesModal'), 'none');
+
 console.log('\nmod settings are surfaced');
 const pill = await evaluate(
   "import('/js/badges.js').then((m) => m.modPill({ acronym: 'DT', settings: { speed_change: 1.3 } }))",

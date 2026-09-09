@@ -124,7 +124,7 @@ profile, so the curve comes from the public dumps instead.
 
 | key | default | meaning |
 |---|---|---|
-| `profileName` | `Fresh Profile` | name of the tracked playstyle |
+| `profileName` | `Fresh Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
 | `openBrowser` | `true` | open the page on start |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
@@ -171,6 +171,27 @@ leaving the destructive button as the only one that worked. No unit test would c
   known-correct values, so the other three inherit that caveat.
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
+
+## Profiles
+
+**Options -> Profiles** manages several playstyles side by side -- "left hand", "mouse
+only", "tablet again" -- each with its own scores, pp, level and start date. Only the
+selected one records plays. A new profile starts empty and tracks from the moment you
+create it, never from earlier plays.
+
+Deleting a profile takes its tracked scores with it and needs an explicit confirmation.
+The last remaining profile cannot be deleted; reset it instead.
+
+## Backing up and exporting
+
+- **Options -> Export this profile** downloads the active profile as JSON: every score with
+  its beatmap, plus the computed totals and rank.
+- **Options -> Back up everything** downloads a copy of the whole database, all profiles
+  included. It is written with `VACUUM INTO` rather than copied, because the database runs
+  in WAL mode and a plain file copy can miss recent writes.
+
+Replays on disk remain the real source of truth -- `node scripts/reingest.mjs` rebuilds
+everything from them -- but these are portable and outlive the app.
 
 ## Importing plays you set while it was closed
 

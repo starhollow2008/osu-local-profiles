@@ -4,6 +4,7 @@ import { loadConfig, saveConfig, dataDir } from './config.ts';
 import { detectInstalls } from './clients/detect.ts';
 import { BeatmapResolver, indexBeatmapFiles } from './clients/beatmaps.ts';
 import { getOrCreateProfile, openDb } from './db/index.ts';
+import { activeProfileId, getProfile } from './profiles.ts';
 import { Tracker } from './tracker/index.ts';
 import { startServer } from './http/server.ts';
 import { OfficialCalculator } from './calc/official.ts';
@@ -52,10 +53,14 @@ async function main(): Promise<void> {
   }
 
   const db = openDb(path.join(dataDir(), 'profiles.db'));
-  const profileId = getOrCreateProfile(db, config.profileName);
-  const profile = db
-    .prepare('SELECT tracking_since FROM profiles WHERE id = ?')
-    .get(profileId) as { tracking_since: number };
+
+  // config.profileName only seeds the very first profile. After that the set of profiles
+  // lives in the database and which one is live is chosen from the page, so that renaming
+  // or switching never has to round-trip through a config file.
+  getOrCreateProfile(db, config.profileName);
+  const active = getProfile(db, activeProfileId(db))!;
+  const profileId = active.id;
+  const profileName = active.name;
 
   /*
    * `--check-only` verifies the install and exits: does it find osu!, and does it find the
@@ -110,7 +115,7 @@ async function main(): Promise<void> {
     resolver,
     installs,
     profileId,
-    trackingSince: profile.tracking_since,
+    trackingSince: active.trackingSince,
     official,
   });
 
@@ -130,8 +135,6 @@ async function main(): Promise<void> {
     db,
     tracker,
     installs,
-    profileId,
-    profileName: config.profileName,
     country: config.country,
     tagline: config.tagline,
     dataDir: dataDir(),
@@ -139,7 +142,7 @@ async function main(): Promise<void> {
   });
 
   const url = `http://localhost:${config.port}`;
-  banner(`Tracking "${config.profileName}" -> ${url}`);
+  banner(`Tracking "${profileName}" -> ${url}`);
   console.log('  Play osu! (online or offline) and scores will appear below.');
   console.log('  Close this window or press Ctrl+C to stop tracking.\n');
 

@@ -68,6 +68,24 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     this.added = 0;
   }
 
+  /**
+   * Point tracking at a different profile.
+   *
+   * Queued behind any ingest already in flight, so a score that landed a moment before the
+   * switch is still written to the profile it was actually played under.
+   */
+  switchProfile(profileId: number, trackingSince: number): Promise<void> {
+    return this.enqueue(async () => {
+      this.opts.profileId = profileId;
+      this.opts.trackingSince = trackingSince;
+      this.added = 0;
+    });
+  }
+
+  get profileId(): number {
+    return this.opts.profileId;
+  }
+
   start(): void {
     if (this.watcher) return;
     const dirs = this.opts.installs.map((i) => i.replayDir);

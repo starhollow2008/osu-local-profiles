@@ -45,8 +45,6 @@ function harness(): Harness {
     db,
     tracker,
     installs: [],
-    profileId,
-    profileName: 'Reset Test',
     country: '',
     tagline: '',
     dataDir: tmp,

@@ -20,7 +20,11 @@
       <div class="menu-wrap">
         <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
         <div class="menu" id="optionsMenu" hidden>
+          <button id="optProfiles" type="button">Profiles&hellip;</button>
           <button id="optBackfill" type="button">Import past plays&hellip;</button>
+          <div class="sep"></div>
+          <button id="optExport" type="button">Export this profile (JSON)</button>
+          <button id="optBackup" type="button">Back up everything (database)</button>
           <div class="sep"></div>
           <button id="optReset" class="danger" type="button">Reset profile</button>
           <div class="sep"></div>
@@ -130,6 +134,31 @@
 </main>
 
 <div class="toast" id="toast"></div>
+
+<div class="backdrop" id="profilesModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profilesTitle">
+    <h3 id="profilesTitle">Profiles</h3>
+    <p>
+      Each profile is a separate playstyle with its own scores, pp and level. Only the
+      selected one records the plays you set.
+    </p>
+
+    <div class="profile-list" id="profileList"></div>
+
+    <label class="field">
+      <span>New profile</span>
+      <input type="text" id="newProfileName" maxlength="60" placeholder="e.g. left hand">
+    </label>
+    <div class="profile-hint" id="profileHint">
+      A new profile starts empty and tracks from the moment you create it.
+    </div>
+
+    <div class="actions">
+      <button id="profilesClose" type="button">Close</button>
+      <button id="profileCreate" class="primary" type="button">Create &amp; switch</button>
+    </div>
+  </div>
+</div>
 
 <div class="backdrop" id="backfillModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">

@@ -192,6 +192,7 @@ async function loadProfile() {
 async function loadState() {
   const s = await (await fetch('/api/state')).json();
   profile = s.profile;
+  profiles = s.profiles ?? [];
   modesWithPlays = s.modesWithPlays ?? [];
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -260,7 +261,157 @@ document.addEventListener('keydown', (e) => {
   setMenuOpen(false);
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
+  if (!$('profilesModal').hidden) closeProfiles();
 });
+
+/* ---------------------------------------------------------------- profiles */
+
+let profiles = [];
+
+function profileHint(message, isError = false) {
+  const el = $('profileHint');
+  el.textContent = message;
+  el.classList.toggle('profile-hint--error', isError);
+}
+
+function renderProfiles() {
+  $('profileList').innerHTML = profiles
+    .map((p) => {
+      const plays = `${fmt(p.scoreCount)} play${p.scoreCount === 1 ? '' : 's'}`;
+      const since = new Date(p.trackingSince).toLocaleDateString();
+      // The only profile cannot be deleted: the app must always have somewhere to write.
+      const canDelete = profiles.length > 1;
+      return `<div class="profile-row${p.active ? ' profile-row--active' : ''}">
+        <div class="profile-row__name">
+          ${escapeHtml(p.name)}
+          <div class="profile-row__meta">${plays} &middot; since ${escapeHtml(since)}</div>
+        </div>
+        <div class="profile-row__actions">
+          ${p.active ? '' : `<button type="button" data-act="switch" data-id="${p.id}">Switch to</button>`}
+          <button type="button" data-act="rename" data-id="${p.id}">Rename</button>
+          <button type="button" class="danger" data-act="delete" data-id="${p.id}"
+                  ${canDelete ? '' : 'disabled title="This is the only profile"'}>Delete</button>
+        </div>
+      </div>`;
+    })
+    .join('');
+}
+
+async function profileAction(payload) {
+  const r = await fetch('/api/profiles', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error ?? 'that did not work');
+  if (data.profiles) {
+    profiles = data.profiles;
+    renderProfiles();
+  }
+  return data;
+}
+
+function openProfiles() {
+  setMenuOpen(false);
+  $('newProfileName').value = '';
+  profileHint('A new profile starts empty and tracks from the moment you create it.');
+  renderProfiles();
+  $('profilesModal').hidden = false;
+  $('profilesClose').focus();
+}
+
+const closeProfiles = () => { $('profilesModal').hidden = true; };
+
+$('optProfiles').onclick = openProfiles;
+$('profilesClose').onclick = closeProfiles;
+$('profilesModal').onclick = (e) => {
+  if (e.target === $('profilesModal')) closeProfiles();
+};
+
+$('profileList').onclick = async (e) => {
+  const button = e.target.closest('[data-act]');
+  if (!button) return;
+  const id = Number(button.dataset.id);
+  const profile = profiles.find((p) => p.id === id);
+  if (!profile) return;
+
+  try {
+    if (button.dataset.act === 'switch') {
+      await profileAction({ action: 'switch', id });
+      toast(`Now tracking "${profile.name}"`);
+      await Promise.all([loadState(), loadProfile()]);
+      profileHint(`Switched to "${profile.name}".`);
+      return;
+    }
+
+    if (button.dataset.act === 'rename') {
+      const name = prompt('Rename this profile to:', profile.name);
+      if (name === null || name.trim() === profile.name) return;
+      await profileAction({ action: 'rename', id, name });
+      await loadState();
+      profileHint(`Renamed to "${name.trim()}".`);
+      return;
+    }
+
+    if (button.dataset.act === 'delete') {
+      const warning =
+        profile.scoreCount > 0
+          ? `Delete "${profile.name}" and its ${profile.scoreCount} tracked play${
+              profile.scoreCount === 1 ? '' : 's'
+            }?\n\nThis cannot be undone. Your replay files are not touched.`
+          : `Delete "${profile.name}"? It has no tracked plays.`;
+      if (!confirm(warning)) return;
+      const data = await profileAction({ action: 'delete', id, confirm: true });
+      toast(`Deleted "${profile.name}" (${fmt(data.deletedScores)} erased)`);
+      await Promise.all([loadState(), loadProfile()]);
+      profileHint(`Deleted "${profile.name}".`);
+    }
+  } catch (err) {
+    profileHint(err.message, true);
+  }
+};
+
+$('profileCreate').onclick = async () => {
+  const name = $('newProfileName').value.trim();
+  if (!name) {
+    profileHint('Give the new profile a name first.', true);
+    $('newProfileName').focus();
+    return;
+  }
+  try {
+    await profileAction({ action: 'create', name });
+    $('newProfileName').value = '';
+    toast(`Created "${name}" and switched to it`);
+    await Promise.all([loadState(), loadProfile()]);
+    profileHint(`Created "${name}". It is now the profile being tracked.`);
+  } catch (err) {
+    profileHint(err.message, true);
+  }
+};
+
+$('newProfileName').onkeydown = (e) => {
+  if (e.key === 'Enter') $('profileCreate').click();
+};
+
+/* ------------------------------------------------------- export and backup */
+
+/*
+ * Both are plain downloads. Navigating rather than fetching lets the browser handle the
+ * save dialog and the filename from content-disposition, and keeps a 20MB database out
+ * of the page's memory.
+ */
+$('optExport').onclick = () => {
+  setMenuOpen(false);
+  window.location.href = '/api/export';
+  toast('Exporting this profile as JSON');
+};
+
+$('optBackup').onclick = () => {
+  setMenuOpen(false);
+  window.location.href = '/api/backup';
+  toast('Backing up every profile');
+};
 
 /* ------------------------------------------------------ import past plays */
 
@@ -457,6 +608,10 @@ es.addEventListener('reset', () => {
 // An import can add dozens of scores at once, so it refreshes the page rather than
 // announcing each one the way a live play does.
 es.addEventListener('backfill', () => {
+  loadProfile();
+  loadState();
+});
+es.addEventListener('profiles', () => {
   loadProfile();
   loadState();
 });
