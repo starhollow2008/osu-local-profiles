@@ -18,6 +18,15 @@ export interface Config {
   /** What to call the playstyle under the profile name, e.g. "left hand, mouse only". */
   tagline: string;
   /**
+   * Ask GitHub once at startup whether a newer release exists.
+   *
+   * One request, when the app starts, and never again while it runs -- the same rule the
+   * osu! API guidance imposes and this project follows everywhere else. Set false and the
+   * app makes no network request of its own at all; the check can still be run by hand from
+   * the page.
+   */
+  checkForUpdates: boolean;
+  /**
    * Listen on every network interface instead of only this machine.
    *
    * Off by default, and that default matters: the page can reset a profile, delete one and
@@ -37,6 +46,7 @@ const DEFAULTS: Config = {
   country: '',
   tagline: '',
   shareOnNetwork: false,
+  checkForUpdates: true,
 };
 
 /**
@@ -49,6 +59,28 @@ const DEFAULTS: Config = {
  */
 export function dataDir(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'data');
+}
+
+/** The directory the app itself lives in -- `data/`'s parent, and what an update replaces. */
+export function installDir(): string {
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+}
+
+/**
+ * The running version, read from `package.json` rather than written down twice.
+ *
+ * Resolved the same way as `dataDir`, so a packaged build reports the version it shipped
+ * as. Unknown rather than guessed if the file cannot be read: a wrong version would make
+ * the update check offer a downgrade, or hide a real update.
+ */
+export function appVersion(): string | null {
+  try {
+    const file = path.join(installDir(), 'package.json');
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { version?: unknown };
+    return typeof parsed.version === 'string' ? parsed.version : null;
+  } catch {
+    return null;
+  }
 }
 
 export function loadConfig(): Config {

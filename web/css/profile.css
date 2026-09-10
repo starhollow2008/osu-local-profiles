@@ -254,6 +254,39 @@
   box-shadow: 0 0 8px var(--green-light);
 }
 
+/*
+ * The update button, beside the tracking pill.
+ *
+ * Deliberately the loudest thing on the header: it is only ever on screen when there is
+ * genuinely a newer release, so it does not have to compete for attention on an ordinary
+ * day, and it should be impossible to miss on the day it appears.
+ */
+.update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10000px;
+  padding: 5px 14px;
+  font-size: var(--fs-normal);
+  font-weight: 700;
+  color: hsl(var(--hsl-b6));
+  background-color: var(--yellow);
+  box-shadow: var(--box-shadow);
+}
+
+.update-pill::before {
+  content: "↓";
+  font-weight: 700;
+}
+
+.update-pill:hover {
+  background-color: var(--yellow-light);
+}
+
+.update-versions {
+  font-size: var(--fs-title-small-3);
+}
+
 /* --- gamemode switcher -------------------------------------------------- */
 
 .game-mode {
@@ -1997,12 +2030,29 @@
   padding: 20px;
 }
 
+/*
+ * A dialog taller than the window scrolls itself.
+ *
+ * Without the cap it grows past the viewport in both directions, because the backdrop is
+ * `position: fixed` and centres it -- so the top is off-screen and unreachable, and the
+ * page behind cannot scroll to it either. Settings is the one that hit this: it grows with
+ * every setting added and with the list of removed scores.
+ *
+ * The cap is on the dialog rather than on the backdrop so the dialog stays centred and
+ * only its *content* moves. `100dvh` matters on mobile, where the browser chrome makes
+ * `100vh` taller than what you can actually see; the `100vh` line before it is the
+ * fallback for anything that does not know `dvh`.
+ */
 .modal {
   background-color: hsl(var(--hsl-b4));
   border-radius: var(--radius-large);
   padding: 22px;
   max-width: 460px;
   width: 100%;
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
 }
 
@@ -2267,6 +2317,47 @@
   background-color: hsl(var(--hsl-b5));
   color: hsl(var(--hsl-l1));
   font-size: var(--fs-normal-2);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.counting-note__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.counting-note__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.counting-note__dismiss {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small-2);
+  white-space: nowrap;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.counting-note__close {
+  background: none;
+  border: 0;
+  padding: 0 2px;
+  line-height: 1;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-title-small-3);
+  cursor: pointer;
+}
+
+.counting-note__dismiss:hover,
+.counting-note__close:hover {
+  color: hsl(var(--hsl-c1));
 }
 
 .backfill-summary {
@@ -2362,4 +2453,44 @@
 /* How many rows are still hidden -- osu-web shows this in brackets after the label. */
 .show-more-link__remaining {
   color: hsl(var(--hsl-l1));
+}
+
+/* ======================================================================== */
+/* Footer                                                                   */
+/* ======================================================================== */
+
+/*
+ * Where the app says what it is. The version is here because it is the one number a user
+ * has to be able to read out when reporting something, and because the update check needs
+ * somewhere to put "you are on the latest" when it has nothing to offer.
+ */
+.site-footer {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 24px var(--gutter) 40px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small-2);
+}
+
+.site-footer a {
+  color: hsl(var(--hsl-l1));
+  text-decoration: none;
+}
+
+.site-footer a:hover {
+  color: hsl(var(--hsl-h1));
+  text-decoration: underline;
+}
+
+.site-footer__sep {
+  opacity: 0.5;
+}
+
+.site-footer__note {
+  margin-left: auto;
 }

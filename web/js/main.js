@@ -69,6 +69,15 @@ const SETTINGS_FIELDS = [
       'no longer comparable with a real osu! account.',
   },
   {
+    key: 'showCountingNote',
+    type: 'toggle',
+    label: 'Warn when scoring is not comparable',
+    hint:
+      'Shows a line in Top Ranks when a setting has made this profile’s pp incomparable ' +
+      'with a real osu! account. Turning it off hides that sentence only - the affected ' +
+      'scores keep their *. This is also what the note’s "Don’t show again" sets.',
+  },
+  {
     key: 'unrankedModPp',
     type: 'choice',
     label: 'Price relax plays',
@@ -139,6 +148,8 @@ const resetPaging = () => {
 let mode = 0;
 let tracking = false;
 let modesWithPlays = [];
+/** What this build is, from /api/state. `version` is null if package.json was unreadable. */
+let app = { version: null };
 let profile = null;
 let stats = null;
 let settings = {};
@@ -305,9 +316,49 @@ function renderRank(data) {
 function renderCountingNote(next) {
   counting = next ?? null;
   const text = countingNoteText(counting);
-  $('countingNote').textContent = text;
-  $('countingNote').hidden = text === '';
+  const note = $('countingNote');
+
+  // Two conditions, and they are not the same one: there is something to warn about, and
+  // this profile has not asked to stop being warned. Dismissing hides the sentence only --
+  // the affected rows keep their `*`.
+  note.hidden = text === '' || settings.showCountingNote === false;
+  if (note.hidden) {
+    note.innerHTML = '';
+    return;
+  }
+
+  note.innerHTML = `<div class="counting-note__text">${escapeHtml(text)}</div>
+    <div class="counting-note__actions">
+      <button type="button" class="counting-note__dismiss" data-dismiss-note>Don't show again</button>
+      <button type="button" class="counting-note__close" data-dismiss-note
+              aria-label="Don't show this again">&times;</button>
+    </div>`;
 }
+
+/*
+ * Both controls do the same thing, and permanently: the X is the affordance people reach
+ * for, the wording is what makes the consequence explicit. Saved per profile, so it can be
+ * turned back on from Settings.
+ */
+$('countingNote').onclick = async (e) => {
+  if (!e.target.closest('[data-dismiss-note]')) return;
+
+  $('countingNote').hidden = true;
+  settings = { ...settings, showCountingNote: false };
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ showCountingNote: false }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'saving that failed');
+    settings = d.settings;
+  } catch (err) {
+    // It is hidden for this view either way; a failed save just means it returns next load.
+    toast(err.message);
+  }
+};
 
 /**
  * The Medals section, grouped the way osu! groups it.
@@ -507,6 +558,12 @@ async function loadState() {
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
 
+  app = s.app ?? app;
+  $('footerVersion').textContent = app.version
+    ? `osu! fresh profile v${app.version}`
+    : 'osu! fresh profile';
+  renderUpdate();
+
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
   $('optInfo').textContent = `${s.profile.name} - watching ${kinds} - ${s.scoresThisSession} score${
     s.scoresThisSession === 1 ? '' : 's'
@@ -581,7 +638,63 @@ document.addEventListener('keydown', (e) => {
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('identityModal').hidden) closeIdentity();
   if (!$('shareModal').hidden) closeShare();
+  if (!$('updateModal').hidden) closeUpdate();
 });
+
+/* ----------------------------------------------------------------- update */
+
+/*
+ * The button only exists when there is something to install.
+ *
+ * `available` is the server's verdict, not the page's: it has already compared the versions,
+ * confirmed there is a build for this platform, and confirmed this install is one that can
+ * be replaced at all -- a source checkout cannot. A failed check leaves `available` false
+ * and no button, which is the right outcome for "no network" and for "the repository is
+ * private" alike.
+ */
+function renderUpdate() {
+  const u = app.update ?? {};
+  $('updateBtn').hidden = !u.available || u.blocked !== null;
+}
+
+function openUpdate() {
+  const u = app.update ?? {};
+  $('updateVersions').innerHTML =
+    `<b>${escapeHtml(u.currentVersion ?? '?')}</b> &rarr; <b>${escapeHtml(u.latestVersion ?? '?')}</b>`;
+  $('updateNotes').innerHTML = u.releaseUrl
+    ? `<a href="${escapeHtml(u.releaseUrl)}" target="_blank" rel="noreferrer noopener">Release notes on GitHub</a>`
+    : '';
+  $('updateHint').innerHTML = '&nbsp;';
+  $('updateConfirm').disabled = false;
+  $('updateModal').hidden = false;
+  $('updateCancel').focus();
+}
+
+const closeUpdate = () => { $('updateModal').hidden = true; };
+
+$('updateBtn').onclick = openUpdate;
+$('updateCancel').onclick = closeUpdate;
+$('updateModal').onclick = (e) => {
+  if (e.target === $('updateModal')) closeUpdate();
+};
+
+/*
+ * The app exits as part of succeeding here, so the request is expected to be the last one
+ * this page ever makes: a dropped connection after a 200 is the update working, not failing.
+ */
+$('updateConfirm').onclick = async () => {
+  $('updateConfirm').disabled = true;
+  $('updateHint').textContent = 'Downloading...';
+  try {
+    const r = await fetch('/api/update/apply', { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'the update failed');
+    $('updateHint').textContent = `${d.message} If it does not come back, start it yourself.`;
+  } catch (err) {
+    $('updateHint').textContent = err.message;
+    $('updateConfirm').disabled = false;
+  }
+};
 
 /* ------------------------------------------------------------------ share */
 

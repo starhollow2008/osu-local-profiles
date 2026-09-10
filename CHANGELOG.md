@@ -20,6 +20,29 @@
   hand-written; it is now generated from osu!'s own mod definitions, so every one of the 69
   mods gets the colour osu! gives it.
 
+### Updating, and a few smaller things
+
+- **One-click updates.** When a newer release exists, an **Update available** button appears
+  beside the tracking indicator. It shows what you are on and what you would get, then
+  downloads, installs and restarts the app for you.
+  - Your `data/` folder -- the database, your settings, your avatar and banner -- is never
+    touched. The files being replaced are *moved* to a `.rollback-<date>` folder beside the
+    app rather than deleted, so a failed update can be undone by hand. `data/update.log`
+    records what happened.
+  - Nothing is swapped until the download has been unpacked and checked to be the version it
+    claimed. A copy running from a source checkout refuses outright, since an "update" there
+    would overwrite your working tree.
+  - One request, at startup, and never on a timer. Set `"checkForUpdates": false` in
+    `data/config.json` and the app makes no network request of its own at all.
+- **Dialogs taller than the window now scroll.** Settings had grown past the bottom of the
+  screen on shorter displays, and because the backdrop is fixed, neither it nor the page
+  behind it could scroll to reach the rest.
+- **The warning in Top Ranks can be dismissed.** The line saying this profile's pp is not
+  comparable with a real osu! account now has a **Don't show again** and an **X**. It is
+  remembered per profile, and can be turned back on from Settings. The affected scores keep
+  their `*` either way.
+- **A footer**, with the running version and a link to the source.
+
 ### For contributors
 
 - **`docs/osu-web-fidelity.md`** maps every region of the profile page to the osu-web file

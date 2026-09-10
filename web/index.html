@@ -14,6 +14,7 @@
 <header class="profile-info">
   <div class="profile-info__bg" id="cover">
     <div class="profile-info__bg-actions">
+      <button class="update-pill" id="updateBtn" type="button" hidden>Update available</button>
       <button class="tracking-pill" id="toggle" type="button">
         <span class="tracking-pill__dot"></span><span id="tracklabel">not tracking</span>
       </button>
@@ -382,6 +383,34 @@
     </div>
   </div>
 </div>
+
+<div class="backdrop" id="updateModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
+    <h3 id="updateTitle">Update available</h3>
+    <p class="update-versions" id="updateVersions"></p>
+    <p>
+      Your tracked scores, settings and profile pictures are kept — they live in
+      <code>data/</code>, which an update never touches. The files being replaced are moved
+      to a <code>.rollback</code> folder beside the app rather than deleted.
+    </p>
+    <p id="updateNotes"></p>
+    <div class="profile-hint" id="updateHint">&nbsp;</div>
+    <div class="actions">
+      <button id="updateCancel" type="button">Not now</button>
+      <button id="updateConfirm" class="primary" type="button">Update and restart</button>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <span id="footerVersion">osu! fresh profile</span>
+  <span class="site-footer__sep">&middot;</span>
+  <a href="https://github.com/jonathant09/osu-fresh-profile" target="_blank" rel="noreferrer noopener">
+    Source code (GitHub)
+  </a>
+  <span class="site-footer__sep">&middot;</span>
+  <span class="site-footer__note">Not affiliated with osu! or ppy.</span>
+</footer>
 
 <script type="module" src="/js/main.js"></script>
 </body>

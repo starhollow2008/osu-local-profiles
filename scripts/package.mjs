@@ -91,6 +91,17 @@ console.log('  copying the app...');
 copyDir(path.join(root, 'src'), path.join(out, 'src'));
 copyDir(path.join(root, 'web'), path.join(out, 'web'));
 
+/*
+ * The one script a release needs at runtime. A build installs the *next* one by running
+ * this file out of the newly downloaded tree, so it has to be in every package or the
+ * update after it has nothing to install itself with.
+ */
+fs.mkdirSync(path.join(out, 'scripts'), { recursive: true });
+fs.copyFileSync(
+  path.join(root, 'scripts', 'apply-update.mjs'),
+  path.join(out, 'scripts', 'apply-update.mjs'),
+);
+
 // The one runtime dependency. Everything else in node_modules is types and tooling.
 for (const dep of Object.keys(pkg.dependencies ?? {})) {
   copyDir(path.join(root, 'node_modules', dep), path.join(out, 'node_modules', dep));
@@ -107,6 +118,9 @@ fs.writeFileSync(
       description: pkg.description,
       type: pkg.type,
       dependencies: pkg.dependencies,
+      // Kept because the update check reads the repository from here rather than having
+      // the address written down a second time in the source.
+      repository: pkg.repository,
     },
     null,
     2,

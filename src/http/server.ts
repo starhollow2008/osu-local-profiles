@@ -46,6 +46,8 @@ import {
   setActiveProfile,
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
+import { appVersion } from '../config.ts';
+import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { eligibilityOf } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
@@ -222,6 +224,10 @@ export function startServer(opts: ServerOptions): http.Server {
       const settings = settingsFor(profile.id);
       return json(res, {
         settings,
+        // What is running, so the page can print it and the update check has something to
+        // compare against. Null when package.json could not be read, which the page shows
+        // as an unknown version rather than inventing one.
+        app: { version: appVersion(), update: updateState() },
         profile: {
           id: profile.id,
           name: profile.name,
@@ -756,6 +762,40 @@ export function startServer(opts: ServerOptions): http.Server {
      * the computed totals. Replays stay on disk and are the real source of truth, but this
      * is portable, readable, and survives the app being deleted.
      */
+    /*
+     * The update check and the update itself.
+     *
+     * A GET reports what the last check found; a POST re-runs it. Both are cheap and
+     * neither is on a timer -- the automatic check happens once, at startup.
+     */
+    if (url.pathname === '/api/update') {
+      if (req.method !== 'POST') return json(res, updateState());
+      return void checkForUpdate().then((s) => json(res, s));
+    }
+
+    /*
+     * Replace this install with the newest release and restart.
+     *
+     * The response is sent *before* the process exits, because the page has to be told what
+     * is happening while it still has something to be told by. The exit is deliberate and
+     * is what the detached updater is waiting for -- see scripts/apply-update.mjs.
+     */
+    if (url.pathname === '/api/update/apply' && req.method === 'POST') {
+      return void applyUpdate(opts.dataDir).then(
+        (result) => {
+          json(res, {
+            ok: true,
+            version: result.version,
+            message: `Installing ${result.version}. The app will close and reopen.`,
+          });
+          // Long enough for the response to reach the browser, short enough that the
+          // updater is not left waiting on a process with nothing left to do.
+          setTimeout(() => process.exit(0), 750);
+        },
+        (e: Error) => json(res, { error: e.message }, 400),
+      );
+    }
+
     if (url.pathname === '/api/export') {
       const id = current();
       const profile = getProfile(opts.db, id)!;

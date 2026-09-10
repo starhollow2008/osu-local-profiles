@@ -88,6 +88,20 @@ export interface Settings {
    * stale, and a hand-edited value cannot make a section unreachable.
    */
   sectionOrder: string[];
+  /**
+   * Whether Top Ranks warns that this profile's pp is not comparable with a real osu!
+   * account.
+   *
+   * On by default, and only *shown* at all when a setting has actually made the profile
+   * incomparable -- `countingNoteText` returns nothing otherwise. Dismissing it is a
+   * per-profile preference rather than a global one: a profile that has deliberately
+   * turned on relax scoring does not need telling twice, while another profile on the same
+   * install may still be scoring officially.
+   *
+   * Turning it off hides the sentence, not the fact: unranked-mod scores keep their `*`,
+   * and the Settings dialog still says what each option does.
+   */
+  showCountingNote: boolean;
 }
 
 /**
@@ -163,6 +177,11 @@ const DEFS: Defs = {
   showIncompleteInRecent: {
     default: 'collapse',
     coerce: (raw) => (raw === 'yes' || raw === 'no' ? raw : 'collapse'),
+  },
+  showCountingNote: {
+    default: true,
+    // Defaults to on, so anything but an explicit "off" leaves the warning showing.
+    coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
   },
   sectionOrder: {
     default: [],

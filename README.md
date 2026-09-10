@@ -220,6 +220,7 @@ profile, so the curve comes from the public dumps instead.
 | `port` | `7272` | local web server port |
 | `openBrowser` | `true` | open the page on start |
 | `shareOnNetwork` | `false` | let other machines on your network open the page (see Sharing) |
+| `checkForUpdates` | `true` | ask GitHub once at startup whether a newer release exists |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |

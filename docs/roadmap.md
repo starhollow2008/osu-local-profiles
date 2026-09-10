@@ -27,6 +27,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.12 | Incomplete plays on osu!stable                | todo   |
 | 5.13 | Paged sections and osu!'s own charts          | done   |
 | 5.14 | The osu-web fidelity kit                      | done   |
+| 5.15 | Scrollable dialogs, footer, dismissible warning | done |
+| 5.16 | One-click update from GitHub releases         | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -835,3 +837,93 @@ same failure. This makes the source readable and writes down what may be taken f
 **Done when.** `docs/osu-web-fidelity.md` maps every region of the page to the osu-web file
 that defines it and states what may be taken; flags and mod badges render from generated
 data; and `npm run ui` measures the badge height and the flag's ratio in a real browser.
+
+
+---
+
+## 5.15 — Scrollable dialogs, a footer, a dismissible warning
+
+Three small things asked for together.
+
+**Status: done.**
+
+### Decisions
+
+- **The cap is on the dialog, not the backdrop.** `.backdrop` is `position: fixed` and
+  centres its child, so a dialog taller than the window overflowed in *both* directions and
+  the top went off-screen where nothing could scroll to it. Capping `.modal` at the viewport
+  keeps it centred and moves only its content. `100dvh` after `100vh` matters on mobile,
+  where browser chrome makes `100vh` taller than what is visible.
+- **The footer carries the version.** It is the one number someone has to be able to read
+  out when reporting a problem, and 5.16 needed somewhere to put it anyway.
+- **Dismissing the warning is a per-profile setting, not a global one.** A profile that has
+  deliberately turned on relax scoring does not need telling twice; another profile on the
+  same install may still be scoring officially and must still be warned.
+- **It hides the sentence, not the fact.** Unranked-mod scores keep their `*`, the Settings
+  dialog still explains what each option does, and a toggle there turns the warning back on
+  -- otherwise "don't show again" would be a one-way door on the app's only disclosure that
+  its numbers are not osu!'s.
+
+## 5.16 — One-click update from GitHub releases
+
+**Status: done.** The one part that cannot be verified from here is the download itself:
+the repository is private, so the unauthenticated releases API answers 404. Everything
+either side of it is exercised -- see **What was actually tested** below.
+
+### Decisions
+
+- **In place, with a rollback copy.** The alternative considered was a side-by-side install,
+  which can never break what you have but leaves every shortcut pointing at the old folder
+  and accumulates version directories. In place keeps the path stable; the outgoing files
+  are *moved* to `.rollback-<stamp>/` rather than deleted, so a swap that dies half way
+  leaves both halves on disk.
+- **`data/` is stepped around, and that is the whole safety story.** `dataDir()` is
+  `<install>/data`, so the user's database, settings and images sit *inside* the thing being
+  replaced. The swap works on the install's other top-level entries and skips that one.
+- **Nothing is swapped until the new build is verified on disk**: the download's size is
+  checked before it is unpacked, the unpacked tree must contain `package.json`, `src`, `web`
+  and a runtime, and its `package.json` must say the version that was advertised.
+- **A source checkout refuses outright.** `start.bat` runs `node src/main.ts` from the
+  repository, and an "update" there would overwrite a working tree with a release zip. Both
+  a `.git` directory and a missing bundled runtime block it, because either test alone can
+  be fooled.
+- **The swap runs from the *new* build, not this one.** On Windows the running `node.exe` is
+  locked by the process that would replace it, so `scripts/apply-update.mjs` is spawned
+  detached from the staged tree using the staged tree's own runtime. A release therefore
+  always installs itself with its own updater rather than with whatever the older version
+  shipped -- which is why that script is now part of every package.
+- **The zip reader is ours.** No dependency was available (`node:sqlite` and one pure-JS
+  LZMA codec are the entire runtime dependency list) and shelling out to Windows' `tar.exe`
+  would have put the riskiest path in the app behind a binary that exists on one OS. It
+  refuses zip64 rather than half-reading it, and refuses any entry whose path escapes the
+  target -- this runs on a file fetched over the network.
+- **Backslash separators had to be handled.** This project's own packager writes them: a
+  release archive says `osu-fresh-profile-1.2.0-win-x64
+ode.exe`. Read to the letter that
+  is one very long filename.
+- **Relaunch goes through `cmd`'s `start`.** Spawning the runtime directly is simpler and
+  wrong: `detached` maps to DETACHED_PROCESS on Windows, so the app would come back running,
+  tracking and *invisible*. The launcher is called `Start osu! fresh profile.bat`, so the
+  quoting is the difficulty -- an unquoted path runs a program called `Start`, which is
+  exactly what the first attempt did.
+- **One request, at startup.** Not a timer, for the reason in `docs/reference-links.md`.
+  `checkForUpdates: false` in `config.json` turns off the app's only outgoing request.
+- **A failed check shows nothing.** No network, a private repository and a rate limit are
+  all ordinary; none is a reason to put an error where a button would go.
+
+### What was actually tested
+
+- The zip reader against the **real 82.7MB 1.2.0 release**: 443 entries, 438 files, and
+  `node.exe` hashes byte-identical to the one in `dist/`.
+- The swap end to end against a throwaway install: `data/` survives, every other entry is
+  replaced, the rollback copy holds the old files and *not* `data/`, `data/update.log` says
+  what happened, and the app is relaunched in a visible window.
+- The refusal path: while the parent process is still alive the updater waits and touches
+  nothing.
+- `fetchLatestRelease` against a real public repository, to prove the request, the tag
+  parsing and the asset matching work against GitHub's actual JSON.
+- Version comparison, including `1.9.0 < 1.10.0` and pre-releases sorting below their
+  release, in `test/update.test.ts`.
+
+**Still unverified:** downloading a real release of *this* project, which needs the
+repository to be public and a release newer than the running build.

@@ -121,7 +121,19 @@ const shown = (id) =>
   evaluate(`getComputedStyle(document.getElementById('${id}')).display`);
 
 const checks = [];
+
+/*
+ * `SKIP` is for a check that cannot be made against the profile this is being run on -- not
+ * for one that failed. Returning it counted as a failure before, so a machine with two
+ * profiles saw a permanently red line that said nothing about the build.
+ */
+const SKIP = Symbol('skipped');
+
 const check = (name, actual, expected) => {
+  if (actual === SKIP || actual === 'skipped') {
+    console.log(`  SKIP  ${name}  (does not apply to this profile)`);
+    return;
+  }
   const pass = actual === expected;
   checks.push(pass);
   console.log(`  ${pass ? 'PASS' : 'FAIL'}  ${name}${pass ? '' : `  (got "${actual}", want "${expected}")`}`);
@@ -357,14 +369,21 @@ const reordered = await evaluate(`(() => {
 })()`);
 const { before, after } = JSON.parse(reordered);
 check('moving a section down swaps it with the next', after[0] === before[1] && after[1] === before[0], true);
-// Put the page back the way it was found, so the check leaves no trace on the profile.
+/*
+ * Put the page back the way it was found, so the check leaves no trace on the profile.
+ *
+ * Polled rather than slept on. Each move posts the new order and re-renders when the server
+ * answers, so a fixed wait races that response -- which made this check fail perhaps one run
+ * in three while the stored order was correct the whole time.
+ */
 await evaluate("document.querySelectorAll('.page-extra')[1].querySelector('[data-move=\"up\"]').click()");
-await sleep(300);
-check(
-  'and moving it back restores the original order',
-  await evaluate("[...document.querySelectorAll('.page-extra')].map((s) => s.id).join(',')"),
-  before.join(','),
-);
+let restored = '';
+for (let i = 0; i < 20; i++) {
+  restored = await evaluate("[...document.querySelectorAll('.page-extra')].map((s) => s.id).join(',')");
+  if (restored === before.join(',')) break;
+  await sleep(150);
+}
+check('and moving it back restores the original order', restored, before.join(','));
 
 console.log('\nthe me! section');
 // Not "the first section": the order is the user's to choose, which is the point of 5.7.
@@ -495,6 +514,23 @@ await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optSettings').click()");
 check('settings dialog opens', await shown('settingsModal'), 'grid');
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
+
+/*
+ * A dialog taller than the window has to scroll itself. The backdrop is `position: fixed`
+ * and centres its child, so an uncapped dialog runs off the top of the screen where
+ * nothing -- not the dialog, not the page behind it -- can scroll to reach it. Settings is
+ * the one that grows, so measure it rather than trusting the rule is still there.
+ */
+const dialogFit = await evaluate(`(() => {
+  const el = document.querySelector('#settingsModal .modal');
+  const r = el.getBoundingClientRect();
+  return JSON.stringify({
+    withinViewport: r.top >= -1 && r.bottom <= window.innerHeight + 1,
+    scrolls: getComputedStyle(el).overflowY,
+  });
+})()`);
+check('the settings dialog stays inside the window', JSON.parse(dialogFit).withinViewport, true);
+check('and scrolls its own content', JSON.parse(dialogFit).scrolls, 'auto');
 // The fields are generated from SETTINGS_FIELDS, so an empty list means the render broke.
 check(
   'every setting has a control and a hint',
@@ -683,10 +719,79 @@ check(
   true,
 );
 
+console.log('\nthe update button');
+check('the update dialog is hidden on load', await shown('updateModal'), 'none');
+/*
+ * The button is the server's verdict rendered, not the page's own guess: it appears only
+ * when a newer release exists, there is a build for this platform, and this install is one
+ * that can be replaced at all. Derived from /api/state so this passes on a checkout (where
+ * it must never appear) and on a packaged build alike.
+ */
+const updateState = await evaluate(`fetch('/api/state').then((r) => r.json()).then(
+  (s) => JSON.stringify(s.app.update ?? {}),
+)`);
+const u = JSON.parse(updateState);
+check(
+  'it is shown exactly when an update can be installed',
+  await evaluate("document.getElementById('updateBtn').hidden"),
+  !(u.available === true && u.blocked === null),
+);
+check(
+  'a source checkout is never offered an update',
+  u.blocked === null ? 'packaged' : 'blocked',
+  // This script normally runs against the dev tree, where updating would overwrite the repo.
+  u.currentVersion === null || u.blocked !== null ? 'blocked' : 'packaged',
+);
+
+console.log('\nthe page says what it is');
+check(
+  'the footer links to the source',
+  await evaluate("document.querySelector('.site-footer a')?.href ?? 'missing'"),
+  'https://github.com/jonathant09/osu-fresh-profile',
+);
+// Compared against what the server reports rather than pattern-matched, so a footer that
+// silently prints someone else's version fails instead of passing on its shape.
+check(
+  'and names the running version',
+  await evaluate(`fetch('/api/state').then((r) => r.json()).then(
+    (s) => document.getElementById('footerVersion').textContent === 'osu! fresh profile v' + s.app.version,
+  )`),
+  true,
+);
+
 console.log('\nunofficial scoring is disclosed');
-// The element is hidden via the `hidden` attribute on a styled div -- the same shape as the
-// bug this whole script exists for -- so check computed display, not just the attribute.
-check('nothing is said while the profile matches osu!', await shown('countingNote'), 'none');
+/*
+ * The warning can be dismissed for good, so when it *is* up it has to carry the control
+ * that does that. Checked without clicking: a click would write a setting into whatever
+ * profile this is being run against.
+ */
+check(
+  'a shown warning offers a way to stop showing it',
+  await evaluate(`(() => {
+    const note = document.getElementById('countingNote');
+    if (note.hidden) return 'not shown';
+    return note.querySelectorAll('[data-dismiss-note]').length === 2;
+  })()`),
+  true,
+);
+/*
+ * The element is hidden via the `hidden` attribute on a styled div -- the same shape as the
+ * bug this whole script exists for -- so check computed display, not just the attribute.
+ *
+ * What it should say depends on the profile being run against, so derive the expectation
+ * from that profile rather than assuming a default one: the note is up exactly when a
+ * setting has made the profile incomparable *and* it has not been dismissed. Asserting a
+ * bare 'none' here failed on any profile that had turned unranked scoring on.
+ */
+const noteState = await evaluate(`fetch('/api/state').then((r) => r.json()).then((s) => {
+  const counting = s.settings.includeUnrankedMods || (s.settings.includeUnrankedMaps ?? []).length > 0;
+  return JSON.stringify({ expected: counting && s.settings.showCountingNote !== false });
+})`);
+check(
+  'the warning is up exactly when this profile has earned it',
+  await shown('countingNote'),
+  JSON.parse(noteState).expected ? 'flex' : 'none',
+);
 
 const noteFor = (counting) =>
   evaluate(

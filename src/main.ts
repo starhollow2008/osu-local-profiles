@@ -8,6 +8,7 @@ import { activeProfileId, getProfile } from './profiles.ts';
 import { Tracker } from './tracker/index.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
+import { checkForUpdate, pruneRollbacks } from './update/index.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
@@ -229,6 +230,20 @@ async function main(): Promise<void> {
   console.log('  Close this window or press Ctrl+C to stop tracking.\n');
 
   if (config.openBrowser) openBrowser(url);
+
+  /*
+   * Tidy away the safety copy a previous update left, then ask once whether there is a
+   * newer release. Both are deliberately after the banner and the browser: neither is
+   * allowed to delay the app being usable, and a failed check is not worth a word on
+   * screen -- the page simply has no update button to show.
+   */
+  pruneRollbacks();
+  if (config.checkForUpdates) {
+    void checkForUpdate().then((u) => {
+      if (u.available) console.log(`  Update available: ${u.latestVersion} (see the page)
+`);
+    });
+  }
 
   const shutdown = () => {
     console.log('\n  stopping...');
