@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { watchablePath } from './watcher.ts';
 import {
   LogSession,
   listLogSessions,
@@ -125,7 +126,8 @@ export class LogWatcher {
       if (latest) this.follow(dir, latest, fileSize(latest.runtime));
 
       try {
-        const w = fs.watch(dir, (_event, filename) => {
+        // See `watchablePath`: an unresolved path here aborts the process on Windows.
+        const w = fs.watch(watchablePath(dir), (_event, filename) => {
           if (!filename) return;
           this.queue(dir, filename.toString());
         });

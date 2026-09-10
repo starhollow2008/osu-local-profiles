@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- **The file watcher could kill the app outright on Windows.** `fs.watch` was given the osu!
+  directory as configured, and libuv *aborts the process* -- not an error, an `abort()` --
+  when that path is not the canonical one: a junction, a drive substitution, or an 8.3 short
+  name. Both watchers resolve the path first now. Found by CI, whose temp directory is
+  exactly such a short name; every local run had passed.
+
 ### The page behaves like osu!'s
 
 - **Recent, Top Ranks, Most Played Beatmaps and Recent Plays start at five rows**, with a

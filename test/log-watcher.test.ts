@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { LogWatcher } from '../src/tracker/log-watcher.ts';
+import { watchablePath } from '../src/tracker/watcher.ts';
 import type { ResolvedLoggedPlay } from '../src/clients/lazer-log.ts';
 
 /*
@@ -191,5 +192,86 @@ test('an older session touched later does not take over', async () => {
     assert.equal(f.seen.length, 0);
   } finally {
     f.cleanup();
+  }
+});
+
+/*
+ * The crash CI found, which no local run reproduces.
+ *
+ * On Windows libuv compares the filename `ReadDirectoryChangesW` reports against the path
+ * `fs.watch` was given, and *aborts the process* when they differ:
+ *
+ *     Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\win\fs-event.c, line 72
+ *
+ * They differ when the watched path is not the canonical one -- an 8.3 short name such as
+ * `C:\Users\RUNNER~1\...`, which is exactly what a GitHub runner's TEMP is. It is an abort
+ * inside the runtime rather than an error, so there is nothing to catch: the process dies,
+ * which is how this took two unrelated test files down with it and why nothing here caught
+ * it first.
+ *
+ * That exact condition cannot be manufactured on a machine whose temp directory is already
+ * canonical, so what is pinned here is the fix rather than the crash: `watchablePath` must
+ * hand `fs.watch` the resolved path. A junction is the same class of mismatch and is
+ * something a real user can have -- an osu! folder moved to another drive and linked back
+ * into place.
+ */
+test('a watched path is resolved to its canonical form before being watched', () => {
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-real-'));
+  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-link-')), 'logs');
+
+  try {
+    try {
+      fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return; // no permission to link here; nothing to prove
+    }
+
+    assert.equal(watchablePath(link), fs.realpathSync.native(real));
+    assert.notEqual(watchablePath(link), link);
+  } finally {
+    fs.rmSync(link, { recursive: true, force: true });
+    fs.rmSync(real, { recursive: true, force: true });
+  }
+});
+
+/** A path that cannot be resolved is handed through, for fs.watch itself to reject. */
+test('an unresolvable path is passed through rather than thrown on', () => {
+  const missing = path.join(os.tmpdir(), 'ofp-definitely-not-here');
+  assert.equal(watchablePath(missing), missing);
+});
+
+/* And the whole watcher still works when reached that way. */
+test('a directory reached through a junction is still watched', async () => {
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-logs-real-'));
+  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-logs-link-')), 'logs');
+
+  try {
+    fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+  } catch {
+    fs.rmSync(real, { recursive: true, force: true });
+    return;
+  }
+
+  const seen: ResolvedLoggedPlay[] = [];
+  const watcher = new LogWatcher({
+    dirs: [link],
+    onPlays: (plays) => seen.push(...plays),
+    onError: () => {},
+  });
+
+  try {
+    const runtime = path.join(link, '1000.runtime.log');
+    fs.writeFileSync(runtime, '');
+    watcher.start();
+
+    fs.appendFileSync(runtime, quitLines(TOKEN, 'Artist - Title (Creator) [Insane]'));
+    for (let i = 0; i < 40 && seen.length < 1; i++) await sleep(100);
+
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]!.token, TOKEN);
+  } finally {
+    watcher.stop();
+    fs.rmSync(link, { recursive: true, force: true });
+    fs.rmSync(real, { recursive: true, force: true });
   }
 });

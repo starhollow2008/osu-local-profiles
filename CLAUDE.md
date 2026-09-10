@@ -236,6 +236,23 @@ the profile. Refresh it by re-running the script with a newer `--dump` date.
 is far too thin to interpolate per country, and a fabricated number would be worse than the
 dash osu! itself shows for an unranked user.
 
+## Never hand `fs.watch` a path you have not resolved
+
+On Windows libuv compares the filename `ReadDirectoryChangesW` reports against the path it
+was given and **aborts the process** when they differ:
+
+    Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\win\fs-event.c, line 72
+
+It is an `abort()` inside the runtime, not an exception -- there is nothing to catch and
+nothing to recover. Any non-canonical path triggers it: a junction, a drive substitution, or
+an 8.3 short name like `C:\Users\RUNNER~1\...`. That last one is what a GitHub runner's
+`TEMP` is, which is how this shipped -- it passed on every local run and then killed two
+unrelated test files on CI, because the process died rather than a test failing.
+
+`watchablePath` in `src/tracker/watcher.ts` resolves the directory, and both watchers go
+through it. Paths are still *reported* against the directory as configured, so nothing
+downstream ever sees two spellings of one file.
+
 ## The profile page's charts are not ordinary SVG
 
 Both charts draw in a 0..100 space with `preserveAspectRatio="none"`, which is what makes

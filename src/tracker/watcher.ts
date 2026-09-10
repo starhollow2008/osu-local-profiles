@@ -39,6 +39,30 @@ export function explainWatchError(err: Error): string {
   return err.message;
 }
 
+/**
+ * The directory to hand `fs.watch`, resolved through symlinks, junctions and 8.3 names.
+ *
+ * Not a tidiness measure. On Windows, libuv compares the filename `ReadDirectoryChangesW`
+ * reports against the path it was given, and **aborts the process** when they disagree:
+ *
+ *     Assertion failed: !_wcsnicmp(filename, dir, dirlen), file src\win\fs-event.c, line 72
+ *
+ * They disagree whenever the watched path is not the canonical one -- a junctioned osu!
+ * folder, a drive substitution, or an 8.3 short name such as `C:\Users\RUNNER~1\...`. It is
+ * an `abort()` inside the runtime, so there is no error to catch and nothing to recover: the
+ * app simply dies. Resolving first is the whole fix, and it costs one syscall at startup.
+ *
+ * Falls back to the path as given, because a directory that cannot be resolved is one
+ * `fs.watch` was going to reject anyway, and that failure is reportable where this is not.
+ */
+export function watchablePath(dir: string): string {
+  try {
+    return fs.realpathSync.native(dir);
+  } catch {
+    return dir;
+  }
+}
+
 function readHead(file: string, n: number): Buffer | null {
   let fd: number | undefined;
   try {
@@ -86,7 +110,9 @@ export class ReplayWatcher {
     for (const dir of this.opts.dirs) {
       if (!fs.existsSync(dir)) continue;
       try {
-        const w = fs.watch(dir, { recursive: true }, (_event, filename) => {
+        // Resolved for the watch, but paths are still reported against the directory as it
+        // was configured, so nothing downstream sees two spellings of the same file.
+        const w = fs.watch(watchablePath(dir), { recursive: true }, (_event, filename) => {
           if (!filename) return;
           this.queue(path.join(dir, filename.toString()));
         });
