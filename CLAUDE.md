@@ -115,6 +115,63 @@ store no pp and say so loudly.
 osu! computes accuracy itself during decoding and returns it; `test/official.test.ts` asserts
 our `src/calc/grade.ts` implementation agrees with it on both a lazer and a stable replay.
 
+## Over half of what osu! counts as a play leaves no replay
+
+This is the load-bearing finding behind `incomplete_plays`, and it is not obvious.
+
+**osu! counts a play it never keeps.** `SubmittingPlayer.submitScore` submits on fail *or*
+quit *or* retry. There is **no minimum object count** -- the rule is only: a token was
+issued, **at least one non-miss judgement landed**, and total score > 0. Quitting before
+hitting anything is the sole case osu! discards, and it logs `No hits registered, skipping
+score submission` when it does.
+
+**lazer keeps a score only for a map played to the end.**
+`Player.prepareAndImportScoreAsync` imports when `ScoreProcessor.HasCompleted &&
+GameplayState.HasPassed`, or on `forceImport`, which only the fail screen's "Save replay"
+button sets. So a solo HP-fail, a quit and a retry write *nothing* to disk.
+
+Measured on one real session of this machine's corpus: **54 plays started, 45 counted by
+osu!, 19 replays written.** The replay watcher alone therefore misses ~58% of the play count.
+
+**Every rank-`F` replay in the store is a multiplayer play, not a fail you can learn from.**
+`MultiplayerPlayer.PerformFail` suppresses failing outright -- "failing in multiplayer only
+marks the score with F rank" -- so the map runs to the end and is imported normally. All 22
+`F` replays in this corpus judged **100%** of their beatmap's hit objects; there is not one
+partially-played replay on disk. Do not go looking for fails among the replays.
+
+**So incomplete plays come from lazer's log**, `<lazer>/logs/<session>.runtime.log` and
+`.network.log`. `Score submission completed!` is emitted exactly when osu! accepted the
+submission, which makes the app's play count agree with the website by construction rather
+than by reimplementing the rule above -- and both go silent together when you play offline.
+A pass is told apart by the screen stack logging `suspended <Player> (waiting on
+<...>ResultsScreen)`; verified against the corpus, that fired 19 times in a session with
+exactly 19 replays on disk, matching one to one. lazer's submission token is the dedupe key.
+
+Log timestamps are **UTC**. The beatmap id lives only in the *network* log's submission
+`PUT`, joined to the runtime log by token. Multiplayer submits via `/rooms/...` and so
+resolves to no id there, which costs nothing since it always writes a replay anyway.
+
+**These rows are not in `scores`, and must not be.** An abandoned play has no accuracy,
+combo, mods, pp or total score -- lazer never writes them down. A row of zeroes in `scores`
+would corrupt weighted accuracy, the grade counts, ranked score, the level bar and every
+medal. Only the four aggregates that should include them read `incomplete_plays`: the play
+count, the monthly play counts, Most Played and Recent Plays. `hitsPerPlay` deliberately
+keeps dividing by *scored* plays, since the hits from an abandoned play are unknowable.
+
+Counting them is not a setting -- osu! counts them, so this does.
+`showIncompleteInRecent` (`yes` | `collapse` | `no`) only decides whether they are *listed*.
+
+**osu!stable is not covered, and the gap is the same shape.** The submission rule above is
+the *server's*, so stable counts fails and quits too, and stable does not save a replay for
+a failed play either -- "Option to save failed replays" is a standing request against it
+(`ppy/osu-stable-issues#254`). What is unknown is only where the evidence lives on a stable
+install, and it is unknown because there is no stable install on this machine to look at.
+**Do not guess at it in code.** `logDirOf` returns null for a stable install, so stable is
+skipped cleanly rather than half-supported, and `ingestIncompletePlay` is already
+client-agnostic -- it wants a token, a timestamp, a beatmap and a pass flag, from anywhere.
+The leads worth chasing, the ones already ruled out, and the measurement to run first are
+written up in `docs/roadmap.md` under **5.12**.
+
 ## The osu! account link needs no API and no credentials
 
 `osu.ppy.sh/users/<name>` redirects to the numeric id and embeds the whole public user
@@ -227,6 +284,9 @@ src/http/screenshot.ts full-page PNG via an already-installed Chrome/Edge over C
 src/identity.ts        per-profile avatar and banner files in data/
 src/clients/osu-web.ts optional, on-demand profile lookup (no API, no credentials)
 src/clients/session.ts the username osu! is signed in as, from its own config file
+src/clients/lazer-log.ts  lazer's own log, the only record of a play that left no replay
+src/tracker/log-watcher.ts  follows the live session log from its current end
+src/tracker/incomplete.ts   an abandoned play -> a tracked one
 tools/PpCalculator/    .NET helper wrapping osu!'s real difficulty/pp code
 src/http/              JSON API + SSE
 web/index.html         Phase 1 UI (plain; Vite + React planned for Phase 2)

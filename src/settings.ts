@@ -1,5 +1,6 @@
 import type { Db } from './db/index.ts';
 import { UNRANKED_MAP_STATUSES, type UnrankedMapStatus } from './clients/beatmaps.ts';
+import type { IncompleteDisplay } from './calc/stats.ts';
 
 /**
  * Per-profile settings, edited from the page.
@@ -64,6 +65,21 @@ export interface Settings {
    * rendered with line breaks and autolinked URLs and nothing else.
    */
   aboutMe: string;
+  /**
+   * Whether Recent Plays shows the plays that finished without a score -- a quit, a retry,
+   * an HP fail.
+   *
+   * Note what this setting is *not*: whether those plays are counted. They always are, in
+   * the play count, the monthly play counts and Most Played, because osu! counts them and a
+   * profile that disagreed with the website about how much someone had played would simply
+   * be wrong. This only decides whether they are listed.
+   *
+   * Three states rather than a switch because there is a middle answer worth having.
+   * `collapse` -- the default -- folds a consecutive run of attempts on one beatmap into a
+   * single row carrying the count, which is what keeps the feed readable for anyone who
+   * retries a map twenty times before finishing it.
+   */
+  showIncompleteInRecent: IncompleteDisplay;
   /**
    * The order the profile's sections appear in, as their ids.
    *
@@ -143,6 +159,10 @@ const DEFS: Defs = {
   aboutMe: {
     default: '',
     coerce: (raw) => cleanMultiline(raw, 4000),
+  },
+  showIncompleteInRecent: {
+    default: 'collapse',
+    coerce: (raw) => (raw === 'yes' || raw === 'no' ? raw : 'collapse'),
   },
   sectionOrder: {
     default: [],

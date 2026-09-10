@@ -97,7 +97,23 @@ export function buildHistory(
     version: string | null;
   }[];
 
-  if (rows.length === 0) return { pp: [], monthlyPlaycounts: [], events: [] };
+  /*
+   * The plays that finished without a score. They belong in the monthly play counts for the
+   * same reason they belong in the play count -- osu! counts them -- but nowhere else in
+   * this function: they carry no pp to move the chart and no total score to raise a level.
+   */
+  const abandoned = db
+    .prepare(
+      `SELECT s.played_at
+         FROM incomplete_plays s
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+        ORDER BY s.played_at ASC`,
+    )
+    .all(profileId, mode) as { played_at: number }[];
+
+  if (rows.length === 0 && abandoned.length === 0) {
+    return { pp: [], monthlyPlaycounts: [], events: [] };
+  }
 
   const bestByMap = new Map<string, number>();
   const pp: PpPoint[] = [];
@@ -109,7 +125,17 @@ export function buildHistory(
   let bestPlay = 0;
   let pendingDay: number | null = null;
 
-  events.push({ type: 'first', at: rows[0]!.played_at });
+  for (const play of abandoned) {
+    const month = utcMonth(play.played_at);
+    monthly.set(month, (monthly.get(month) ?? 0) + 1);
+  }
+
+  // The profile started when it was first played, which an abandoned attempt counts as.
+  const firstAt = Math.min(
+    rows[0]?.played_at ?? Number.POSITIVE_INFINITY,
+    abandoned[0]?.played_at ?? Number.POSITIVE_INFINITY,
+  );
+  events.push({ type: 'first', at: firstAt });
 
   for (const row of rows) {
     const day = utcDay(row.played_at);

@@ -231,7 +231,9 @@ test('recent plays list everything, and say which of them counted', () => {
 
     const recent = recentPlays(h.db, h.profileId, 0, 25, VANILLA);
     assert.equal(recent.length, 2);
-    const byMap = new Map(recent.map((p) => [p.beatmapMd5, p]));
+    const byMap = new Map(
+      recent.filter((p) => p.kind === 'score').map((p) => [p.beatmapMd5, p]),
+    );
     assert.equal(byMap.get('ranked')!.counted, true);
     assert.equal(byMap.get('loved')!.counted, false);
     // The pp is still reported: it is the honest answer to "what would this be worth".

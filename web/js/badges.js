@@ -66,6 +66,23 @@ export function gradeBadge(grade, { title } = {}) {
 </svg>`;
 }
 
+/**
+ * The badge for a play that has no grade, because it was never finished.
+ *
+ * Deliberately not the `F` badge. `F` is a real osu! grade, awarded to a score that exists
+ * and failed; these plays have no score at all, and dressing them up as one would be a
+ * quiet lie about what is known. An outline and a dash say "nothing here" instead, at the
+ * same 32x16 as every grade so the rows still line up.
+ */
+export function incompleteBadge() {
+  return `<svg viewBox="0 0 32 16" role="img" aria-label="Play not finished">
+  <rect x="0.75" y="0.75" width="30.5" height="14.5" rx="7.25"
+        fill="none" stroke-width="1.5" stroke-dasharray="3 2.5"
+        style="stroke: hsl(var(--hsl-f1))"/>
+  <rect x="12" y="7.25" width="8" height="1.5" rx="0.75" style="fill: hsl(var(--hsl-f1))"/>
+</svg>`;
+}
+
 /* ------------------------------------------------------------------------ */
 /* Mods                                                                     */
 /* ------------------------------------------------------------------------ */

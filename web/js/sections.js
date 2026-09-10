@@ -1,6 +1,6 @@
 /** Markup builders for the repeated rows on the profile page. */
 import { escapeHtml, fmt, pct, timeAgo, fullDate } from './format.js';
-import { coverUrl, gradeBadge, modList } from './badges.js';
+import { coverUrl, gradeBadge, incompleteBadge, modList } from './badges.js';
 
 function titleOf(item) {
   const name = [item.artist, item.title].filter(Boolean).join(' - ');
@@ -200,11 +200,57 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
 </div>`;
 }
 
+/**
+ * A play osu! counted that never produced a score: a quit, a retry, or an HP fail.
+ *
+ * lazer only writes a replay for a map played to the end, so there is no accuracy here, no
+ * combo, no mods and no pp -- the game never records them for a play it does not keep. The
+ * row is built to look like what it is: the beatmap and when, dimmed, and *no* zeroes
+ * standing in for numbers nobody knows.
+ */
+export function incompleteRow(play) {
+  const artist = play.artist
+    ? ` <small class="play-detail__artist">by ${escapeHtml(play.artist)}</small>`
+    : '';
+  const title = maybeLink(
+    beatmapHref(play),
+    `${escapeHtml(play.title ?? titleOf(play))}${artist}`,
+    'play-detail__title u-ellipsis',
+  );
+
+  const attempts =
+    play.attempts > 1
+      ? `<span class="play-detail__attempts" title="${play.attempts} attempts in a row on this beatmap, none finished">&times;${fmt(play.attempts)}</span>`
+      : '';
+
+  return `<div class="play-detail play-detail--incomplete" data-incomplete-id="${play.id}">
+  <div class="play-detail__group play-detail__group--top">
+    <div class="play-detail__icon">${incompleteBadge()}</div>
+    <div class="play-detail__detail">
+      ${title}
+      <div class="play-detail__beatmap-and-time">
+        <span class="play-detail__beatmap u-ellipsis">${escapeHtml(play.version ?? '')}</span>
+        <span class="play-detail__time" title="${escapeHtml(fullDate(play.playedAt))}">${escapeHtml(timeAgo(play.playedAt))}</span>
+      </div>
+    </div>
+  </div>
+  <div class="play-detail__group play-detail__group--bottom">
+    <div class="play-detail__score-detail">
+      <span class="play-detail__didnt-finish"
+            title="Started but not finished - quit, retried, or failed. osu! counts this toward your play count, but there is no score to show: lazer only saves a replay for a map played to the end.">Didn&rsquo;t finish</span>
+    </div>
+    <div class="play-detail__mods-pp">${attempts}</div>
+  </div>
+</div>`;
+}
+
 export function playList(plays, options = {}) {
   if (!plays || plays.length === 0) {
     return `<div class="u-empty">${escapeHtml(options.empty ?? 'Nothing here yet.')}</div>`;
   }
-  return `<div class="play-detail-list">${plays.map((p) => playRow(p, options)).join('')}</div>`;
+  return `<div class="play-detail-list">${plays
+    .map((p) => (p.kind === 'incomplete' ? incompleteRow(p) : playRow(p, options)))
+    .join('')}</div>`;
 }
 
 /**

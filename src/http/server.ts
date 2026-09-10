@@ -142,6 +142,9 @@ export function startServer(opts: ServerOptions): http.Server {
   };
 
   opts.tracker.on('score', (score) => broadcast('score', score));
+  // A play with no score still moves the play count and the charts, so the page has to be
+  // told about it -- it just has nothing to put in a toast beyond which map it was.
+  opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
 
   const json = (res: http.ServerResponse, body: unknown, status = 200) => {
@@ -256,7 +259,14 @@ export function startServer(opts: ServerOptions): http.Server {
         medals: computeMedals(opts.db, current(), mode, e),
         pinned: pinnedPlays(opts.db, current(), mode, e),
         top: topPlays(opts.db, current(), mode, 100, e),
-        recent: recentPlays(opts.db, current(), mode, 25, e),
+        recent: recentPlays(
+          opts.db,
+          current(),
+          mode,
+          25,
+          e,
+          settingsFor(current()).showIncompleteInRecent,
+        ),
         mostPlayed: mostPlayed(opts.db, current(), mode, 15),
         ppHistory: history.pp,
         // osu-web charts global rank here, so do the same wherever a curve exists.
@@ -546,8 +556,11 @@ export function startServer(opts: ServerOptions): http.Server {
         }
 
         const before = opts.db
-          .prepare('SELECT COUNT(*) AS n FROM scores WHERE profile_id = ?')
-          .get(current()) as { n: number };
+          .prepare(
+            `SELECT (SELECT COUNT(*) FROM scores WHERE profile_id = ?)
+                  + (SELECT COUNT(*) FROM incomplete_plays WHERE profile_id = ?) AS n`,
+          )
+          .get(current(), current()) as { n: number };
 
         const now = Date.now();
         // Moving tracking_since forward is what makes this a *fresh* profile: without it
@@ -555,6 +568,9 @@ export function startServer(opts: ServerOptions): http.Server {
         opts.db.exec('BEGIN');
         try {
           opts.db.prepare('DELETE FROM scores WHERE profile_id = ?').run(current());
+          // Abandoned attempts are part of the profile's play count, so a reset that left
+          // them behind would clear the scores and still show an evening of plays.
+          opts.db.prepare('DELETE FROM incomplete_plays WHERE profile_id = ?').run(current());
           opts.db.prepare('DELETE FROM snapshots WHERE profile_id = ?').run(current());
           opts.db
             .prepare('UPDATE profiles SET tracking_since = ? WHERE id = ?')
@@ -567,7 +583,7 @@ export function startServer(opts: ServerOptions): http.Server {
 
         opts.tracker.setTrackingSince(now);
         broadcast('reset', { deleted: before.n, trackingSince: now });
-        console.log(`\n  profile reset -- ${before.n} score(s) erased, tracking from now\n`);
+        console.log(`\n  profile reset -- ${before.n} play(s) erased, tracking from now\n`);
         json(res, { ok: true, deleted: before.n, trackingSince: now });
       });
       return;

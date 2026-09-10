@@ -1,5 +1,44 @@
 # Changelog
 
+## Unreleased
+
+### Plays that were never finished
+
+Until now the profile only knew about plays osu!lazer kept a replay for -- which means
+plays you finished. osu! counts a play you quit, retried or failed too, and lazer saves a
+score only for a map played to the end, so those left nothing to detect. Measured on one
+real session: **54 plays started, 45 counted by osu!, 19 replays written.** The play count
+was missing well over half of itself.
+
+- Unfinished plays are now tracked, read from lazer's own session log -- still no API, no
+  credentials and no polling. A play is counted at the moment the log records osu!
+  accepting the submission, so the play count agrees with the website by construction
+  rather than by reimplementing its rules, and both go quiet together when you play offline.
+- They count toward the **play count**, the **monthly play counts** and **Most Played**.
+  That is not a setting: osu! counts them, so this does.
+- They appear in **Recent Plays** as dimmed rows marked "Didn't finish". The new setting
+  **Unfinished plays in Recent** chooses between grouping a consecutive run of attempts on
+  one beatmap into a single row with its count (the default), listing every attempt, and
+  hiding them.
+- There is no accuracy, combo, mod list or pp on these rows, and none is invented: lazer
+  records none of it for a play it discards. `hits per play` still divides by scored plays
+  for the same reason.
+- Resetting or deleting a profile clears them along with its scores.
+
+Along the way, two things worth knowing were established from ppy/osu and this machine's
+2,433-replay corpus, and are written down in `CLAUDE.md`:
+
+osu!stable is not covered: it has the same gap, but where a stable install records an
+unfinished play -- if it does at all -- could not be established without one to inspect.
+`docs/roadmap.md` **5.12** holds the leads, what is already ruled out, and the measurement
+to run first.
+
+- osu! applies **no minimum object count** to a play. It submits a fail or a quit as long as
+  a token was issued, at least one non-miss judgement landed, and the score is above zero.
+- Every rank-`F` replay on disk is a **multiplayer** play, where failing only marks the
+  score `F` instead of ending the map. All 22 of them judged 100% of their beatmap; there is
+  no such thing as a partially-played replay in the store.
+
 ## 1.1.0
 
 Phase 5: the profile becomes yours to configure, arrange and share.

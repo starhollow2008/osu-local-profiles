@@ -29,7 +29,9 @@ export function listProfiles(db: Db): Profile[] {
   const rows = db
     .prepare(
       `SELECT p.id, p.name, p.created_at, p.tracking_since,
-              (SELECT COUNT(*) FROM scores s WHERE s.profile_id = p.id) AS score_count
+              ((SELECT COUNT(*) FROM scores s WHERE s.profile_id = p.id)
+               + (SELECT COUNT(*) FROM incomplete_plays i WHERE i.profile_id = p.id))
+                AS score_count
          FROM profiles p
         ORDER BY p.created_at ASC`,
     )
@@ -135,9 +137,14 @@ export function deleteProfile(db: Db, id: number): { deletedScores: number; next
   const count = db.prepare('SELECT COUNT(*) AS n FROM profiles').get() as { n: number };
   if (count.n <= 1) throw new Error('this is the only profile -- reset it instead of deleting it');
 
-  const scores = db.prepare('SELECT COUNT(*) AS n FROM scores WHERE profile_id = ?').get(id) as {
-    n: number;
-  };
+  // Everything the profile has tracked, abandoned attempts included -- they are plays, and
+  // the confirmation has to say how much is about to go.
+  const scores = db
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM scores WHERE profile_id = ?)
+            + (SELECT COUNT(*) FROM incomplete_plays WHERE profile_id = ?) AS n`,
+    )
+    .get(id, id) as { n: number };
 
   db.exec('BEGIN');
   try {

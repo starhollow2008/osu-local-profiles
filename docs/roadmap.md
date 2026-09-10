@@ -23,6 +23,12 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.8  | Medals                                        | done   |
 | 5.9  | Share: screenshot and standalone HTML         | done   |
 | 5.10 | macOS and Linux support                       | deferred |
+| 5.11 | Incomplete plays (fails, quits, retries)      | done   |
+| 5.12 | Incomplete plays on osu!stable                | todo   |
+
+5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
+of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
+machine and 5.10 cannot.
 
 Ordering is by dependency, not by the order they were written down. 5.1 is the foundation
 every toggle needs. 5.2 and 5.3 share one schema and ingest change, so they are adjacent.
@@ -419,3 +425,199 @@ a fresh directory. Until someone can run it, the README says which platforms are
   `ADDED_COLUMNS`, because `schema.sql` is `CREATE TABLE IF NOT EXISTS` only.
 - Dev and packaged builds keep separate `data/` directories. Do not alternate between them
   while testing a data change.
+
+---
+
+## 5.11 — Incomplete plays (fails, quits and retries)
+
+**Status:** done
+
+**Goal.** Count the plays osu! counts and this app does not: a play that was started but
+never finished, whether by early exit, a retry, or an HP fail. They join the play count, the
+monthly play counts, Most Played, and (configurably) Recent Plays.
+
+### What osu! actually counts — established from ppy/osu, not guessed
+
+`SubmittingPlayer.submitScore` submits a score on fail *or* quit *or* retry. There is **no
+minimum object count** — the questions we assumed might exist ("15 objects? 25?") are not
+what osu! asks. It asks exactly three things, and a play counts if all three hold:
+
+1. a score token was issued (the play started while online and logged in, with
+   user-playable mods),
+2. **at least one non-miss judgement landed** (`Statistics.Any(s => s.Key.IsHit() && s.Value > 0)`),
+3. total score > 0.
+
+Quitting before hitting anything is the only case osu! itself throws away, and it says so:
+`No hits registered, skipping score submission`.
+
+### Why the replay watcher cannot see these plays
+
+`Player.prepareAndImportScoreAsync` imports a score locally only when
+`ScoreProcessor.HasCompleted && GameplayState.HasPassed`, or when `forceImport` is set —
+which only `FailOverlay.SaveReplay` does, i.e. the user clicking "Save replay" by hand. So:
+
+| play type | replay in lazer's store | osu! counts it |
+| --------- | ----------------------- | -------------- |
+| passed | yes | yes |
+| multiplayer HP-fail | yes, rank `F` | yes |
+| solo HP-fail | **no**, unless "Save replay" is clicked | yes |
+| quit / early exit / retry | **no** | yes |
+
+Multiplayer is the odd one out because `MultiplayerPlayer.PerformFail` suppresses the fail
+outright — "failing in multiplayer only marks the score with F rank" — so the map plays to
+the end and is imported normally. That is what every rank-`F` replay in this machine's store
+turned out to be: all 22 of them judged **100%** of their beatmap's hit objects. There is not
+one partially-played replay on disk, which is the clearest possible confirmation that a real
+fail or quit leaves nothing behind.
+
+Measured on one real session (`logs/1789001733.*`): **54 plays started, 45 counted by osu!,
+19 replays written**. The app was therefore missing 58% of its own play count.
+
+### Decisions
+
+- **The source is lazer's own log files**, `<lazer>/logs/<session>.runtime.log` plus
+  `.network.log`. This is the only local record of a play that leaves no replay, and it
+  needs no API, no credentials and no polling — the same trade already accepted for
+  `src/clients/osu-web.ts`. Like that module it is a private detail of osu! and must fail
+  quietly and visibly rather than inventing plays.
+- **A play is counted when osu! counted it.** The log line `Score submission completed!` is
+  emitted exactly when osu! accepted the submission, so the app's play count agrees with the
+  website by construction rather than by reimplementing rule 2 above. Better still, both go
+  silent together: play offline and there is no token, no submission, and no play count on
+  either side.
+- **A pass is told apart by the results screen**, not by matching against replays. While a
+  play is open the screen stack logs `suspended <Player> (waiting on <...>ResultsScreen)`
+  for a completed map and `exit from <Player>` for one that was abandoned. Verified against
+  the corpus: in that session the signal fired 19 times and there were exactly 19 replays on
+  disk, matching one-to-one on time and beatmap. A time-window match against ingested scores
+  was considered and rejected — two attempts at the same map minutes apart are genuinely
+  ambiguous, and the log answers the question directly.
+- **lazer's submission token is the dedupe key.** It is server-issued and unique per play,
+  so re-reading a log can never duplicate a play, and it needs no synthesised identity.
+- **Stored in their own table, not in `scores`.** An incomplete play has no accuracy, no
+  combo, no mods, no pp and no total score — that data never leaves lazer's memory. Putting
+  a row of zeroes into `scores` would silently poison weighted accuracy, grade counts,
+  ranked score, the level bar and every medal. `incomplete_plays` keeps them separate and
+  the four aggregates that should include them opt in explicitly.
+- **Counting them is not a setting.** osu! counts them, so the play count counts them.
+  What *is* a setting is whether they appear in Recent Plays, because a player who retries
+  a lot would otherwise see a feed that is mostly retries: `showIncompleteInRecent` is
+  `yes` | `collapse` | `no`, default **`collapse`**, which folds consecutive attempts on one
+  beatmap into a single row carrying the attempt count.
+- **`hitsPerPlay` keeps dividing by scored plays.** osu!'s own figure includes the hits from
+  failed plays, which we do not have; dividing hits we *do* have by a play count inflated
+  with plays contributing none would bias it low by the size of the gap. The ratio over the
+  scored subset is the better estimate of osu!'s number.
+- **The mode comes from the beatmap**, since the log never names the ruleset. A converted
+  play therefore lands under the beatmap's own mode. Noted rather than guessed at.
+- **Nothing is scanned at startup**, exactly as for replays: tailing begins at the current
+  end of the log. Past sessions are an explicit, previewed backfill or nothing.
+- **lazer only.** osu!stable submits fails too but keeps no comparable log, so a stable
+  install contributes passes exactly as it does today.
+
+### Plan
+
+- `src/clients/lazer-log.ts` — the log grammar and a `LogSession` that turns lines into
+  plays. Pure and line-at-a-time, so live tailing and whole-file parsing share one path.
+- `src/tracker/log-watcher.ts` — follow the newest session's logs by byte offset.
+- `src/tracker/incomplete.ts` — resolve the beatmap, apply the cutoff, insert.
+- Schema: `incomplete_plays`, keyed by profile and token, with `hidden_at` so `visibleSql()`
+  applies to it verbatim.
+- `src/calc/stats.ts` and `src/calc/history.ts`: play count, monthly play counts, Most
+  Played, Recent Plays.
+- `src/settings.ts` + the Settings dialog: `showIncompleteInRecent`.
+- `web/js/sections.js`: a dimmed row with a "Didn't finish" badge and no invented numbers.
+- `test/lazer-log.test.ts` against real log excerpts, plus aggregate tests.
+
+**Done when.** A quit, a retry and an HP fail each raise the play count, appear in the
+monthly chart and Most Played, and show in Recent Plays according to the setting — and a
+passed play is still counted exactly once.
+
+---
+
+## 5.12 — Incomplete plays on osu!stable
+
+**Status:** todo — blocked on having an osu!stable install to inspect
+
+**Goal.** What 5.11 does for lazer, for osu!stable: count the plays that were started and
+never finished. Today a stable install contributes its passes exactly as it always has, and
+nothing else, so a stable player's play count is short by however much they quit and retry.
+
+**Read 5.11 first.** Its findings about what osu! counts are about the *server*, and so they
+hold for stable too. What differs is only where the evidence lives on disk.
+
+### Established (verified against ppy/osu and this machine's corpus)
+
+- **osu! counts a fail, a quit and a retry**, on any client, provided a token was issued, at
+  least one non-miss judgement landed, and the score is above zero. There is no minimum
+  object count. This is server-side behaviour and is not lazer-specific.
+- **stable does not save a replay for a failed play.** "Option to save failed replays" is a
+  standing feature request against stable
+  (<https://github.com/ppy/osu-stable-issues/issues/254>), which settles it: `Data/r/` holds
+  passes only, the same shape of gap lazer has.
+- **`scores.db` is "the local leaderboards"** per osu!'s own wiki, and a local leaderboard
+  is a list of completed plays — so it is very unlikely to hold an abandoned one. Worth
+  five minutes to disprove, not worth building on.
+
+### Unverified leads, in the order worth trying
+
+Nothing below has been confirmed, because there is no stable install here. Treat each as a
+question, not a fact, and **write the answer back into this section** either way — a lead
+ruled out is as useful to the next session as one that worked.
+
+1. **Does stable have a `Logs/` directory, and does it record score submission?** Several
+   sources say stable writes `network.log`, `runtime.log`, `osu!auth.log`, `performance.log`
+   and `session.log` under the install root, but osu!'s own wiki page for the program files
+   does not list a `Logs` folder at all, and the sources may be describing lazer. **Check
+   this first**: if stable logs its submissions the way lazer does, 5.12 is mostly a second
+   grammar and very little else.
+   - What to look for: a line written when a score is submitted, and anything naming the
+     beatmap. stable is a different codebase from lazer, so the *wording* will differ — do
+     not expect `Score submission completed!`.
+   - stable's logs are widely described as being obfuscated/minimal compared to lazer's, so
+     be ready for this to come to nothing.
+2. **`osu!.db`.** The wiki calls it "osu!'s database of beatmaps"; it is known to record
+   whether a beatmap has been played. If it also keeps a per-beatmap *play count* that
+   includes failed attempts, that is a source for Most Played and the play count, though
+   not for Recent Plays — a counter has no timestamps, so it can say how much but never
+   when. Deltas on a counter would also be fragile across restarts.
+3. **`scores.db`.** Rule it out (see above) rather than assume it.
+4. **Nothing local at all.** If none of the above pans out, say so in the README and stop.
+   The osu! API's `include_fails=1` would answer it completely, and is still refused: it
+   needs an OAuth client id and secret and breaks the project's "no login anywhere"
+   promise. Not counting a play is much better than that.
+
+### The experiment that made 5.11 tractable
+
+Do this before writing any code. It is what turned "lazer probably drops some plays" into a
+number, and it will do the same for stable:
+
+1. Play one normal session — pass some maps, quit some, retry some, fail some.
+2. Count **plays started**, **plays osu! counted**, and **replays written to disk** over
+   that window. For lazer those came from the session log and from the file store's replay
+   timestamps; for stable, `Data/r/` file times will give the third number, and your own
+   profile page on the website gives the second.
+3. The gap between the second and third numbers is the whole feature. On lazer it was 45
+   against 19.
+
+### Where it plugs in
+
+The ingest is already client-agnostic and does not need changing:
+
+- `ingestIncompletePlay` in `src/tracker/incomplete.ts` takes a `ResolvedLoggedPlay` —
+  token, timestamp, beatmap id or name, and whether it passed — and knows nothing about
+  where that came from. Give it those five facts from any source and everything downstream
+  (the play count, the monthly counts, Most Played, Recent Plays, reset, delete) already
+  works.
+- `src/clients/lazer-log.ts` and `src/tracker/log-watcher.ts` are the lazer-specific half.
+  A stable source is a sibling of those two, not a change to them.
+- The dedupe key must stay something stable and unique per play. lazer's submission token is
+  ideal because osu! issues it. If stable offers nothing equivalent, a key will have to be
+  synthesised, and it must survive a re-read of the same source without producing a second
+  play — see how `dedupe_key` is used in `src/tracker/incomplete.ts`.
+- `logDirOf` in `src/clients/lazer-log.ts` already returns null for a stable install, so
+  stable installs are silently skipped today rather than half-supported.
+
+**Done when.** A quit and a retry on osu!stable raise the play count the same way they do on
+lazer — or this section records, with evidence, that stable keeps no local trace of them and
+the README says so plainly.

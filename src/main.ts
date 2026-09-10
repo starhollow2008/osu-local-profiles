@@ -160,6 +160,15 @@ async function main(): Promise<void> {
       console.log('            -> does not count toward this profile');
     }
   });
+  /*
+   * A play osu! counted that produced no score -- a quit, a retry, an HP fail. There is no
+   * grade, accuracy or pp to print, because lazer records none of it for a play it throws
+   * away; only that it happened, and on what.
+   */
+  tracker.on('incomplete', (play) => {
+    const time = new Date(play.playedAt).toLocaleTimeString();
+    console.log(`  [${time}]   --   -- did not finish        ${play.title}`);
+  });
   tracker.on('error', (e) => console.error(`  watcher error: ${e.message}`));
 
   tracker.start();
@@ -185,6 +194,12 @@ async function main(): Promise<void> {
       `, level ${standing.level.current}`,
   );
   console.log('  Play osu! (online or offline) and scores will appear below.');
+  if (installs.some((i) => i.kind === 'lazer')) {
+    // Worth saying plainly, because the difference is invisible otherwise: an unfinished
+    // play is only counted when osu! counted it, and osu! only counts one it was told
+    // about. Signed out or offline, the game does not submit and neither side counts it.
+    console.log('  Unfinished plays (quit, retried, failed) count too, while osu! is signed in.');
+  }
   console.log('  Close this window or press Ctrl+C to stop tracking.\n');
 
   if (config.openBrowser) openBrowser(url);

@@ -3,6 +3,9 @@ import type { Db } from '../db/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
 import { BeatmapResolver, indexOneFile } from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
+import { LogWatcher } from './log-watcher.ts';
+import { logDirOf, type ResolvedLoggedPlay } from '../clients/lazer-log.ts';
+import { ingestIncompletePlay, type IngestedIncomplete } from './incomplete.ts';
 import { ingestReplayFile, type IngestedScore } from './ingest.ts';
 import { scanForReplays, type BackfillScan } from './backfill.ts';
 import { countStale, recomputeScores, type RecomputeResult } from './recompute.ts';
@@ -20,6 +23,8 @@ export interface TrackerOptions {
 
 export interface TrackerEvents {
   score: [IngestedScore];
+  /** A play osu! counted that finished without a score: a quit, a retry, or an HP fail. */
+  incomplete: [IngestedIncomplete];
   skip: [{ reason: string }];
   error: [Error];
 }
@@ -42,6 +47,7 @@ export interface BackfillResult {
 export class Tracker extends EventEmitter<TrackerEvents> {
   private readonly opts: TrackerOptions;
   private watcher: ReplayWatcher | null = null;
+  private logWatcher: LogWatcher | null = null;
   private enabled = false;
   /** Serialises ingestion so two replays landing together cannot interleave writes. */
   private queue: Promise<void> = Promise.resolve();
@@ -98,12 +104,33 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       onError: (e) => this.emit('error', e),
     });
     this.watcher.start();
+
+    /*
+     * The second half of detection. lazer writes a replay only for a map played to the end,
+     * so a quit, a retry or an HP fail exists nowhere on disk except its own log -- and on
+     * a real session those outnumbered the replays. Nothing is read unless the install is
+     * lazer and its log directory is actually there.
+     */
+    const logDirs = this.opts.installs
+      .map((i) => logDirOf(i))
+      .filter((d): d is string => d !== null);
+    if (logDirs.length > 0) {
+      this.logWatcher = new LogWatcher({
+        dirs: logDirs,
+        onPlays: (plays) => this.handleLoggedPlays(plays),
+        onError: (e) => this.emit('error', e),
+      });
+      this.logWatcher.start();
+    }
+
     this.enabled = true;
   }
 
   stop(): void {
     this.watcher?.stop();
     this.watcher = null;
+    this.logWatcher?.stop();
+    this.logWatcher = null;
     this.enabled = false;
   }
 
@@ -208,6 +235,33 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       () => undefined,
     );
     return run;
+  }
+
+  /**
+   * Record the plays osu! counted that left no replay.
+   *
+   * Queued behind replay ingestion like everything else -- and it has to be, because a
+   * passing play in the same batch is only recognised as one by the score its replay
+   * writes, so the two must never be in flight together.
+   */
+  private handleLoggedPlays(plays: ResolvedLoggedPlay[]): void {
+    this.queue = this.queue
+      .then(() => {
+        for (const play of plays) {
+          const result = ingestIncompletePlay(play, {
+            db: this.opts.db,
+            resolver: this.opts.resolver,
+            profileId: this.opts.profileId,
+            trackingSince: this.opts.trackingSince,
+          });
+          if (result.status === 'added') this.emit('incomplete', result.play);
+          // A passed play is not a skip worth reporting: its replay is the event.
+          else if (result.reason !== 'passed') this.emit('skip', { reason: result.reason });
+        }
+      })
+      .catch((e: unknown) => {
+        this.emit('error', e as Error);
+      });
   }
 
   private handleReplay(file: string): void {

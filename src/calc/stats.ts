@@ -17,6 +17,8 @@ const TOP_PLAY_LIMIT = 100;
 
 /** One score as the profile page renders it. Shared by Top Ranks and Recent Plays. */
 export interface Play {
+  /** Distinguishes a real score from the score-less rows Recent Plays also carries. */
+  kind: 'score';
   id: number;
   beatmapMd5: string;
   beatmapId: number | null;
@@ -116,6 +118,7 @@ function toPlay(r: Row, e: Eligibility): Play {
   }
 
   return {
+    kind: 'score',
     id: r['id'] as number,
     beatmapMd5: r['beatmap_md5'] as string,
     beatmapId: (r['beatmap_id'] as number | null) ?? null,
@@ -192,6 +195,18 @@ export function computeStats(
     max_combo: number;
   };
 
+  /*
+   * Plays that finished without a score -- a quit, a retry, an HP fail. osu! counts these
+   * and so does this, because the alternative is a play count that disagrees with the
+   * website by more than half. See src/clients/lazer-log.ts for where they come from.
+   */
+  const incomplete = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM incomplete_plays s
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}`,
+    )
+    .get(profileId, mode) as { n: number };
+
   // Ranked score counts the best score on each ranked map, not every attempt.
   const ranked = db
     .prepare(
@@ -212,11 +227,19 @@ export function computeStats(
     weightedPp: weighted,
     bonusPp: bonus,
     accuracy: weightedAccuracy(top.map((r) => r.accuracy)),
-    playcount: totals.playcount,
+    playcount: totals.playcount + incomplete.n,
     totalScore: totals.total_score,
     rankedScore: ranked.ranked_score,
     totalHits: totals.total_hits,
-    // osu-web floors this rather than rounding (Stats.getHitsPerPlay).
+    /*
+     * Divided by the *scored* plays, not the play count above. osu!'s own figure includes
+     * the hits from failed plays; ours cannot, because a play with no replay records no
+     * hits anywhere. Dividing the hits we do have by a play count swollen with plays that
+     * contribute none would bias this low by the whole size of that gap, so the ratio is
+     * taken over the subset where both halves are known.
+     *
+     * osu-web floors this rather than rounding (Stats.getHitsPerPlay).
+     */
     hitsPerPlay: totals.playcount > 0 ? Math.floor(totals.total_hits / totals.playcount) : 0,
     maxCombo: totals.max_combo,
     level: levelFromScore(totals.total_score),
@@ -279,9 +302,50 @@ export function pinnedPlays(
 }
 
 /**
+ * How Recent Plays treats the plays that finished without a score.
+ *
+ * A setting rather than a fixed answer because it genuinely depends on how someone plays:
+ * on the session this feature was built from there were 26 abandoned attempts against 19
+ * finished ones, so showing every one of them turns the feed into a list of retries.
+ * `collapse` folds a consecutive run on one beatmap into a single row that says how many.
+ */
+export type IncompleteDisplay = 'yes' | 'collapse' | 'no';
+
+/** A play osu! counted that has no score attached to it. */
+export interface IncompletePlay {
+  kind: 'incomplete';
+  id: number;
+  beatmapMd5: string | null;
+  beatmapId: number | null;
+  beatmapsetId: number | null;
+  artist: string | null;
+  title: string | null;
+  version: string | null;
+  creator: string | null;
+  playedAt: number;
+  /** Consecutive attempts on this beatmap folded into this row; 1 unless collapsed. */
+  attempts: number;
+}
+
+export type RecentEntry = Play | IncompletePlay;
+
+/**
+ * How many rows to pull from each side before merging.
+ *
+ * Collapsing shrinks the list, so the answer cannot be built from exactly `limit` rows of
+ * each: a run of forty attempts on one map would otherwise fill the whole feed and leave
+ * nothing else to show. Bounded so a profile with a long history still costs one indexed
+ * read per side.
+ */
+const RECENT_SOURCE_ROWS = 200;
+
+/**
  * Every recent play, counting or not -- this is a log of what was played, so an unranked
  * map or a relax attempt belongs in it. Each row carries `counted` so the page can say
  * which of them reached Best Performance.
+ *
+ * Abandoned attempts are merged in by time, subject to `incomplete`. They carry none of the
+ * numbers a score does, because lazer never writes them down for a play it does not keep.
  */
 export function recentPlays(
   db: Db,
@@ -289,7 +353,10 @@ export function recentPlays(
   mode: Ruleset,
   limit = 25,
   e: Eligibility = VANILLA,
-): Play[] {
+  incomplete: IncompleteDisplay = 'collapse',
+): RecentEntry[] {
+  const want = incomplete === 'no' ? limit : Math.min(RECENT_SOURCE_ROWS, Math.max(limit * 8, limit));
+
   const rows = db
     .prepare(
       `SELECT ${playColumns(e)}, ${ppColumn(e)} AS pp
@@ -299,25 +366,100 @@ export function recentPlays(
         ORDER BY s.played_at DESC
         LIMIT ?`,
     )
-    .all(profileId, mode, limit) as Row[];
+    .all(profileId, mode, want) as Row[];
 
-  return rows.map((r) => toPlay(r, e));
+  const scores: RecentEntry[] = rows.map((r) => toPlay(r, e));
+  if (incomplete === 'no') return scores.slice(0, limit);
+
+  const abandoned = db
+    .prepare(
+      `SELECT s.id, s.beatmap_md5, s.beatmap_id, s.beatmap_name, s.played_at,
+              b.beatmapset_id, b.artist, b.title, b.version, b.creator
+         FROM incomplete_plays s
+         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+        ORDER BY s.played_at DESC
+        LIMIT ?`,
+    )
+    .all(profileId, mode, want) as Row[];
+
+  const merged: RecentEntry[] = [...scores, ...abandoned.map(toIncomplete)].sort(
+    (a, b) => b.playedAt - a.playedAt,
+  );
+
+  return (incomplete === 'collapse' ? collapseRuns(merged) : merged).slice(0, limit);
 }
 
-/** osu-web's "Most Played Beatmaps": every attempt counts, passed or not. */
+function toIncomplete(r: Row): IncompletePlay {
+  return {
+    kind: 'incomplete',
+    id: r['id'] as number,
+    beatmapMd5: (r['beatmap_md5'] as string | null) ?? null,
+    beatmapId: (r['beatmap_id'] as number | null) ?? null,
+    beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
+    artist: (r['artist'] as string | null) ?? null,
+    // Whatever the log called the map stands in when the beatmap itself is not resolvable,
+    // so the row still names something rather than showing a hash.
+    title: (r['title'] as string | null) ?? (r['beatmap_name'] as string | null) ?? null,
+    version: (r['version'] as string | null) ?? null,
+    creator: (r['creator'] as string | null) ?? null,
+    playedAt: r['played_at'] as number,
+    attempts: 1,
+  };
+}
+
+/**
+ * Fold each run of abandoned attempts on one beatmap into a single row.
+ *
+ * Only *consecutive* ones, so a finished run in the middle of a grind still breaks the
+ * feed up the way it happened. The row keeps the time of the most recent attempt, since
+ * the list is newest first and that is where it sits.
+ */
+function collapseRuns(entries: RecentEntry[]): RecentEntry[] {
+  const out: RecentEntry[] = [];
+  for (const entry of entries) {
+    const previous = out[out.length - 1];
+    if (
+      entry.kind === 'incomplete' &&
+      previous?.kind === 'incomplete' &&
+      previous.beatmapMd5 !== null &&
+      previous.beatmapMd5 === entry.beatmapMd5
+    ) {
+      previous.attempts++;
+      continue;
+    }
+    out.push(entry.kind === 'incomplete' ? { ...entry } : entry);
+  }
+  return out;
+}
+
+/**
+ * osu-web's "Most Played Beatmaps": every attempt counts, passed or not.
+ *
+ * "Every attempt" has to mean the abandoned ones too, or the map someone spent an evening
+ * retrying twenty times shows up as the two runs they managed to finish -- which is the
+ * opposite of what this section is for.
+ */
 export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15): MostPlayed[] {
   const rows = db
     .prepare(
-      `SELECT s.beatmap_md5, s.beatmap_id, COUNT(*) AS count, MAX(s.played_at) AS last_played,
+      `SELECT p.beatmap_md5, MAX(p.beatmap_id) AS beatmap_id,
+              COUNT(*) AS count, MAX(p.played_at) AS last_played,
               b.beatmapset_id, b.artist, b.title, b.version, b.creator
-         FROM scores s
-         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
-        GROUP BY s.beatmap_md5
+         FROM (SELECT s.beatmap_md5, s.beatmap_id, s.played_at
+                 FROM scores s
+                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+                UNION ALL
+               SELECT s.beatmap_md5, s.beatmap_id, s.played_at
+                 FROM incomplete_plays s
+                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+                      AND s.beatmap_md5 IS NOT NULL) p
+         LEFT JOIN beatmaps b ON b.md5 = p.beatmap_md5
+        GROUP BY p.beatmap_md5
         ORDER BY count DESC, last_played DESC
         LIMIT ?`,
     )
-    .all(profileId, mode, limit) as Row[];
+    .all(profileId, mode, profileId, mode, limit) as Row[];
 
   return rows.map((r) => ({
     beatmapMd5: r['beatmap_md5'] as string,
@@ -331,7 +473,13 @@ export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15)
   }));
 }
 
-/** Which mode to show on load: whichever the most recent tracked play was set on. */
+/**
+ * Which mode to show on load: whichever the most recent tracked play was set on.
+ *
+ * Scores only, deliberately. An abandoned attempt is enough to say a mode has been played
+ * (see `modesWithPlays`) but not enough to open the page on it, since every section but the
+ * play count would be empty.
+ */
 export function mostRecentMode(db: Db, profileId: number): Ruleset {
   const row = db
     .prepare(`SELECT mode FROM scores s WHERE s.profile_id = ? AND ${visibleSql()}
@@ -340,11 +488,21 @@ export function mostRecentMode(db: Db, profileId: number): Ruleset {
   return ((row?.mode ?? 0) as Ruleset);
 }
 
-/** Modes with at least one tracked play, so the tab bar can mark which are in use. */
+/**
+ * Modes with at least one tracked play, so the tab bar can mark which are in use.
+ *
+ * A play that was quit still happened, and it is in the mode's play count, so the mode has
+ * to be reachable -- otherwise the profile would hold plays with no tab to see them under.
+ */
 export function modesWithPlays(db: Db, profileId: number): Ruleset[] {
   const rows = db
-    .prepare(`SELECT DISTINCT s.mode FROM scores s WHERE s.profile_id = ? AND ${visibleSql()}
-       ORDER BY s.mode`)
-    .all(profileId) as { mode: number }[];
+    .prepare(
+      `SELECT DISTINCT mode FROM (
+         SELECT s.mode FROM scores s WHERE s.profile_id = ? AND ${visibleSql()}
+         UNION ALL
+         SELECT s.mode FROM incomplete_plays s WHERE s.profile_id = ? AND ${visibleSql()})
+       ORDER BY mode`,
+    )
+    .all(profileId, profileId) as { mode: number }[];
   return rows.map((r) => r.mode as Ruleset);
 }

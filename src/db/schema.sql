@@ -112,6 +112,38 @@ CREATE TABLE IF NOT EXISTS not_beatmaps (
   size INTEGER NOT NULL
 );
 
+-- Plays osu! counted that left no replay behind: a quit, a retry, or an HP fail outside
+-- multiplayer. lazer imports a score only for a map played to the end, so these exist
+-- nowhere on disk except lazer's own log -- see src/clients/lazer-log.ts.
+--
+-- Deliberately *not* rows in `scores`. An incomplete play has no accuracy, combo, mods, pp
+-- or total score, and a row of zeroes in `scores` would quietly corrupt weighted accuracy,
+-- the grade counts, ranked score, the level bar and every medal. The aggregates that should
+-- include these plays -- the play count, the monthly play counts, Most Played and Recent
+-- Plays -- read this table explicitly instead.
+CREATE TABLE IF NOT EXISTS incomplete_plays (
+  id          INTEGER PRIMARY KEY,
+  profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  -- lazer's submission token: server-issued and unique per play, so re-reading a log can
+  -- never duplicate one.
+  dedupe_key  TEXT    NOT NULL,
+  mode        INTEGER NOT NULL,
+  -- Both may be null: a play can be counted before its beatmap can be resolved locally.
+  beatmap_md5 TEXT,
+  beatmap_id  INTEGER,
+  -- What the log called the beatmap, kept so a row is still readable when the map is not
+  -- installed and nothing else can name it.
+  beatmap_name TEXT,
+  played_at   INTEGER NOT NULL,
+  online_score_id TEXT,
+  -- Removed from the profile by the user, exactly as on `scores`, so visibleSql() applies
+  -- to this table verbatim.
+  hidden_at   INTEGER,
+  UNIQUE (profile_id, dedupe_key)
+);
+CREATE INDEX IF NOT EXISTS incomplete_profile_played
+  ON incomplete_plays (profile_id, mode, played_at DESC);
+
 CREATE TABLE IF NOT EXISTS snapshots (
   id           INTEGER PRIMARY KEY,
   profile_id   INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

@@ -846,6 +846,37 @@
   color: hsl(var(--hsl-l3));
 }
 
+/*
+ * A play that was started and never finished -- a quit, a retry, an HP fail.
+ *
+ * osu! counts these toward a play count and this profile does too, but there is no score
+ * behind them: lazer only writes a replay for a map played to the end, so no accuracy, no
+ * mods and no pp exist to show. The row is dimmed so the feed still reads as a list of
+ * scores with these sitting quietly between them, rather than as rows with missing values.
+ */
+.play-detail--incomplete {
+  opacity: 0.62;
+}
+
+.play-detail--incomplete .play-detail__icon {
+  opacity: 0.9;
+}
+
+.play-detail__didnt-finish {
+  font-size: var(--fs-small);
+  color: hsl(var(--hsl-f1));
+  font-style: italic;
+  white-space: nowrap;
+}
+
+/* How many attempts in a row this one row stands for, when they have been collapsed. */
+.play-detail__attempts {
+  font-size: var(--fs-normal);
+  font-weight: 700;
+  color: hsl(var(--hsl-f1));
+  white-space: nowrap;
+}
+
 @media (min-width: 900px) {
   .play-detail {
     display: flex;

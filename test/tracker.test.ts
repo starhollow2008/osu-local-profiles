@@ -141,3 +141,81 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
   db.close();
   fs.rmSync(tmp, { recursive: true, force: true });
 });
+
+/*
+ * The other half of detection, end to end: a play that osu! counted but lazer kept no
+ * replay for. Nothing here touches a real osu! installation -- the log directory, the
+ * beatmap and the play are all synthetic -- because the point is the wiring between the
+ * log watcher, the ingest and the profile totals.
+ */
+test('the tracker counts a play that finished without a score', { timeout: 30_000 }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-incomplete-e2e-'));
+  const logs = path.join(tmp, 'logs');
+  const watchDir = path.join(tmp, 'files');
+  fs.mkdirSync(logs);
+  fs.mkdirSync(watchDir);
+
+  const db = openDb(path.join(tmp, 'test.db'));
+  const profileId = getOrCreateProfile(db, 'Test Profile');
+  // Seeded straight into the cache, which is where md5ForBeatmapId looks first, so this
+  // needs neither online.db nor a .osu on disk.
+  db.prepare(
+    `INSERT INTO beatmaps (md5, beatmap_id, beatmapset_id, artist, title, version, creator,
+       status, cached_at) VALUES ('md5-a', 5438074, 900, 'Artist', 'Title', 'Insane', 'C', 1, 0)`,
+  ).run();
+
+  const tracker = new Tracker({
+    db,
+    resolver: new BeatmapResolver(db, []),
+    installs: [
+      { kind: 'lazer', root: tmp, replayDir: watchDir, beatmapRoots: [], onlineDb: null },
+    ],
+    profileId,
+    trackingSince: 0,
+    official: null,
+  });
+
+  const token = '1775729216';
+  const gotPlay = new Promise<{ title: string; mode: number }>((resolve, reject) => {
+    tracker.on('incomplete', resolve);
+    tracker.on('error', reject);
+    setTimeout(() => reject(new Error('no incomplete play reported within 15s')), 15_000).unref();
+  });
+
+  const runtime = path.join(logs, '1000.runtime.log');
+  fs.writeFileSync(runtime, '');
+  fs.writeFileSync(
+    path.join(logs, '1000.network.log'),
+    `2026-09-10 01:12:59 [verbose]: Request to https://osu.ppy.sh/api/v2/beatmaps/5438074/solo/scores/${token} successfully completed!\n`,
+  );
+
+  tracker.start();
+  await new Promise((r) => setTimeout(r, 300));
+  fs.appendFileSync(
+    runtime,
+    `2026-09-10 01:11:55 [verbose]: Game-wide working beatmap updated to Artist - Title (C) [Insane]
+2026-09-10 01:11:56 [verbose]: Score submission token retrieved (${token})
+2026-09-10 01:11:56 [verbose]: OsuScreenStack#658(depth:6) entered SoloPlayer#414
+2026-09-10 01:12:59 [verbose]: Score submission completed! (token:${token} id:7446699999)
+2026-09-10 01:12:59 [verbose]: OsuScreenStack#658(depth:5) exit from SoloPlayer#414
+`,
+  );
+
+  try {
+    const play = await gotPlay;
+    assert.equal(play.title, 'Artist - Title [Insane]');
+    assert.equal(play.mode, 0);
+
+    // It is a play: it counts, and it brings none of a score's numbers with it.
+    const stats = computeStats(db, profileId, 0);
+    assert.equal(stats.playcount, 1);
+    assert.equal(stats.totalScore, 0);
+    assert.equal(stats.totalPp, 0);
+  } finally {
+    // The watchers hold the event loop open, so a failed assertion would hang the run
+    // rather than reporting itself.
+    tracker.stop();
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

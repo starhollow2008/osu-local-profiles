@@ -75,11 +75,38 @@ Everything happens locally. There is no polling loop and no account login.
 
 Three things make the offline path possible:
 
-- **osu!lazer writes a legacy `.osr` for every play** into its content-addressed file
-  store, so replays can be watched for without touching its Realm database.
+- **osu!lazer writes a legacy `.osr` for every play it keeps** into its content-addressed
+  file store, so replays can be watched for without touching its Realm database.
 - **lazer ships `online.db`**, a SQLite database of ~234k beatmaps keyed by MD5 with ranked
   status, so a score can be matched to its beatmap with no network access.
 - **pp is computed locally**, so it works for plays that were never submitted.
+
+### Plays that were never finished
+
+osu! counts a play you quit, retried or failed. lazer does not *keep* one: it saves a score
+only for a map played to the end, so a fail or a quit leaves no replay behind. On one real
+session that was 26 of 45 counted plays -- more than half a play count, invisible.
+
+So those are read from lazer's own session log instead, which records the moment osu!
+accepted each submission:
+
+```
+  lazer:  %APPDATA%/osu/logs/<session>.runtime.log  ──→ osu! accepted a submission
+                             <session>.network.log  ──→ ...for this beatmap
+                                        │
+                    did it reach a results screen?  ──yes──→ it is a pass; its replay
+                                        │                    is already being tracked
+                                        no
+                                        ▼
+                   an unfinished play: counted, with no score attached
+```
+
+This needs osu! to be signed in, which is also exactly when osu! counts the play -- so the
+two agree, and both go quiet together when you play offline. There is no accuracy, combo,
+mod list or pp for these: lazer never writes any of it down for a play it discards. They
+count toward your play count, monthly play counts and Most Played, and appear in Recent
+Plays as dimmed rows according to the **Unfinished plays in Recent** setting. It is a lazer
+feature only; osu!stable keeps no comparable log.
 
 ### pp comes from osu!'s own calculator
 
@@ -201,6 +228,17 @@ leaving the destructive button as the only one that worked. No unit test would c
   known-correct values, so the other three inherit that caveat.
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
+- **Unfinished plays carry no score, and are lazer-only.** osu!lazer keeps no record of a
+  play it discards, so a quit, a retry or a fail can be counted but never scored -- there is
+  no accuracy, combo, mod list or pp to recover. They also need osu! signed in, since the
+  play is only visible once osu! has accepted the submission. A converted beatmap files
+  under the beatmap's own ruleset, because the log never names the one it was played in.
+- **osu!stable's unfinished plays are not counted yet.** stable has the same gap -- osu!
+  counts its fails and quits, and stable saves no replay for them either -- but where a
+  stable install records them, if it records them at all, has not been established, because
+  there is none on the development machine. A stable install contributes its passes exactly
+  as before. [docs/roadmap.md](docs/roadmap.md) **5.12** has the leads and the measurement
+  to run first.
 
 ## Editing the profile
 
@@ -356,6 +394,28 @@ None by default. Six states, each its own choice, because they are not one propo
 
 pp still comes from osu!'s own calculator, which will price any beatmap it is handed. The
 two settings are independent: a Loved map played with Relax needs both before it counts.
+
+### Unfinished plays in Recent
+
+Plays that were started and never finished -- quit, retried, or failed. They **always**
+count toward your play count, monthly play counts and Most Played, because osu! counts them
+and a profile that disagreed with the website about how much you had played would simply be
+wrong. This setting only decides whether they are listed in Recent Plays.
+
+| Setting | What Recent Plays shows |
+| ------- | ----------------------- |
+| Group retries on one map | *(default)* a run of attempts on one beatmap becomes one row, with the count |
+| Show every attempt | one row per attempt |
+| Hide them | scores only |
+
+The default is grouping because of how much of a session these can be: on the session this
+was built from there were 26 abandoned attempts against 19 finished ones, and listing each
+one turns the feed into a list of retries. A run is only grouped while it is *consecutive*,
+so a finished play in the middle still breaks it up the way it happened.
+
+These rows carry no accuracy, mods or pp, and are shown dimmed with a "Didn't finish" note
+rather than with zeroes standing in for numbers nobody recorded. See
+[Plays that were never finished](#plays-that-were-never-finished) for why.
 
 ### Recalculating older scores
 

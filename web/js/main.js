@@ -83,6 +83,21 @@ const SETTINGS_FIELDS = [
       'Both numbers come from osu! itself and both are stored, so switching is instant.',
   },
   {
+    key: 'showIncompleteInRecent',
+    type: 'choice',
+    label: 'Unfinished plays in Recent',
+    options: [
+      ['collapse', 'group retries on one map'],
+      ['yes', 'show every attempt'],
+      ['no', 'hide them'],
+    ],
+    hint:
+      'Plays that were started but never finished - quit, retried, or failed. They always ' +
+      'count toward your play count, monthly play counts and Most Played, because osu! ' +
+      'counts them too; this only decides whether they are listed here. There is no score ' +
+      'to show for them: osu!lazer saves a replay only for a map played to the end.',
+  },
+  {
     key: 'includeUnrankedMaps',
     type: 'checkboxes',
     label: 'Include pp for unranked beatmaps',
@@ -1911,7 +1926,7 @@ $('resetConfirm').onclick = async () => {
     });
     const data = await r.json();
     if (!r.ok) throw new Error(data.error ?? 'reset failed');
-    toast(`Profile reset - ${data.deleted} score${data.deleted === 1 ? '' : 's'} erased`);
+    toast(`Profile reset - ${data.deleted} play${data.deleted === 1 ? '' : 's'} erased`);
   } catch (err) {
     toast(`Reset failed: ${err.message}`);
   } finally {
@@ -1936,6 +1951,17 @@ es.addEventListener('score', (e) => {
   const pp = shownPp == null ? '' : `${fmt(shownPp, 0)}pp${counted ? '' : ' (not counted)'}`;
   toast(`${s.grade} ${pct(s.accuracy)} ${pp} - ${s.title}`.replace(/\s+/g, ' '));
   if (s.mode === mode) loadProfile();
+  loadState();
+});
+/*
+ * A play that was started and never finished. It moves the play count and the charts, so
+ * the page has to reload -- but there is nothing to put in a toast beyond which map it was,
+ * and no grade or accuracy, because lazer keeps none of that for a play it discards.
+ */
+es.addEventListener('incomplete', (e) => {
+  const play = JSON.parse(e.data);
+  toast(`Didn't finish - ${play.title}`);
+  if (play.mode === mode) loadProfile();
   loadState();
 });
 es.addEventListener('tracking', (e) => setTracking(JSON.parse(e.data).tracking));

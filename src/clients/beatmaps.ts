@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import type { Db } from '../db/index.ts';
 import { openReadOnly } from '../db/index.ts';
 import type { OsuInstall } from './detect.ts';
+import type { Ruleset } from '../osr.ts';
 
 /** osu!'s `approved` enum. pp is only awarded on RANKED and APPROVED. */
 export const Status = {
@@ -61,6 +62,9 @@ export interface ResolvedBeatmap {
 }
 
 const OSU_MAGIC = 'osu file format v';
+
+/** .osu files are CRLF in practice but not by rule. */
+const NEWLINE = /\r?\n/;
 
 function readHead(file: string, n: number): Buffer | null {
   let fd: number | undefined;
@@ -206,7 +210,7 @@ function parseOsuMetadata(file: string): OsuMetadata {
   const nextSection = text.indexOf('[', start + 1);
   const section = text.slice(start, nextSection < 0 ? undefined : nextSection);
 
-  for (const line of section.split(/\r?\n/)) {
+  for (const line of section.split(NEWLINE)) {
     const sep = line.indexOf(':');
     if (sep < 0) continue;
     const key = line.slice(0, sep).trim();
@@ -219,6 +223,38 @@ function parseOsuMetadata(file: string): OsuMetadata {
     else if (key === 'BeatmapSetID') out.beatmapsetId = Number(value) || null;
   }
   return out;
+}
+
+/**
+ * The ruleset a beatmap was written for, from its `[General]` section.
+ *
+ * Only needed for a play with no replay, where nothing else says which mode it belongs to:
+ * lazer's log never names the ruleset. A play on a *converted* beatmap therefore files
+ * under the beatmap's own mode rather than the one it was played in. That is a known
+ * limitation of the log, not a guess -- there is no second source to check it against.
+ */
+export function beatmapMode(file: string): Ruleset {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return 0;
+  }
+
+  const start = text.indexOf('[General]');
+  if (start < 0) return 0;
+  // The next section header, so a `Mode:` further down the file cannot be picked up.
+  const nextSection = text.indexOf('[', start + 1);
+  const section = text.slice(start, nextSection < 0 ? undefined : nextSection);
+
+  for (const line of section.split(NEWLINE)) {
+    const sep = line.indexOf(':');
+    if (sep < 0) continue;
+    if (line.slice(0, sep).trim() !== 'Mode') continue;
+    const mode = Number(line.slice(sep + 1).trim());
+    return mode === 1 || mode === 2 || mode === 3 ? mode : 0;
+  }
+  return 0;
 }
 
 /**
@@ -236,6 +272,30 @@ export class BeatmapResolver {
       const handle = openReadOnly(i.onlineDb);
       if (handle) this.onlineDbs.push(handle);
     }
+  }
+
+  /**
+   * The MD5 of an online beatmap id, from lazer's `online.db`.
+   *
+   * The reverse of the usual direction: a score names its beatmap by MD5, but a play read
+   * out of lazer's log is only ever identified by its online id, because that is what the
+   * submission URL carries. `osu_beatmaps.beatmap_id` is the primary key there, so this is
+   * an index lookup rather than the scan the other direction would need.
+   */
+  md5ForBeatmapId(beatmapId: number): string | null {
+    // A map already cached locally answers without opening online.db at all.
+    const cached = this.db
+      .prepare('SELECT md5 FROM beatmaps WHERE beatmap_id = ? LIMIT 1')
+      .get(beatmapId) as { md5: string } | undefined;
+    if (cached) return cached.md5;
+
+    for (const online of this.onlineDbs) {
+      const row = online
+        .prepare('SELECT checksum FROM osu_beatmaps WHERE beatmap_id = ?')
+        .get(beatmapId) as { checksum: string | null } | undefined;
+      if (row?.checksum) return row.checksum;
+    }
+    return null;
   }
 
   resolve(md5: string): ResolvedBeatmap {

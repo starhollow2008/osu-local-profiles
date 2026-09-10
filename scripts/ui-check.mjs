@@ -730,6 +730,50 @@ check('a value that does not count is dimmed', uncounted.includes('play-detail__
 const failedPlay = await ppCellFor({ counted: false, passed: false });
 check('a failed play says so', failedPlay.includes('failed play never counts'), true);
 
+/*
+ * A play that was started and never finished. It has no accuracy, no combo, no mods and no
+ * pp -- lazer records none of that for a play it discards -- so the row has to read as
+ * "nothing is known here" rather than as a score whose numbers all came out zero. The
+ * dimming is the whole cue, which makes it exactly the kind of thing worth asserting
+ * against computed style rather than markup.
+ */
+console.log('\nan unfinished play is shown as one');
+const incompleteRow = (play) =>
+  evaluate(`import('/js/sections.js').then((m) => {
+    const host = document.createElement('div');
+    host.innerHTML = m.playList([Object.assign(
+      { kind: 'incomplete', id: 1, title: 'A map', version: 'Insane', artist: 'Someone',
+        beatmapMd5: 'abc', beatmapId: null, beatmapsetId: null, creator: null,
+        playedAt: Date.now(), attempts: 1 },
+      ${JSON.stringify(play)},
+    )]);
+    document.body.appendChild(host);
+    const row = host.querySelector('.play-detail');
+    const style = getComputedStyle(row);
+    const out = {
+      html: host.innerHTML,
+      opacity: Number(style.opacity),
+      display: style.display,
+      attempts: host.querySelector('.play-detail__attempts')?.textContent ?? '',
+    };
+    host.remove();
+    return out;
+  })`);
+
+const dnf = await incompleteRow({});
+check('it says the play was not finished', dnf.html.includes('Didn&rsquo;t finish') || dnf.html.includes('Didn’t finish'), true);
+check('it is dimmed against the scored rows', dnf.opacity < 1, true);
+check('but it is still shown', dnf.display !== 'none', true);
+// The numbers a score has must be absent, not zero: nobody knows what they were.
+check('no accuracy is invented', dnf.html.includes('play-detail__accuracy'), false);
+check('no pp cell is invented', dnf.html.includes('play-detail__pp'), false);
+// `F` is a real osu! grade for a score that exists and failed. These have no score at all.
+check('it does not borrow the F grade badge', dnf.html.includes('>F</text>'), false);
+check('a single attempt shows no count', dnf.attempts, '');
+
+const collapsed = await incompleteRow({ attempts: 4 });
+check('a collapsed run says how many attempts', collapsed.attempts.includes('4'), true);
+
 console.log('\nmod settings are surfaced');
 const pill = await evaluate(
   "import('/js/badges.js').then((m) => m.modPill({ acronym: 'DT', settings: { speed_change: 1.3 } }))",
