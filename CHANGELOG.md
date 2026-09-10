@@ -1,8 +1,12 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
 
-Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
+Phase 5: the profile becomes yours to configure, arrange and share.
+
+Planned feature by feature in [docs/roadmap.md](docs/roadmap.md), where 5.0 to 5.9 are
+done. macOS and Linux support (5.10) is deferred to a phase of its own -- it is the only
+item that cannot be verified on the development machine.
 
 ### Settings
 

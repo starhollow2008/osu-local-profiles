@@ -16,9 +16,10 @@ matches `osu.ppy.sh`'s profile design, global rank is estimated offline, past pl
 imported deliberately, several playstyles can be tracked side by side, and
 `npm run package` produces a portable build that needs nothing installed.
 
-Work in progress is **Phase 5** -- profile customisation, pinned scores, medals, sharing,
-and macOS/Linux support -- planned feature by feature in
-[docs/roadmap.md](docs/roadmap.md).
+**Phase 5 is released as v1.1.0**: settings, pp for unranked mods and beatmaps, pinned and
+removable scores, an editable name/picture/banner, the `me!` section, rearrangeable
+sections, medals, and sharing. It is planned feature by feature in
+[docs/roadmap.md](docs/roadmap.md); macOS and Linux support is deferred to a later phase.
 
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
