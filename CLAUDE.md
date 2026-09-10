@@ -357,6 +357,14 @@ path escapes the target — this runs on a file fetched over the network — and
 `osu-fresh-profile-1.3.0-win-x64
 ode.exe`.
 
+**This path has been run end to end against the real public repository** -- see
+`docs/roadmap.md` 5.16. The way to re-verify it after changing anything here, without
+waiting for a release: copy a packaged build, set its `package.json` version *below* the
+published one, start it, and let it update itself. Put a value in that copy's
+`data/config.json` that exists nowhere in the release archive -- the port is ideal -- and
+check the app comes back using it. That is what proves `data/` survived, rather than
+assuming it.
+
 The check is one request at startup, never a timer, and `checkForUpdates: false` turns off
 the app's only outgoing request. A failed check shows nothing: no network, a private
 repository and a rate limit are all ordinary, and none is a reason to put an error where a

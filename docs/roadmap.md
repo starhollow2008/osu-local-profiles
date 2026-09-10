@@ -925,9 +925,29 @@ ode.exe`. Read to the letter that
 - Version comparison, including `1.9.0 < 1.10.0` and pre-releases sorting below their
   release, in `test/update.test.ts`.
 
-**Still unverified:** downloading a real release of *this* project, which needs the
-repository to be **public** and a release newer than the running build. v1.3.0 is the first
-build that ships `scripts/apply-update.mjs`, so it is the first that can be updated *from* --
-a 1.2.0 install has no updater to run and must be replaced by hand. The first real exercise
-of this path will therefore be a 1.3.0 install offered a 1.4.0 release, against a public
-repository.
+### Verified end to end (2026-09-10, after the repository was made public)
+
+Nothing is left unproven. The whole path was run for real against the public repository,
+without waiting for a 1.4.0 release: a throwaway copy of the packaged 1.3.0 build had its
+`package.json` set to **1.2.9**, so the genuine 1.3.0 release looked like an update to it,
+and it then updated itself. **18/18 checks passed.**
+
+What that exercised, all of it real: the startup check against `api.github.com`, the asset
+match, the 83MB download, the size check, the unpack, the version verification, the detached
+swap, the rollback copy, and the relaunch.
+
+The proof that `data/` came through untouched is the port. The throwaway copy was configured
+to listen on **7333** in its own `data/config.json`, a value that appears nowhere in the
+release archive. After the swap the app came back **on 7333, under its own profile name**,
+with a canary file still in `data/` -- so the folder cannot have been replaced by the one
+from the archive. The rollback copy held 1.2.9 and contained no `data/` directory, and
+`data/update.log` recorded `OK: updated to 1.3.0`.
+
+The test is `scratchpad/update-e2e.mjs`; it is not in the repository because it downloads
+83MB and needs a packaged build, but the shape is worth repeating after any change to the
+swap: **copy a package, lower its version, let it update itself, then check that a value
+that exists only in `data/` survived.**
+
+**One thing that remains true:** a **1.2.0** install cannot use the button, because it has
+no `scripts/apply-update.mjs` inside it to run. v1.3.0 is the first build that can be
+updated *from*, so 1.2.0 users must download 1.3.0 by hand once.
