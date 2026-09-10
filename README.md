@@ -40,7 +40,7 @@ ago` by day, and Play History reads `Plays 430` / `March 2020` by month.
 | Platform | State |
 | -------- | ----- |
 | **Windows** | Verified. Developed and used on it daily. |
-| **Linux** | Written and tested as far as it can be from Windows: CI runs the typecheck, the tests and a real start-up on `ubuntu-latest`. Nobody has yet run it against an actual osu! install. |
+| **Linux** | Green on CI (`ubuntu-latest`): typecheck, the full test suite, and a real start-up. Nobody has yet run it against an actual osu! install. |
 | **macOS** | The same, on `macos-latest`. |
 
 The honest summary is that Linux and macOS are *supported but unproven*. What can be

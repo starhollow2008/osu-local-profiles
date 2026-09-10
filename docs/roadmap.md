@@ -460,6 +460,15 @@ run on the target OS".
 - **CI** runs on `windows-latest`, `ubuntu-latest` and `macos-latest` with `fail-fast:
   false`, and now also starts the app far enough to prove the modules load, the schema
   applies and the pp calculator runs on that platform.
+  - **Green on all three as of run 34446669359 (2026-09-10)**, which is the first time this
+    project has been run on macOS or Linux at all.
+  - It earned its keep immediately, and not in the direction anyone expected: **ubuntu and
+    macOS passed while Windows failed.** `fs.watch` was being handed a path that was not
+    canonical, which makes libuv *abort the process* rather than raise -- see
+    `CLAUDE.md`, "Never hand `fs.watch` a path you have not resolved". A GitHub runner's
+    `TEMP` is an 8.3 short name, so it fired there and never locally, and because the
+    process died rather than a test failing it took two unrelated test files down at once.
+    Two commits had already shipped red before anyone looked. **Check CI after pushing.**
 
 ### What is left, and needs a real machine
 
