@@ -43,6 +43,48 @@ export function countingNoteText(counting) {
 }
 
 /**
+ * The profile's own description, as markup.
+ *
+ * Plain text in, escaped HTML out. osu! itself accepts BBCode here, but a local profile
+ * gains nothing from an HTML sanitiser it would have to get exactly right, and everything
+ * to lose by getting it wrong. So: escape everything, keep the line breaks, and turn bare
+ * URLs into links -- that is the whole feature.
+ *
+ * URLs are found in the *raw* text and escaped individually, rather than escaping the whole
+ * string first and matching afterwards. Escaping first looks safer and is worse: it turns
+ * a typed quote into `&quot;`, which contains no character the URL pattern stops at, so the
+ * match runs straight through the entity and swallows the rest of the line into the href.
+ */
+const URL_PATTERN = /\bhttps?:\/\/[^\s<>"'`]+/g;
+
+/** Sentence punctuation almost never belongs to the URL it follows. */
+const TRAILING_PUNCTUATION = /[.,;:!?)\]]+$/;
+
+export function aboutHtml(text) {
+  if (!text) return '';
+
+  let out = '';
+  let cursor = 0;
+  for (const match of text.matchAll(URL_PATTERN)) {
+    const found = match[0];
+    const url = found.replace(TRAILING_PUNCTUATION, '');
+    out += escapeHtml(text.slice(cursor, match.index));
+    // Both the href and the visible text are escaped: everything here came from the user.
+    const safe = escapeHtml(url);
+    out += `<a href="${safe}" target="_blank" rel="noreferrer noopener">${safe}</a>`;
+    // Whatever was trimmed is punctuation belonging to the sentence, not the link.
+    cursor = match.index + url.length;
+  }
+  out += escapeHtml(text.slice(cursor));
+
+  const BREAK = String.fromCharCode(10);
+  return out
+    .split(BREAK + BREAK)
+    .map((paragraph) => `<p>${paragraph.split(BREAK).join('<br>')}</p>`)
+    .join('');
+}
+
+/**
  * The pp figure for one play, and why it is what it is.
  *
  * There are more cases here than on osu!, because this profile can be configured to count

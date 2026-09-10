@@ -8,11 +8,18 @@
 import { MODE_NAMES, escapeHtml, fmt, pct } from './format.js';
 import { coverUrl, generatedAvatar, gradeBadge, levelBadge } from './badges.js';
 import { playcountChart, ppChart, rankChart } from './charts.js';
-import { activityList, beatmapPlaycountList, countingNoteText, playList } from './sections.js';
+import {
+  aboutHtml,
+  activityList,
+  beatmapPlaycountList,
+  countingNoteText,
+  playList,
+} from './sections.js';
 
 const $ = (id) => document.getElementById(id);
 
 const SECTIONS = [
+  ['me', 'me!'],
   ['recent', 'Recent'],
   ['top_ranks', 'Top Ranks'],
   ['historical', 'Historical'],
@@ -308,6 +315,8 @@ async function loadState() {
 
   setTracking(s.tracking);
   renderIdentity();
+  // Never clobber what is being typed: a 15-second poll must not swallow a draft.
+  if (!editingAbout) renderAbout();
 
   if (!window.__modeInit) {
     window.__modeInit = true;
@@ -372,6 +381,83 @@ document.addEventListener('keydown', (e) => {
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('identityModal').hidden) closeIdentity();
 });
+
+/* ------------------------------------------------------------------- me! */
+
+/*
+ * The profile's own description, click to edit.
+ *
+ * Stored and rendered as **plain text**. osu! itself accepts BBCode, but a local profile
+ * gains nothing from an HTML sanitiser it would have to get exactly right, and everything
+ * to lose by getting it wrong. So: escape everything, keep the line breaks, and turn bare
+ * URLs into links. That is the whole feature.
+ */
+
+let editingAbout = false;
+
+function renderAbout() {
+  const text = settings.aboutMe ?? '';
+  $('aboutView').innerHTML = text
+    ? aboutHtml(text)
+    : '<div class="about__empty">Nothing here yet. Click to write something.</div>';
+  $('aboutView').classList.toggle('about--empty', !text);
+  $('aboutView').title = editingAbout ? '' : 'Click to edit';
+}
+
+function openAboutEditor() {
+  if (editingAbout) return;
+  editingAbout = true;
+  $('aboutText').value = settings.aboutMe ?? '';
+  updateAboutCount();
+  $('aboutView').hidden = true;
+  $('aboutEdit').hidden = false;
+  $('aboutText').focus();
+}
+
+function closeAboutEditor() {
+  editingAbout = false;
+  $('aboutEdit').hidden = true;
+  $('aboutView').hidden = false;
+  renderAbout();
+}
+
+function updateAboutCount() {
+  const used = $('aboutText').value.length;
+  // Only worth mentioning as the limit gets close; a counter on an empty box is noise.
+  $('aboutCount').textContent = used > 3000 ? `${fmt(4000 - used)} characters left` : '';
+}
+
+$('aboutView').onclick = openAboutEditor;
+$('aboutText').oninput = updateAboutCount;
+$('aboutCancel').onclick = closeAboutEditor;
+
+$('aboutText').onkeydown = (e) => {
+  // Escape leaves without saving; the page-wide Escape handler must not also fire.
+  if (e.key === 'Escape') {
+    e.stopPropagation();
+    closeAboutEditor();
+  }
+};
+
+$('aboutSave').onclick = async () => {
+  $('aboutSave').disabled = true;
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ aboutMe: $('aboutText').value }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'saving failed');
+    settings = d.settings;
+    closeAboutEditor();
+    toast('Saved');
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    $('aboutSave').disabled = false;
+  }
+};
 
 /* ---------------------------------------------------------------- identity */
 

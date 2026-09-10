@@ -1160,6 +1160,98 @@
 }
 
 /* ======================================================================== */
+/* me!: the profile's own description                                       */
+/* ======================================================================== */
+
+/*
+ * Plain text, rendered with line breaks and autolinked URLs and nothing else. osu! accepts
+ * BBCode here; a local profile gains nothing from an HTML sanitiser it would have to get
+ * exactly right, and everything to lose by getting it wrong.
+ */
+.about {
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal-2);
+  line-height: 1.55;
+  cursor: text;
+  border-radius: var(--radius-base);
+  padding: 4px 6px;
+  margin: -4px -6px;
+}
+
+.about:hover {
+  background-color: hsla(var(--hsl-b6), 0.35);
+}
+
+.about p {
+  margin: 0 0 0.8em;
+}
+
+.about p:last-child {
+  margin-bottom: 0;
+}
+
+.about a {
+  color: hsl(var(--hsl-l1));
+  text-decoration: underline;
+}
+
+.about__empty {
+  color: hsl(var(--hsl-f1));
+}
+
+.about-edit textarea {
+  display: block;
+  width: 100%;
+  resize: vertical;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: var(--fs-normal-2);
+  line-height: 1.55;
+}
+
+.about-edit__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.about-edit__count {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.about-edit__actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.about-edit__actions button {
+  padding: 7px 14px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+.about-edit__actions button:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.about-edit__actions button.primary {
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-weight: 600;
+}
+
+.about-edit__actions button.primary:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-p));
+}
+
+/* ======================================================================== */
 /* Identity: the profile's name, picture and banner                         */
 /* ======================================================================== */
 

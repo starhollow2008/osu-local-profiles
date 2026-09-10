@@ -154,3 +154,60 @@ test('a corrupt stored value falls back to the default instead of throwing', () 
     h.cleanup();
   }
 });
+
+/* ------------------------------------------------------------------- me! */
+
+test('the description keeps paragraphs but not stray control characters', () => {
+  const h = harness();
+  try {
+    const nl = String.fromCharCode(10);
+    const cr = String.fromCharCode(13);
+    const tab = String.fromCharCode(9);
+
+    const saved = updateSettings(h.db, h.profileId, {
+      aboutMe: `Left hand.${cr}${nl}${nl}Going${tab}slowly.`,
+    }).aboutMe;
+
+    assert.equal(saved, `Left hand.${nl}${nl}Going slowly.`);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('runs of blank lines collapse, so pasted text cannot stretch the page', () => {
+  const h = harness();
+  try {
+    const nl = String.fromCharCode(10);
+    const saved = updateSettings(h.db, h.profileId, {
+      aboutMe: `a${nl.repeat(9)}b`,
+    }).aboutMe;
+    assert.equal(saved, `a${nl}${nl}b`);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('the description is capped, and is not a place to store a novel', () => {
+  const h = harness();
+  try {
+    const saved = updateSettings(h.db, h.profileId, { aboutMe: 'x'.repeat(9000) }).aboutMe;
+    assert.equal(saved.length, 4000);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * Stored verbatim, escaped at render time. Anything that mangled markup here would be a
+ * sanitiser -- which is exactly what plain text exists to avoid needing.
+ */
+test('markup typed into the description is stored as the text it is', () => {
+  const h = harness();
+  try {
+    const hostile = '<script>alert(1)</script> & <b>bold</b>';
+    assert.equal(updateSettings(h.db, h.profileId, { aboutMe: hostile }).aboutMe, hostile);
+    assert.equal(getSettings(h.db, h.profileId).aboutMe, hostile);
+  } finally {
+    h.cleanup();
+  }
+});

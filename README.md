@@ -218,6 +218,16 @@ identity by definition, so it is never adopted without being asked for.
 Nothing here is required. With no picture the page draws an avatar from the profile's name,
 and the banner falls back to the cover art of the profile's best play.
 
+## The me! section
+
+The description box from osu!'s own profile, at the top of the page. Click it to write
+something; it belongs to the profile, so each playstyle gets its own.
+
+It is **plain text**, not BBCode. Line breaks are kept and bare URLs become links; anything
+else you type appears as the characters you typed. That is deliberate: osu!'s BBCode subset
+is large, and a local profile gains nothing from an HTML sanitiser it would have to get
+exactly right -- and everything to lose by getting it wrong.
+
 ## Pinning and removing scores
 
 Every score row has a **⋯** menu.

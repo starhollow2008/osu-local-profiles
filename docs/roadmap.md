@@ -18,8 +18,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.3  | Include pp for unranked **maps**              | done   |
 | 5.4  | Score actions: pin, reorder, hide             | done   |
 | 5.5  | Editable identity + linked osu! account       | done   |
-| 5.6  | `me!` section                                 | in progress |
-| 5.7  | Draggable section order                       | todo   |
+| 5.6  | `me!` section                                 | done   |
+| 5.7  | Draggable section order                       | in progress |
 | 5.8  | Medals                                        | todo   |
 | 5.9  | Share: screenshot and standalone HTML         | todo   |
 | 5.10 | macOS and Linux support                       | todo   |
@@ -275,7 +275,7 @@ typing. With a linked account, avatar and banner appear and are cached.
 
 ## 5.6 — `me!` section
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** The description box from the official profile page, click-to-edit, per profile.
 
@@ -293,7 +293,7 @@ as literal text.
 
 ## 5.7 — Draggable section order
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** Reorder `me!`, Recent, Top Ranks, Historical, Medals by dragging, order saved —
 the way osu! lets you rearrange your own profile.

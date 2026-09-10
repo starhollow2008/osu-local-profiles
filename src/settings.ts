@@ -56,6 +56,14 @@ export interface Settings {
   linkedUserId: number;
   /** The username that id had when it was looked up, so the link reads as a name. */
   linkedUsername: string;
+  /**
+   * The profile's own description -- osu!'s "me!" box.
+   *
+   * Plain text. osu! itself accepts BBCode, but a local profile gains nothing from an HTML
+   * sanitiser it would have to get exactly right, so this is escaped on the way out and
+   * rendered with line breaks and autolinked URLs and nothing else.
+   */
+  aboutMe: string;
 }
 
 /**
@@ -84,6 +92,23 @@ function cleanText(raw: unknown, maxLength: number): string {
   return out.trim().slice(0, maxLength);
 }
 
+/**
+ * Like `cleanText`, but for a box the user is meant to write paragraphs in: newlines are
+ * kept and only the other control characters are flattened.
+ */
+function cleanMultiline(raw: unknown, maxLength: number): string {
+  if (typeof raw !== 'string') return '';
+  let out = '';
+  for (const ch of raw) {
+    const code = ch.codePointAt(0) ?? 0;
+    if (code === 10) out += ch; // newline
+    else if (code === 13) continue; // carriage return, so CRLF normalises to LF
+    else out += code < 32 || code === 127 ? ' ' : ch;
+  }
+  // Runs of blank lines collapse to one, so pasted text cannot push the page apart.
+  return out.replace(/\n{3,}/g, '\n\n').trim().slice(0, maxLength);
+}
+
 const DEFS: Defs = {
   country: {
     default: '',
@@ -106,6 +131,10 @@ const DEFS: Defs = {
   unrankedModPp: {
     default: 'without-the-mod',
     coerce: (raw) => (raw === 'as-played' ? 'as-played' : 'without-the-mod'),
+  },
+  aboutMe: {
+    default: '',
+    coerce: (raw) => cleanMultiline(raw, 4000),
   },
   linkedUserId: {
     default: 0,

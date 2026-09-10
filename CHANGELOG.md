@@ -42,6 +42,17 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   draft nobody finished, and a never-submitted one exists only on your machine.
 - Independent of the mod setting: a Loved map played with Relax needs both before it counts.
 
+### The me! section
+
+- osu!'s description box, at the top of the profile. Click to edit; per profile.
+- **Plain text, not BBCode.** Line breaks are kept and bare URLs become links; everything
+  else renders as the characters that were typed. osu!'s BBCode subset is large, and a
+  local profile gains nothing from an HTML sanitiser it would have to get exactly right.
+- URLs are found in the raw text and escaped individually rather than the text being
+  escaped first and matched afterwards -- escaping first turns a typed quote into an entity
+  the URL pattern does not stop at, so the match runs through it and swallows the rest of
+  the line into the link.
+
 ### Editing the profile
 
 - **Options -> Edit profile**, or click the avatar or the name. Sets the profile's name,

@@ -115,6 +115,22 @@
 </nav>
 
 <main class="user-profile-pages">
+  <section class="page-extra" id="section-me">
+    <h2 class="title">me!</h2>
+    <div class="about" id="aboutView"></div>
+    <div class="about-edit" id="aboutEdit" hidden>
+      <textarea id="aboutText" maxlength="4000" rows="8"
+                placeholder="Say something about this profile - what you are tracking, how it is going."></textarea>
+      <div class="about-edit__footer">
+        <span class="about-edit__count" id="aboutCount"></span>
+        <div class="about-edit__actions">
+          <button type="button" id="aboutCancel">Cancel</button>
+          <button type="button" class="primary" id="aboutSave">Save</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="page-extra" id="section-recent">
     <h2 class="title">Recent</h2>
     <div id="recentActivity"></div>

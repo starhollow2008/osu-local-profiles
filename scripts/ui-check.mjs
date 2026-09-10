@@ -189,6 +189,81 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nthe me! section');
+check('it is the first section', await evaluate(
+  "document.querySelector('.page-extra').id"), 'section-me');
+check('the editor starts closed', await shown('aboutEdit'), 'none');
+check(
+  'clicking the text opens the editor',
+  await evaluate(`(() => {
+    document.getElementById('aboutView').click();
+    return JSON.stringify({
+      edit: getComputedStyle(document.getElementById('aboutEdit')).display,
+      view: getComputedStyle(document.getElementById('aboutView')).display,
+    });
+  })()`),
+  JSON.stringify({ edit: 'block', view: 'none' }),
+);
+check(
+  'Cancel puts it back without saving',
+  await evaluate(`(() => {
+    document.getElementById('aboutText').value = 'discard me';
+    document.getElementById('aboutCancel').click();
+    return JSON.stringify({
+      edit: getComputedStyle(document.getElementById('aboutEdit')).display,
+      text: document.getElementById('aboutView').textContent.includes('discard me'),
+    });
+  })()`),
+  JSON.stringify({ edit: 'none', text: false }),
+);
+
+/*
+ * The description is plain text, escaped on the way out. Markup typed into it must render
+ * as the characters it is -- avoiding an HTML sanitiser is the entire reason it is not
+ * BBCode, so this is the check that keeps that decision honest.
+ */
+const aboutFor = (text) =>
+  evaluate(
+    "import('/js/sections.js').then((m) => m.aboutHtml(" + JSON.stringify(text) + "))",
+  );
+
+const hostile = await aboutFor('<script>alert(1)</script> & <b>bold</b>');
+check('a script tag is escaped, not rendered', hostile.includes('<script>'), false);
+check('and survives as visible text', hostile.includes('&lt;script&gt;'), true);
+check('an ampersand is escaped once', hostile.includes('&amp;'), true);
+
+const paragraphs = await aboutFor('one' + String.fromCharCode(10, 10) + 'two');
+check('a blank line starts a new paragraph', paragraphs, '<p>one</p><p>two</p>');
+const lineBreak = await aboutFor('one' + String.fromCharCode(10) + 'two');
+check('a single newline is a line break', lineBreak, '<p>one<br>two</p>');
+
+const link = await aboutFor('see https://osu.ppy.sh/users/2 for more');
+check('a bare URL becomes a link', link.includes('href="https://osu.ppy.sh/users/2"'), true);
+check('and it opens safely', link.includes('rel="noreferrer noopener"'), true);
+/*
+ * Typed anchor markup: the URL inside it is a URL the user wrote, so linking it is the
+ * honest plain-text behaviour. What must never happen is the surrounding markup becoming
+ * real -- and the href must not swallow the rest of the line, which is what escaping before
+ * matching used to do.
+ */
+const fakeLink = await aboutFor('<a href="https://evil.example">click</a>');
+check('the surrounding markup stays visible text', fakeLink.includes('&lt;a href='), true);
+check('and does not become an element', /<a [^>]*>click/.test(fakeLink), false);
+check(
+  'the href stops at the quote instead of eating the line',
+  fakeLink.includes('href="https://evil.example"'),
+  true,
+);
+const punctuated = await aboutFor('see https://osu.ppy.sh/users/2, then stop.');
+check(
+  'a trailing comma is punctuation, not part of the URL',
+  punctuated.includes('href="https://osu.ppy.sh/users/2"'),
+  true,
+);
+check('and it is still shown', punctuated.includes('</a>, then stop.'), true);
+
+check('nothing at all renders as nothing', await aboutFor(''), '');
+
 console.log('\nedit profile dialog');
 check('the identity dialog is hidden on load', await shown('identityModal'), 'none');
 // The avatar and the name are the affordance -- osu!'s own header has no button here.
@@ -527,7 +602,14 @@ check(
   await evaluate("document.querySelectorAll('#profileStats .profile-stats__entry').length"),
   7,
 );
-check('three sections', await evaluate("document.querySelectorAll('.page-extra').length"), 3);
+// Named rather than counted, so adding a section is a deliberate edit here.
+check(
+  'the sections are the expected ones, in order',
+  await evaluate(
+    "[...document.querySelectorAll('.page-extra')].map((s) => s.id).join(',')",
+  ),
+  'section-me,section-recent,section-top_ranks,section-historical',
+);
 // Consecutive headings must stack: they were inline-block once, which overlapped
 // "Top Ranks" with "Best Performance".
 check(
