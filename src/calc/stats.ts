@@ -434,6 +434,42 @@ function collapseRuns(entries: RecentEntry[]): RecentEntry[] {
 }
 
 /**
+ * How many rows each paged section has in total.
+ *
+ * The page loads five of each and asks for more as the user expands, so the lists it holds
+ * are deliberately short -- but the headings still show a count, and the "show more" button
+ * only exists while there is more. Both need the real total, which is a `COUNT` rather than
+ * the length of a page.
+ */
+export function recentPlayTotal(db: Db, profileId: number, mode: Ruleset): number {
+  const row = db
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM scores s
+                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()})
+            + (SELECT COUNT(*) FROM incomplete_plays s
+                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}) AS n`,
+    )
+    .get(profileId, mode, profileId, mode) as { n: number };
+  return row.n;
+}
+
+/** Distinct beatmaps played, which is how many rows Most Played can ever show. */
+export function mostPlayedTotal(db: Db, profileId: number, mode: Ruleset): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM (
+         SELECT s.beatmap_md5 FROM scores s
+          WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+          UNION
+         SELECT s.beatmap_md5 FROM incomplete_plays s
+          WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+                AND s.beatmap_md5 IS NOT NULL)`,
+    )
+    .get(profileId, mode, profileId, mode) as { n: number };
+  return row.n;
+}
+
+/**
  * osu-web's "Most Played Beatmaps": every attempt counts, passed or not.
  *
  * "Every attempt" has to mean the abandoned ones too, or the map someone spent an evening

@@ -244,6 +244,40 @@ export function incompleteRow(play) {
 </div>`;
 }
 
+/*
+ * osu-web's `show-more-link`: a pill with the label between two chevrons, and the number
+ * still hidden in brackets after it. The chevron is drawn here rather than pulled from an
+ * icon font, the way every other icon on this page is.
+ */
+const CHEVRON =
+  '<svg class="show-more-link__chevron" viewBox="0 0 10 6" aria-hidden="true">' +
+  '<path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"' +
+  ' stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+/**
+ * The control that lengthens one of the paged sections.
+ *
+ * Returns nothing once everything is shown -- a button that would reveal nothing is worse
+ * than no button, because it reads as a list with more in it.
+ *
+ * Knowing when to stop takes both halves of the test, and neither alone is enough. A list
+ * shorter than what was asked for is definitely complete, which is the reliable half. But
+ * `total` counts *plays*, and Recent Plays can draw fewer rows than it has plays, because a
+ * run of retries on one beatmap collapses into a single row -- so a page that came back
+ * exactly full might still be the end of the list. Requiring both means the button appears
+ * only when there is genuinely more behind it.
+ */
+export function showMore(section, returned, requested, total) {
+  const complete = returned < requested || (Number.isFinite(total) && total <= returned);
+  if (complete) return '';
+
+  return `<button class="show-more-link" type="button" data-show-more="${escapeHtml(section)}">
+  ${CHEVRON}
+  <span class="show-more-link__text">show more</span>
+  ${CHEVRON}
+</button>`;
+}
+
 export function playList(plays, options = {}) {
   if (!plays || plays.length === 0) {
     return `<div class="u-empty">${escapeHtml(options.empty ?? 'Nothing here yet.')}</div>`;

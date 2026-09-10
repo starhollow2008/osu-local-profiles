@@ -11,12 +11,29 @@ import {
   computeStats,
   modesWithPlays,
   mostPlayed,
+  mostPlayedTotal,
+  recentPlayTotal,
   mostRecentMode,
   pinnedPlays,
   recentPlays,
   topPlays,
 } from '../calc/stats.ts';
 import { buildHistory } from '../calc/history.ts';
+
+/**
+ * osu! only ever weights the top 100 plays, so Best Performance cannot be longer than that
+ * however many eligible maps a profile has.
+ */
+const TOP_PLAYS = 100;
+
+/**
+ * The most rows one request may ask a section for.
+ *
+ * The page expands 25 at a time and would have to be driven for a very long while to reach
+ * this. It is here because the limits arrive as query parameters, and an unbounded one lets
+ * a stray URL ask the database to assemble every score ever tracked.
+ */
+const MAX_PAGE = 2000;
 import { computeMedals } from '../calc/medals.ts';
 import { estimateRank, rankTable } from '../calc/rank.ts';
 import {
@@ -242,7 +259,21 @@ export function startServer(opts: ServerOptions): http.Server {
     if (url.pathname === '/api/profile') {
       const mode = (Number(url.searchParams.get('mode') ?? '0') || 0) as Ruleset;
       const e = rules();
-      const history = buildHistory(opts.db, current(), mode, 15, e);
+
+      /*
+       * The paged sections. The page shows five rows of each and asks for more as the user
+       * expands, so what comes back is normally tiny -- and the cost of expanding is one
+       * request rather than a payload sized for the largest thing anyone might scroll to.
+       */
+      const page = (name: string, fallback: number) => {
+        const asked = Number(url.searchParams.get(name));
+        if (!Number.isFinite(asked)) return fallback;
+        // Clamped: this is a query parameter, and an unbounded one would let a stray URL
+        // ask the database to build a list of every score ever tracked.
+        return Math.min(Math.max(Math.floor(asked), 1), MAX_PAGE);
+      };
+
+      const history = buildHistory(opts.db, current(), mode, page('events', 15), e);
       const stats = computeStats(opts.db, current(), mode, e);
       const table = rankTable(mode);
       return json(res, {
@@ -258,16 +289,27 @@ export function startServer(opts: ServerOptions): http.Server {
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
         medals: computeMedals(opts.db, current(), mode, e),
         pinned: pinnedPlays(opts.db, current(), mode, e),
-        top: topPlays(opts.db, current(), mode, 100, e),
+        top: topPlays(opts.db, current(), mode, page('top', 100), e),
         recent: recentPlays(
           opts.db,
           current(),
           mode,
-          25,
+          page('recent', 25),
           e,
           settingsFor(current()).showIncompleteInRecent,
         ),
-        mostPlayed: mostPlayed(opts.db, current(), mode, 15),
+        mostPlayed: mostPlayed(opts.db, current(), mode, page('mostPlayed', 15)),
+        /*
+         * How many rows each of those sections has in full, so the headings can show a real
+         * count and "show more" can know when to stop offering. Top Ranks is capped at 100
+         * because that is all osu! ever weights.
+         */
+        totals: {
+          top: Math.min(stats.distinctRankedBeatmaps, TOP_PLAYS),
+          recent: recentPlayTotal(opts.db, current(), mode),
+          mostPlayed: mostPlayedTotal(opts.db, current(), mode),
+          events: history.eventsTotal,
+        },
         ppHistory: history.pp,
         // osu-web charts global rank here, so do the same wherever a curve exists.
         rankHistory: history.pp.map((p) => ({ at: p.at, rank: estimateRank(p.pp, mode)?.rank ?? null })),

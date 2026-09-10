@@ -30,6 +30,11 @@ built against.
 
 Country rank still shows `-`, on purpose; see Known gaps.
 
+The long sections -- Recent, Top Ranks, Most Played Beatmaps and Recent Plays -- start at
+five rows with a **show more** button, expanding to 25 and then 25 at a time, as on osu!.
+Both charts are hoverable: the rank graph reads out `Global Ranking #120,000` / `40 days
+ago` by day, and Play History reads `Plays 430` / `March 2020` by month.
+
 ## Platform support
 
 | Platform | State |

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### The page behaves like osu!'s
+
+- **Recent, Top Ranks, Most Played Beatmaps and Recent Plays start at five rows**, with a
+  **show more** button that expands to 25 and then 25 at a time. Paging is served rather
+  than done in the browser, so a profile with thousands of plays opens with twenty rows and
+  expanding still works however long the list is.
+- **The rank graph is osu!'s yellow** (`#ffcc22` at 2px, from osu-web's
+  `.line-chart--profile-page`) instead of the page's pink.
+- **The rank graph reads out on hover**: `Global Ranking #120,000` over `40 days ago`, at
+  daily granularity, snapping to real recorded points rather than interpolating between
+  them.
+- **Monthly Playcounts is now Play History** -- its actual name on osu! -- drawn as a yellow
+  line rather than bars, and hoverable for `Plays 430` over `March 2020`.
+- The hover marker and tooltip are HTML drawn over the chart rather than SVG inside it: the
+  charts stretch to their container, which would render a circle as an ellipse. osu-web does
+  the same, for the same reason.
+
 ### macOS and Linux
 
 Written, and covered by CI on `ubuntu-latest` and `macos-latest` alongside Windows. **Not

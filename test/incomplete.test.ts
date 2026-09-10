@@ -7,7 +7,14 @@ import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
 import { BeatmapResolver, beatmapMode } from '../src/clients/beatmaps.ts';
 import { ingestIncompletePlay } from '../src/tracker/incomplete.ts';
 import type { ResolvedLoggedPlay } from '../src/clients/lazer-log.ts';
-import { computeStats, mostPlayed, recentPlays, modesWithPlays } from '../src/calc/stats.ts';
+import {
+  computeStats,
+  mostPlayed,
+  mostPlayedTotal,
+  recentPlayTotal,
+  recentPlays,
+  modesWithPlays,
+} from '../src/calc/stats.ts';
 import { buildHistory } from '../src/calc/history.ts';
 import { VANILLA } from '../src/calc/eligibility.ts';
 
@@ -379,5 +386,66 @@ test('the mode of an abandoned play comes from the beatmap, since the log never 
     assert.equal(beatmapMode(path.join(tmp, 'missing.osu')), 0);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------- paging totals */
+
+/*
+ * The counts behind the headings and the "show more" button. Both tables have to be in
+ * them, or a profile whose recent plays are mostly abandoned attempts would show a heading
+ * that disagrees with the list underneath it.
+ */
+test('the recent-play total counts abandoned attempts as well as scores', () => {
+  const h = harness();
+  try {
+    h.addBeatmap('map-a', 111, 'A');
+    h.addScore('map-a', T0);
+    h.addScore('map-a', T0 + 1000);
+    h.quit({ beatmapId: 111, countedAt: T0 + 2000 });
+
+    assert.equal(recentPlayTotal(h.db, h.profileId, 0), 3);
+    // Another mode's plays are a different list entirely.
+    assert.equal(recentPlayTotal(h.db, h.profileId, 1), 0);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('the most-played total counts each beatmap once, from either table', () => {
+  const h = harness();
+  try {
+    h.addBeatmap('shared', 111, 'Shared');
+    h.addBeatmap('scored', 222, 'Scored');
+    h.addBeatmap('quit-only', 333, 'Quit only');
+
+    h.addScore('shared', T0);
+    h.addScore('scored', T0 + 1000);
+    h.quit({ beatmapId: 111, countedAt: T0 + 2000 }); // same map as a score: not a new row
+    h.quit({ beatmapId: 333, countedAt: T0 + 3000 }); // never scored: a row of its own
+
+    assert.equal(mostPlayedTotal(h.db, h.profileId, 0), 3);
+    assert.equal(mostPlayed(h.db, h.profileId, 0, 15).length, 3);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * The reason the page cannot decide "there is more" from the total alone. Collapsing folds
+ * a run of attempts into one row, so the list is legitimately shorter than the number of
+ * plays behind it -- and a button offering the difference would never go away.
+ */
+test('collapsing makes rows fewer than plays, which paging has to allow for', () => {
+  const h = harness();
+  try {
+    h.addBeatmap('grind', 111, 'Grind');
+    for (let i = 0; i < 4; i++) h.quit({ beatmapId: 111, countedAt: T0 + i * 1000 });
+
+    assert.equal(recentPlayTotal(h.db, h.profileId, 0), 4);
+    assert.equal(recentPlays(h.db, h.profileId, 0, 25, VANILLA, 'collapse').length, 1);
+    assert.equal(recentPlays(h.db, h.profileId, 0, 25, VANILLA, 'yes').length, 4);
+  } finally {
+    h.cleanup();
   }
 });

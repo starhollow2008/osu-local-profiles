@@ -25,6 +25,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.10 | macOS and Linux support                       | in progress |
 | 5.11 | Incomplete plays (fails, quits, retries)      | done   |
 | 5.12 | Incomplete plays on osu!stable                | todo   |
+| 5.13 | Paged sections and osu!'s own charts          | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -693,3 +694,80 @@ The ingest is already client-agnostic and does not need changing:
 **Done when.** A quit and a retry on osu!stable raise the play count the same way they do on
 lazer — or this section records, with evidence, that stable keeps no local trace of them and
 the README says so plainly.
+
+---
+
+## 5.13 — Paged sections, and charts that match osu!'s
+
+**Status:** done
+
+**Goal.** Four things the profile page did differently from osu!'s own, all asked for
+together because they are the same complaint: the page did not look or behave like the
+thing it is modelled on.
+
+1. Recent, Top Ranks, Most Played Beatmaps and Recent Plays start at **five rows** with a
+   **show more** button, expanding to 25 and then 25 at a time.
+2. The rank graph is **osu!'s yellow**, not this page's pink.
+3. The rank graph is **hoverable**, reading out `Global Ranking #120,000` / `40 days ago`
+   at daily granularity.
+4. Monthly Playcounts becomes **Play History**: a yellow line chart, monthly, hoverable for
+   `Plays 430` / `March 2020`.
+
+### Everything here was read off osu-web rather than eyeballed
+
+Each value below comes from osu-web's own source, so this is a match rather than an
+impression of one:
+
+- The line is **`@yellow`, `#ffcc22`, at 2px** — `.line-chart--profile-page` in
+  `resources/css/bem/line-chart.less`. It is a literal rather than one of this project's
+  `--hsl-*` tokens because it is not derived from the page's base hue: it stays gold
+  whatever the accent is.
+- The **hover marker** is a 20px circle filled `--hsl-b5` with a 4px yellow border, over a
+  full-height 2px yellow line — same file.
+- The **tooltip** is pinned to a top corner and *flips away from the cursor* rather than
+  following the point (`data-float`), which is what keeps it from sitting under the pointer.
+  Its value line is white and its date line `--hsl-l1`, with the value on top.
+- The **rank wording** is `<strong>Global Ranking</strong> #123` over `40 days ago`, from
+  `profile-page/rank-chart.tsx` — the x axis there really is days-ago rather than a date,
+  which is why the tooltip says so.
+- **Play History** is the section's real name (`users.show.extra.historical.monthly_playcounts.title`),
+  its tooltip is `<strong>Plays</strong> 430` over `March 2020`
+  (`MMMM YYYY`), and it is a `curveLinear` line — `profile-page/chart.tsx`.
+- The **button** is `show-more-link`: a centred pill, white on `--hsl-b2`, `--hsl-b1` on
+  hover, label between two chevrons, reading `show more`.
+
+### Decisions
+
+- **The hover marker and tooltip are HTML over the plot, not SVG inside it.** The charts
+  stretch with `preserveAspectRatio="none"` in a 0..100 space, which is what makes them
+  responsive without measuring the DOM — and would render a circle as an ellipse whose shape
+  depended on the window width. osu-web does the same thing for the same reason: its hover
+  circle is a `div`.
+- **The tooltip text is formatted at render time and carried on the element as JSON.** The
+  hover handler is then a pure lookup that never has to know which chart it is attached to,
+  and re-arming after a re-render is one call rather than one per chart.
+- **Hovering snaps to the nearest real point** rather than interpolating. That is what makes
+  the granularity real: daily on the rank chart, monthly on Play History. You are always
+  reading a value that was actually recorded.
+- **Paging is server-side.** The page sends the size it wants for each section and gets
+  totals back. The alternative — fetch everything and slice in the browser — would either
+  cap how far "show more" can go or make opening a profile cost as much as its whole
+  history. Now a profile with thousands of plays opens with twenty rows, and expanding
+  stays honest for however long the list is.
+- **The bracketed remaining count was dropped.** osu-web's `ShowMoreLink` can show one, but
+  the profile page does not pass it — and here it would be subtly wrong, because Recent
+  Plays counts *plays* while it draws *rows*, and a collapsed run of retries is several
+  plays in one row.
+- **Knowing when to stop offering needs both halves of the test**, and this is the one real
+  trap in the feature. A page shorter than what was asked for is definitely the end. But the
+  total counts plays, so a section that came back exactly full might still be complete once
+  retries collapse — `total <= returned` catches that. Either test alone leaves a button
+  that reveals nothing.
+- **Top Ranks is capped at 100** regardless of how many eligible maps a profile has, because
+  100 is all osu! ever weights.
+- Switching mode **resets the expansion**: a different mode is a different set of lists, and
+  carrying an expansion over would ask for 200 rows of a mode with three.
+
+**Done when.** All four sections start at five and expand; both charts are osu!'s yellow and
+read out on hover at the right granularity; and `npm run ui` checks each of those against
+computed style in a real browser rather than against markup.

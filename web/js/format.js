@@ -54,13 +54,37 @@ export function shortDate(ms) {
   });
 }
 
-/** "Sep 2026" -- the x-axis label on the monthly playcount chart. */
+/** "Sep 2026" -- the x-axis label on the play history chart. osu-web's `MMM YYYY`. */
 export function monthLabel(ms) {
   return new Date(ms).toLocaleDateString(undefined, {
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+/** "September 2026" -- the month in a chart tooltip. osu-web's `MMMM YYYY`. */
+export function monthTitle(ms) {
+  return new Date(ms).toLocaleDateString(undefined, {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+const DAY_MS = 86_400_000;
+
+/**
+ * "40 days ago", or "now" for today.
+ *
+ * The rank chart's x axis on osu! is days-ago rather than a date, and its tooltip says so
+ * in those words (`common.time.days_ago`, with `now` at zero). Counted in whole UTC days,
+ * because that is the granularity the chart itself has -- one point per day.
+ */
+export function daysAgoLabel(ms) {
+  const days = Math.round((Date.now() - ms) / DAY_MS);
+  if (days <= 0) return 'now';
+  return `${fmt(days)} day${days === 1 ? '' : 's'} ago`;
 }
 
 export function dayLabel(ms) {

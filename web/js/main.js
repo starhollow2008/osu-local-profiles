@@ -13,13 +13,14 @@ import {
   levelBadge,
   medalPlaceholder,
 } from './badges.js';
-import { playcountChart, ppChart, rankChart } from './charts.js';
+import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
 import {
   aboutHtml,
   activityList,
   beatmapPlaycountList,
   countingNoteText,
   playList,
+  showMore,
 } from './sections.js';
 
 const $ = (id) => document.getElementById(id);
@@ -118,6 +119,23 @@ const SETTINGS_FIELDS = [
   },
 ];
 
+/*
+ * The paged sections, and how far each is currently expanded.
+ *
+ * Five rows to begin with, as on osu!, then a jump to 25 and 25 at a time after that. The
+ * counts are sent with every profile request rather than the whole history being fetched
+ * and sliced here, so a profile with thousands of plays costs the same to open as a new
+ * one -- and expanding stays honest for however long the list actually is.
+ */
+const PAGE_FIRST = 5;
+const PAGE_STEP = 25;
+const PAGED = ['events', 'top', 'mostPlayed', 'recent'];
+
+const shown = Object.fromEntries(PAGED.map((s) => [s, PAGE_FIRST]));
+const resetPaging = () => {
+  for (const section of PAGED) shown[section] = PAGE_FIRST;
+};
+
 let mode = 0;
 let tracking = false;
 let modesWithPlays = [];
@@ -181,6 +199,9 @@ $('modes').addEventListener('click', (e) => {
   if (!link) return;
   e.preventDefault();
   mode = Number(link.dataset.mode);
+  // A different mode is a different set of lists; carrying an expansion across would ask
+  // for 200 rows of a mode that has three.
+  resetPaging();
   renderModes();
   loadProfile();
 });
@@ -377,7 +398,14 @@ function renderMedals(summary) {
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
-  const data = await (await fetch(`/api/profile?mode=${mode}`)).json();
+  const query = new URLSearchParams({ mode: String(mode) });
+  for (const section of PAGED) query.set(section, String(shown[section]));
+  const data = await (await fetch(`/api/profile?${query}`)).json();
+
+  // A profile that has never been paged has no totals; fall back to what arrived, so the
+  // page still renders against an older server.
+  const totals = data.totals ?? {};
+  const totalFor = (section, list) => totals[section] ?? list.length;
 
   renderStats(data.stats);
   renderCover(data.top);
@@ -390,7 +418,9 @@ async function loadProfile() {
     ? rankChart(rankPoints)
     : ppChart(data.ppHistory, data.stats.playcount > 0 ? 'no ranked plays yet' : 'unranked');
 
-  $('recentActivity').innerHTML = activityList(data.events);
+  $('recentActivity').innerHTML =
+    activityList(data.events) +
+    showMore('events', data.events.length, shown.events, totalFor('events', data.events));
 
   renderCountingNote(data.counting);
   renderMedals(data.medals);
@@ -405,28 +435,40 @@ async function loadProfile() {
     empty: 'Nothing pinned. Use the menu on any score to pin it here.',
   });
 
-  $('topCount').textContent = fmt(data.top.length);
-  $('topRanks').innerHTML = playList(data.top, {
-    showWeight: true,
-    actions: true,
-    empty:
-      settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
-        ? 'No plays with a pp value tracked yet.'
-        : 'No ranked plays tracked yet.',
-  });
+  const topTotal = totalFor('top', data.top);
+  $('topCount').textContent = fmt(topTotal);
+  $('topRanks').innerHTML =
+    playList(data.top, {
+      showWeight: true,
+      actions: true,
+      empty:
+        settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
+          ? 'No plays with a pp value tracked yet.'
+          : 'No ranked plays tracked yet.',
+    }) + showMore('top', data.top.length, shown.top, topTotal);
 
-  const chart = playcountChart(data.monthlyPlaycounts);
+  const chart = playHistoryChart(data.monthlyPlaycounts);
   $('playcountChart').innerHTML = chart;
   $('playcountChart').hidden = chart === '';
 
-  $('mostPlayedCount').textContent = fmt(data.mostPlayed.length);
-  $('mostPlayed').innerHTML = beatmapPlaycountList(data.mostPlayed);
+  const mostPlayedTotal = totalFor('mostPlayed', data.mostPlayed);
+  $('mostPlayedCount').textContent = fmt(mostPlayedTotal);
+  $('mostPlayed').innerHTML =
+    beatmapPlaycountList(data.mostPlayed) +
+    showMore('mostPlayed', data.mostPlayed.length, shown.mostPlayed, mostPlayedTotal);
 
-  $('recentCount').textContent = fmt(data.recent.length);
-  $('recentPlays').innerHTML = playList(data.recent, {
-    actions: true,
-    empty: 'Nothing yet - go set a play.',
-  });
+  const recentTotal = totalFor('recent', data.recent);
+  $('recentCount').textContent = fmt(recentTotal);
+  $('recentPlays').innerHTML =
+    playList(data.recent, {
+      actions: true,
+      empty: 'Nothing yet - go set a play.',
+    }) + showMore('recent', data.recent.length, shown.recent, recentTotal);
+
+  // Every render above replaced markup wholesale, which discards the nodes any previous
+  // hover listener was attached to. Re-arming here rather than per chart keeps it to one
+  // call that cannot be forgotten when a chart moves.
+  bindCharts(document);
 }
 
 async function loadState() {
@@ -825,6 +867,24 @@ function moveSection(id, delta) {
   order.splice(to, 0, ...order.splice(from, 1));
   void saveSectionOrder(order);
 }
+
+/*
+ * Lengthen a paged section: five rows to twenty-five, then twenty-five at a time.
+ *
+ * The button is disabled while the request is in flight rather than removed, so the page
+ * does not jump under a cursor that is about to press it again.
+ */
+document.addEventListener('click', async (e) => {
+  const button = e.target.closest('[data-show-more]');
+  if (!button || button.disabled) return;
+
+  const section = button.dataset.showMore;
+  if (!PAGED.includes(section)) return;
+
+  shown[section] = shown[section] < PAGE_STEP ? PAGE_STEP : shown[section] + PAGE_STEP;
+  button.disabled = true;
+  await loadProfile();
+});
 
 document.addEventListener('click', (e) => {
   const button = e.target.closest('[data-move]');

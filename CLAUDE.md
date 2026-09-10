@@ -236,6 +236,26 @@ the profile. Refresh it by re-running the script with a newer `--dump` date.
 is far too thin to interpolate per country, and a fabricated number would be worse than the
 dash osu! itself shows for an unranked user.
 
+## The profile page's charts are not ordinary SVG
+
+Both charts draw in a 0..100 space with `preserveAspectRatio="none"`, which is what makes
+them responsive without measuring the DOM -- and means **anything drawn inside them is
+sheared by the container's aspect ratio**. A circle comes out an ellipse whose shape depends
+on the window width. So the axis labels, the hover marker and the tooltip are all HTML
+positioned over the plot in percentages. osu-web does exactly the same: its hover circle is
+a `div`. Keep it that way.
+
+Colours and wording come from osu-web's own source, not from looking at a screenshot -- the
+line is `@yellow` `#ffcc22` at 2px, the tooltip says `Global Ranking #123` over `40 days
+ago`, and Play History says `Plays 430` over `March 2020`. `docs/roadmap.md` 5.13 records
+where each of those came from.
+
+Section lists are **paged by the server**: the page asks for a size per section and gets
+totals back. Deciding whether to offer "show more" needs *both* "the page came back full"
+and "the total is larger than what was returned" -- Recent Plays counts plays but draws
+rows, and a collapsed run of retries is several plays in one row, so either test alone
+leaves a button that reveals nothing.
+
 ## Windows is the only verified platform
 
 macOS and Linux are written, covered by CI on `ubuntu-latest` and `macos-latest`, and

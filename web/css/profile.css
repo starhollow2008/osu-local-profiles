@@ -277,12 +277,7 @@
   font-size: var(--fs-normal);
 }
 
-.profile-detail-stats__chart svg {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: block;
-}
+/* The chart brings its own layout; this only gives it a box to fill. */
 
 .profile-detail-stats__empty-chart {
   margin: auto;
@@ -608,12 +603,7 @@
   margin-bottom: 10px;
 }
 
-.page-extra__chart svg {
-  flex: 1;
-  width: 100%;
-  min-height: 0;
-  display: block;
-}
+/* The chart brings its own layout; this only gives it a box to fill. */
 
 @media (min-width: 900px) {
   .page-extra {
@@ -1075,20 +1065,100 @@
 /* Charts                                                                   */
 /* ======================================================================== */
 
+/*
+ * osu-web's `.line-chart--profile-page`: a flat yellow line at 2px. The colour is @yellow
+ * from osu-web's palette, which is a literal rather than one of the --hsl-* tokens because
+ * it is not derived from the page's base hue -- it stays gold whatever the accent is.
+ */
+.chart {
+  --chart-line: #ffcc22;
+  --chart-hover-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.chart__plot {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.chart__plot svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .chart__line {
   fill: none;
-  stroke: hsl(var(--hsl-h1));
+  stroke: var(--chart-line);
   stroke-width: 2;
   stroke-linejoin: round;
   stroke-linecap: round;
 }
 
-.chart__dot {
-  fill: hsl(var(--hsl-c1));
+/* ---------------------------------------------------------------- hover */
+
+/*
+ * The marker and tooltip are HTML over the plot rather than SVG inside it. The chart
+ * stretches with preserveAspectRatio="none", so a circle drawn in it would render as an
+ * ellipse whose shape depended on the window width. osu-web does the same for the same
+ * reason.
+ */
+.chart__hover {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
 }
 
-.chart__bar {
-  fill: hsl(var(--hsl-h1));
+.chart__hover-line {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  margin-left: -1px;
+  background-color: var(--chart-line);
+}
+
+.chart__hover-circle {
+  position: absolute;
+  width: calc(var(--chart-hover-radius) * 2);
+  height: calc(var(--chart-hover-radius) * 2);
+  margin: calc(var(--chart-hover-radius) * -1) 0 0 calc(var(--chart-hover-radius) * -1);
+  border-radius: 50%;
+  background-color: hsl(var(--hsl-b5));
+  border: 4px solid var(--chart-line);
+  box-sizing: border-box;
+}
+
+.chart__hover-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 5px;
+  padding: 10px;
+  border-radius: 10px;
+  background-color: hsl(var(--hsl-b6));
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-normal);
+  white-space: nowrap;
+}
+
+/* Flipped away from the cursor so the tooltip never sits under the pointer. */
+.chart__hover-box[data-float='right'] {
+  left: auto;
+  right: 0;
+}
+
+.chart__hover-y {
+  color: #fff;
+}
+
+.chart__hover-x {
+  color: hsl(var(--hsl-l1));
 }
 
 /*
@@ -2210,4 +2280,49 @@
 .toast.show {
   opacity: 1;
   transform: none;
+}
+
+/* ======================================================================== */
+/* Show more                                                               */
+/* ======================================================================== */
+
+/*
+ * osu-web's `.show-more-link`: a centred pill, white text on b2, lifting to b1 on hover,
+ * with the label between two chevrons.
+ */
+.show-more-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 10px auto 0;
+  padding: 5px 20px;
+  width: max-content;
+  border: 0;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b2));
+  color: #fff;
+  font: inherit;
+  font-size: var(--fs-normal);
+  line-height: normal;
+  cursor: pointer;
+}
+
+.show-more-link:hover {
+  background-color: hsl(var(--hsl-b1));
+}
+
+.show-more-link[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.show-more-link__chevron {
+  width: 10px;
+  height: 6px;
+  display: block;
+}
+
+/* How many rows are still hidden -- osu-web shows this in brackets after the label. */
+.show-more-link__remaining {
+  color: hsl(var(--hsl-l1));
 }

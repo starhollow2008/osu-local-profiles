@@ -35,7 +35,10 @@ export type ActivityEvent =
 export interface History {
   pp: PpPoint[];
   monthlyPlaycounts: MonthlyPlaycount[];
+  /** The most recent `maxEvents`, newest first. */
   events: ActivityEvent[];
+  /** How many there are in total, so the page can offer to show more of them. */
+  eventsTotal: number;
 }
 
 const DAY = 86_400_000;
@@ -112,7 +115,7 @@ export function buildHistory(
     .all(profileId, mode) as { played_at: number }[];
 
   if (rows.length === 0 && abandoned.length === 0) {
-    return { pp: [], monthlyPlaycounts: [], events: [] };
+    return { pp: [], monthlyPlaycounts: [], events: [], eventsTotal: 0 };
   }
 
   const bestByMap = new Map<string, number>();
@@ -185,5 +188,6 @@ export function buildHistory(
     pp,
     monthlyPlaycounts,
     events: events.slice(-maxEvents).reverse(),
+    eventsTotal: events.length,
   };
 }

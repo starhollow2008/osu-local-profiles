@@ -779,6 +779,143 @@ check('a single attempt shows no count', dnf.attempts, '');
 const collapsed = await incompleteRow({ attempts: 4 });
 check('a collapsed run says how many attempts', collapsed.attempts.includes('4'), true);
 
+/*
+ * The charts. osu-web's profile line chart is `@yellow` (#ffcc22) at 2px, with the marker
+ * and tooltip drawn as HTML over the plot rather than inside the SVG -- the chart stretches
+ * with preserveAspectRatio="none", so a circle drawn in it would render as an ellipse whose
+ * shape depended on the window width.
+ */
+console.log('\nthe charts match osu!s profile');
+const chartLine = (id) =>
+  evaluate(`(() => {
+    const line = document.querySelector('#${id} .chart__line');
+    if (!line) return 'no chart';
+    const s = getComputedStyle(line);
+    return { stroke: s.stroke, width: s.strokeWidth };
+  })()`);
+
+for (const [name, id] of [['rank', 'ppChart'], ['play history', 'playcountChart']]) {
+  const line = await chartLine(id);
+  if (line === 'no chart') {
+    check(`the ${name} chart is drawn`, 'missing', 'present');
+    continue;
+  }
+  check(`the ${name} chart line is osu!s yellow`, line.stroke, 'rgb(255, 204, 34)');
+  check(`the ${name} chart line is 2px`, line.width, '2px');
+}
+
+check(
+  'the play history is a line, not bars',
+  await evaluate("document.querySelectorAll('#playcountChart .chart__bar').length"),
+  0,
+);
+check(
+  'the section is called Play History, as on osu!',
+  await evaluate("document.querySelector('#section-historical .title--sub-first')?.textContent"),
+  'Play History',
+);
+
+/*
+ * The area fill reaches its colour through var(--chart-line) inside an SVG gradient stop.
+ * A presentation attribute would silently not resolve it -- the same trap the grade badges
+ * hit -- and the fill would simply be absent.
+ */
+check(
+  'the area fill resolves its colour',
+  await evaluate(`(() => {
+    const stop = document.querySelector('#playcountChart svg stop');
+    if (stop == null) return 'no gradient';
+    return getComputedStyle(stop).stopColor;
+  })()`),
+  'rgb(255, 204, 34)',
+);
+
+console.log('\nthe charts are hoverable');
+check(
+  'nothing is shown until the mouse is over the chart',
+  await evaluate("document.querySelector('#ppChart .chart__hover')?.hidden"),
+  true,
+);
+
+const hoverChart = (id) =>
+  evaluate(`(() => {
+    const plot = document.querySelector('#${id} .chart__plot');
+    if (plot == null) return 'no chart';
+    const r = plot.getBoundingClientRect();
+    plot.dispatchEvent(new MouseEvent('mousemove', {
+      clientX: r.left + r.width * 0.6, clientY: r.top + r.height / 2, bubbles: true,
+    }));
+    const hover = document.querySelector('#${id} .chart__hover');
+    const out = {
+      hidden: hover.hidden,
+      y: hover.querySelector('.chart__hover-y').textContent,
+      x: hover.querySelector('.chart__hover-x').textContent,
+      circle: hover.querySelector('.chart__hover-circle').style.left,
+    };
+    plot.dispatchEvent(new MouseEvent('mouseleave', { bubbles: true }));
+    return out;
+  })()`);
+
+const rankHover = await hoverChart('ppChart');
+check('hovering the rank chart shows a reading', rankHover.hidden, false);
+// osu-web's wording exactly: `<strong>Global Ranking</strong> #123` over a days-ago line.
+check('it names the global ranking', /^Global Ranking #[\d,]+$/.test(rankHover.y), true);
+check('and says how long ago, by day', /^(now|[\d,]+ days? ago)$/.test(rankHover.x), true);
+check('and marks the point it read', rankHover.circle.endsWith('%'), true);
+
+const playsHover = await hoverChart('playcountChart');
+// `<strong>Plays</strong> 430` over `March 2020`, at monthly granularity.
+check('hovering the play history shows a month', /^Plays [\d,]+$/.test(playsHover.y), true);
+check('named in full, as on osu!', /^[A-Z][a-z]+ \d{4}$/.test(playsHover.x), true);
+
+check(
+  'the marker is hidden again when the mouse leaves',
+  await evaluate("document.querySelector('#ppChart .chart__hover')?.hidden"),
+  true,
+);
+
+/*
+ * Paged sections: five rows to begin with, as on osu!, then twenty-five, then twenty-five
+ * more at a time. Each check is skipped rather than failed when the profile has too few
+ * rows to page -- a freshly reset profile is a legitimate state to run this in.
+ */
+console.log('\nlong sections start short and expand');
+const SECTION_ROWS = {
+  recent: '#recentPlays .play-detail',
+  top: '#topRanks .play-detail',
+  mostPlayed: '#mostPlayed .beatmap-playcount',
+  events: '#recentActivity .activity',
+};
+
+let expandable = null;
+for (const [section, selector] of Object.entries(SECTION_ROWS)) {
+  const state = await evaluate(`({
+    rows: document.querySelectorAll('${selector}').length,
+    button: !!document.querySelector('[data-show-more="${section}"]'),
+  })`);
+
+  if (state.rows === 0) continue;
+  check(`${section} shows at most five rows at first`, state.rows <= 5, true);
+  if (state.rows === 5 && state.button) expandable ??= section;
+  // The other half of the rule: no button where pressing it would reveal nothing.
+  if (state.rows < 5) check(`${section} offers no button when it is complete`, state.button, false);
+}
+
+if (expandable == null) {
+  console.log('  SKIP  no section has more than five rows to expand');
+} else {
+  const rowsIn = (section) =>
+    evaluate(`document.querySelectorAll('${SECTION_ROWS[section]}').length`);
+
+  const before = await rowsIn(expandable);
+  await evaluate(`document.querySelector('[data-show-more="${expandable}"]').click()`);
+  await sleep(1500);
+  const after = await rowsIn(expandable);
+
+  check(`${expandable} grows when show more is pressed`, after > before, true);
+  check('and stops at twenty-five, or at the end of the list', after <= 25, true);
+}
+
 console.log('\nmod settings are surfaced');
 const pill = await evaluate(
   "import('/js/badges.js').then((m) => m.modPill({ acronym: 'DT', settings: { speed_change: 1.3 } }))",
