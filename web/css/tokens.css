@@ -104,6 +104,15 @@
    */
   --font-default: "Torus", "Torus Pro", "Inter", "Segoe UI Variable Text", "Segoe UI",
     system-ui, "Helvetica Neue", Tahoma, Arial, sans-serif;
+
+  /*
+   * osu-web's @font-grade, used for the letter on a grade badge and the acronym on a mod.
+   * Venera is a commercial display face and is not shipped, so this is the same bargain as
+   * Torus above: named first, used by a machine that already has it, and otherwise falling
+   * through to the body font -- which is what makes those letterforms lighter here than on
+   * osu!. See docs/osu-web-fidelity.md.
+   */
+  --font-grade: "Venera", var(--font-default);
 }
 
 /* osu-web's "desktop" breakpoint. */

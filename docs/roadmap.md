@@ -26,6 +26,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.11 | Incomplete plays (fails, quits, retries)      | done   |
 | 5.12 | Incomplete plays on osu!stable                | todo   |
 | 5.13 | Paged sections and osu!'s own charts          | done   |
+| 5.14 | The osu-web fidelity kit                      | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -780,3 +781,57 @@ impression of one:
 **Done when.** All four sections start at five and expand; both charts are osu!'s yellow and
 read out on hover at the right granularity; and `npm run ui` checks each of those against
 computed style in a real browser rather than against markup.
+
+
+---
+
+## 5.14 — The osu-web fidelity kit
+
+Every "make it look more like osu!" request so far cost a round trip, because the design was
+being reconstructed from description rather than read from the thing that defines it. The
+chart colour, the hover readout, the missing flag and the washed-out SS badge were all the
+same failure. This makes the source readable and writes down what may be taken from it.
+
+**Status: done.**
+
+### Decisions
+
+- **A sparse, gitignored reference checkout, not a fork.** `reference/osu-web` is 6.5MB of
+  the 158MB repo — the LESS, the profile-page TSX, the badge images and `database/mods.json`.
+  Building *on* osu-web was considered and rejected: it is a Laravel app needing PHP, MySQL
+  8.4+, Elasticsearch 7+ and Redis, its profile page reads osu!'s API schema rather than
+  this app's, and 14.5MB of its 158MB is PHP against 689KB of LESS. The part worth having is
+  the part that is readable in place.
+- **Values, never files, and the licence is the reason.** osu-web is AGPL-3.0-or-later.
+  Copying its stylesheets or images would relicense this project away from MIT and, because
+  the app serves a page over HTTP, engage AGPL §13 as soon as `shareOnNetwork` is set.
+  Colours, ratios and wording are facts and carry no such condition.
+- **`ppy/osu-resources` is off limits, and it is the trap.** lazer's own flag and mod
+  textures look like the obvious source. They are **CC-BY-NC 4.0** — incompatible with MIT
+  *and* with AGPL, and NonCommercial sits badly beside taking donations. Flags come from
+  Twemoji, which is where osu-resources' own `osu_flags.sh` gets them.
+- **Flags are vendored, not fetched.** `country` is a setting that can be typed with no
+  network, so any of the 258 codes has to resolve offline. 636KB for the set; the page loads
+  one 2.4KB file. `scripts/build-flags.mjs` reads the npm tarball with a 40-line tar reader
+  rather than adding a dependency.
+- **The country's *name* is shown beside the flag, as osu! does**, via `Intl.DisplayNames`.
+  A table of 250 country names would have been the obvious way and would have shipped bytes
+  the browser already has.
+- **The mod type table is generated now.** It was hand-written and its own comment called it
+  "rough"; the type is what picks a mod's colour, so a wrong row was a visibly wrong badge.
+  `database/mods.json` also supplies real mod names, so a tooltip says `Double Time (1.3×)`
+  rather than listing raw setting keys.
+- **The mod badge is osu!'s shape, with the acronym where the glyph goes.** The hexagon,
+  the type colour, the extender tab and the cog are all reproduced from `mod.less`'s
+  measurements — including both darkenings, which happen in *different colour spaces*
+  (linear sRGB for the glyph at 10%, plain sRGB for the extender at 26.3%, from
+  `Colour4.Darken(2.8f)`). The 71 per-mod glyphs are AGPL artwork and are not reproduced;
+  osu! itself falls back to the acronym for any mod it has no glyph for.
+- **The gold on SS and S was a half-implemented gradient**, not a palette error. Both
+  variants are the same badge with two different letterform gradients — gold #FFE7A8 →
+  #FFB800, silver white → #AADFF0 — and only the silver one had been implemented, so SS and
+  S fell back to the flat outline colour and read as washed out.
+
+**Done when.** `docs/osu-web-fidelity.md` maps every region of the page to the osu-web file
+that defines it and states what may be taken; flags and mod badges render from generated
+data; and `npm run ui` measures the badge height and the flag's ratio in a real browser.

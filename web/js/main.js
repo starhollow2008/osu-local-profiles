@@ -149,6 +149,28 @@ let sharing = { onNetwork: false, addresses: [], canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
 
+/**
+ * `US` -> `United States`. osu! writes the country's name beside the flag rather than its
+ * code, and `Intl.DisplayNames` is built into every browser this page runs in -- so the
+ * names cost no bytes and are already localised. An unrecognised code falls back to
+ * itself rather than being dropped.
+ */
+const REGION_NAMES = (() => {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'region' });
+  } catch {
+    return null;
+  }
+})();
+
+function countryName(code) {
+  try {
+    return REGION_NAMES?.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 function renderIdentity() {
   if (!profile) return;
 
@@ -161,10 +183,14 @@ function renderIdentity() {
   const bits = [];
   if (profile.country) {
     const code = profile.country.toUpperCase();
-    // The flag image is decoration: if it fails, or there is no network, the code pill
-    // beside it still says which country this is.
+    const name = countryName(code);
+    // The flag is a background image on a span, as it is on osu!: the sheen overlay in
+    // `.flag-country::after` inherits it. A code we have no flag for renders nothing and
+    // leaves the name beside it, which is still the whole answer.
     bits.push(`<span class="profile-info__flag">
-      <span class="profile-info__flag-code">${escapeHtml(code)}</span>
+      <span class="flag-country" role="img" title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}"
+            style="background-image: url('/flags/${escapeHtml(code.toLowerCase())}.svg')"></span>
+      <span class="profile-info__flag-text">${escapeHtml(name)}</span>
     </span>`);
   }
   if (profile.tagline) bits.push(`<span class="profile-info__tagline">${escapeHtml(profile.tagline)}</span>`);

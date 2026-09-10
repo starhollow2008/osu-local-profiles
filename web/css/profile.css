@@ -109,37 +109,66 @@
   max-width: 100%;
 }
 
+/*
+ * `profile-info.less`: the row is sized by font-size, because the flag is 1em tall and
+ * everything scales off it. 15px on mobile, @flag-size-medium (20px) on desktop.
+ */
 .profile-info__flags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-  font-size: var(--fs-title-small);
+  gap: 5px;
+  margin-top: 10px;
+  font-size: 15px;
   color: hsl(var(--hsl-c1));
 }
 
 .profile-info__flag {
-  display: inline-flex;
+  display: grid;
+  gap: 4px;
   align-items: center;
-  gap: 6px;
 }
 
-.profile-info__flag img {
-  width: 21px;
-  height: 15px;
-  border-radius: 2px;
-  object-fit: cover;
+.profile-info__flag-text {
+  font-size: var(--fs-title-small);
+  display: none;
+}
+
+/*
+ * `flag-country.less`, reproduced by its measurements.
+ *
+ * The 100/72 ratio is not cosmetic: a Twemoji flag is drawn in a 36x26 band inside a 36x36
+ * viewBox, so a box of exactly that ratio filled with `cover` crops the transparent
+ * margins off and lands on the flag. osu-web's comment says a different ratio "turns the
+ * flag into a blurry mess on Chrome", which is the same cause seen from the other side.
+ *
+ * The ::after layer is osu!'s: the flag again, flattened to grey (`contrast(0)`) and
+ * doubled in brightness, laid over itself at 0.25 -- a wash that lifts dark flags so they
+ * read against the cover image.
+ */
+.flag-country {
+  --height: 1em;
+  --width-height-ratio: calc(100 / 72);
+
+  height: var(--height);
+  width: calc(var(--height) * var(--width-height-ratio));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 3px;
+  position: relative;
+  filter: saturate(1.1);
   display: block;
 }
 
-.profile-info__flag-code {
-  font-size: var(--fs-small-2);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  background-color: hsla(var(--hsl-b6), 0.6);
-  border-radius: 3px;
-  padding: 1px 5px;
+.flag-country::after {
+  position: absolute;
+  inset: 0;
+  background: inherit;
+  border-radius: inherit;
+  filter: contrast(0) brightness(2);
+  opacity: 0.25;
+  content: "";
 }
 
 .profile-info__tagline {
@@ -172,6 +201,22 @@
 
   .profile-info__info {
     margin-left: 20px;
+  }
+
+  /* @flag-size-medium, and the country's name appears beside it only here. */
+  .profile-info__flags {
+    flex-wrap: nowrap;
+    gap: 10px;
+    margin-top: 5px;
+    font-size: 20px;
+  }
+
+  .profile-info__flag {
+    grid-template-columns: auto 1fr;
+  }
+
+  .profile-info__flag-text {
+    display: block;
   }
 
   .profile-info__name {
@@ -791,7 +836,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
+  font-size: var(--mod-height, 22px);
 }
 
 .play-detail__pp {
@@ -939,27 +984,19 @@
 /* --- mod pills ---------------------------------------------------------- */
 
 /*
- * A mod whose settings were customised (DT at 1.3x, DA with a changed AR) gets an
- * underline, so it is never mistaken for the default at a glance. The settings themselves
- * are in the tooltip.
+ * `mod.less`: the whole badge scales off one number. Its height is 1em and every part of
+ * it -- the icon's 1.42em width, the extender's 2.2em, the acronym's 0.4em -- is written
+ * in em against that, so the row's font-size is the only size there is. @mod-height-normal
+ * is 22px. Everything the badge draws is inside its SVG, which is why there is so little
+ * here; the shape, the colours and the cog are in web/js/badges.js.
+ *
+ * Badges sit flush, as they do on osu!: the points nest into each other.
  */
-.mod--customised {
-  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.35);
-}
-
 .mod {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 30px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 4px;
-  font-size: var(--fs-small-2);
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  color: hsl(var(--hsl-b6));
-  background-color: var(--mod-colour, var(--mod-unknown));
+  height: 1em;
+  width: auto;
+  display: block;
+  flex: none;
 }
 
 /* ======================================================================== */

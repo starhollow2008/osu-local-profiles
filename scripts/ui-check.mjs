@@ -920,15 +920,52 @@ console.log('\nmod settings are surfaced');
 const pill = await evaluate(
   "import('/js/badges.js').then((m) => m.modPill({ acronym: 'DT', settings: { speed_change: 1.3 } }))",
 );
-check('a customised rate is shown on the pill', pill.includes('DT 1.3x'), true);
-check('a customised mod is marked', pill.includes('mod--customised'), true);
-check(
-  'the settings are in the tooltip',
-  pill.includes('Rate 1.3x'),
-  true,
-);
+// osu! writes the rate to two places and two precisions: the extender tab and the tooltip.
+check('a customised rate is shown on the extender', pill.includes('1.30×'), true);
+check('a customised mod is marked with a cog', pill.includes('mod__customised-indicator'), true);
+check('the tooltip names the mod, not its acronym', pill.includes('Double Time (1.3×)'), true);
 const plain = await evaluate("import('/js/badges.js').then((m) => m.modPill({ acronym: 'HD' }))");
-check('a default mod is not marked', plain.includes('mod--customised'), false);
+check('a default mod is not marked', plain.includes('mod__customised-indicator'), false);
+check('and carries no extender, so it stays one badge wide', plain.includes('viewBox="0 0 100 70"'), true);
+
+/*
+ * The badge's whole size comes from the row's font-size, so a missing rule shows up as a
+ * badge of the wrong height rather than as anything visibly broken. Measure it rendered.
+ */
+console.log('\nmods and flags are sized off their row');
+const modHeight = await evaluate(`(() => {
+  const row = document.createElement('div');
+  row.className = 'play-detail__mods';
+  document.body.appendChild(row);
+  row.innerHTML = ${JSON.stringify(pill)};
+  const h = row.querySelector('.mod').getBoundingClientRect().height;
+  row.remove();
+  return Math.round(h);
+})()`);
+check('a mod badge is @mod-height-normal tall', modHeight, 22);
+
+/*
+ * The flag's width is derived from its height by osu!'s 100/72 ratio, which is what crops
+ * a 36x36 Twemoji SVG down to the flag inside it. A wrong ratio is a letterboxed flag.
+ */
+const flag = await evaluate(`(() => {
+  const row = document.createElement('div');
+  row.className = 'profile-info__flags';
+  row.style.fontSize = '20px';
+  row.innerHTML = '<span class="flag-country"></span>';
+  document.body.appendChild(row);
+  const r = row.querySelector('.flag-country').getBoundingClientRect();
+  row.remove();
+  // Two decimals, not three: the width lands on a subpixel, so 100/72 measures 1.3883.
+  return { h: Math.round(r.height), ratio: Math.round((r.width / r.height) * 100) };
+})()`);
+check('a flag is one line tall', flag.h, 20);
+check('and 100/72 as wide, as on osu!', flag.ratio, 139);
+check(
+  'a flag for the vendored set resolves',
+  await evaluate("fetch('/flags/us.svg').then((r) => r.status)"),
+  200,
+);
 
 /*
  * The token layer. A mistyped custom property (--hsl-b4 -> --hsl-b44) makes the whole

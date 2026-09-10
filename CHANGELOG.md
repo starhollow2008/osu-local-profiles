@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### The page looks like osu!'s
+
+- **Country flags.** The flag beside your name is now the flag, not just the two-letter
+  code — and the country's full name is written beside it, as osu! writes it. The whole set
+  is bundled, so it works with no network for any country. It is the same artwork osu! uses:
+  both come from Twemoji.
+- **SS and S are gold again.** osu!'s badges carry a gradient on the letter, and it is the
+  gradient — gold, or silver for the hidden variants — that tells the two apart. Only the
+  silver one had been implemented, so SS and S were falling back to a flat dark letter and
+  reading as washed out.
+- **Mod badges are osu!'s.** The angled hexagon in the mod type's colour, the acronym
+  darkened into it, a tab on the right carrying the rate for a sped-up or slowed-down play,
+  and a cog when anything about the mod was customised. Tooltips now say `Double Time (1.3×)`
+  rather than listing raw setting keys.
+- **Mod colours are right, not approximately right.** The acronym-to-type table was
+  hand-written; it is now generated from osu!'s own mod definitions, so every one of the 69
+  mods gets the colour osu! gives it.
+
+### For contributors
+
+- **`docs/osu-web-fidelity.md`** maps every region of the profile page to the osu-web file
+  that defines it, and sets out what may be taken from osu! and what may not. Matching osu!
+  more closely should no longer take several passes per detail.
+- `npm run build:flags` and `npm run build:mods` regenerate the bundled flags and the mod
+  table. `THIRD-PARTY-NOTICES.md` records where both came from.
+
 ## 1.2.0
 
 ### Fixed

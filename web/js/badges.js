@@ -7,16 +7,25 @@
  * rather than copied from osu-web's assets.
  */
 import { escapeHtml } from './format.js';
+import { MOD_DEFINITIONS } from './mod-definitions.js';
 
 /* Unique ids per generated SVG, since several appear on the page at once. */
 let uid = 0;
 const nextId = (prefix) => `${prefix}${++uid}`;
 
 /*
- * Grade badge palettes, read from GradeSmall-*.svg. `letter` is the flat letterform
- * colour; the silver grades (XH, SH) are the *same* palette but with the letterform
- * filled by a white -> #AADFF0 gradient instead, which is the entire "silver" cue.
+ * Grade badge palettes, read from GradeSmall-*.svg.
+ *
+ * `letter` is the flat letterform colour used by A..F. SS and S do not use it: their
+ * letterform carries a *gradient*, and which gradient is the entire gold/silver cue --
+ * gold #FFE7A8 -> #FFB800 on SS/S, white -> #AADFF0 on the silver SSH/SH. Both run
+ * vertically from y=2.08 to y=16 in the same 32x16 box, so the two variants differ by
+ * nothing but their two stops.
  */
+const GRADE_GRADIENT = {
+  gold: ['#FFE7A8', '#FFB800'],
+  silver: ['#FFFFFF', '#AADFF0'],
+};
 const GRADE_PALETTE = {
   X: { pill: '#CE1C9D', light: '#DE31AE', darkA: '#C30B90', darkB: '#BE0089', letter: '#5E244E' },
   S: { pill: '#00A8B5', light: '#02B5C3', darkA: '#009DAA', darkB: '#0096A2', letter: '#095056' },
@@ -43,14 +52,16 @@ export function gradeBadge(grade, { title } = {}) {
 
   const clip = nextId('gclip');
   const grad = nextId('ggrad');
-  const fill = silver ? `url(#${grad})` : p.letter;
+  // Only SS and S are gradient-filled; A..F take the flat dark letterform.
+  const stops = key === 'X' || key === 'S' ? GRADE_GRADIENT[silver ? 'silver' : 'gold'] : null;
+  const fill = stops === null ? p.letter : `url(#${grad})`;
 
   return `<svg viewBox="0 0 32 16" role="img" aria-label="${escapeHtml(title ?? `${text} rank`)}">
   <defs>
     <clipPath id="${clip}"><rect width="32" height="16" rx="8"/></clipPath>
-    ${silver ? `<linearGradient id="${grad}" x1="0" y1="2" x2="0" y2="16" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff"/><stop offset="1" stop-color="#AADFF0"/>
-    </linearGradient>` : ''}
+    ${stops === null ? '' : `<linearGradient id="${grad}" x1="16" y1="2.08" x2="16" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="${stops[0]}"/><stop offset="1" stop-color="${stops[1]}"/>
+    </linearGradient>`}
   </defs>
   <g clip-path="url(#${clip})">
     <rect width="32" height="16" fill="${p.pill}"/>
@@ -62,7 +73,7 @@ export function gradeBadge(grade, { title } = {}) {
   <text x="16" y="12.2" text-anchor="middle" fill="${fill}"
         font-size="${text.length > 1 ? 10.5 : 11}" font-weight="800"
         letter-spacing="${text.length > 1 ? -0.6 : 0}"
-        font-family="var(--font-default)">${text}</text>
+        style="font-family: var(--font-grade)">${text}</text>
 </svg>`;
 }
 
@@ -88,78 +99,228 @@ export function incompleteBadge() {
 /* ------------------------------------------------------------------------ */
 
 /*
- * Acronym -> ModType, so each pill gets the accent colour osu! gives that category
- * (OsuColour.ForModType). An acronym missing here is drawn in a neutral grey rather than
- * being guessed into the wrong category.
+ * The accent colour of each mod type, from ppy/osu's `OsuColour.ForModType`, keyed by
+ * osu!'s own type names so this table lines up with `mod-definitions.js` entry for entry.
+ *
+ * A mod no build of this app has heard of is drawn in a neutral grey. It is not guessed
+ * into a category: a wrong colour states a fact about the mod that is not true.
  */
-const MOD_TYPES = {
-  reduction: ['EZ', 'NF', 'HT', 'DC'],
-  increase: ['HR', 'SD', 'PF', 'DT', 'NC', 'HD', 'FL', 'AC', 'BL', 'ST'],
-  automation: ['AT', 'CN', 'RX', 'AP', 'SO'],
-  conversion: ['CL', 'DA', 'RD', 'MR', 'TP', 'AL', 'SG', 'DS', 'CS', 'FR', 'SW', 'HO',
-    '1K', '2K', '3K', '4K', '5K', '6K', '7K', '8K', '9K', '10K'],
-  fun: ['TR', 'WG', 'SI', 'MG', 'RP', 'AS', 'MU', 'NS', 'BR', 'BU', 'SY', 'DP', 'BM', 'WU', 'WD'],
-  system: ['SV2', 'TD'],
+const MOD_TYPE_COLOUR = {
+  DifficultyReduction: '#b2ff66',
+  DifficultyIncrease: '#ff6666',
+  Automation: '#66ccff',
+  Conversion: '#8c66ff',
+  Fun: '#ff66ab',
+  System: '#ffcc22',
 };
 
-const MOD_COLOUR = (() => {
-  const map = new Map();
-  for (const [type, acronyms] of Object.entries(MOD_TYPES)) {
-    for (const a of acronyms) map.set(a, `var(--mod-${type})`);
-  }
-  return map;
-})();
+/* hsl(var(--hsl-b1)) resolved, because the badge does its colour arithmetic in JS. */
+const MOD_UNKNOWN_COLOUR = '#705c65';
 
-/*
- * Setting keys lazer writes, in the names osu! itself uses. Anything not listed is still
- * shown, just with its raw key humanised -- a new mod setting should be visible rather
- * than silently dropped.
- */
-const SETTING_LABELS = {
-  speed_change: 'Rate',
-  circle_size: 'CS',
-  approach_rate: 'AR',
-  drain_rate: 'HP',
-  overall_difficulty: 'OD',
-  initial_rate: 'From',
-  final_rate: 'To',
-  extended_limits: 'Extended limits',
-  adjust_pitch: 'Pitch',
-  only_fade_approach_circles: 'Fade approach circles only',
-  restart: 'Restart on fail',
-  retries: 'Retries',
-};
+const round2 = (n) => Math.round(n * 100) / 100;
 
-const humanise = (key) => key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const linearToSrgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
 
-function settingValue(key, value) {
-  if (typeof value === 'boolean') return value ? 'on' : 'off';
-  // Rates read as "1.3x" everywhere in osu!, so keep that form.
-  if (key === 'speed_change' || key === 'initial_rate' || key === 'final_rate') return `${value}x`;
-  return String(value);
+function channels(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
 }
 
-function settingEntries(mod) {
-  return Object.entries(mod.settings ?? {}).map(
-    ([k, v]) => `${SETTING_LABELS[k] ?? humanise(k)} ${settingValue(k, v)}`,
-  );
+function toHex(rgb) {
+  const byte = (v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
+  return `#${rgb.map(byte).join('')}`;
 }
 
 /**
- * One mod. A customised mod is marked so it cannot be mistaken for the default: the rate
- * is shown inline because it changes the difficulty outright, and every setting is listed
- * in the tooltip.
+ * Darken an accent colour towards black, the two ways osu! does it.
+ *
+ * The two are not the same operation. The glyph colour is `Colour4` interpolation, which
+ * osu!framework does in *linear* sRGB; the extender is a plain sRGB multiply. osu-web's
+ * `mod.less` reproduces both with `color-mix` and spells out where each comes from --
+ * `.Darken(2.8f)` divides every component by 3.8, which is a mix at 1/3.8 = 26.3%.
+ *
+ * Doing the arithmetic here rather than leaving it to `color-mix` keeps the result the
+ * same on any browser, and keeps both constants visible next to their reason.
+ */
+function darken(hex, amount, { linear }) {
+  const rgb = channels(hex);
+  return toHex(linear ? rgb.map((c) => linearToSrgb(srgbToLinear(c) * amount)) : rgb.map((c) => c * amount));
+}
+
+/*
+ * The badge a mod is stamped on: flat top and bottom, a point at each end, rounded
+ * corners. osu-web masks with `blanks/mod-icon.svg` at 100x70 and `mod-icon-extender.svg`
+ * at 155x70, which is where these numbers come from -- 70 units to 1em, so the icon is
+ * 1.42em wide, the extender 2.2em, and they overlap by 0.5em.
+ *
+ * The shape is constructed here rather than copied: a hexagon inset by half the stroke
+ * width and stroked with a round join comes back out to the full size with rounded
+ * corners, at the same edge slope as osu!'s.
+ */
+const MOD_UNIT = 70;
+const MOD_ICON_W = 100;
+const MOD_EXTENDER_W = 155;
+const MOD_OVERLAP = 35;
+const MOD_ROUND = 12;
+
+function hexagonPoints(x, width) {
+  const inset = MOD_ROUND / 2;
+  const middle = MOD_UNIT / 2;
+  const top = inset;
+  const bottom = MOD_UNIT - inset;
+  const left = x + inset;
+  const right = x + width - inset;
+  // osu!'s end slope: 25.5 across for 35 up.
+  const run = (middle - inset) * (25.5 / 35);
+
+  return [
+    [left, middle],
+    [left + run, top],
+    [right - run, top],
+    [right, middle],
+    [right - run, bottom],
+    [left + run, bottom],
+  ]
+    .map(([px, py]) => `${round2(px)},${round2(py)}`)
+    .join(' ');
+}
+
+function hexagon(x, width, colour) {
+  return `<polygon points="${hexagonPoints(x, width)}" stroke-width="${MOD_ROUND}"
+      stroke-linejoin="round" style="fill: ${colour}; stroke: ${colour}"/>`;
+}
+
+/** A gear, generated from its tooth count rather than drawn. */
+function cogPoints(cx, cy, outer, inner, teeth) {
+  const points = [];
+  const steps = teeth * 2;
+  for (let i = 0; i < steps; i += 1) {
+    const r = i % 2 === 0 ? outer : inner;
+    const angle = (i / steps) * Math.PI * 2 - Math.PI / 2;
+    points.push(`${round2(cx + Math.cos(angle) * r)},${round2(cy + Math.sin(angle) * r)}`);
+  }
+  return points.join(' ');
+}
+
+/* Mods whose extender shows a rate, and the adjustments Difficulty Adjust can show. */
+const RATE_MODS = new Set(['HT', 'DC', 'DT', 'NC']);
+const DA_DISPLAY = {
+  approach_rate: ['AR', 1],
+  circle_size: ['CS', 1],
+  drain_rate: ['HP', 1],
+  overall_difficulty: ['OD', 1],
+  scroll_speed: ['SS', 2],
+};
+
+/**
+ * What the extender tab says, following osu-web's `getExtendedContent`.
+ *
+ * Only a rate change and Difficulty Adjust get one, and Difficulty Adjust only when
+ * *one* value was changed -- two would not fit, so osu! shows neither and leaves the
+ * tooltip to say what happened. Everything else has an empty extender and no tab.
+ */
+function extendedContent(mod) {
+  const settings = mod.settings ?? {};
+
+  if (RATE_MODS.has(mod.acronym)) {
+    const rate = settings.speed_change;
+    return typeof rate === 'number' ? `${rate.toFixed(2)}×` : '';
+  }
+
+  if (mod.acronym === 'DA') {
+    let shown = '';
+    for (const [key, [acronym, digits]] of Object.entries(DA_DISPLAY)) {
+      if (typeof settings[key] !== 'number') continue;
+      if (shown !== '') return '';
+      shown = `${acronym}${settings[key].toFixed(digits)}`;
+    }
+    return shown;
+  }
+
+  return '';
+}
+
+function settingValue(value) {
+  if (typeof value === 'boolean') return value ? 'on' : 'off';
+  return String(value);
+}
+
+/**
+ * `Double Time (1.5×)` -- the mod's name first, then whatever was customised, which is
+ * how osu! writes it. A setting osu! gives no label to is left out of the tooltip rather
+ * than shown under its raw key.
+ */
+function modTitle(mod, definition) {
+  const settings = [];
+  for (const [key, value] of Object.entries(mod.settings ?? {})) {
+    if (key === 'speed_change') {
+      settings.push(`${value}×`);
+      continue;
+    }
+    const label = definition?.settings?.[key];
+    if (label != null) settings.push(`${label}: ${settingValue(value)}`);
+  }
+
+  const name = definition?.name ?? mod.acronym;
+  return settings.length === 0 ? name : `${name} (${settings.join(', ')})`;
+}
+
+/**
+ * One mod, as osu! draws it: the type's colour in the badge, the acronym darkened into it,
+ * a tab on the right carrying the rate when the mod was sped up or slowed down, and a cog
+ * when anything at all about it was customised.
+ *
+ * The acronym is the label rather than a glyph. osu!'s own glyphs are artwork this project
+ * cannot redistribute (see docs/osu-web-fidelity.md), and an acronym on the badge is what
+ * osu! itself falls back to for any mod it has no glyph for.
  */
 export function modPill(mod) {
   const m = typeof mod === 'string' ? { acronym: mod } : mod;
-  const colour = MOD_COLOUR.get(m.acronym) ?? 'var(--mod-unknown)';
-  const entries = settingEntries(m);
-  const rate = m.settings?.speed_change;
-  const label = rate == null ? m.acronym : `${m.acronym} ${rate}x`;
-  const title = entries.length > 0 ? ` title="${escapeHtml(entries.join(' · '))}"` : '';
-  const customised = entries.length > 0 ? ' mod--customised' : '';
+  const definition = MOD_DEFINITIONS[m.acronym] ?? null;
+  const colour = definition === null
+    ? MOD_UNKNOWN_COLOUR
+    : MOD_TYPE_COLOUR[definition.type] ?? MOD_UNKNOWN_COLOUR;
 
-  return `<span class="mod${customised}" style="--mod-colour: ${colour}"${title}>${escapeHtml(label)}</span>`;
+  const glyphColour = darken(colour, 0.1, { linear: true });
+  const extenderColour = darken(colour, 0.263, { linear: false });
+
+  const extended = extendedContent(m);
+  const customised = Object.keys(m.settings ?? {}).length > 0;
+  const width = extended === '' ? MOD_ICON_W : MOD_ICON_W + MOD_EXTENDER_W - MOD_OVERLAP;
+  const title = modTitle(m, definition);
+
+  const parts = [];
+
+  // Drawn first so the icon overlaps it, which is what hides the tab's left-hand notch.
+  if (extended !== '') {
+    parts.push(hexagon(MOD_ICON_W - MOD_OVERLAP, MOD_EXTENDER_W, extenderColour));
+    parts.push(`<text x="${round2((MOD_ICON_W + width) / 2)}" y="${MOD_UNIT / 2}"
+      text-anchor="middle" dominant-baseline="central" font-size="35" font-weight="700"
+      style="fill: ${colour}">${escapeHtml(extended)}</text>`);
+  }
+
+  parts.push(hexagon(0, MOD_ICON_W, colour));
+  // 0.4em of the badge's 1em height, as `mod.less` sets it.
+  parts.push(`<text x="${MOD_ICON_W / 2}" y="${MOD_UNIT / 2}" text-anchor="middle"
+    dominant-baseline="central" font-size="28" font-weight="900"
+    style="fill: ${glyphColour}; font-family: var(--font-grade)">${escapeHtml(m.acronym)}</text>`);
+
+  /*
+   * osu! marks a customised mod with a cog over the badge's top-right corner, half of it
+   * hanging outside. Here it is tucked inside instead: the badge's box is its own SVG, and
+   * growing that box to let the cog overhang would make a customised mod a different size
+   * from every other mod in the row.
+   */
+  if (customised) {
+    parts.push(`<g class="mod__customised-indicator">
+      <polygon points="${cogPoints(72, 16, 10, 7, 7)}" style="fill: ${glyphColour}"/>
+      <circle cx="72" cy="16" r="3.5" style="fill: ${colour}"/>
+    </g>`);
+  }
+
+  return `<svg class="mod" viewBox="0 0 ${width} ${MOD_UNIT}" role="img"
+    aria-label="${escapeHtml(title)}"><title>${escapeHtml(title)}</title>${parts.join('')}</svg>`;
 }
 
 export function modList(mods) {

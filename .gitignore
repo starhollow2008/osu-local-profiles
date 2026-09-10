@@ -9,3 +9,8 @@ web/dist/
 tools/**/bin/
 tools/**/obj/
 tools/pp/
+
+# Read-only reference checkout of ppy/osu-web (AGPL). Never committed: this repo is MIT,
+# and a copy of their tree inside it would be exactly the thing docs/osu-web-fidelity.md
+# exists to avoid. Recreate it with the clone command in that file.
+reference/
