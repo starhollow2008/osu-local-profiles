@@ -194,6 +194,23 @@ leaving the destructive button as the only one that worked. No unit test would c
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
 
+## Pinning and removing scores
+
+Every score row has a **⋯** menu.
+
+- **Pin to profile** puts it in a **Pinned** section above Best Performance, as on osu!.
+  Pins are per game mode, and a pinned score does not have to be in your top 100 -- pinning
+  is how you show a play you are proud of that pp does not reward.
+- Drag pinned scores to reorder them, or use **Move up** / **Move down** in the same menu.
+- **Remove from profile** takes the score out of every section *and* out of the totals:
+  pp, play count, ranked score, level, the charts and Most Played.
+
+Removing never deletes anything. The score is marked hidden and can be put back from
+**Options -> Settings**, under *Removed scores*. That is not only a convenience: the replay
+file is still in osu!'s store, so a genuinely deleted row would be re-imported the next
+time it was noticed -- and with nothing left to recognise it by, it would come back looking
+like a brand new play.
+
 ## Settings
 
 **Options -> Settings**, and everything there belongs to the profile you are on -- two

@@ -3,7 +3,14 @@ import type { LazerMod, Ruleset } from '../osr.ts';
 import { bonusPp, weightedAccuracy, weightedTotal } from './pp.ts';
 import { levelFromScore, type Level } from './level.ts';
 import type { Grade } from './grade.ts';
-import { countsSql, ppColumn, starsColumn, VANILLA, type Eligibility } from './eligibility.ts';
+import {
+  countsSql,
+  ppColumn,
+  starsColumn,
+  visibleSql,
+  VANILLA,
+  type Eligibility,
+} from './eligibility.ts';
 
 /** osu! weights only the top 100 plays. */
 const TOP_PLAY_LIMIT = 100;
@@ -42,6 +49,8 @@ export interface Play {
    * Relax or Autopilot removed, so it must be shown as the estimate it is.
    */
   ppBasis: 'as-played' | 'without-unranked-mods' | null;
+  /** Pinned to the profile by the user, so the row's menu offers to unpin it. */
+  pinned: boolean;
 }
 
 export interface MostPlayed {
@@ -90,6 +99,7 @@ function playColumns(e: Eligibility): string {
         ${starsColumn(e)} AS stars,
         ${countsSql(e)} AS counts,
         s.pp_nomod IS NOT NULL AS has_nomod,
+        s.pinned_at IS NOT NULL AS pinned,
         b.beatmapset_id, b.artist, b.title, b.version, b.creator`;
 }
 
@@ -127,6 +137,7 @@ function toPlay(r: Row, e: Eligibility): Play {
     weight: null,
     weightedPp: null,
     counted: r['counts'] === 1,
+    pinned: r['pinned'] === 1,
     ppBasis:
       r['pp'] === null
         ? null
@@ -171,8 +182,8 @@ export function computeStats(
               COALESCE(SUM(count300 + count100 + count50
                            + count_geki + count_katu), 0)         AS total_hits,
               COALESCE(MAX(max_combo), 0)                         AS max_combo
-         FROM scores
-        WHERE profile_id = ? AND mode = ?`,
+         FROM scores s
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}`,
     )
     .get(profileId, mode) as {
     playcount: number;
@@ -242,6 +253,32 @@ export function topPlays(
 }
 
 /**
+ * Scores the user pinned, in the order they arranged them.
+ *
+ * Deliberately not filtered by eligibility: pinning is how you show a play you are proud of
+ * that pp does not reward -- an unranked map, a relax run, a play outside the top 100. Each
+ * row still carries `counted`, so a pin that contributes nothing to the total says so.
+ */
+export function pinnedPlays(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  e: Eligibility = VANILLA,
+): Play[] {
+  const rows = db
+    .prepare(
+      `SELECT ${playColumns(e)}, ${ppColumn(e)} AS pp
+         FROM scores s
+         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()} AND s.pinned_at IS NOT NULL
+        ORDER BY s.pin_order ASC, s.pinned_at ASC`,
+    )
+    .all(profileId, mode) as Row[];
+
+  return rows.map((r) => toPlay(r, e));
+}
+
+/**
  * Every recent play, counting or not -- this is a log of what was played, so an unranked
  * map or a relax attempt belongs in it. Each row carries `counted` so the page can say
  * which of them reached Best Performance.
@@ -258,7 +295,7 @@ export function recentPlays(
       `SELECT ${playColumns(e)}, ${ppColumn(e)} AS pp
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ?
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
         ORDER BY s.played_at DESC
         LIMIT ?`,
     )
@@ -275,7 +312,7 @@ export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15)
               b.beatmapset_id, b.artist, b.title, b.version, b.creator
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ?
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
         GROUP BY s.beatmap_md5
         ORDER BY count DESC, last_played DESC
         LIMIT ?`,
@@ -297,7 +334,8 @@ export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15)
 /** Which mode to show on load: whichever the most recent tracked play was set on. */
 export function mostRecentMode(db: Db, profileId: number): Ruleset {
   const row = db
-    .prepare('SELECT mode FROM scores WHERE profile_id = ? ORDER BY played_at DESC LIMIT 1')
+    .prepare(`SELECT mode FROM scores s WHERE s.profile_id = ? AND ${visibleSql()}
+       ORDER BY s.played_at DESC LIMIT 1`)
     .get(profileId) as { mode: number } | undefined;
   return ((row?.mode ?? 0) as Ruleset);
 }
@@ -305,7 +343,8 @@ export function mostRecentMode(db: Db, profileId: number): Ruleset {
 /** Modes with at least one tracked play, so the tab bar can mark which are in use. */
 export function modesWithPlays(db: Db, profileId: number): Ruleset[] {
   const rows = db
-    .prepare('SELECT DISTINCT mode FROM scores WHERE profile_id = ? ORDER BY mode')
+    .prepare(`SELECT DISTINCT s.mode FROM scores s WHERE s.profile_id = ? AND ${visibleSql()}
+       ORDER BY s.mode`)
     .all(profileId) as { mode: number }[];
   return rows.map((r) => r.mode as Ruleset);
 }

@@ -69,6 +69,12 @@ CREATE TABLE IF NOT EXISTS scores (
   played_at       INTEGER NOT NULL,
   online_score_id TEXT,
   replay_path     TEXT,
+  -- Removed from the profile by the user. A hide rather than a DELETE: the replay is still
+  -- on disk, so a deleted row would be re-ingested and dedupe would no longer suppress it.
+  hidden_at       INTEGER,
+  -- Pinned to the profile, as on osu!. pin_order is the user's own ordering within a mode.
+  pinned_at       INTEGER,
+  pin_order       INTEGER,
   UNIQUE (profile_id, dedupe_key)
 );
 CREATE INDEX IF NOT EXISTS scores_profile_mode_pp ON scores (profile_id, mode, pp DESC);

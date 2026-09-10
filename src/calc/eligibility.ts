@@ -60,6 +60,18 @@ function mapStatuses(names: readonly string[] | undefined): number[] {
   return [...out].sort((a, b) => a - b);
 }
 
+/**
+ * Scores the user has not removed from the profile.
+ *
+ * This belongs on *every* query over `scores`, not only the ones that decide pp: a removed
+ * score must vanish from Recent Plays, Most Played, the play count and the level bar too,
+ * or it has not really been removed. It is separate from `countsSql` because it applies to
+ * queries that have nothing to do with eligibility.
+ */
+export function visibleSql(alias = 's'): string {
+  return `${alias}.hidden_at IS NULL`;
+}
+
 /** Statuses that award pp in osu!. */
 const RANKED_STATUSES = [Status.RANKED, Status.APPROVED];
 
@@ -111,7 +123,8 @@ function modsSql(e: Eligibility, alias: string): string {
  * Returned without a leading `AND` so callers read as `WHERE ... AND ${countsSql(e)}`.
  */
 export function countsSql(e: Eligibility, alias = 's'): string {
-  return `(${alias}.passed = 1
+  return `(${visibleSql(alias)}
+           AND ${alias}.passed = 1
            AND ${mapSql(e, alias)}
            AND ${modsSql(e, alias)}
            AND ${ppColumn(e, alias)} IS NOT NULL)`;

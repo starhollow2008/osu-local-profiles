@@ -2,7 +2,7 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { bonusPp, weightedTotal } from './pp.ts';
 import { levelFromScore } from './level.ts';
-import { countsSql, ppColumn, VANILLA, type Eligibility } from './eligibility.ts';
+import { countsSql, ppColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
 
 /**
  * The time-series and activity feed behind the profile page's chart, the Historical
@@ -83,7 +83,7 @@ export function buildHistory(
               b.title, b.artist, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ?
+        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
         ORDER BY s.played_at ASC`,
     )
     .all(profileId, mode) as {

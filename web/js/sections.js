@@ -89,7 +89,7 @@ function ppCell(play) {
  * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
  * accuracy, mods and pp stepping right.
  */
-export function playRow(play, { showWeight = false } = {}) {
+export function playRow(play, { showWeight = false, actions = false, reorderable = false } = {}) {
   const artist = play.artist ? ` <small class="play-detail__artist">by ${escapeHtml(play.artist)}</small>` : '';
   const title = maybeLink(
     beatmapHref(play),
@@ -110,7 +110,26 @@ export function playRow(play, { showWeight = false } = {}) {
 
   const stars = play.stars != null ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
 
-  return `<div class="play-detail">
+  /*
+   * One shared popover does the menu (see #playMenu), so a row only carries the button and
+   * the state the menu needs. Rendering a menu per row would put 100 hidden dialogs on the
+   * page and put each of them inside a container that clips them.
+   */
+  const menu = actions
+    ? `<button class="play-detail__menu" type="button" data-play-menu
+         data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}"
+         aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
+    : '';
+
+  // The drag handle is a convenience; the menu's Move up / Move down do the same job for
+  // anyone not using a mouse.
+  const grip = reorderable
+    ? '<div class="play-detail__grip" aria-hidden="true" title="Drag to reorder">&#8942;&#8942;</div>'
+    : '';
+
+  return `<div class="play-detail${reorderable ? ' play-detail--reorderable' : ''}"
+    data-score-id="${play.id}"${reorderable ? ' draggable="true"' : ''}>
+  ${grip}
   <div class="play-detail__group play-detail__group--top">
     <div class="play-detail__icon">${gradeBadge(play.grade)}</div>
     <div class="play-detail__detail">
@@ -134,6 +153,7 @@ export function playRow(play, { showWeight = false } = {}) {
       <div class="play-detail__mods">${modList(play.mods)}</div>
       ${pp}
     </div>
+    ${menu}
   </div>
 </div>`;
 }

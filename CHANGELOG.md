@@ -42,6 +42,21 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   draft nobody finished, and a never-submitted one exists only on your machine.
 - Independent of the mod setting: a Loved map played with Relax needs both before it counts.
 
+### Pinning and removing scores
+
+- Every score row has a **⋯** menu, matching the one on osu!'s own profile.
+- **Pin to profile** adds it to a new **Pinned** section above Best Performance. Pins are
+  per game mode and do not have to be top-100 plays -- pinning is for a play you are proud
+  of that pp does not reward, so an unranked or relax score can be pinned too.
+- Pinned scores can be dragged to reorder, or moved with the menu for anyone not using a
+  mouse. The order is saved.
+- **Remove from profile** -- which osu! itself has no equivalent for -- takes a score out of
+  every section and every total: pp, play count, ranked score, level, the charts, Most
+  Played, the mode tabs.
+- Removing never deletes. The score can be put back from Settings, under *Removed scores*.
+  A real delete would be re-imported from the replay still on disk, and with its dedupe key
+  gone it would return looking like a brand new play.
+
 ### Development
 
 - `npm run build:pp:local` refreshes `tools/pp/`, which `src/calc/official.ts` prefers over

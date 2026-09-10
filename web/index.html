@@ -119,6 +119,8 @@
 
   <section class="page-extra" id="section-top_ranks">
     <h2 class="title">Top Ranks</h2>
+    <h3 class="title title--sub title--sub-first">Pinned<span class="title__count" id="pinnedCount">0</span></h3>
+    <div id="pinnedPlays"></div>
     <h3 class="title title--sub">Best Performance<span class="title__count" id="topCount">0</span></h3>
     <div class="counting-note" id="countingNote" hidden></div>
     <div id="topRanks"></div>
@@ -135,6 +137,19 @@
   </section>
 </main>
 
+<!--
+  One popover shared by every score row. Rendering a menu inside each row would put a
+  hundred hidden dialogs on the page, each of them clipped by the row that contains it.
+-->
+<div class="play-menu" id="playMenu" role="menu" hidden>
+  <button type="button" data-act="pin" role="menuitem">Pin to profile</button>
+  <button type="button" data-act="unpin" role="menuitem">Unpin</button>
+  <button type="button" data-act="move-up" role="menuitem">Move up</button>
+  <button type="button" data-act="move-down" role="menuitem">Move down</button>
+  <div class="sep"></div>
+  <button type="button" class="danger" data-act="hide" role="menuitem">Remove from profile</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <div class="backdrop" id="settingsModal" hidden>
@@ -146,6 +161,15 @@
     </p>
 
     <div id="settingsFields"></div>
+
+    <div class="removed-scores" id="removedScores" hidden>
+      <h4>Removed scores<span class="title__count" id="removedCount">0</span></h4>
+      <p class="setting__hint">
+        Removing a score never deletes it. Put one back and it returns to every section and
+        to the totals.
+      </p>
+      <div class="removed-list" id="removedList"></div>
+    </div>
 
     <div class="profile-hint" id="settingsHint">&nbsp;</div>
 

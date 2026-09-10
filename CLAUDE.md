@@ -89,6 +89,13 @@ There is exactly one definition of "counts"; do not write `ranked = 1` in a new 
 Rows ingested before those columns existed have NULL in them and fall back to `ranked`;
 `POST /api/recompute` fills them in from the replays.
 
+**Removing a score is a hide, never a `DELETE`.** The replay stays in osu!'s file store, so
+a deleted row would be re-ingested the next time that file was noticed -- and with its
+`dedupe_key` gone, it would come back looking like a brand new score. `scores.hidden_at`
+is set instead, and `visibleSql()` in `src/calc/eligibility.ts` filters it out of *every*
+query over `scores`, not just the ones about pp: a removed score has to leave the play
+count and the level bar too, or it has not really been removed.
+
 **`tools/pp/` shadows the plain build.** `src/calc/official.ts` prefers it, and a stale copy
 there does not fail loudly -- it answers the *old* protocol and quietly returns values
 calculated the old way. After changing `Program.cs`, run `npm run build:pp:local`, not just
@@ -172,6 +179,7 @@ src/calc/official.ts   JSON-lines client for the .NET calculator
 src/calc/eligibility.ts  the single definition of "this score counts toward pp"
 src/settings.ts        per-profile settings, stored one row per key
 src/tracker/recompute.ts  recalculate stored scores in place from their replays
+src/scores.ts          pin, order pins, remove a score from the profile (a hide)
 tools/PpCalculator/    .NET helper wrapping osu!'s real difficulty/pp code
 src/http/              JSON API + SSE
 web/index.html         Phase 1 UI (plain; Vite + React planned for Phase 2)

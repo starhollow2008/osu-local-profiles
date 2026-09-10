@@ -97,6 +97,7 @@ let stats = null;
 let settings = {};
 let counting = null;
 let staleScores = 0;
+let hiddenScoreCount = 0;
 
 /* ---------------------------------------------------------------- header */
 
@@ -257,9 +258,20 @@ async function loadProfile() {
 
   renderCountingNote(data.counting);
 
+  // Held for the menu's Move up / Move down and for drag reordering, both of which work in
+  // terms of positions in this list.
+  pinnedIds = (data.pinned ?? []).map((p) => p.id);
+  $('pinnedCount').textContent = fmt(pinnedIds.length);
+  $('pinnedPlays').innerHTML = playList(data.pinned, {
+    actions: true,
+    reorderable: true,
+    empty: 'Nothing pinned. Use the menu on any score to pin it here.',
+  });
+
   $('topCount').textContent = fmt(data.top.length);
   $('topRanks').innerHTML = playList(data.top, {
     showWeight: true,
+    actions: true,
     empty:
       settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
         ? 'No plays with a pp value tracked yet.'
@@ -275,6 +287,7 @@ async function loadProfile() {
 
   $('recentCount').textContent = fmt(data.recent.length);
   $('recentPlays').innerHTML = playList(data.recent, {
+    actions: true,
     empty: 'Nothing yet - go set a play.',
   });
 }
@@ -285,6 +298,7 @@ async function loadState() {
   profiles = s.profiles ?? [];
   settings = s.settings ?? {};
   staleScores = s.staleScores ?? 0;
+  hiddenScoreCount = s.hiddenScores ?? 0;
   modesWithPlays = s.modesWithPlays ?? [];
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -355,6 +369,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('backfillModal').hidden) closeBackfill();
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
+  if (!$('playMenu').hidden) closePlayMenu();
 });
 
 /* ---------------------------------------------------------------- settings */
@@ -435,8 +450,61 @@ function renderSettingsFields() {
   $('settingsFields').onchange = applySettingDependencies;
 }
 
+/**
+ * The list of scores removed from the profile, so a removal can be undone.
+ *
+ * Fetched when the dialog opens rather than carried in /api/state: it is usually empty, and
+ * a profile that has removed a hundred scores should not send them with every poll.
+ */
+async function renderRemovedScores() {
+  const panel = $('removedScores');
+  panel.hidden = hiddenScoreCount === 0;
+  if (panel.hidden) return;
+
+  $('removedCount').textContent = fmt(hiddenScoreCount);
+  $('removedList').innerHTML = '<div class="setting__hint">Loading...</div>';
+
+  try {
+    const d = await scoreAction({ action: 'list-hidden' });
+    $('removedList').innerHTML = d.hidden
+      .map(
+        (h) => `<div class="removed-row">
+          <div class="removed-row__detail">
+            <div class="u-ellipsis">${escapeHtml(h.title)}${
+              h.version ? ` <span class="removed-row__version">[${escapeHtml(h.version)}]</span>` : ''
+            }</div>
+            <div class="removed-row__meta">
+              ${escapeHtml(h.grade)} &middot; ${pct(h.accuracy)} &middot;
+              ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmt(h.pp, 0)}pp` : ''}
+            </div>
+          </div>
+          <button type="button" data-restore="${h.id}">Put back</button>
+        </div>`,
+      )
+      .join('');
+  } catch (err) {
+    $('removedList').innerHTML = `<div class="setting__hint">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+$('removedList').onclick = async (e) => {
+  const button = e.target.closest('[data-restore]');
+  if (!button) return;
+  button.disabled = true;
+  try {
+    await scoreAction({ action: 'restore', id: Number(button.dataset.restore) });
+    toast('Score put back');
+    await Promise.all([loadState(), loadProfile()]);
+    await renderRemovedScores();
+  } catch (err) {
+    settingsHint(err.message, true);
+    button.disabled = false;
+  }
+};
+
 function openSettings() {
   setMenuOpen(false);
+  void renderRemovedScores();
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
   settingsHint(' ');
@@ -492,6 +560,152 @@ $('settingsSave').onclick = async () => {
     $('settingsSave').disabled = false;
   }
 };
+
+/* ------------------------------------------------------------ score actions */
+
+/*
+ * Pinning, ordering pins, and removing a score from the profile.
+ *
+ * Removing never deletes: the replay is still on disk, so a deleted row would come back on
+ * the next ingest -- and with its dedupe key gone, it would come back looking new. The
+ * server hides it instead, and the Settings dialog can put it back.
+ */
+
+let pinnedIds = [];
+
+async function scoreAction(payload) {
+  const r = await fetch('/api/scores', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error ?? 'that did not work');
+  return d;
+}
+
+function closePlayMenu() {
+  $('playMenu').hidden = true;
+  $('playMenu').dataset.id = '';
+}
+
+/**
+ * Open the shared popover beside the button that asked for it.
+ *
+ * Positioned in viewport coordinates and clamped to the right edge, because the row it
+ * belongs to is inside a panel that would otherwise clip it.
+ */
+function openPlayMenu(button) {
+  const menu = $('playMenu');
+  const id = Number(button.dataset.id);
+  const pinned = button.dataset.pinned === '1';
+  const index = pinnedIds.indexOf(id);
+
+  menu.dataset.id = String(id);
+  menu.querySelector('[data-act="pin"]').hidden = pinned;
+  menu.querySelector('[data-act="unpin"]').hidden = !pinned;
+  // Reordering only means something for a pin that has somewhere to go.
+  menu.querySelector('[data-act="move-up"]').hidden = !pinned || index <= 0;
+  menu.querySelector('[data-act="move-down"]').hidden =
+    !pinned || index < 0 || index >= pinnedIds.length - 1;
+
+  menu.hidden = false;
+  const box = button.getBoundingClientRect();
+  const width = menu.offsetWidth;
+  menu.style.left = `${Math.max(8, Math.min(box.right - width, window.innerWidth - width - 8))}px`;
+  menu.style.top = `${box.bottom + 4}px`;
+}
+
+document.addEventListener('click', (e) => {
+  const button = e.target.closest('[data-play-menu]');
+  if (button) {
+    e.stopPropagation();
+    const open = !$('playMenu').hidden && $('playMenu').dataset.id === button.dataset.id;
+    closePlayMenu();
+    if (!open) openPlayMenu(button);
+    return;
+  }
+  if (!e.target.closest('#playMenu')) closePlayMenu();
+});
+
+$('playMenu').onclick = async (e) => {
+  const button = e.target.closest('[data-act]');
+  if (!button) return;
+  const id = Number($('playMenu').dataset.id);
+  const act = button.dataset.act;
+  closePlayMenu();
+
+  try {
+    if (act === 'move-up' || act === 'move-down') {
+      const from = pinnedIds.indexOf(id);
+      const to = act === 'move-up' ? from - 1 : from + 1;
+      if (from < 0 || to < 0 || to >= pinnedIds.length) return;
+      const next = [...pinnedIds];
+      next.splice(to, 0, ...next.splice(from, 1));
+      await scoreAction({ action: 'reorder', ids: next });
+    } else {
+      await scoreAction({ action: act, id });
+      if (act === 'hide') toast('Removed from this profile - undo it in Settings');
+      if (act === 'pin') toast('Pinned');
+    }
+    await Promise.all([loadProfile(), loadState()]);
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
+/*
+ * Dragging to reorder pins. Native HTML5 drag and drop, no library: the list is short, and
+ * the menu's Move up / Move down does the same job for anyone not using a mouse.
+ */
+let draggingId = null;
+
+$('pinnedPlays').addEventListener('dragstart', (e) => {
+  const row = e.target.closest('[data-score-id]');
+  if (!row) return;
+  draggingId = Number(row.dataset.scoreId);
+  row.classList.add('play-detail--dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  // Firefox will not start a drag without data on the transfer.
+  e.dataTransfer.setData('text/plain', row.dataset.scoreId);
+});
+
+$('pinnedPlays').addEventListener('dragover', (e) => {
+  if (draggingId === null) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+});
+
+$('pinnedPlays').addEventListener('drop', async (e) => {
+  if (draggingId === null) return;
+  e.preventDefault();
+  const target = e.target.closest('[data-score-id]');
+  const id = draggingId;
+  draggingId = null;
+
+  const from = pinnedIds.indexOf(id);
+  const to = target ? pinnedIds.indexOf(Number(target.dataset.scoreId)) : pinnedIds.length - 1;
+  if (from < 0 || to < 0 || from === to) {
+    await loadProfile();
+    return;
+  }
+
+  const next = [...pinnedIds];
+  next.splice(to, 0, ...next.splice(from, 1));
+  try {
+    await scoreAction({ action: 'reorder', ids: next });
+  } catch (err) {
+    toast(err.message);
+  }
+  await loadProfile();
+});
+
+$('pinnedPlays').addEventListener('dragend', () => {
+  draggingId = null;
+  for (const el of $('pinnedPlays').querySelectorAll('.play-detail--dragging')) {
+    el.classList.remove('play-detail--dragging');
+  }
+});
 
 /* --------------------------------------------------------------- recompute */
 
@@ -903,6 +1117,11 @@ es.addEventListener('profiles', () => {
 // Settings only change the header, but a second tab open on the same profile should not
 // be left showing the old country.
 es.addEventListener('settings', () => loadState());
+// Pin, unpin and remove all change what the page should be showing.
+es.addEventListener('scores', () => {
+  loadProfile();
+  loadState();
+});
 // A recompute can run for a while on a large profile; report progress rather than looking
 // frozen. The final `recompute` event is handled by whoever started it.
 es.addEventListener('recompute-progress', (e) => {

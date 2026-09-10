@@ -11,6 +11,7 @@ import {
   modesWithPlays,
   mostPlayed,
   mostRecentMode,
+  pinnedPlays,
   recentPlays,
   topPlays,
 } from '../calc/stats.ts';
@@ -27,6 +28,13 @@ import {
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { eligibilityOf } from '../calc/eligibility.ts';
+import {
+  applyScoreAction,
+  hiddenCount,
+  hiddenScores,
+  reorderPins,
+  type ScoreAction,
+} from '../scores.ts';
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
@@ -159,6 +167,8 @@ export function startServer(opts: ServerOptions): http.Server {
         // Scores ingested before the eligibility columns existed. Non-zero means the
         // Settings dialog should offer a recompute rather than silently under-reporting.
         staleScores: opts.tracker.staleScores,
+        // Scores removed from the profile. They are never deleted, so they can be put back.
+        hiddenScores: hiddenCount(opts.db, current()),
         defaultMode: mostRecentMode(opts.db, current()),
         modesWithPlays: modesWithPlays(opts.db, current()),
         installs: opts.installs.map((i) => ({
@@ -186,6 +196,7 @@ export function startServer(opts: ServerOptions): http.Server {
         // ~200 countries is far too thin to interpolate per country.
         rank: estimateRank(stats.totalPp, mode),
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
+        pinned: pinnedPlays(opts.db, current(), mode, e),
         top: topPlays(opts.db, current(), mode, 100, e),
         recent: recentPlays(opts.db, current(), mode, 25, e),
         mostPlayed: mostPlayed(opts.db, current(), mode, 15),
@@ -268,6 +279,32 @@ export function startServer(opts: ServerOptions): http.Server {
           return json(res, { ok: true, ...result });
         } catch (e) {
           return json(res, { error: (e as Error).message }, 500);
+        }
+      });
+    }
+
+    /*
+     * Pinning, ordering pins, and removing a score from the profile.
+     *
+     * Removing is a hide rather than a delete -- the replay is still on disk, and a deleted
+     * row would be re-ingested with dedupe no longer able to suppress it. See src/scores.ts.
+     */
+    if (url.pathname === '/api/scores' && req.method === 'POST') {
+      return readBody(req, res, (body) => {
+        const action = String(body['action'] ?? '');
+        try {
+          if (action === 'reorder') {
+            const ids = Array.isArray(body['ids']) ? (body['ids'] as unknown[]).map(Number) : [];
+            reorderPins(opts.db, current(), ids);
+          } else if (action === 'list-hidden') {
+            return json(res, { hidden: hiddenScores(opts.db, current()) });
+          } else {
+            applyScoreAction(opts.db, current(), Number(body['id']), action as ScoreAction);
+          }
+          broadcast('scores', { action });
+          return json(res, { ok: true, hiddenScores: hiddenCount(opts.db, current()) });
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
         }
       });
     }

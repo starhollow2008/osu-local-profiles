@@ -1159,6 +1159,136 @@
   font-size: var(--fs-normal);
 }
 
+/* ======================================================================== */
+/* Score actions: pin, reorder, remove                                      */
+/* ======================================================================== */
+
+/*
+ * One popover shared by every score row, positioned in viewport coordinates. It lives at
+ * the end of <body> rather than inside a row because `.page-extra` would clip it, and
+ * because a hundred rows would otherwise mean a hundred hidden dialogs.
+ */
+.play-menu {
+  position: fixed;
+  min-width: 190px;
+  background-color: hsl(var(--hsl-b4));
+  border-radius: var(--radius-large);
+  padding: 5px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  z-index: 60;
+  text-align: left;
+}
+
+.play-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 11px;
+  border-radius: 5px;
+  font-size: var(--fs-normal-2);
+}
+
+.play-menu button:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.play-menu .sep {
+  height: 1px;
+  background-color: hsl(var(--hsl-b3));
+  margin: 4px 0;
+}
+
+.play-detail__menu {
+  flex: none;
+  align-self: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-base);
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-title-small-3);
+  line-height: 1;
+}
+
+.play-detail__menu:hover {
+  background-color: hsla(var(--hsl-b6), 0.5);
+  color: hsl(var(--hsl-c1));
+}
+
+.play-detail--reorderable {
+  position: relative;
+}
+
+.play-detail__grip {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+  letter-spacing: -2px;
+  cursor: grab;
+  user-select: none;
+}
+
+.play-detail--dragging {
+  opacity: 0.4;
+}
+
+/* --- the restore list in Settings --------------------------------------- */
+
+.removed-scores {
+  margin-top: 16px;
+  border-top: 1px solid hsl(var(--hsl-b3));
+  padding-top: 12px;
+}
+
+.removed-scores h4 {
+  margin: 0 0 4px;
+  font-size: var(--fs-title-small);
+  font-weight: 700;
+}
+
+.removed-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.removed-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  font-size: var(--fs-normal-2);
+}
+
+.removed-row__detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.removed-row__version,
+.removed-row__meta {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.removed-row button {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+.removed-row button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
 .backdrop {
   position: fixed;
   inset: 0;

@@ -314,6 +314,70 @@ check('Escape closes the profiles dialog', await shown('profilesModal'), 'none')
  * rows. This drives the renderer directly rather than saving a setting, so the check does
  * not depend on -- or change -- how the running profile is configured.
  */
+console.log('\nscore actions');
+check('the score menu is hidden on load', await shown('playMenu'), 'none');
+check(
+  'every score row offers one',
+  await evaluate(`(() => {
+    const rows = document.querySelectorAll('#recentPlays .play-detail');
+    if (rows.length === 0) return 'no scores tracked';
+    return [...rows].every((r) => r.querySelector('[data-play-menu]'));
+  })()`),
+  true,
+);
+check(
+  'the menu opens beside the row that asked for it',
+  await evaluate(`(() => {
+    const button = document.querySelector('#recentPlays [data-play-menu]');
+    if (!button) return 'no scores tracked';
+    button.click();
+    const menu = document.getElementById('playMenu');
+    if (getComputedStyle(menu).display === 'none') return 'stayed hidden';
+    // Positioned in viewport coordinates, so it must be on screen and near the button.
+    const m = menu.getBoundingClientRect();
+    const b = button.getBoundingClientRect();
+    return m.left >= 0 && m.right <= window.innerWidth && Math.abs(m.top - b.bottom) < 20;
+  })()`),
+  true,
+);
+check(
+  'an unpinned score is offered Pin, not Unpin',
+  await evaluate(`(() => {
+    const menu = document.getElementById('playMenu');
+    return JSON.stringify({
+      pin: menu.querySelector('[data-act=pin]').hidden,
+      unpin: menu.querySelector('[data-act=unpin]').hidden,
+      up: menu.querySelector('[data-act="move-up"]').hidden,
+    });
+  })()`),
+  JSON.stringify({ pin: false, unpin: true, up: true }),
+);
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes the score menu', await shown('playMenu'), 'none');
+
+await evaluate("document.querySelector('#recentPlays [data-play-menu]')?.click()");
+await evaluate('document.body.click()');
+check('clicking elsewhere closes it', await shown('playMenu'), 'none');
+
+check(
+  'the Pinned section is there, above Best Performance',
+  await evaluate(`(() => {
+    const pinned = document.getElementById('pinnedPlays');
+    const top = document.getElementById('topRanks');
+    return pinned.getBoundingClientRect().top < top.getBoundingClientRect().top;
+  })()`),
+  true,
+);
+check(
+  'an empty Pinned section says how to fill it',
+  await evaluate(
+    "document.querySelector('#pinnedPlays .u-empty')?.textContent.includes('pin it here') ?? 'not empty'",
+  ),
+  true,
+);
+
 console.log('\nunofficial scoring is disclosed');
 // The element is hidden via the `hidden` attribute on a styled div -- the same shape as the
 // bug this whole script exists for -- so check computed display, not just the attribute.

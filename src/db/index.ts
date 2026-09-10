@@ -31,6 +31,10 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'scores', column: 'map_status', definition: 'INTEGER' },
   { table: 'scores', column: 'mods_ranked', definition: 'INTEGER' },
   { table: 'scores', column: 'mods_countable', definition: 'INTEGER' },
+  // Added with pinning and removing scores.
+  { table: 'scores', column: 'hidden_at', definition: 'INTEGER' },
+  { table: 'scores', column: 'pinned_at', definition: 'INTEGER' },
+  { table: 'scores', column: 'pin_order', definition: 'INTEGER' },
 ];
 
 function migrate(db: Db): void {
