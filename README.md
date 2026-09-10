@@ -124,7 +124,7 @@ Two hosts are contacted, both public and unauthenticated, and both optional:
 
 | host | what for | if it fails |
 |---|---|---|
-| `assets.ppy.sh` | beatmap cover art, keyed by the beatmapset id already resolved offline | the placeholder colour shows instead |
+| `assets.ppy.sh` | beatmap cover art, and medal icons | a drawn placeholder shows instead |
 | `data.ppy.sh` | the rank-curve dumps, only when you run `npm run rank:refresh` by hand | nothing; the checked-in curves keep working |
 | `osu.ppy.sh` | one page fetch when you press **Look up** in Edit profile, to find a name, picture and banner | it says so; type a name and upload an image instead |
 
@@ -217,6 +217,33 @@ identity by definition, so it is never adopted without being asked for.
 
 Nothing here is required. With no picture the page draws an avatar from the profile's name,
 and the banner falls back to the cover art of the profile's best play.
+
+## Medals
+
+A Medals section mirroring osu!'s, restricted to the medals a local profile can actually
+decide for itself. The names, descriptions, icons and thresholds are osu!'s own, taken from
+its published achievement list by `node scripts/build-medal-table.mjs`.
+
+What exists is **not the same in every mode**, and that is osu!'s doing rather than a gap
+here:
+
+| family | osu!standard | taiko, catch, mania |
+|---|---|---|
+| Combo | 500 / 750 / 1,000 / 2,000 | none in osu! |
+| Plays | 5,000 / 15,000 / 25,000 / 50,000 | none in osu! |
+| Hits | none in osu! | four tiers, per mode |
+| Beatmap pass | 1★ to 10★ | 1★ to 8★ |
+| Beatmap full combo | 1★ to 10★ | 1★ to 8★ |
+| Rank | top 50,000 / 10,000 / 5,000 / 1,000 | the same four |
+
+Medals are **derived from the scores, never stored**: removing a score that earned one takes
+the medal with it. Two families are only as good as their inputs, and say so:
+
+- **Rank** medals use the estimated pp-to-rank curve, so they inherit its approximation.
+- **Full combo** needs the beatmap's own maximum combo. A lazer score can drop slider ends
+  without breaking combo, so "no misses" alone is not enough. Scores tracked before that
+  was recorded are reported as unknown rather than guessed either way; the section says how
+  many, and Settings can recalculate them.
 
 ## Rearranging the page
 

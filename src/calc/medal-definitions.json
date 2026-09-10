@@ -1,0 +1,686 @@
+{
+  "builtAt": "2026-09-10",
+  "source": "osu.ppy.sh profile page achievements payload",
+  "rank": [
+    {
+      "slug": "all-skill-highranker-1",
+      "name": "I Can See The Top",
+      "description": "Your dedication has paid off. Welcome to the top 50,000!",
+      "icon": "https://assets.ppy.sh/medals/web/all-skill-highranker-1.png",
+      "threshold": 50000
+    },
+    {
+      "slug": "all-skill-highranker-2",
+      "name": "The Gradual Rise",
+      "description": "There's no stopping you, is there? Welcome to the top 10,000!",
+      "icon": "https://assets.ppy.sh/medals/web/all-skill-highranker-2.png",
+      "threshold": 10000
+    },
+    {
+      "slug": "all-skill-highranker-3",
+      "name": "Scaling Up",
+      "description": "Welcome to the top 5,000. Never give up!",
+      "icon": "https://assets.ppy.sh/medals/web/all-skill-highranker-3.png",
+      "threshold": 5000
+    },
+    {
+      "slug": "all-skill-highranker-4",
+      "name": "Approaching The Summit",
+      "description": "Pro tier. Welcome to the top 1,000!",
+      "icon": "https://assets.ppy.sh/medals/web/all-skill-highranker-4.png",
+      "threshold": 1000
+    }
+  ],
+  "modes": {
+    "0": {
+      "combo": [
+        {
+          "slug": "osu-combo-500",
+          "name": "500 Combo",
+          "description": "500 big ones! You're moving up in the world!",
+          "icon": "https://assets.ppy.sh/medals/web/osu-combo-500.png",
+          "threshold": 500
+        },
+        {
+          "slug": "osu-combo-750",
+          "name": "750 Combo",
+          "description": "750 notes back to back? Woah.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-combo-750.png",
+          "threshold": 750
+        },
+        {
+          "slug": "osu-combo-1000",
+          "name": "1,000 Combo",
+          "description": "A thousand reasons why you rock at this game.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-combo-1000.png",
+          "threshold": 1000
+        },
+        {
+          "slug": "osu-combo-2000",
+          "name": "2,000 Combo",
+          "description": "Nothing can stop you now.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-combo-2000.png",
+          "threshold": 2000
+        }
+      ],
+      "plays": [
+        {
+          "slug": "osu-plays-5000",
+          "name": "5,000 Plays",
+          "description": "There's a lot more where that came from.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-plays-5000.png",
+          "threshold": 5000
+        },
+        {
+          "slug": "osu-plays-15000",
+          "name": "15,000 Plays",
+          "description": "Must.. click.. circles..",
+          "icon": "https://assets.ppy.sh/medals/web/osu-plays-15000.png",
+          "threshold": 15000
+        },
+        {
+          "slug": "osu-plays-25000",
+          "name": "25,000 Plays",
+          "description": "There's no going back.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-plays-25000.png",
+          "threshold": 25000
+        },
+        {
+          "slug": "osu-plays-50000",
+          "name": "50,000 Plays",
+          "description": "You're here forever.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-plays-50000.png",
+          "threshold": 50000
+        }
+      ],
+      "pass": [
+        {
+          "slug": "osu-skill-pass-1",
+          "name": "Rising Star",
+          "description": "Can't go forward without the first steps.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "osu-skill-pass-2",
+          "name": "Constellation Prize",
+          "description": "Definitely not a consolation prize. Now things start getting hard!",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "osu-skill-pass-3",
+          "name": "Building Confidence",
+          "description": "Oh, you've SO got this.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "osu-skill-pass-4",
+          "name": "Insanity Approaches",
+          "description": "You're not twitching, you're just ready.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "osu-skill-pass-5",
+          "name": "These Clarion Skies",
+          "description": "Everything seems so clear now.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "osu-skill-pass-6",
+          "name": "Above and Beyond",
+          "description": "A cut above the rest.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "osu-skill-pass-7",
+          "name": "Supremacy",
+          "description": "All marvel before your prowess.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "osu-skill-pass-8",
+          "name": "Absolution",
+          "description": "My god, you're full of stars!",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-8.png",
+          "threshold": 8
+        },
+        {
+          "slug": "osu-skill-pass-9",
+          "name": "Event Horizon",
+          "description": "No force dares to pull you under.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-9.png",
+          "threshold": 9
+        },
+        {
+          "slug": "osu-skill-pass-10",
+          "name": "Phantasm",
+          "description": "Fevered is your passion, extraordinary is your skill.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-pass-10.png",
+          "threshold": 10
+        }
+      ],
+      "fc": [
+        {
+          "slug": "osu-skill-fc-1",
+          "name": "Totality",
+          "description": "All the notes. Every single one.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "osu-skill-fc-2",
+          "name": "Business As Usual",
+          "description": "Two to go, please.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "osu-skill-fc-3",
+          "name": "Building Steam",
+          "description": "Hey, this isn't so bad.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "osu-skill-fc-4",
+          "name": "Moving Forward",
+          "description": "Bet you feel good about that.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "osu-skill-fc-5",
+          "name": "Paradigm Shift",
+          "description": "Surprisingly difficult.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "osu-skill-fc-6",
+          "name": "Anguish Quelled",
+          "description": "Don't choke.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "osu-skill-fc-7",
+          "name": "Never Give Up",
+          "description": "Excellence is its own reward.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "osu-skill-fc-8",
+          "name": "Aberration",
+          "description": "They said it couldn't be done. They were wrong.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-8.png",
+          "threshold": 8
+        },
+        {
+          "slug": "osu-skill-fc-9",
+          "name": "Chosen",
+          "description": "Reign among the Prometheans, where you belong.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-9.png",
+          "threshold": 9
+        },
+        {
+          "slug": "osu-skill-fc-10",
+          "name": "Unfathomable",
+          "description": "You have no equal.",
+          "icon": "https://assets.ppy.sh/medals/web/osu-skill-fc-10.png",
+          "threshold": 10
+        }
+      ]
+    },
+    "1": {
+      "hits": [
+        {
+          "slug": "taiko-hits-30000",
+          "name": "30,000 Drum Hits",
+          "description": "Did that drum have a face?",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-hits-30000.png",
+          "threshold": 30000
+        },
+        {
+          "slug": "taiko-hits-300000",
+          "name": "300,000 Drum Hits",
+          "description": "The rhythm never stops.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-hits-300000.png",
+          "threshold": 300000
+        },
+        {
+          "slug": "taiko-hits-3000000",
+          "name": "3,000,000 Drum Hits",
+          "description": "Truly, the Don of dons.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-hits-3000000.png",
+          "threshold": 3000000
+        },
+        {
+          "slug": "taiko-hits-30000000",
+          "name": "30,000,000 Drum Hits",
+          "description": "Your rhythm, eternal.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-hits-30000000.png",
+          "threshold": 30000000
+        }
+      ],
+      "pass": [
+        {
+          "slug": "taiko-skill-pass-1",
+          "name": "My First Don",
+          "description": "Marching to the beat of your own drum. Literally.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "taiko-skill-pass-2",
+          "name": "Katsu Katsu Katsu",
+          "description": "Hora! Ikuzo!",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "taiko-skill-pass-3",
+          "name": "Not Even Trying",
+          "description": "Muzukashii? Not even.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "taiko-skill-pass-4",
+          "name": "Face Your Demons",
+          "description": "The first trials are now behind you, but are you a match for the Oni?",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "taiko-skill-pass-5",
+          "name": "The Demon Within",
+          "description": "No rest for the wicked.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "taiko-skill-pass-6",
+          "name": "Drumbreaker",
+          "description": "Too strong.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "taiko-skill-pass-7",
+          "name": "The Godfather",
+          "description": "You are the Don of Dons.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "taiko-skill-pass-8",
+          "name": "Rhythm Incarnate",
+          "description": "Feel the beat. Become the beat.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-pass-8.png",
+          "threshold": 8
+        }
+      ],
+      "fc": [
+        {
+          "slug": "taiko-skill-fc-1",
+          "name": "Keeping Time",
+          "description": "Don, then katsu. Don, then katsu..",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "taiko-skill-fc-2",
+          "name": "To Your Own Beat",
+          "description": "Straight and steady.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "taiko-skill-fc-3",
+          "name": "Big Drums",
+          "description": "Bigger scores to match.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "taiko-skill-fc-4",
+          "name": "Adversity Overcome",
+          "description": "Difficult? Not for you.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "taiko-skill-fc-5",
+          "name": "Demonslayer",
+          "description": "An Oni felled forevermore.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "taiko-skill-fc-6",
+          "name": "Rhythm's Call",
+          "description": "Heralding true skill.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "taiko-skill-fc-7",
+          "name": "Time Everlasting",
+          "description": "Not a single beat escapes you.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "taiko-skill-fc-8",
+          "name": "The Drummer's Throne",
+          "description": "Percussive brilliance befitting royalty alone.",
+          "icon": "https://assets.ppy.sh/medals/web/taiko-skill-fc-8.png",
+          "threshold": 8
+        }
+      ]
+    },
+    "2": {
+      "hits": [
+        {
+          "slug": "fruits-hits-20000",
+          "name": "Catch 20,000 fruits",
+          "description": "That is a lot of dietary fiber.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-hits-20000.png",
+          "threshold": 20000
+        },
+        {
+          "slug": "fruits-hits-200000",
+          "name": "Catch 200,000 fruits",
+          "description": "So, I heard you like fruit...",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-hits-200000.png",
+          "threshold": 200000
+        },
+        {
+          "slug": "fruits-hits-2000000",
+          "name": "Catch 2,000,000 fruits",
+          "description": "Downright healthy.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-hits-2000000.png",
+          "threshold": 2000000
+        },
+        {
+          "slug": "fruits-hits-20000000",
+          "name": "Catch 20,000,000 fruits",
+          "description": "Nothing left behind.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-hits-20000000.png",
+          "threshold": 20000000
+        }
+      ],
+      "pass": [
+        {
+          "slug": "fruits-skill-pass-1",
+          "name": "A Slice Of Life",
+          "description": "Hey, this fruit catching business isn't bad.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "fruits-skill-pass-2",
+          "name": "Dashing Ever Forward",
+          "description": "Fast is how you do it.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "fruits-skill-pass-3",
+          "name": "Zesty Disposition",
+          "description": "No scurvy for you, not with that much fruit.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "fruits-skill-pass-4",
+          "name": "Hyperdash ON!",
+          "description": "Time and distance is no obstacle to you.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "fruits-skill-pass-5",
+          "name": "It's Raining Fruit",
+          "description": "And you can catch them all.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "fruits-skill-pass-6",
+          "name": "Fruit Ninja",
+          "description": "Legendary techniques.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "fruits-skill-pass-7",
+          "name": "Dreamcatcher",
+          "description": "No fruit, only dreams now.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "fruits-skill-pass-8",
+          "name": "Lord of the Catch",
+          "description": "Your kingdom kneels before you.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-pass-8.png",
+          "threshold": 8
+        }
+      ],
+      "fc": [
+        {
+          "slug": "fruits-skill-fc-1",
+          "name": "Sweet And Sour",
+          "description": "Apples and oranges, literally.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "fruits-skill-fc-2",
+          "name": "Reaching The Core",
+          "description": "The seeds of future success.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "fruits-skill-fc-3",
+          "name": "Clean Platter",
+          "description": "Clean only of failure. It is completely full, otherwise.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "fruits-skill-fc-4",
+          "name": "Between The Rain",
+          "description": "No umbrella needed.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "fruits-skill-fc-5",
+          "name": "Addicted",
+          "description": "That was an overdose?",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "fruits-skill-fc-6",
+          "name": "Quickening",
+          "description": "A dash above normal limits.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "fruits-skill-fc-7",
+          "name": "Supersonic",
+          "description": "Faster than is reasonably necessary.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "fruits-skill-fc-8",
+          "name": "Dashing Scarlet",
+          "description": "Speed beyond mortal reckoning.",
+          "icon": "https://assets.ppy.sh/medals/web/fruits-skill-fc-8.png",
+          "threshold": 8
+        }
+      ]
+    },
+    "3": {
+      "hits": [
+        {
+          "slug": "mania-hits-40000",
+          "name": "40,000 Keys",
+          "description": "Just the start of the rainbow.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-hits-40000.png",
+          "threshold": 40000
+        },
+        {
+          "slug": "mania-hits-400000",
+          "name": "400,000 Keys",
+          "description": "Four hundred thousand and still not even close.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-hits-400000.png",
+          "threshold": 400000
+        },
+        {
+          "slug": "mania-hits-4000000",
+          "name": "4,000,000 Keys",
+          "description": "Is this the end of the rainbow?",
+          "icon": "https://assets.ppy.sh/medals/web/mania-hits-4000000.png",
+          "threshold": 4000000
+        },
+        {
+          "slug": "mania-hits-40000000",
+          "name": "40,000,000 Keys",
+          "description": "When someone asks which keys you play, the answer is now 'yes'.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-hits-40000000.png",
+          "threshold": 40000000
+        }
+      ],
+      "pass": [
+        {
+          "slug": "mania-skill-pass-1",
+          "name": "First Steps",
+          "description": "It isn't 9-to-5, but 1-to-9. Keys, that is.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "mania-skill-pass-2",
+          "name": "No Normal Player",
+          "description": "Not anymore, at least.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "mania-skill-pass-3",
+          "name": "Impulse Drive",
+          "description": "Not quite hyperspeed, but getting close.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "mania-skill-pass-4",
+          "name": "Hyperspeed",
+          "description": "Woah.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "mania-skill-pass-5",
+          "name": "Ever Onwards",
+          "description": "Another challenge is just around the corner.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "mania-skill-pass-6",
+          "name": "Another Surpassed",
+          "description": "Is there no limit to your skills?",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "mania-skill-pass-7",
+          "name": "Extra Credit",
+          "description": "See me after class.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "mania-skill-pass-8",
+          "name": "Maniac",
+          "description": "There's just no stopping you.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-pass-8.png",
+          "threshold": 8
+        }
+      ],
+      "fc": [
+        {
+          "slug": "mania-skill-fc-1",
+          "name": "Keystruck",
+          "description": "The beginning of a new story.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-1.png",
+          "threshold": 1
+        },
+        {
+          "slug": "mania-skill-fc-2",
+          "name": "Keying In",
+          "description": "Finding your groove.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-2.png",
+          "threshold": 2
+        },
+        {
+          "slug": "mania-skill-fc-3",
+          "name": "Hyperflow",
+          "description": "You can *feel* the rhythm.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-3.png",
+          "threshold": 3
+        },
+        {
+          "slug": "mania-skill-fc-4",
+          "name": "Breakthrough",
+          "description": "Many skills mastered, rolled into one.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-4.png",
+          "threshold": 4
+        },
+        {
+          "slug": "mania-skill-fc-5",
+          "name": "Everything Extra",
+          "description": "Giving your all is giving everything you have.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-5.png",
+          "threshold": 5
+        },
+        {
+          "slug": "mania-skill-fc-6",
+          "name": "Level Breaker",
+          "description": "Finesse beyond reason.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-6.png",
+          "threshold": 6
+        },
+        {
+          "slug": "mania-skill-fc-7",
+          "name": "Step Up",
+          "description": "A precipice rarely seen.",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-7.png",
+          "threshold": 7
+        },
+        {
+          "slug": "mania-skill-fc-8",
+          "name": "Behind The Veil",
+          "description": "Supernatural!",
+          "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-8.png",
+          "threshold": 8
+        }
+      ]
+    }
+  }
+}

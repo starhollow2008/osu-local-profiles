@@ -1161,6 +1161,106 @@
 }
 
 /* ======================================================================== */
+/* Medals                                                                   */
+/* ======================================================================== */
+
+.medal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 14px 10px;
+  margin-bottom: 22px;
+}
+
+.medal {
+  text-align: center;
+  min-width: 0;
+}
+
+/*
+ * osu!'s own icon sits on top of a drawn placeholder, exactly as beatmap covers do: a
+ * request that fails -- or a page opened offline -- still shows a complete medal instead of
+ * a broken image.
+ */
+.medal__icon {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 6px;
+}
+
+.medal__icon img,
+.medal__placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.medal__icon img {
+  object-fit: contain;
+}
+
+/*
+ * osu! ships one icon per medal, so a locked one is dimmed here rather than fetched. The
+ * whole tile fades, not only the picture: several of osu!'s skill medals are silver to
+ * begin with, and greyscale alone barely separates them from an earned one.
+ */
+.medal--locked {
+  opacity: 0.5;
+}
+
+.medal--locked .medal__icon img,
+.medal--locked .medal__placeholder {
+  filter: grayscale(1) brightness(0.6);
+}
+
+/* And an earned one is lifted, so the two are told apart at a glance. */
+.medal:not(.medal--locked) .medal__icon {
+  filter: drop-shadow(0 0 6px hsla(var(--hsl-h1), 0.35));
+}
+
+.medal__name {
+  font-size: var(--fs-normal-2);
+  font-weight: 600;
+  color: hsl(var(--hsl-c1));
+}
+
+.medal__detail {
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+  line-height: 1.35;
+}
+
+.medal--locked .medal__name {
+  color: hsl(var(--hsl-l1));
+}
+
+.medal__progress {
+  height: 3px;
+  margin: 5px auto 0;
+  width: 68px;
+  border-radius: 2px;
+  background-color: hsl(var(--hsl-b6));
+  overflow: hidden;
+}
+
+.medal__progress-fill {
+  height: 100%;
+  background-color: hsl(var(--hsl-h1));
+}
+
+.medals-note {
+  margin: 0 0 16px;
+  padding: 8px 11px;
+  border-left: 3px solid var(--rank-b);
+  border-radius: 5px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal-2);
+}
+
+/* ======================================================================== */
 /* Section order                                                            */
 /* ======================================================================== */
 

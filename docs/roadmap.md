@@ -20,8 +20,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.5  | Editable identity + linked osu! account       | done   |
 | 5.6  | `me!` section                                 | done   |
 | 5.7  | Draggable section order                       | done   |
-| 5.8  | Medals                                        | in progress |
-| 5.9  | Share: screenshot and standalone HTML         | todo   |
+| 5.8  | Medals                                        | done   |
+| 5.9  | Share: screenshot and standalone HTML         | in progress |
 | 5.10 | macOS and Linux support                       | todo   |
 
 Ordering is by dependency, not by the order they were written down. 5.1 is the foundation
@@ -312,15 +312,16 @@ code appends it cleanly to an existing saved order.
 
 ## 5.8 — Medals
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** A Medals section mirroring the official profile's, restricted to the medals that
 are actually computable from local data:
 
-- **Combo**: 500, 750, 1000, 2000
-- **Play count**: 5,000 · 15,000 · 25,000 · 50,000
-- **Rank**: top 50,000 · 10,000 · 5,000 · 1,000
-- **Beatmap pass** and **FC**, 1★ through 10★
+- **Combo**: 500, 750, 1000, 2000 — *osu!standard only; osu! has no others*
+- **Play count**: 5,000 · 15,000 · 25,000 · 50,000 — *osu!standard only*
+- **Hit count**: four tiers — *the other three modes' equivalent, which osu! does have*
+- **Rank**: top 50,000 · 10,000 · 5,000 · 1,000 — real osu! medals, all modes
+- **Beatmap pass** and **FC**: 1★–10★ for osu!standard, 1★–8★ elsewhere
 
 **Decisions.**
 - Derived on the fly from stored scores, not stored as awards — the same reasoning as
@@ -332,9 +333,11 @@ are actually computable from local data:
   losses on lazer scores, which is why the map's own value is needed rather than a guess).
 - **Rank medals** use the estimated rank curve, so they are estimates and say so — the same
   disclaimer the Global Ranking panel already carries.
-- **Artwork**: official medal images from `assets.ppy.sh` when reachable, cached to `data/`;
-  a generated SVG medal in the project's own style otherwise, so the section is never empty
-  offline. Same pattern as beatmap covers today.
+- **Artwork and every name**: taken from osu!'s *published achievement list*, which the
+  profile-page payload already carries -- so `scripts/build-medal-table.mjs` generates
+  `medal-definitions.json` rather than anyone typing names out. That is what revealed the
+  asymmetry above. The icons load from `assets.ppy.sh` over a drawn placeholder, exactly as
+  beatmap covers do, so the section is complete offline.
 - Locked medals are shown greyed with their requirement, as osu! does.
 
 **Plan.** `src/calc/medals.ts` (pure, tested against fixture score sets), the section markup,
@@ -347,7 +350,7 @@ renders offline, and `test/medals.test.ts` covers each family including the boun
 
 ## 5.9 — Share: screenshot and standalone HTML
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** Hand someone else the profile. Three ways, in increasing fidelity:
 

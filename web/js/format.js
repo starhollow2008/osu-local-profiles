@@ -45,6 +45,15 @@ export function fullDate(ms) {
   return new Date(ms).toLocaleString();
 }
 
+/** "9 Sep 2026" -- a date with no time, for somewhere too narrow to carry one. */
+export function shortDate(ms) {
+  return new Date(ms).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 /** "Sep 2026" -- the x-axis label on the monthly playcount chart. */
 export function monthLabel(ms) {
   return new Date(ms).toLocaleDateString(undefined, {

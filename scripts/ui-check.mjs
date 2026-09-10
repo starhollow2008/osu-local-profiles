@@ -189,6 +189,65 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nmedals');
+check(
+  'the medal grid is rendered',
+  await evaluate("document.querySelectorAll('#medalGroups .medal').length > 0"),
+  true,
+);
+check(
+  'the section header counts earned against total',
+  await evaluate(`(() => {
+    const parts = document.getElementById('medalCount').textContent.split(' / ');
+    if (parts.length !== 2) return 'not a fraction';
+    const [earned, total] = parts.map((p) => Number(p.replace(/,/g, '')));
+    // Both real numbers, and you cannot have earned more than exist.
+    return Number.isFinite(earned) && total > 0 && earned <= total;
+  })()`),
+  true,
+);
+/*
+ * Every medal carries osu!'s own icon over a drawn placeholder, so a failed request -- or a
+ * page opened with no network -- still shows a complete medal rather than a broken image.
+ */
+check(
+  'each medal has both an icon and a drawn fallback',
+  await evaluate(`(() => {
+    const medals = [...document.querySelectorAll('.medal')];
+    return medals.every(
+      (m) => m.querySelector('.medal__icon img') && m.querySelector('svg.medal__placeholder'),
+    );
+  })()`),
+  true,
+);
+check(
+  'the fallback is behind the icon, not beside it',
+  await evaluate(`(() => {
+    const icon = document.querySelector('.medal__icon');
+    const img = icon.querySelector('img').getBoundingClientRect();
+    const svg = icon.querySelector('svg').getBoundingClientRect();
+    return Math.abs(img.top - svg.top) < 1 && Math.abs(img.left - svg.left) < 1;
+  })()`),
+  true,
+);
+check(
+  'a locked medal says what it needs',
+  await evaluate(`(() => {
+    const locked = document.querySelector('.medal--locked');
+    if (!locked) return 'every medal is earned';
+    return locked.querySelector('.medal__detail').textContent.trim().length > 0;
+  })()`),
+  true,
+);
+// The star families are not running totals, so a progress bar there would be nonsense.
+check(
+  'star medals show no progress bar',
+  await evaluate(
+    "[...document.querySelectorAll('.medal')].filter((m) => /star beatmap/.test(m.title)).every((m) => !m.querySelector('.medal__progress'))",
+  ),
+  true,
+);
+
 console.log('\nsection order');
 check(
   'every section has reorder controls',
@@ -667,7 +726,7 @@ check(
   await evaluate(
     "[...document.querySelectorAll('.page-extra')].map((s) => s.id).sort().join(',')",
   ),
-  'section-historical,section-me,section-recent,section-top_ranks',
+  'section-historical,section-me,section-medals,section-recent,section-top_ranks',
 );
 // Consecutive headings must stack: they were inline-block once, which overlapped
 // "Top Ranks" with "Best Performance".

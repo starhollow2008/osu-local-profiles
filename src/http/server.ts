@@ -16,6 +16,7 @@ import {
   topPlays,
 } from '../calc/stats.ts';
 import { buildHistory } from '../calc/history.ts';
+import { computeMedals } from '../calc/medals.ts';
 import { estimateRank, rankTable } from '../calc/rank.ts';
 import {
   activeProfileId,
@@ -192,6 +193,7 @@ export function startServer(opts: ServerOptions): http.Server {
         // ~200 countries is far too thin to interpolate per country.
         rank: estimateRank(stats.totalPp, mode),
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
+        medals: computeMedals(opts.db, current(), mode, e),
         pinned: pinnedPlays(opts.db, current(), mode, e),
         top: topPlays(opts.db, current(), mode, 100, e),
         recent: recentPlays(opts.db, current(), mode, 25, e),

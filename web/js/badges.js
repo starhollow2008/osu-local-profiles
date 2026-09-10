@@ -205,3 +205,44 @@ export function generatedAvatar(name) {
         font-family="var(--font-default)">${escapeHtml(initial)}</text>
 </svg>`;
 }
+
+/*
+ * Medal colours by family, loosely following osu!'s own: combo and hits are the warm
+ * "dedication" side, the skill families are cooler as they get harder.
+ */
+const MEDAL_HUE = { combo: 42, plays: 28, hits: 28, rank: 275, pass: 200, fc: 330 };
+
+/**
+ * A drawn stand-in for a medal image.
+ *
+ * osu!'s own icons are loaded over the top of this, the same arrangement beatmap covers
+ * use: the placeholder sits underneath, so a request that fails -- or a page opened with no
+ * network at all -- still shows a complete medal rather than a broken image.
+ */
+export function medalPlaceholder(medal) {
+  const hue = MEDAL_HUE[medal.family] ?? 210;
+  const locked = medal.achievedAt === null;
+  const grad = nextId('mgrad');
+
+  // A star level is worth showing on the face; a five-digit combo is not.
+  const stamp = medal.family === 'pass' || medal.family === 'fc' ? String(medal.threshold) : '';
+
+  return `<svg class="medal__placeholder" viewBox="0 0 100 100" aria-hidden="true">
+  <defs>
+    <radialGradient id="${grad}" cx="0.4" cy="0.32" r="0.85">
+      <stop offset="0" stop-color="hsl(${hue}, ${locked ? 8 : 62}%, ${locked ? 34 : 62}%)"/>
+      <stop offset="1" stop-color="hsl(${hue}, ${locked ? 6 : 55}%, ${locked ? 18 : 28}%)"/>
+    </radialGradient>
+  </defs>
+  <circle cx="50" cy="50" r="44" fill="url(#${grad})"/>
+  <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(0,0,0,.35)" stroke-width="3"/>
+  <circle cx="50" cy="50" r="31" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="2"/>
+  ${
+    stamp
+      ? `<text x="50" y="52" text-anchor="middle" dominant-baseline="central"
+              font-size="34" font-weight="700" fill="rgba(255,255,255,.85)"
+              font-family="var(--font-default)">${escapeHtml(stamp)}</text>`
+      : ''
+  }
+</svg>`;
+}

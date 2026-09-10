@@ -5,8 +5,14 @@
  * refetch followed by a re-render of the affected block, which is plenty for a page that
  * changes once every few minutes when a play lands.
  */
-import { MODE_NAMES, escapeHtml, fmt, pct } from './format.js';
-import { coverUrl, generatedAvatar, gradeBadge, levelBadge } from './badges.js';
+import { MODE_NAMES, escapeHtml, fmt, fullDate, pct, shortDate } from './format.js';
+import {
+  coverUrl,
+  generatedAvatar,
+  gradeBadge,
+  levelBadge,
+  medalPlaceholder,
+} from './badges.js';
 import { playcountChart, ppChart, rankChart } from './charts.js';
 import {
   aboutHtml,
@@ -22,6 +28,7 @@ const SECTIONS = [
   ['me', 'me!'],
   ['recent', 'Recent'],
   ['top_ranks', 'Top Ranks'],
+  ['medals', 'Medals'],
   ['historical', 'Historical'],
 ];
 
@@ -239,6 +246,116 @@ function renderCountingNote(next) {
   $('countingNote').hidden = text === '';
 }
 
+/**
+ * The Medals section, grouped the way osu! groups it.
+ *
+ * osu!'s own icon is used where it loads, over a generated placeholder that stays visible
+ * if it does not -- the same arrangement as beatmap covers, and for the same reason: the
+ * page has to be complete with no network.
+ */
+
+/** Labels for each family, and the order they appear in. */
+const MEDAL_GROUPS = [
+  ['combo', 'Combo'],
+  ['hits', 'Hits'],
+  ['plays', 'Plays'],
+  ['rank', 'Rank'],
+  ['pass', 'Beatmap Pass'],
+  ['fc', 'Beatmap Full Combo'],
+];
+
+/** What a locked medal still needs, said in the family's own terms. */
+function medalRequirement(medal) {
+  switch (medal.family) {
+    case 'combo':
+      return `Reach a combo of ${fmt(medal.threshold)}`;
+    case 'plays':
+      return `Play ${fmt(medal.threshold)} times`;
+    case 'hits':
+      return `Land ${fmt(medal.threshold)} hits`;
+    case 'rank':
+      return `Reach the top ${fmt(medal.threshold)}`;
+    case 'pass':
+      return `Pass a ${medal.threshold}-star beatmap`;
+    case 'fc':
+      return `Full combo a ${medal.threshold}-star beatmap`;
+    default:
+      return '';
+  }
+}
+
+function medalTile(medal) {
+  const earned = medal.achievedAt !== null;
+
+  /*
+   * Earned medals show the date and nothing else. The beatmap that earned it is worth
+   * knowing but not worth five wrapped lines in a 104px tile, so it goes in the tooltip.
+   */
+  const detail = earned ? shortDate(medal.achievedAt) : medalRequirement(medal);
+
+  // A percentage only means something for the families that are a running total.
+  const bar =
+    !earned && medal.progress !== null && medal.progress > 0
+      ? `<div class="medal__progress" title="${Math.round(medal.progress * 100)}% of the way there">
+           <div class="medal__progress-fill" style="width: ${Math.round(medal.progress * 100)}%"></div>
+         </div>`
+      : '';
+
+  const tooltip = [
+    medal.name,
+    medal.description,
+    earned
+      ? `Earned ${fullDate(medal.achievedAt)}${medal.earnedOn ? ` on ${medal.earnedOn}` : ''}`
+      : medalRequirement(medal),
+  ].join(' - ');
+
+  return `<div class="medal${earned ? '' : ' medal--locked'}" title="${escapeHtml(tooltip)}">
+    <div class="medal__icon">
+      ${medalPlaceholder(medal)}
+      <img src="${escapeHtml(medal.icon)}" alt="" loading="lazy">
+    </div>
+    <div class="medal__name u-ellipsis">${escapeHtml(medal.name)}</div>
+    <div class="medal__detail">${escapeHtml(detail)}</div>
+    ${bar}
+  </div>`;
+}
+
+function renderMedals(summary) {
+  if (!summary) return;
+
+  $('medalCount').textContent = `${fmt(summary.earned)} / ${fmt(summary.total)}`;
+
+  /*
+   * An FC cannot be told from a near-miss without the beatmap's own maximum combo, which
+   * older scores were never given. Say so rather than quietly under-awarding, and point at
+   * the fix.
+   */
+  const note = $('medalsNote');
+  if (summary.fcUnknown > 0) {
+    note.hidden = false;
+    note.textContent =
+      `${fmt(summary.fcUnknown)} play${summary.fcUnknown === 1 ? '' : 's'} ` +
+      `${summary.fcUnknown === 1 ? 'was' : 'were'} tracked before this app recorded each ` +
+      "beatmap's maximum combo, so a full combo cannot be told apart from a near-miss on " +
+      'them. Settings can recalculate those from their replay files.';
+  } else {
+    note.hidden = true;
+  }
+
+  const groups = MEDAL_GROUPS.map(([family, label]) => {
+    const medals = summary.medals.filter((m) => m.family === family);
+    if (medals.length === 0) return '';
+    const earned = medals.filter((m) => m.achievedAt !== null).length;
+    return `<h3 class="title title--sub">${escapeHtml(label)}
+        <span class="title__count">${fmt(earned)} / ${fmt(medals.length)}</span>
+      </h3>
+      <div class="medal-grid">${medals.map(medalTile).join('')}</div>`;
+  }).join('');
+
+  $('medalGroups').innerHTML =
+    groups || '<div class="u-empty">No medals apply to this mode yet.</div>';
+}
+
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
@@ -258,6 +375,7 @@ async function loadProfile() {
   $('recentActivity').innerHTML = activityList(data.events);
 
   renderCountingNote(data.counting);
+  renderMedals(data.medals);
 
   // Held for the menu's Move up / Move down and for drag reordering, both of which work in
   // terms of positions in this list.

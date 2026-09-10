@@ -42,6 +42,22 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   draft nobody finished, and a never-submitted one exists only on your machine.
 - Independent of the mod setting: a Loved map played with Relax needs both before it counts.
 
+### Medals
+
+- A Medals section mirroring osu!'s: combo, plays, hits, rank, and beatmap pass and full
+  combo by star rating.
+- Names, descriptions, icons and thresholds are **osu!'s own**, taken from its published
+  achievement list by `node scripts/build-medal-table.mjs` rather than typed out. That is
+  also how it came to light that combo and play-count medals exist for osu!standard only,
+  that the other modes have hit-count medals in their place, and that star tiers run to 10
+  for osu!standard and to 8 elsewhere.
+- Derived from the scores rather than stored, so removing a score that earned a medal takes
+  the medal with it, and a reingest can never leave a stale one behind.
+- Full combo requires the beatmap's own maximum combo, not merely no misses: a lazer score
+  can drop slider ends without breaking combo. Scores tracked before that was recorded are
+  reported as unknown rather than guessed, and the section says how many.
+- osu!'s medal icons load over a drawn placeholder, so the section is complete offline.
+
 ### Rearranging the page
 
 - Sections can be reordered, and the order is saved with the profile -- as osu! remembers
