@@ -25,6 +25,11 @@ sections, medals, and sharing. It is planned feature by feature in
 failed run leaves no replay, and that was over half the play count -- along with macOS and
 Linux support, and a profile page that pages and charts the way osu!'s own does.
 
+**v1.3.0** makes the page look like osu!'s rather than nearly like it -- country flags, the
+gold on an SS, and mod badges drawn the way osu! draws them -- and adds a one-click update
+that installs the newest release and restarts, keeping your `data/` folder untouched and the
+files it replaces in a rollback copy.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
