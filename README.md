@@ -19,7 +19,11 @@ imported deliberately, several playstyles can be tracked side by side, and
 **Phase 5 is released as v1.1.0**: settings, pp for unranked mods and beatmaps, pinned and
 removable scores, an editable name/picture/banner, the `me!` section, rearrangeable
 sections, medals, and sharing. It is planned feature by feature in
-[docs/roadmap.md](docs/roadmap.md); macOS and Linux support is deferred to a later phase.
+[docs/roadmap.md](docs/roadmap.md).
+
+**v1.2.0** adds the plays osu! counts and this app could not see -- a quit, a retry or a
+failed run leaves no replay, and that was over half the play count -- along with macOS and
+Linux support, and a profile page that pages and charts the way osu!'s own does.
 
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --

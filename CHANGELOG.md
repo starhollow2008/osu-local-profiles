@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0
 
 ### Fixed
 
@@ -86,16 +86,16 @@ was missing well over half of itself.
 Along the way, two things worth knowing were established from ppy/osu and this machine's
 2,433-replay corpus, and are written down in `CLAUDE.md`:
 
-osu!stable is not covered: it has the same gap, but where a stable install records an
-unfinished play -- if it does at all -- could not be established without one to inspect.
-`docs/roadmap.md` **5.12** holds the leads, what is already ruled out, and the measurement
-to run first.
-
 - osu! applies **no minimum object count** to a play. It submits a fail or a quit as long as
   a token was issued, at least one non-miss judgement landed, and the score is above zero.
 - Every rank-`F` replay on disk is a **multiplayer** play, where failing only marks the
   score `F` instead of ending the map. All 22 of them judged 100% of their beatmap; there is
   no such thing as a partially-played replay in the store.
+
+osu!stable is not covered: it has the same gap, but where a stable install records an
+unfinished play -- if it does at all -- could not be established without one to inspect.
+`docs/roadmap.md` **5.12** holds the leads, what is already ruled out, and the measurement
+to run first.
 
 ## 1.1.0
 
