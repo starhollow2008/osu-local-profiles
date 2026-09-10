@@ -162,12 +162,6 @@ $('modes').addEventListener('click', (e) => {
   loadProfile();
 });
 
-function renderSectionTabs() {
-  $('sectionTabs').innerHTML = SECTIONS.map(
-    ([id, label]) => `<a class="page-mode__item" href="#section-${id}">${escapeHtml(label)}</a>`,
-  ).join('');
-}
-
 /* ----------------------------------------------------------- detail block */
 
 function renderStats(next) {
@@ -317,6 +311,7 @@ async function loadState() {
   renderIdentity();
   // Never clobber what is being typed: a 15-second poll must not swallow a draft.
   if (!editingAbout) renderAbout();
+  applySectionOrder();
 
   if (!window.__modeInit) {
     window.__modeInit = true;
@@ -380,6 +375,176 @@ document.addEventListener('keydown', (e) => {
   if (!$('settingsModal').hidden) closeSettings();
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('identityModal').hidden) closeIdentity();
+});
+
+/* --------------------------------------------------------- section order */
+
+/*
+ * Rearranging the profile, the way osu! lets you rearrange your own.
+ *
+ * The order is a list of section ids in settings, reconciled against SECTIONS on every
+ * read: ids that no longer exist are dropped and new ones are appended. That is what makes
+ * adding a section later safe -- a saved order from before it existed still works, and the
+ * new section simply turns up at the bottom instead of vanishing.
+ */
+
+const DEFAULT_ORDER = SECTIONS.map(([id]) => id);
+
+function reconcileOrder(saved) {
+  const seen = new Set();
+  const out = [];
+  for (const id of saved ?? []) {
+    if (!DEFAULT_ORDER.includes(id) || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  for (const id of DEFAULT_ORDER) if (!seen.has(id)) out.push(id);
+  return out;
+}
+
+function currentOrder() {
+  return reconcileOrder(settings.sectionOrder);
+}
+
+function sectionLabel(id) {
+  return SECTIONS.find(([sectionId]) => sectionId === id)?.[1] ?? id;
+}
+
+/**
+ * The controls that live in each section's heading.
+ *
+ * The grip is a convenience. Move up and move down are the real interface: they work from
+ * the keyboard, they work on a touchscreen, and they cannot half-succeed the way a drag can.
+ */
+function sectionControls(id, index, total) {
+  const first = index === 0;
+  const last = index === total - 1;
+  return `<span class="section-order">
+    <span class="section-order__grip" data-grip="${id}" aria-hidden="true"
+          title="Drag to move this section">&#8942;&#8942;</span>
+    <button type="button" class="section-order__move" data-move="up" data-section="${id}"
+            ${first ? 'disabled' : ''} aria-label="Move ${escapeHtml(sectionLabel(id))} up"
+            title="Move up">&#9650;</button>
+    <button type="button" class="section-order__move" data-move="down" data-section="${id}"
+            ${last ? 'disabled' : ''} aria-label="Move ${escapeHtml(sectionLabel(id))} down"
+            title="Move down">&#9660;</button>
+  </span>`;
+}
+
+/** Put the sections and the tab bar in the saved order, and (re)draw their controls. */
+function applySectionOrder() {
+  const order = currentOrder();
+  const main = document.querySelector('.user-profile-pages');
+
+  order.forEach((id, index) => {
+    const section = $(`section-${id}`);
+    if (!section) return;
+    // appendChild moves an existing node, so this ends up as exactly the wanted order.
+    main.appendChild(section);
+
+    // Placed on the section rather than inside the heading: `.title` is `width: max-content`
+    // so that its underline hugs the text, and anything added inside it drags that rule out
+    // under the controls.
+    section.querySelector(':scope > .section-order')?.remove();
+    section.insertAdjacentHTML('afterbegin', sectionControls(id, index, order.length));
+  });
+
+  $('sectionTabs').innerHTML = order
+    .map((id) => `<a class="page-mode__item" href="#section-${id}">${escapeHtml(sectionLabel(id))}</a>`)
+    .join('');
+}
+
+async function saveSectionOrder(order) {
+  settings = { ...settings, sectionOrder: order };
+  applySectionOrder();
+  try {
+    const r = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sectionOrder: order }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'saving the order failed');
+    settings = d.settings;
+  } catch (err) {
+    toast(err.message);
+    // Put back what the server actually has, rather than leaving the page lying.
+    await loadState();
+    applySectionOrder();
+  }
+}
+
+function moveSection(id, delta) {
+  const order = currentOrder();
+  const from = order.indexOf(id);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= order.length) return;
+  order.splice(to, 0, ...order.splice(from, 1));
+  void saveSectionOrder(order);
+}
+
+document.addEventListener('click', (e) => {
+  const button = e.target.closest('[data-move]');
+  if (!button || button.disabled) return;
+  moveSection(button.dataset.section, button.dataset.move === 'up' ? -1 : 1);
+  // Keep the focus on the control that was pressed, which has just been re-rendered.
+  const again = document.querySelector(
+    `[data-move="${button.dataset.move}"][data-section="${button.dataset.section}"]`,
+  );
+  (again?.disabled ? document.querySelector(`[data-section="${button.dataset.section}"]`) : again)?.focus();
+});
+
+/*
+ * Dragging. `draggable` is turned on only while the grip is held: setting it permanently on
+ * a section makes selecting the text inside it start a drag instead.
+ */
+let draggingSection = null;
+
+document.addEventListener('mousedown', (e) => {
+  const grip = e.target.closest('[data-grip]');
+  if (!grip) return;
+  $(`section-${grip.dataset.grip}`).draggable = true;
+});
+
+document.addEventListener('dragstart', (e) => {
+  const section = e.target.closest('.page-extra[draggable="true"]');
+  if (!section) return;
+  draggingSection = section.id.replace('section-', '');
+  section.classList.add('page-extra--dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', draggingSection);
+});
+
+document.addEventListener('dragover', (e) => {
+  if (draggingSection === null) return;
+  const over = e.target.closest('.page-extra');
+  if (!over) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+});
+
+document.addEventListener('drop', (e) => {
+  if (draggingSection === null) return;
+  const over = e.target.closest('.page-extra');
+  const moved = draggingSection;
+  draggingSection = null;
+  if (!over) return;
+  e.preventDefault();
+
+  const order = currentOrder();
+  const from = order.indexOf(moved);
+  const to = order.indexOf(over.id.replace('section-', ''));
+  if (from < 0 || to < 0 || from === to) return;
+  order.splice(to, 0, ...order.splice(from, 1));
+  void saveSectionOrder(order);
+});
+
+document.addEventListener('dragend', () => {
+  draggingSection = null;
+  for (const el of document.querySelectorAll('.page-extra')) {
+    el.draggable = false;
+    el.classList.remove('page-extra--dragging');
+  }
 });
 
 /* ------------------------------------------------------------------- me! */
@@ -1478,7 +1643,7 @@ es.addEventListener('recompute-progress', (e) => {
 
 /* ------------------------------------------------------------------ boot */
 
-renderSectionTabs();
 await loadState();
+applySectionOrder();
 await loadProfile();
 setInterval(loadState, 15000);

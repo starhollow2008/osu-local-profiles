@@ -42,6 +42,14 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   draft nobody finished, and a never-submitted one exists only on your machine.
 - Independent of the mod setting: a Loved map played with Relax needs both before it counts.
 
+### Rearranging the page
+
+- Sections can be reordered, and the order is saved with the profile -- as osu! remembers
+  the arrangement of your own page. Drag by the grip, or use the arrows beside it.
+- The saved order is reconciled against the code's own list on every read: ids that no
+  longer exist are dropped, and new ones are appended. Adding a section later can therefore
+  never leave a saved order stale or make a section unreachable.
+
 ### The me! section
 
 - osu!'s description box, at the top of the profile. Click to edit; per profile.

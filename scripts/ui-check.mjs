@@ -189,9 +189,64 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nsection order');
+check(
+  'every section has reorder controls',
+  await evaluate(
+    "[...document.querySelectorAll('.page-extra')].every((s) => s.querySelector(':scope > .section-order'))",
+  ),
+  true,
+);
+// Hidden until the section is hovered, so they do not clutter a page nobody is editing.
+check(
+  'they are out of the way until hovered',
+  await evaluate(
+    "getComputedStyle(document.querySelector('.section-order')).opacity",
+  ),
+  '0',
+);
+// The ends cannot move further, and saying so beats a control that silently does nothing.
+check(
+  'the first section cannot move up and the last cannot move down',
+  await evaluate(`(() => {
+    const sections = [...document.querySelectorAll('.page-extra')];
+    const first = sections[0].querySelector('[data-move="up"]');
+    const last = sections[sections.length - 1].querySelector('[data-move="down"]');
+    return JSON.stringify({ first: first.disabled, last: last.disabled });
+  })()`),
+  JSON.stringify({ first: true, last: true }),
+);
+check(
+  'the tab bar follows the sections',
+  await evaluate(`(() => {
+    const tabs = [...document.querySelectorAll('#sectionTabs a')].map((a) => a.getAttribute('href'));
+    const sections = [...document.querySelectorAll('.page-extra')].map((s) => '#' + s.id);
+    return JSON.stringify(tabs) === JSON.stringify(sections);
+  })()`),
+  true,
+);
+// Moving is a real DOM move, so the check is that the order actually changed.
+const reordered = await evaluate(`(() => {
+  const before = [...document.querySelectorAll('.page-extra')].map((s) => s.id);
+  document.querySelector('.page-extra [data-move="down"]').click();
+  const after = [...document.querySelectorAll('.page-extra')].map((s) => s.id);
+  return JSON.stringify({ before, after });
+})()`);
+const { before, after } = JSON.parse(reordered);
+check('moving a section down swaps it with the next', after[0] === before[1] && after[1] === before[0], true);
+// Put the page back the way it was found, so the check leaves no trace on the profile.
+await evaluate("document.querySelectorAll('.page-extra')[1].querySelector('[data-move=\"up\"]').click()");
+await sleep(300);
+check(
+  'and moving it back restores the original order',
+  await evaluate("[...document.querySelectorAll('.page-extra')].map((s) => s.id).join(',')"),
+  before.join(','),
+);
+
 console.log('\nthe me! section');
-check('it is the first section', await evaluate(
-  "document.querySelector('.page-extra').id"), 'section-me');
+// Not "the first section": the order is the user's to choose, which is the point of 5.7.
+check('it is one of the sections', await evaluate(
+  "!!document.querySelector('.page-extra#section-me')"), true);
 check('the editor starts closed', await shown('aboutEdit'), 'none');
 check(
   'clicking the text opens the editor',
@@ -602,13 +657,17 @@ check(
   await evaluate("document.querySelectorAll('#profileStats .profile-stats__entry').length"),
   7,
 );
-// Named rather than counted, so adding a section is a deliberate edit here.
+/*
+ * Named rather than counted, so adding a section is a deliberate edit here -- but compared
+ * as a set, because the order belongs to the profile and this check must not depend on how
+ * the user has arranged their page.
+ */
 check(
-  'the sections are the expected ones, in order',
+  'every expected section is present',
   await evaluate(
-    "[...document.querySelectorAll('.page-extra')].map((s) => s.id).join(',')",
+    "[...document.querySelectorAll('.page-extra')].map((s) => s.id).sort().join(',')",
   ),
-  'section-me,section-recent,section-top_ranks,section-historical',
+  'section-historical,section-me,section-recent,section-top_ranks',
 );
 // Consecutive headings must stack: they were inline-block once, which overlapped
 // "Top Ranks" with "Best Performance".

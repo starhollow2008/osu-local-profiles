@@ -589,6 +589,7 @@
 }
 
 .page-extra {
+  position: relative;
   box-shadow: var(--box-shadow);
   padding: 20px 8px;
   margin: 0 2px;
@@ -1157,6 +1158,63 @@
   padding: 6px 11px 8px;
   color: hsl(var(--hsl-f1));
   font-size: var(--fs-normal);
+}
+
+/* ======================================================================== */
+/* Section order                                                            */
+/* ======================================================================== */
+
+/*
+ * Reordering the profile, as osu! allows on your own. The grip is a convenience; the arrows
+ * are the real interface, because they work from the keyboard and on a touchscreen and
+ * cannot half-succeed the way a drag can. Both stay quiet until the section is hovered.
+ */
+.section-order {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 2;
+}
+
+.page-extra:hover .section-order,
+.section-order:focus-within {
+  opacity: 1;
+}
+
+.section-order__grip {
+  color: hsl(var(--hsl-f1));
+  letter-spacing: -2px;
+  padding: 0 4px;
+  cursor: grab;
+  user-select: none;
+}
+
+.section-order__move {
+  color: hsl(var(--hsl-l1));
+  background-color: hsl(var(--hsl-b5));
+  border-radius: var(--radius-base);
+  padding: 3px 7px;
+  font-size: var(--fs-normal);
+  line-height: 1;
+}
+
+.section-order__move:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+}
+
+.section-order__move:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.page-extra--dragging {
+  opacity: 0.45;
 }
 
 /* ======================================================================== */

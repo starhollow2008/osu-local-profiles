@@ -19,8 +19,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.4  | Score actions: pin, reorder, hide             | done   |
 | 5.5  | Editable identity + linked osu! account       | done   |
 | 5.6  | `me!` section                                 | done   |
-| 5.7  | Draggable section order                       | in progress |
-| 5.8  | Medals                                        | todo   |
+| 5.7  | Draggable section order                       | done   |
+| 5.8  | Medals                                        | in progress |
 | 5.9  | Share: screenshot and standalone HTML         | todo   |
 | 5.10 | macOS and Linux support                       | todo   |
 
@@ -293,7 +293,7 @@ as literal text.
 
 ## 5.7 — Draggable section order
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** Reorder `me!`, Recent, Top Ranks, Historical, Medals by dragging, order saved —
 the way osu! lets you rearrange your own profile.
@@ -312,7 +312,7 @@ code appends it cleanly to an existing saved order.
 
 ## 5.8 — Medals
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** A Medals section mirroring the official profile's, restricted to the medals that
 are actually computable from local data:

@@ -64,6 +64,14 @@ export interface Settings {
    * rendered with line breaks and autolinked URLs and nothing else.
    */
   aboutMe: string;
+  /**
+   * The order the profile's sections appear in, as their ids.
+   *
+   * Reconciled against the code's own list on every read: ids that no longer exist are
+   * dropped and new ones are appended, so adding a section later never leaves a saved order
+   * stale, and a hand-edited value cannot make a section unreachable.
+   */
+  sectionOrder: string[];
 }
 
 /**
@@ -135,6 +143,21 @@ const DEFS: Defs = {
   aboutMe: {
     default: '',
     coerce: (raw) => cleanMultiline(raw, 4000),
+  },
+  sectionOrder: {
+    default: [],
+    coerce: (raw) => {
+      if (!Array.isArray(raw)) return [];
+      // Only shape is checked here; which ids are real is the page's business, and it
+      // reconciles against its own list anyway.
+      const seen = new Set<string>();
+      return raw.filter((value): value is string => {
+        if (typeof value !== 'string' || !/^[a-z_]{1,32}$/.test(value)) return false;
+        if (seen.has(value)) return false;
+        seen.add(value);
+        return true;
+      });
+    },
   },
   linkedUserId: {
     default: 0,

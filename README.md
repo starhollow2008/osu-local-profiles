@@ -218,6 +218,15 @@ identity by definition, so it is never adopted without being asked for.
 Nothing here is required. With no picture the page draws an avatar from the profile's name,
 and the banner falls back to the cover art of the profile's best play.
 
+## Rearranging the page
+
+Hover a section and use the arrows in its top-right corner, or drag it by the grip beside
+them. The order is saved with the profile, the way osu! remembers the arrangement of your
+own page.
+
+The arrows are the real interface, not a fallback: they work from the keyboard and on a
+touchscreen, and they cannot half-succeed the way a drag can.
+
 ## The me! section
 
 The description box from osu!'s own profile, at the top of the page. Click it to write
