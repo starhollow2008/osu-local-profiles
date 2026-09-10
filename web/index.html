@@ -25,6 +25,7 @@
           <button id="optProfiles" type="button">Profiles&hellip;</button>
           <button id="optBackfill" type="button">Import past plays&hellip;</button>
           <div class="sep"></div>
+          <button id="optShare" type="button">Share this profile&hellip;</button>
           <button id="optExport" type="button">Export this profile (JSON)</button>
           <button id="optBackup" type="button">Back up everything (database)</button>
           <div class="sep"></div>
@@ -231,6 +232,40 @@
     <div class="actions">
       <button id="identityClose" type="button">Close</button>
       <button id="identitySave" class="primary" type="button">Save name</button>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="shareModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
+    <h3 id="shareTitle">Share this profile</h3>
+
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b>Save as a web page</b>
+        <div class="setting__hint">
+          One <code>.html</code> file holding everything on this page. It opens anywhere,
+          needs neither this app nor a connection, and keeps working forever.
+        </div>
+      </div>
+      <button type="button" id="shareHtml" class="primary">Save&hellip;</button>
+    </div>
+
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b>Save as an image</b>
+        <div class="setting__hint" id="shareScreenshotNote">&nbsp;</div>
+      </div>
+      <button type="button" id="shareScreenshot">Save&hellip;</button>
+    </div>
+
+    <h4 class="identity-heading">On your network</h4>
+    <div class="share-network" id="shareNetwork"></div>
+
+    <div class="profile-hint" id="shareHint">&nbsp;</div>
+
+    <div class="actions">
+      <button id="shareClose" type="button">Close</button>
     </div>
   </div>
 </div>

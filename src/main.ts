@@ -171,6 +171,7 @@ async function main(): Promise<void> {
     tagline: config.tagline,
     dataDir: dataDir(),
     port: config.port,
+    shareOnNetwork: config.shareOnNetwork,
   });
 
   const url = `http://localhost:${config.port}`;

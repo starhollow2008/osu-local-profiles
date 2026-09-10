@@ -42,6 +42,28 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   draft nobody finished, and a never-submitted one exists only on your machine.
 - Independent of the mod setting: a Loved map played with Relax needs both before it counts.
 
+### Sharing
+
+- **Options -> Share this profile**, with three ways out:
+  - **A standalone `.html` file** -- one file, opens anywhere, needs neither this app nor a
+    connection. Built from the live page rather than re-rendered on the server, so it
+    captures exactly what is on screen, section order included.
+  - **A full-page PNG**, rendered by an already-installed Chrome or Edge. Nothing is
+    bundled: a headless browser would dwarf the whole 83MB app. Without one, the button
+    says so and points at the HTML export.
+  - **The live page on your local network**, off by default.
+
+### Security: the server no longer listens to the whole network by default
+
+- **Behaviour change.** The server used to listen on every interface, so anyone on the same
+  network could open the profile -- and also reset it, delete a profile, or remove scores,
+  since none of those endpoints asks who is calling. Requests that are not from this
+  machine are now refused, and sharing is opt-in via `"shareOnNetwork": true` in
+  `data/config.json`.
+- Enforced per request rather than by binding to `127.0.0.1`: a host-bound listen also cuts
+  off IPv6 loopback, and `localhost` resolves to `::1` first on Windows, so binding
+  "safely" would have left the app unreachable from its own browser.
+
 ### Medals
 
 - A Medals section mirroring osu!'s: combo, plays, hits, rank, and beatmap pass and full

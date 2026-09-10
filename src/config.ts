@@ -17,6 +17,16 @@ export interface Config {
   country: string;
   /** What to call the playstyle under the profile name, e.g. "left hand, mouse only". */
   tagline: string;
+  /**
+   * Listen on every network interface instead of only this machine.
+   *
+   * Off by default, and that default matters: the page can reset a profile, delete one and
+   * remove scores, and none of those endpoints asks who is calling. Bound to localhost they
+   * are reachable only from this machine. Turned on, anyone on the same network can open
+   * the profile -- which is the point -- but also do anything else the page can do. So it
+   * is opt-in, and the app says so on startup.
+   */
+  shareOnNetwork: boolean;
 }
 
 const DEFAULTS: Config = {
@@ -26,6 +36,7 @@ const DEFAULTS: Config = {
   installRoots: [],
   country: '',
   tagline: '',
+  shareOnNetwork: false,
 };
 
 /**

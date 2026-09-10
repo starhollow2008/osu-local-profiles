@@ -1,6 +1,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { Db } from '../db/index.ts';
 import type { Tracker } from '../tracker/index.ts';
@@ -29,6 +30,7 @@ import {
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { eligibilityOf } from '../calc/eligibility.ts';
+import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
 import { downloadImage, lookupUser } from '../clients/osu-web.ts';
 import {
@@ -47,6 +49,35 @@ import {
   reorderPins,
   type ScoreAction,
 } from '../scores.ts';
+
+/**
+ * The addresses this machine can be reached at from the local network.
+ *
+ * Only IPv4, and only non-internal: an IPv6 link-local address is not something anyone is
+ * going to type into a phone.
+ */
+function localAddresses(port: number): string[] {
+  const out: string[] = [];
+  for (const entries of Object.values(os.networkInterfaces())) {
+    for (const entry of entries ?? []) {
+      if (entry.family !== 'IPv4' || entry.internal) continue;
+      out.push(`http://${entry.address}:${port}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Is this request coming from the machine the app is running on?
+ *
+ * Both loopback families, since `localhost` resolves to `::1` before `127.0.0.1` on
+ * Windows, and Node reports an IPv4 loopback over a dual-stack socket as `::ffff:127.0.0.1`.
+ */
+function isLocal(remoteAddress: string | undefined): boolean {
+  if (!remoteAddress) return false;
+  const address = remoteAddress.replace(/^::ffff:/, '');
+  return address === '127.0.0.1' || address === '::1' || address.startsWith('127.');
+}
 
 /** Upload ceiling for an avatar or banner; anything larger is a mistake. */
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
@@ -74,6 +105,8 @@ export interface ServerOptions {
   tagline: string;
   dataDir: string;
   port: number;
+  /** Listen on every interface rather than only this machine. Off by default. */
+  shareOnNetwork: boolean;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -144,6 +177,26 @@ export function startServer(opts: ServerOptions): http.Server {
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
+    /*
+     * Refuse anyone who is not on this machine, unless sharing was asked for.
+     *
+     * This used to be open by default, and that was wrong: the page can reset a profile,
+     * delete one and remove scores, and none of those endpoints asks who is calling.
+     *
+     * Enforced here rather than by binding to 127.0.0.1, because a host-bound listen also
+     * cuts off IPv6 loopback -- and `localhost` resolves to ::1 first on Windows -- so
+     * binding "safely" would leave the app unreachable from its own browser.
+     */
+    if (!opts.shareOnNetwork && !isLocal(req.socket.remoteAddress)) {
+      res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
+      res.end(
+        'This osu! fresh profile is private to the machine it runs on.\n' +
+          'To share it on your network, set "shareOnNetwork": true in data/config.json ' +
+          'and restart.\n',
+      );
+      return;
+    }
+
     if (url.pathname === '/api/state') {
       const profile = getProfile(opts.db, current())!;
       const settings = settingsFor(profile.id);
@@ -166,6 +219,13 @@ export function startServer(opts: ServerOptions): http.Server {
         staleScores: opts.tracker.staleScores,
         // Scores removed from the profile. They are never deleted, so they can be put back.
         hiddenScores: hiddenCount(opts.db, current()),
+        // How this profile can be shared. `addresses` is empty unless sharing is on, which
+        // is what stops the page offering a URL nothing outside this machine can reach.
+        sharing: {
+          onNetwork: opts.shareOnNetwork,
+          addresses: opts.shareOnNetwork ? localAddresses(opts.port) : [],
+          canScreenshot: findBrowser() !== null,
+        },
         defaultMode: mostRecentMode(opts.db, current()),
         modesWithPlays: modesWithPlays(opts.db, current()),
         installs: opts.installs.map((i) => ({
@@ -445,6 +505,30 @@ export function startServer(opts: ServerOptions): http.Server {
           return json(res, { error: (e as Error).message }, 400);
         }
       });
+    }
+
+    /*
+     * A full-page PNG, rendered by an already-installed Chrome or Edge. Nothing is bundled;
+     * see src/http/screenshot.ts for why, and what happens when neither is there.
+     */
+    if (url.pathname === '/api/screenshot') {
+      void (async () => {
+        try {
+          const png = await capture({ url: `http://127.0.0.1:${opts.port}/?export=1` });
+          const stamp = new Date().toISOString().slice(0, 10);
+          const profile = getProfile(opts.db, current())!;
+          const name = `${profile.name.replace(/[^\w.-]+/g, '-')}-${stamp}.png`;
+          res.writeHead(200, {
+            'content-type': 'image/png',
+            'content-disposition': `attachment; filename="${name}"`,
+            'cache-control': 'no-store',
+          });
+          res.end(png);
+        } catch (e) {
+          json(res, { error: (e as Error).message }, 503);
+        }
+      })();
+      return;
     }
 
     if (url.pathname === '/api/profile/reset' && req.method === 'POST') {

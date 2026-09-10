@@ -146,6 +146,7 @@ profile, so the curve comes from the public dumps instead.
 | `profileName` | `Fresh Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
 | `openBrowser` | `true` | open the page on start |
+| `shareOnNetwork` | `false` | let other machines on your network open the page (see Sharing) |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
@@ -217,6 +218,32 @@ identity by definition, so it is never adopted without being asked for.
 
 Nothing here is required. With no picture the page draws an avatar from the profile's name,
 and the banner falls back to the cover art of the profile's best play.
+
+## Sharing the profile
+
+**Options -> Share this profile.**
+
+- **Save as a web page** -- one `.html` file holding everything on the page. It opens
+  anywhere, needs neither this app nor a connection, and keeps working indefinitely. It is
+  built from the live page rather than re-rendered, so it captures exactly what is on
+  screen, section order included. This is the one that survives.
+- **Save as an image** -- a full-page PNG, rendered by the Chrome or Edge already on your
+  machine. Nothing is bundled: a headless browser would be several times the size of this
+  whole app. Without one installed the button says so and points at the HTML export.
+- **On your network** -- off by default.
+
+### Why network sharing is off by default
+
+The page can reset a profile, delete one and remove scores, and none of those endpoints
+asks who is calling. So the server refuses anything that is not coming from this machine
+unless you opt in with `"shareOnNetwork": true` in `data/config.json`.
+
+*(This changed in Phase 5. Before it, the server listened on every interface, which meant
+anyone on the same network could not only read the profile but reset it.)*
+
+The check is on the request rather than the listening socket, because binding to
+`127.0.0.1` also cuts off IPv6 loopback -- and `localhost` resolves to `::1` first on
+Windows, so binding "safely" would leave the app unreachable from its own browser.
 
 ## Medals
 

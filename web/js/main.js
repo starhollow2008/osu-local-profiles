@@ -112,6 +112,7 @@ let settings = {};
 let counting = null;
 let staleScores = 0;
 let hiddenScoreCount = 0;
+let sharing = { onNetwork: false, addresses: [], canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
 
@@ -312,7 +313,9 @@ function medalTile(medal) {
   return `<div class="medal${earned ? '' : ' medal--locked'}" title="${escapeHtml(tooltip)}">
     <div class="medal__icon">
       ${medalPlaceholder(medal)}
-      <img src="${escapeHtml(medal.icon)}" alt="" loading="lazy">
+      <!-- Not lazy: a full-page screenshot renders below the fold without ever
+           scrolling there, and lazy icons never loaded. 32 small PNGs is nothing. -->
+      <img src="${escapeHtml(medal.icon)}" alt="">
     </div>
     <div class="medal__name u-ellipsis">${escapeHtml(medal.name)}</div>
     <div class="medal__detail">${escapeHtml(detail)}</div>
@@ -418,6 +421,7 @@ async function loadState() {
   settings = s.settings ?? {};
   staleScores = s.staleScores ?? 0;
   hiddenScoreCount = s.hiddenScores ?? 0;
+  sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -493,7 +497,213 @@ document.addEventListener('keydown', (e) => {
   if (!$('settingsModal').hidden) closeSettings();
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('identityModal').hidden) closeIdentity();
+  if (!$('shareModal').hidden) closeShare();
 });
+
+/* ------------------------------------------------------------------ share */
+
+/*
+ * Three ways to hand this profile to someone else, in order of how well they survive.
+ *
+ * 1. A standalone .html file. One file, opens anywhere, needs neither this app nor a
+ *    network. It is built from the *live page* rather than re-rendered on the server, so
+ *    it captures exactly what is on screen -- the section order, the medals, everything --
+ *    and cannot drift from it.
+ * 2. A PNG, rendered by a browser that is already installed.
+ * 3. The page itself, over the local network, which is off by default.
+ */
+
+/** Elements that only make sense while you are using the page, not while reading it. */
+const EXPORT_STRIP = [
+  '#optionsBtn', '.menu-wrap', '#toggle', '.backdrop', '#playMenu', '#toast',
+  '#identityFile', '.section-order', '.play-detail__menu', '.play-detail__grip',
+  '#aboutEdit', 'script',
+];
+
+/**
+ * `?export=1` is the same page with its controls hidden. The screenshot endpoint loads it,
+ * and so does anyone who just wants to look without the affordances getting in the way.
+ */
+function applyExportMode() {
+  if (new URLSearchParams(location.search).get('export') !== '1') return;
+  document.body.classList.add('export-mode');
+}
+
+/** Read a same-origin file as text, for inlining. */
+async function fetchText(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`could not read ${url}`);
+  return r.text();
+}
+
+/** Read a same-origin image as a data: URI, so the export needs nothing from this app. */
+async function fetchDataUri(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`could not read ${url}`);
+  const blob = await r.blob();
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`could not encode ${url}`));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Build a single self-contained HTML file from the page as it stands.
+ *
+ * Local images become data: URIs; osu!'s own cover art and medal icons stay as the absolute
+ * URLs they already are, so the file is small and shows them to anyone with a connection,
+ * and degrades to the drawn placeholders without one. Nothing same-origin is left behind,
+ * so no part of the file depends on this app still running.
+ */
+async function buildStandaloneHtml() {
+  const clone = document.documentElement.cloneNode(true);
+
+  for (const selector of EXPORT_STRIP) {
+    for (const el of clone.querySelectorAll(selector)) el.remove();
+  }
+  /*
+   * The editor is gone, so the text it was editing must not be left hidden with it -- and
+   * an empty description has nothing to say to a reader, so its whole section goes, tab and
+   * all. "Click to write something" is an instruction to the owner, not to whoever opens
+   * the file.
+   */
+  const about = clone.querySelector('#aboutView');
+  if (about) about.hidden = false;
+  if (about?.classList.contains('about--empty')) {
+    clone.querySelector('#section-me')?.remove();
+    clone.querySelector('#sectionTabs a[href="#section-me"]')?.remove();
+  }
+
+  // Stylesheets become one inline <style>, in the order they were linked.
+  const hrefs = [...clone.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.getAttribute('href'));
+  for (const el of clone.querySelectorAll('link[rel="stylesheet"]')) el.remove();
+  const css = await Promise.all(hrefs.map((href) => fetchText(href)));
+
+  const style = document.createElement('style');
+  style.textContent = [
+    ...css,
+    // The exported file is a document, not an app: nothing in it is interactive.
+    '.section-order, .play-detail__menu, .play-detail__grip { display: none !important; }',
+    '.about { cursor: default; } .about:hover { background: none; }',
+    '.profile-info__avatar::after { display: none; } .profile-info__name { cursor: default; }',
+  ].join('\n');
+  clone.querySelector('head').append(style);
+
+  // Anything served by this app has to be carried, or the file breaks the moment it moves.
+  for (const img of clone.querySelectorAll('img[src^="/"], img[src^="./"]')) {
+    try {
+      img.src = await fetchDataUri(img.getAttribute('src'));
+    } catch {
+      img.remove();
+    }
+  }
+  const cover = clone.querySelector('#cover');
+  if (cover && profile?.hasCover) {
+    try {
+      cover.style.setProperty('--cover', `url('${await fetchDataUri('/api/image/cover')}')`);
+    } catch {
+      cover.style.setProperty('--cover', 'none');
+    }
+  }
+
+  const when = new Date().toLocaleString();
+  return `<!doctype html>
+<!-- osu! fresh profile - "${profile?.name ?? 'profile'}" as of ${when}. Not an osu! page. -->
+${clone.outerHTML}`;
+}
+
+/** Hand the browser a file to save, without going near the server. */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  // Revoked on the next tick: revoking immediately can cancel the download in some browsers.
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+const safeName = () =>
+  `${(profile?.name ?? 'profile').replace(/[^\w.-]+/g, '-')}-${new Date().toISOString().slice(0, 10)}`;
+
+function shareHint(message, isError = false) {
+  const el = $('shareHint');
+  el.textContent = message;
+  el.classList.toggle('profile-hint--error', isError);
+}
+
+function openShare() {
+  setMenuOpen(false);
+  shareHint(' ');
+
+  const addresses = sharing.addresses ?? [];
+  $('shareNetwork').innerHTML = sharing.onNetwork
+    ? `<p>Anyone on your network can open this profile at:</p>
+       ${addresses.map((a) => `<code class="share-url">${escapeHtml(a)}</code>`).join('') ||
+         '<p class="setting__hint">No network address was found for this machine.</p>'}
+       <p class="setting__hint">
+         Sharing is on. Remember that anyone who can open the page can also use it &mdash;
+         including resetting this profile. Turn it off in <code>data/config.json</code>.
+       </p>`
+    : `<p class="setting__hint">
+         This profile is private to this machine. To let someone on the same network open
+         it live, set <code>"shareOnNetwork": true</code> in <code>data/config.json</code>
+         and restart.
+       </p>
+       <p class="setting__hint">
+         It is off by default because the page can reset this profile, delete a profile and
+         remove scores, and none of that asks who is calling.
+       </p>`;
+
+  $('shareScreenshot').disabled = !sharing.canScreenshot;
+  $('shareScreenshotNote').textContent = sharing.canScreenshot
+    ? 'Rendered by the Chrome or Edge already on this machine.'
+    : 'Needs Chrome, Edge or Chromium installed. The web page above needs nothing.';
+
+  $('shareModal').hidden = false;
+  $('shareClose').focus();
+}
+
+const closeShare = () => { $('shareModal').hidden = true; };
+
+$('optShare').onclick = openShare;
+$('shareClose').onclick = closeShare;
+$('shareModal').onclick = (e) => {
+  if (e.target === $('shareModal')) closeShare();
+};
+
+$('shareHtml').onclick = async () => {
+  $('shareHtml').disabled = true;
+  shareHint('Building the page...');
+  try {
+    const html = await buildStandaloneHtml();
+    downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safeName()}.html`);
+    shareHint('Saved. That file opens on its own, with or without a connection.');
+  } catch (err) {
+    shareHint(err.message, true);
+  } finally {
+    $('shareHtml').disabled = false;
+  }
+};
+
+$('shareScreenshot').onclick = async () => {
+  $('shareScreenshot').disabled = true;
+  shareHint('Rendering the image...');
+  try {
+    const r = await fetch('/api/screenshot');
+    if (!r.ok) throw new Error(((await r.json()).error) ?? 'rendering failed');
+    downloadBlob(await r.blob(), `${safeName()}.png`);
+    shareHint('Saved.');
+  } catch (err) {
+    shareHint(err.message, true);
+  } finally {
+    $('shareScreenshot').disabled = false;
+  }
+};
 
 /* --------------------------------------------------------- section order */
 
@@ -1761,7 +1971,11 @@ es.addEventListener('recompute-progress', (e) => {
 
 /* ------------------------------------------------------------------ boot */
 
+applyExportMode();
 await loadState();
 applySectionOrder();
 await loadProfile();
+// Tells the screenshot renderer the page has finished drawing itself.
+document.body.dataset.rendered = 'true';
+
 setInterval(loadState, 15000);

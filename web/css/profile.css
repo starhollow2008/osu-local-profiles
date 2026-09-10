@@ -1161,6 +1161,94 @@
 }
 
 /* ======================================================================== */
+/* Sharing                                                                  */
+/* ======================================================================== */
+
+.share-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid hsl(var(--hsl-b3));
+}
+
+.share-option__detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.share-option button {
+  flex: none;
+  padding: 8px 16px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+.share-option button:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.share-option button.primary {
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-weight: 600;
+}
+
+.share-option button.primary:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-p));
+}
+
+.share-option button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.share-network p {
+  margin: 0 0 6px;
+}
+
+.share-url {
+  display: block;
+  margin-bottom: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal-2);
+  user-select: all;
+}
+
+/*
+ * `?export=1`: the same page with everything you would only use while *using* it removed.
+ * The screenshot renderer loads this, and so does anyone who wants to read without the
+ * affordances in the way. Display is forced off rather than the elements being deleted, so
+ * one class does the whole job and nothing has to be rebuilt.
+ */
+.export-mode .menu-wrap,
+.export-mode .tracking-pill,
+.export-mode .section-order,
+.export-mode .play-detail__menu,
+.export-mode .play-detail__grip {
+  display: none !important;
+}
+
+.export-mode .about {
+  cursor: default;
+}
+
+.export-mode .about:hover {
+  background: none;
+}
+
+.export-mode .profile-info__avatar::after {
+  display: none;
+}
+
+.export-mode .profile-info__name {
+  cursor: default;
+}
+
+/* ======================================================================== */
 /* Medals                                                                   */
 /* ======================================================================== */
 

@@ -21,8 +21,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.6  | `me!` section                                 | done   |
 | 5.7  | Draggable section order                       | done   |
 | 5.8  | Medals                                        | done   |
-| 5.9  | Share: screenshot and standalone HTML         | in progress |
-| 5.10 | macOS and Linux support                       | todo   |
+| 5.9  | Share: screenshot and standalone HTML         | done   |
+| 5.10 | macOS and Linux support                       | in progress |
 
 Ordering is by dependency, not by the order they were written down. 5.1 is the foundation
 every toggle needs. 5.2 and 5.3 share one schema and ingest change, so they are adjacent.
@@ -350,7 +350,7 @@ renders offline, and `test/medals.test.ts` covers each family including the boun
 
 ## 5.9 — Share: screenshot and standalone HTML
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** Hand someone else the profile. Three ways, in increasing fidelity:
 
@@ -380,7 +380,7 @@ matches, and the LAN option is off by default.
 
 ## 5.10 — macOS and Linux support
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** Everything above works on macOS and Linux. This is last because it cannot be
 verified on the development machine — treat every step as "written carefully, needs a real

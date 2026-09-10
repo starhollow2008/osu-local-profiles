@@ -49,6 +49,8 @@ function harness(): Harness {
     tagline: '',
     dataDir: tmp,
     port: 0, // ephemeral
+    // Localhost only, as in the real default: a test must not open a port to the network.
+    shareOnNetwork: false,
   });
   const { port } = server.address() as AddressInfo;
   return {

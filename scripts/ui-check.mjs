@@ -189,6 +189,70 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nshare dialog');
+check('the share dialog is hidden on load', await shown('shareModal'), 'none');
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optShare').click()");
+check('it opens', await shown('shareModal'), 'grid');
+check(
+  'the web page export is the primary action',
+  await evaluate("document.getElementById('shareHtml').classList.contains('primary')"),
+  true,
+);
+/*
+ * Whether an image can be rendered depends on a browser being installed. Either way the
+ * button and its note have to agree, rather than offering something that cannot happen.
+ */
+check(
+  'the image button agrees with whether a browser was found',
+  await evaluate(`(() => {
+    const button = document.getElementById('shareScreenshot');
+    const note = document.getElementById('shareScreenshotNote').textContent;
+    return button.disabled === note.includes('Needs Chrome');
+  })()`),
+  true,
+);
+// Sharing on the network is off by default, and the dialog must say why rather than
+// offering a URL that nothing outside this machine can reach.
+check(
+  'the network section explains its default',
+  await evaluate(`(() => {
+    const text = document.getElementById('shareNetwork').textContent;
+    return text.includes('private to this machine')
+      ? !text.includes('http://')
+      : text.includes('http://');
+  })()`),
+  true,
+);
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes the share dialog', await shown('shareModal'), 'none');
+
+/*
+ * `?export=1` hides everything that only makes sense while using the page. The screenshot
+ * renderer relies on it, so a control leaking through would end up in someone's image.
+ */
+console.log('\nexport mode');
+check(
+  'the page reports when it has finished drawing',
+  await evaluate("document.body.dataset.rendered"),
+  'true',
+);
+check(
+  'export mode hides every control',
+  await evaluate(`(() => {
+    document.body.classList.add('export-mode');
+    const hidden = ['.menu-wrap', '.tracking-pill', '.section-order', '.play-detail__menu']
+      .map((sel) => document.querySelector(sel))
+      .filter(Boolean)
+      .every((el) => getComputedStyle(el).display === 'none');
+    document.body.classList.remove('export-mode');
+    return hidden;
+  })()`),
+  true,
+);
+
 console.log('\nmedals');
 check(
   'the medal grid is rendered',
