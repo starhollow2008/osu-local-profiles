@@ -15,14 +15,32 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPpHelper } from './build-pp-helper.mjs';
+import { buildPpHelper, defaultRid } from './build-pp-helper.mjs';
+import { launcherFor, readmeFor } from './package-files.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 
 const target = process.argv.includes('--rid')
   ? process.argv[process.argv.indexOf('--rid') + 1]
-  : 'win-x64';
+  : defaultRid();
+
+/*
+ * A package can only be built on the system it is for.
+ *
+ * `dotnet publish` will happily cross-compile the pp helper for another runtime, but step 2
+ * copies *this* process's Node binary, and there is no cross-platform equivalent of that
+ * short of downloading one. Failing here beats shipping a macOS archive containing a
+ * Windows node.exe, which would look complete and start on nothing.
+ */
+const hostOs = defaultRid().split('-')[0];
+if (target.split('-')[0] !== hostOs) {
+  console.error(`\n  cannot build a ${target} package on ${hostOs}.`);
+  console.error('  The .NET helper would cross-compile, but the bundled Node runtime is this');
+  console.error(`  machine's own binary. Run this on a ${target.split('-')[0]} machine.\n`);
+  process.exit(1);
+}
+
 const name = `osu-fresh-profile-${pkg.version}-${target}`;
 const distRoot = path.join(root, 'dist');
 const out = path.join(distRoot, name);
@@ -97,50 +115,24 @@ fs.writeFileSync(
 
 /* --------------------------------------------------------- 4. the launcher */
 
-// `cd /d "%~dp0"` is the important line: double-clicking from Explorer starts the process
-// in whatever directory Explorer feels like, and without it the app would look for its
-// data somewhere else entirely.
-fs.writeFileSync(
-  path.join(out, 'Start osu! fresh profile.bat'),
-  [
-    '@echo off',
-    'cd /d "%~dp0"',
-    'title osu! fresh profile',
-    'node.exe src\\main.ts',
-    'if errorlevel 1 (',
-    '  echo.',
-    '  echo The app stopped with an error. The message above says why.',
-    '  pause',
-    ')',
-    '',
-  ].join('\r\n'),
-);
+/*
+ * The launcher and the README are built in scripts/package-files.mjs, as pure functions of
+ * the platform. They live there so the macOS and Linux versions can be tested from here --
+ * otherwise the only way to see them would be to build on macOS and on Linux, which is
+ * exactly the position this project is trying not to be in.
+ */
+const nodeBinary = path.basename(process.execPath);
+const launcher = launcherFor(hostOs, nodeBinary);
 
-fs.writeFileSync(
-  path.join(out, 'README.txt'),
-  [
-    'osu! fresh profile',
-    '==================',
-    '',
-    'Double-click "Start osu! fresh profile.bat".',
-    'Your browser opens at http://localhost:7272 and tracking begins.',
-    '',
-    'Play osu! -- lazer or stable, online or offline -- and scores appear as you set them.',
-    'Closing the console window stops tracking.',
-    '',
-    'Nothing needs installing. Node and osu!\'s pp calculator are both included.',
-    '',
-    'Everything this app records lives in the "data" folder next to this file, so you can',
-    'move or copy the whole folder and your profiles come with it. Deleting "data" resets',
-    'the app to a clean slate.',
-    '',
-    'The first run takes about a minute while it indexes your local beatmaps.',
-    'Later runs start immediately.',
-    '',
-    'Settings are in data/config.json (profile name, port, country, tagline).',
-    '',
-  ].join('\r\n'),
-);
+fs.writeFileSync(path.join(out, launcher.name), launcher.content);
+if (launcher.mode !== null) {
+  fs.chmodSync(path.join(out, launcher.name), launcher.mode);
+  // copyFileSync keeps the mode of the Node binary it copied, but say so explicitly rather
+  // than depend on it: an archive whose runtime is not executable starts on nothing.
+  fs.chmodSync(path.join(out, nodeBinary), 0o755);
+}
+
+fs.writeFileSync(path.join(out, 'README.txt'), readmeFor(hostOs));
 
 /* -------------------------------------------------------- 5. verify it works */
 
@@ -156,7 +148,7 @@ fs.writeFileSync(
  */
 console.log('\n  verifying the packaged build...');
 const probe = spawnSync(
-  path.join(out, 'node.exe'),
+  path.join(out, nodeBinary),
   [path.join(out, 'src', 'main.ts'), '--check-only'],
   { cwd: path.parse(out).root, encoding: 'utf8', timeout: 240_000 },
 );

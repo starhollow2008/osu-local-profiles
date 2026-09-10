@@ -22,7 +22,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.7  | Draggable section order                       | done   |
 | 5.8  | Medals                                        | done   |
 | 5.9  | Share: screenshot and standalone HTML         | done   |
-| 5.10 | macOS and Linux support                       | deferred |
+| 5.10 | macOS and Linux support                       | in progress |
 | 5.11 | Incomplete plays (fails, quits, retries)      | done   |
 | 5.12 | Incomplete plays on osu!stable                | todo   |
 
@@ -386,7 +386,8 @@ matches, and the LAN option is off by default.
 
 ## 5.10 — macOS and Linux support
 
-**Status:** deferred to a later phase
+**Status:** in progress — written and covered by CI on all three platforms; **unverified
+against a real osu! install on macOS or Linux**
 
 **Goal.** Everything above works on macOS and Linux. This is last because it cannot be
 verified on the development machine — treat every step as "written carefully, needs a real
@@ -409,8 +410,79 @@ run on the target OS".
 - **`openBrowser`** already branches correctly.
 - **CI** (`.github/workflows/`): run `npm run check` on ubuntu and macos runners.
 
-**Done when.** `npm run check:app` passes on each platform and a packaged build starts from
-a fresh directory. Until someone can run it, the README says which platforms are verified.
+### What was built
+
+- **Detection** was rewritten around an injected `DetectEnvironment` (platform, home, env)
+  so the candidate paths are a *pure function* and can be tested for a platform this machine
+  is not -- which is the only way any of this could be checked here at all. `os.homedir()`
+  replaces `$HOME`, so an unset variable no longer sends it looking in a directory called
+  "undefined". `XDG_DATA_HOME` is honoured, and a relative one ignored as the spec requires.
+- **osu!stable under Wine** covers the Wineskin bundles (`osu!.app/drive_c/...`, which sits
+  beside `Contents` rather than inside it), plain and `WINEPREFIX` prefixes, CrossOver
+  bottles listed rather than guessed, Wine's per-account profile directory, and
+  **osu-winello** -- which writes the install path it was given to
+  `$XDG_DATA_HOME/osuconfig/osupath` and links it as the prefix's `D:` drive, so both are
+  *read* rather than guessed. A missing prefix is the normal case and never an error.
+- **`installRoots` now actually works.** It was documented in `config.json`, printed in the
+  "no osu! found" message as the thing to set, and read by nothing. That was survivable on
+  Windows, where detection nearly always succeeds, and would have been the first thing a
+  macOS or Linux user hit. A configured root is classified by what is inside it, so the user
+  does not also have to say which client it is.
+- **The pp helper's pruning is platform-aware.** It deleted a hardcoded list of `.dll`
+  names, so on macOS or Linux it would have matched nothing and silently shipped a 273MB
+  helper instead of a 114MB one -- **including BASS**, which is not freely redistributable.
+  Matching is now by base name across `.dll`/`.dylib`/`.so` with either version convention,
+  anchored so `ppy.ManagedBass.dll` (which the helper cannot start without) is untouched.
+  The patterns are pinned by tests against the verified Windows list, the macOS and Linux
+  spellings, and every one of the 273 files in a real pruned helper. The build warns loudly
+  if it prunes nothing.
+- **The runtime identifier defaults to the host** rather than always `win-x64`.
+- **Packaging** writes a `.command` on macOS (the extension Finder will run; a `.sh` opens
+  in a text editor) and `start.sh` on Linux, both `chmod 0o755`, and a `README.txt` for that
+  platform -- including that macOS *will* refuse the first launch, because the build is
+  unsigned, and the two ways round it. Building for a different OS than the host is refused:
+  the bundled Node runtime is a copy of the running one, so a cross-built archive would look
+  complete and start on nothing.
+  - That text lives in `scripts/package-files.mjs` as pure functions of the platform, for
+    the same reason detection does: otherwise the macOS and Linux launchers are unread text
+    first seen by whoever downloads them. `test/package-files.test.ts` pins the extension,
+    the executable bit, the shebang, the `cd` line every launcher exists for, and that each
+    README names the launcher its own platform actually has.
+  - Verified not to have changed the Windows output: the rebuilt package is the same 272MB
+    -> 112MB prune, the same 203MB/83MB result, and a byte-identical `.bat`.
+- **Browser discovery** for the screenshot and the UI check is now one shared function that
+  also searches `PATH`, instead of the UI check's two hardcoded Windows paths -- which meant
+  `npm run ui` could not run at all on macOS or Linux.
+- **`--check-only` reports both answers.** It used to stop at "no osu! installation found"
+  and never reach the pp calculator; "osu! is not where I looked" and "the helper will not
+  start" are separate faults with separate fixes.
+- **CI** runs on `windows-latest`, `ubuntu-latest` and `macos-latest` with `fail-fast:
+  false`, and now also starts the app far enough to prove the modules load, the schema
+  applies and the pp calculator runs on that platform.
+
+### What is left, and needs a real machine
+
+None of this can be done from Windows:
+
+1. `npm run check:app` against an **actual osu! installation** on macOS and on Linux --
+   that detection finds it, not merely that the code runs.
+2. `npm run package` on each, and a packaged build started from a fresh directory after
+   being unzipped -- especially that the executable bit survives the archive.
+3. `npm run ui` on each, which needs a browser and a running app.
+4. The **file watcher**, which is the mechanism the whole tracker rests on. `fs.watch` with
+   `recursive: true` means one `ReadDirectoryChangesW` handle on Windows, but on Linux the
+   kernel watches a single directory at a time, so Node implements recursion in JavaScript
+   by adding an inotify watch **per directory** -- and lazer's store is ~4,000 of them. On a
+   system with a low `fs.inotify.max_user_watches` that fails with `ENOSPC`, which reads as
+   "disk full" and is not. `explainWatchError` in `src/tracker/watcher.ts` now says what it
+   actually means and how to raise the limit, but nobody has yet watched a real store on
+   Linux to see whether the default limit is enough.
+5. **osu!stable under Wine**, against a real wrapper. Every path in `wineStableCandidates`
+   is from documentation and source, not from a machine.
+
+**Done when.** `npm run check:app` passes on each platform against a real osu! install, and
+a packaged build starts from a fresh directory. Until someone can run it, the README says
+which platforms are verified and which are only written.
 
 ---
 

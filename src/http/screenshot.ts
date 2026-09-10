@@ -37,14 +37,49 @@ function browserCandidates(): string[] {
   } else {
     candidates.push(
       '/usr/bin/google-chrome',
+      '/usr/bin/google-chrome-stable',
       '/usr/bin/chromium',
       '/usr/bin/chromium-browser',
       '/usr/bin/microsoft-edge',
+      '/usr/bin/brave-browser',
       '/snap/bin/chromium',
+      '/var/lib/flatpak/exports/bin/org.chromium.Chromium',
+      path.join(os.homedir(), '.local/share/flatpak/exports/bin/org.chromium.Chromium'),
     );
   }
 
+  /*
+   * Then whatever is simply on PATH.
+   *
+   * A fixed list is guesswork on Linux, where the same browser is packaged a dozen ways and
+   * installed anywhere -- /usr/bin, /usr/local/bin, /opt, a Nix store path, a Flatpak. If
+   * the user can type `chromium` and have it work, so should this.
+   */
+  for (const name of ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge']) {
+    const found = onPath(name);
+    if (found) candidates.push(found);
+  }
+
   return candidates.filter((c) => fs.existsSync(c));
+}
+
+/** Resolve a command through PATH, the way a shell would. Windows needs the extensions. */
+function onPath(name: string): string | null {
+  const dirs = (process.env['PATH'] ?? '').split(path.delimiter).filter(Boolean);
+  const extensions =
+    process.platform === 'win32' ? (process.env['PATHEXT'] ?? '.EXE').split(';') : [''];
+  for (const dir of dirs) {
+    for (const extension of extensions) {
+      const candidate = path.join(dir, name + extension);
+      try {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        return candidate;
+      } catch {
+        /* not here, or not executable */
+      }
+    }
+  }
+  return null;
 }
 
 export function findBrowser(): string | null {

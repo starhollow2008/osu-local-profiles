@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### macOS and Linux
+
+Written, and covered by CI on `ubuntu-latest` and `macos-latest` alongside Windows. **Not
+yet run against a real osu! install on either**, so they are supported-but-unproven; the
+README says so and `docs/roadmap.md` 5.10 lists what still needs a real machine.
+
+- **Detection** takes the platform, home directory and environment as an argument instead of
+  reading `process`, so the paths it looks in are a pure function and can be tested for a
+  platform this project has never run on. `os.homedir()` replaces `$HOME` -- unset, it used
+  to look in a directory literally called `undefined` -- and `XDG_DATA_HOME` is honoured.
+- **osu!stable under Wine** is looked for in the Wineskin bundles, plain and `WINEPREFIX`
+  prefixes, CrossOver bottles and osu-winello. osu-winello records the install path it was
+  given, so that is read rather than guessed at. A missing Wine prefix is never an error.
+- **`installRoots` in `config.json` now works.** It was documented, and named in the "no
+  osu! found" message as the thing to set, and read by nothing. A configured folder is
+  classified by what is inside it, so you do not also have to say which client it is.
+- **The packaged build** gets a `.command` on macOS and an executable `start.sh` on Linux,
+  and a `README.txt` for that platform -- including that macOS will refuse the first launch
+  because the build is unsigned, and the two ways round it. Building a package for a
+  different OS than the one you are on is refused rather than producing an archive that
+  starts on nothing.
+- **The pp helper's pruning** matches native libraries by base name across
+  `.dll`/`.dylib`/`.so`. It deleted a hardcoded list of `.dll` names before, so a macOS or
+  Linux build would have matched nothing and silently shipped a 273MB helper rather than a
+  114MB one -- BASS included, which is not ours to redistribute.
+- **`--check-only`** reports whether osu! was found *and* whether the pp calculator starts,
+  rather than stopping at the first problem.
+- **`npm run ui`** finds a browser on all three platforms, and on `PATH`, instead of two
+  hardcoded Windows paths.
+- On Linux, the recursive file watch is one inotify watch per directory and lazer's store is
+  thousands of them, so hitting the limit is plausible. It now says that is what happened
+  and how to raise it, rather than reporting a bare `ENOSPC`, which reads as "disk full".
+
 ### Plays that were never finished
 
 Until now the profile only knew about plays osu!lazer kept a replay for -- which means

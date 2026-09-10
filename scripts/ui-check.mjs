@@ -12,17 +12,17 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { findBrowser } from '../src/http/screenshot.ts';
 
 const URL_UNDER_TEST = process.argv[2] ?? 'http://localhost:7272/';
 const PORT = 9333;
 
-const CHROMES = [
-  'C:/Program Files/Google/Chrome/Application/chrome.exe',
-  'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-];
-const binary = CHROMES.find((p) => fs.existsSync(p));
+// The same finder the screenshot feature uses, rather than a second list that would only
+// know about Windows -- which is what this was before, so the check could not run at all on
+// macOS or Linux.
+const binary = findBrowser();
 if (!binary) {
-  console.error('no Chromium browser found');
+  console.error('no Chromium browser found (looked in the usual places and on PATH)');
   process.exit(1);
 }
 
@@ -619,7 +619,12 @@ check('the score menu is hidden on load', await shown('playMenu'), 'none');
 check(
   'every score row offers one',
   await evaluate(`(() => {
-    const rows = document.querySelectorAll('#recentPlays .play-detail');
+    // Not every row in Recent Plays is a score. A play that was quit or failed has no
+    // score behind it and so nothing to pin, reorder or remove -- excluded here rather
+    // than given a menu whose every action would be meaningless.
+    const rows = document.querySelectorAll(
+      '#recentPlays .play-detail:not(.play-detail--incomplete)',
+    );
     if (rows.length === 0) return 'no scores tracked';
     return [...rows].every((r) => r.querySelector('[data-play-menu]'));
   })()`),

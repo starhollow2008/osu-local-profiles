@@ -14,6 +14,31 @@ export interface WatcherOptions {
   onError?: (err: Error) => void;
 }
 
+/**
+ * Turn a watch failure into something worth reading.
+ *
+ * This exists for one error in particular. On Windows a recursive `fs.watch` is a single
+ * `ReadDirectoryChangesW` handle for the whole tree; on Linux the kernel watches one
+ * directory at a time, so Node implements recursion by adding an inotify watch per
+ * directory -- and lazer's store is about 4,000 sharded directories. On a system whose
+ * `max_user_watches` is low, that fails with `ENOSPC`, which reads as "the disk is full"
+ * and means nothing of the sort. Someone hitting this deserves to be told the actual fix
+ * rather than left to search for it.
+ */
+export function explainWatchError(err: Error): string {
+  const code = (err as NodeJS.ErrnoException).code;
+  if (code === 'ENOSPC' && process.platform === 'linux') {
+    return (
+      `${err.message}\n` +
+      "  This is the inotify watch limit, not disk space: osu!lazer's file store is\n" +
+      '  thousands of directories and Linux watches them one at a time. Raise it with:\n' +
+      '    sudo sysctl fs.inotify.max_user_watches=524288\n' +
+      '  (add it to /etc/sysctl.conf to keep it across reboots)'
+    );
+  }
+  return err.message;
+}
+
 function readHead(file: string, n: number): Buffer | null {
   let fd: number | undefined;
   try {

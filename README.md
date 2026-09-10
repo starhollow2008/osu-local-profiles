@@ -30,10 +30,46 @@ built against.
 
 Country rank still shows `-`, on purpose; see Known gaps.
 
+## Platform support
+
+| Platform | State |
+| -------- | ----- |
+| **Windows** | Verified. Developed and used on it daily. |
+| **Linux** | Written and tested as far as it can be from Windows: CI runs the typecheck, the tests and a real start-up on `ubuntu-latest`. Nobody has yet run it against an actual osu! install. |
+| **macOS** | The same, on `macos-latest`. |
+
+The honest summary is that Linux and macOS are *supported but unproven*. What can be
+checked without one of those machines has been: every path the app looks for osu! in is
+pinned by tests that run on all three platforms, and CI builds osu!'s pp calculator and
+starts the app on each. What cannot is everything that needs a real osu! installation --
+that detection finds it, that the file watcher fires, and that a packaged build runs after
+being unzipped.
+
+If you run it on one of them, the interesting output is `node src/main.ts --check-only`.
+It reports whether osu! was found and whether the pp calculator starts, as two separate
+answers. If osu! is not found, point `installRoots` in `data/config.json` at it, and please
+open an issue with the path -- that is exactly the kind of layout that cannot be guessed
+from here.
+
+**osu!stable on macOS and Linux** runs under Wine, and there is no single layout for it.
+The Wineskin bundles, plain `~/.wine` prefixes, CrossOver bottles and osu-winello are all
+looked in; osu-winello's own record of where it installed osu! is read rather than guessed
+at. Anything else needs `installRoots`.
+
 ## Running it
 
-**If you have a packaged build**, unzip it anywhere and double-click
-`Start osu! fresh profile.bat`. Nothing needs installing.
+**If you have a packaged build**, unzip it anywhere and start it. Nothing needs installing.
+
+| Platform | Start it with |
+| -------- | ------------- |
+| Windows | double-click `Start osu! fresh profile.bat` |
+| macOS | double-click `Start osu! fresh profile.command` |
+| Linux | run `./start.sh` |
+
+On macOS the first launch is refused, because the build is not signed by a paid Apple
+developer account and macOS quarantines downloaded programs that are not. Right-click the
+file and choose Open, or run `xattr -dr com.apple.quarantine .` in the folder once. The
+packaged `README.txt` says so too.
 
 **From source:**
 
@@ -496,10 +532,18 @@ the download, not the decompression.
 npm run package
 ```
 
-Produces `dist/osu-fresh-profile-<version>-win-x64/` and a zip beside it: **203MB on disk,
-83MB to download**, containing Node, osu!'s pp calculator and the app. The user extracts it
-and double-clicks the launcher; there is nothing to install and no admin rights needed, and
-because `data/` lives beside the app the whole folder can be moved or carried on a stick.
+Produces `dist/osu-fresh-profile-<version>-<rid>/` and a zip beside it: **203MB on disk,
+83MB to download** for `win-x64`, containing Node, osu!'s pp calculator and the app. The
+user extracts it and runs the launcher; there is nothing to install and no admin rights
+needed, and because `data/` lives beside the app the whole folder can be moved or carried
+on a stick.
+
+**A package has to be built on the system it is for.** The runtime identifier defaults to
+the machine's own (`win-x64`, `osx-arm64`, `linux-x64`, ...) and `--rid` can only narrow
+that to a different architecture, not a different OS: `dotnet publish` would happily
+cross-compile the pp helper, but the bundled Node runtime is a copy of the one running the
+script, and there is no cross-platform equivalent of that. Building for another OS is
+refused rather than producing an archive that starts on nothing.
 
 Most of that script is *removal*. osu!'s NuGet packages carry the entire game -- fonts,
 textures, audio samples, ffmpeg, SDL, a shader compiler -- and a self-contained publish is

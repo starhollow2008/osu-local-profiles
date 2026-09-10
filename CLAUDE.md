@@ -236,6 +236,31 @@ the profile. Refresh it by re-running the script with a newer `--dump` date.
 is far too thin to interpolate per country, and a fabricated number would be worse than the
 dash osu! itself shows for an unranked user.
 
+## Windows is the only verified platform
+
+macOS and Linux are written, covered by CI on `ubuntu-latest` and `macos-latest`, and
+**have never been run against a real osu! install**. Treat anything platform-specific as
+unproven rather than working, and see `docs/roadmap.md` 5.10 for the list of what still
+needs a real machine.
+
+Two rules follow from that, and both were learned by getting them wrong:
+
+- **Anything that varies by platform belongs behind a pure function that takes the
+  platform.** `src/clients/detect.ts` takes a `DetectEnvironment` (platform, home, env)
+  rather than reading `process`, which is the only reason macOS and Linux paths can be
+  tested at all from here -- see `test/detect.test.ts`. Reading `process.env` directly makes
+  a behaviour that can only be checked by owning the machine.
+- **A platform-specific list must fail loudly when it matches nothing.** The pp helper's
+  pruning deleted a hardcoded list of `.dll` names; on macOS or Linux it would have matched
+  nothing at all, and *silently* shipped a 273MB helper instead of a 114MB one, BASS
+  included -- which is not ours to redistribute. It now matches by base name across
+  `.dll`/`.dylib`/`.so` and warns when it prunes nothing.
+
+`config.installRoots` is the escape hatch for a layout nobody anticipated, and on macOS and
+Linux that is the normal case for osu!stable: there is no official build, only Wine
+wrappers. It had been documented and printed in the "no osu! found" message while being read
+by nothing at all.
+
 ## Design constraints worth preserving
 
 - **No native modules in the Node process.** `node:sqlite` is built in, `rosu-pp-js` is

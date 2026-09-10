@@ -32,28 +32,75 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** Assemblies and natives the calculator never touches. See the note above. */
-const PRUNE_FILES = [
+/**
+ * Managed assemblies safe to drop. Named exactly, because a managed assembly is called the
+ * same thing on every platform.
+ */
+const PRUNE_ASSEMBLIES = [
   // Fonts, textures and audio samples: 125MB, and the single biggest win.
   'osu.Game.Resources.dll',
-
-  /*
-   * Native audio. BASS is un4seen's commercial library -- free for non-commercial use but
-   * not freely redistributable -- and this app never plays a sound, so shipping it would be
-   * both pointless and awkward. Note the *managed* wrapper `ppy.ManagedBass` must stay:
-   * osu.Framework references it directly, and the helper will not start without it.
-   */
-  'bass.dll', 'bass_fx.dll', 'bassmix.dll', 'basswasapi.dll',
-
-  // Native video decoding: nothing here ever plays a beatmap background.
-  'avcodec-58.dll', 'avformat-58.dll', 'avutil-56.dll', 'swscale-5.dll', 'swresample-3.dll',
-
-  // Native windowing, image loading and shader compilation: no window is ever opened.
-  'SDL2.dll', 'SDL3.dll', 'libveldrid-spirv.dll', 'stbi.dll',
-
-  // Native debug symbol reader.
-  'Microsoft.DiaSymReader.Native.amd64.dll', 'Microsoft.DiaSymReader.Native.x86.dll',
 ];
+
+/**
+ * Native libraries the calculator never calls, by *base* name.
+ *
+ * Matched by pattern rather than by filename because the same library is called three
+ * different things: `bass.dll`, `libbass.dylib`, `libbass.so`, and ffmpeg carries its
+ * version in a different place on each (`avcodec-58.dll` against `libavcodec.so.58`).
+ * Listing every spelling would mean guessing at names on platforms this was written on
+ * none of -- and a guess that missed would silently ship a 273MB helper instead of a 114MB
+ * one, and ship BASS with it.
+ *
+ * BASS is the reason this is not merely a size question. It is un4seen's commercial
+ * library, free for non-commercial use but *not* freely redistributable, and this app never
+ * plays a sound. The pattern has to catch it on every platform, not just the one that was
+ * tested.
+ *
+ * The *managed* wrapper `ppy.ManagedBass.dll` must stay -- osu.Framework references it
+ * directly and the helper will not start without it -- which is why these match a whole
+ * filename and never a substring.
+ */
+const PRUNE_NATIVES = [
+  // Audio.
+  'bass', 'bass_fx', 'bassmix', 'basswasapi',
+  // Video decoding: nothing here ever plays a beatmap background.
+  'avcodec', 'avformat', 'avutil', 'swscale', 'swresample',
+  // Windowing, image loading and shader compilation: no window is ever opened.
+  'SDL2', 'SDL3', 'veldrid-spirv', 'stbi',
+  // Debug symbol reader.
+  'Microsoft.DiaSymReader.Native.amd64', 'Microsoft.DiaSymReader.Native.x86',
+];
+
+const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/*
+ * `[lib]<name>[-1.2][.dll|.dylib|.so][.3]`, anchored at both ends.
+ *
+ * Anchoring is what keeps `ppy.ManagedBass.dll` and `osu.Framework.dll` safe: a substring
+ * test would take both. The two version slots cover where each platform puts it --
+ * `avcodec-58.dll`, `libavcodec.58.dylib`, `libavcodec.so.58`, `libSDL2-2.0.so.0`.
+ */
+const NATIVE_PATTERNS = PRUNE_NATIVES.map(
+  (name) =>
+    new RegExp(
+      `^(lib)?${escape(name)}([-.][0-9][0-9.]*)?\\.(dll|dylib|so)(\\.[0-9][0-9.]*)?$`,
+      'i',
+    ),
+);
+
+/** Whether a published file is one this helper has no use for. Exported for the tests. */
+export function shouldPrune(filename) {
+  if (PRUNE_ASSEMBLIES.includes(filename)) return true;
+  return NATIVE_PATTERNS.some((pattern) => pattern.test(filename));
+}
+
+/** The .NET runtime identifier for the machine this is running on. */
+export function defaultRid() {
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  if (process.platform === 'win32') return `win-${arch}`;
+  if (process.platform === 'darwin') return `osx-${arch}`;
+  return `linux-${arch}`;
+}
 
 /*
  * Kept despite looking unnecessary, each verified by removing it and watching the helper
@@ -75,7 +122,7 @@ function sizeOf(dir) {
 const mb = (bytes) => `${(bytes / 1048576).toFixed(0)}MB`;
 
 /** Publish into `outDir`, replacing whatever is there, and prune it. */
-export function buildPpHelper(outDir, target = 'win-x64') {
+export function buildPpHelper(outDir, target = defaultRid()) {
   fs.rmSync(outDir, { recursive: true, force: true });
 
   const result = spawnSync(
@@ -91,13 +138,25 @@ export function buildPpHelper(outDir, target = 'win-x64') {
   if (result.status !== 0) throw new Error(`dotnet publish exited ${result.status}`);
 
   const before = sizeOf(outDir);
-  // Localisation satellite assemblies: one directory per language.
+  /*
+   * Walk what was actually published rather than deleting a list of expected names. On a
+   * platform this has never run on, a name that does not appear is silently nothing --
+   * which is how a macOS build would have shipped BASS and 160MB of unused natives while
+   * reporting success.
+   */
+  let removed = 0;
   for (const entry of fs.readdirSync(outDir, { withFileTypes: true })) {
-    if (entry.isDirectory()) fs.rmSync(path.join(outDir, entry.name), { recursive: true, force: true });
+    // Localisation satellite assemblies: one directory per language.
+    if (entry.isDirectory()) {
+      fs.rmSync(path.join(outDir, entry.name), { recursive: true, force: true });
+      continue;
+    }
+    if (!shouldPrune(entry.name)) continue;
+    fs.rmSync(path.join(outDir, entry.name), { force: true });
+    removed++;
   }
-  for (const file of PRUNE_FILES) fs.rmSync(path.join(outDir, file), { force: true });
 
-  return { before, after: sizeOf(outDir) };
+  return { before, after: sizeOf(outDir), removed };
 }
 
 // Run directly (rather than imported by scripts/package.mjs) to refresh tools/pp.
@@ -106,11 +165,18 @@ export function buildPpHelper(outDir, target = 'win-x64') {
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const rid = process.argv.includes('--rid')
     ? process.argv[process.argv.indexOf('--rid') + 1]
-    : 'win-x64';
+    : defaultRid();
   const positional = process.argv.slice(2).find((a) => !a.startsWith('--') && a !== rid);
   const outDir = positional ? path.resolve(positional) : path.join(root, 'tools', 'pp');
 
   console.log(`\n  publishing the pp helper (${rid}) into ${outDir}\n`);
-  const { before, after } = buildPpHelper(outDir, rid);
-  console.log(`\n  ${mb(before)} -> ${mb(after)} after pruning\n`);
+  const { before, after, removed } = buildPpHelper(outDir, rid);
+  console.log(`\n  ${mb(before)} -> ${mb(after)}, ${removed} native file(s) pruned\n`);
+  // On a platform whose native library names were never verified, pruning nothing is the
+  // failure mode to catch: the helper still works, it is just three times the size and
+  // carries BASS, which is not ours to redistribute.
+  if (removed === 0) {
+    console.log('  WARNING: no native libraries matched. The helper will be much larger than');
+    console.log('  it should be, and may contain BASS. Check the names in PRUNE_NATIVES.\n');
+  }
 }

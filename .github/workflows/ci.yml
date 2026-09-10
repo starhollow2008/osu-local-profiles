@@ -8,7 +8,15 @@ on:
 
 jobs:
   check:
-    runs-on: windows-latest
+    # macOS and Linux support cannot be verified on the development machine, so CI is the
+    # only thing that runs this project on them at all. `fail-fast: false` because a break
+    # on one platform is exactly when the other two results are most worth having.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -33,6 +41,26 @@ jobs:
       # Several tests need a real osu! installation and a replay corpus, which a CI runner
       # does not have; those skip themselves. What still runs everywhere is the part that
       # can silently rot: accuracy, level, pp weighting, the rank curves' shape, profile
-      # lifecycle and the backfill cutoff logic.
+      # lifecycle, the backfill cutoff logic, and -- the reason this runs on three
+      # platforms -- where each of them keeps osu!.
       - name: Test
         run: npm test
+
+      # The app refuses to start without an osu! installation, which a runner has none of,
+      # so this only proves it gets that far: modules load, the schema applies, and the pp
+      # helper is found. Those are the parts that break on a platform nobody ran them on.
+      - name: Start far enough to need osu!
+        shell: bash
+        run: |
+          set -o pipefail
+          output=$(node src/main.ts --check-only 2>&1) && status=0 || status=$?
+          echo "$output"
+          # Exit 1 with that banner is the expected outcome on a machine with no osu!.
+          if [ "$status" -ne 0 ] && ! echo "$output" | grep -q 'No osu! installation found'; then
+            echo "::error::the app failed before it got as far as looking for osu!"
+            exit 1
+          fi
+          if ! echo "$output" | grep -q "pp: osu!'s official calculator"; then
+            echo "::error::the pp calculator was not found -- scores would be tracked with no pp"
+            exit 1
+          fi

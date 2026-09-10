@@ -6,6 +6,7 @@ import { BeatmapResolver, indexBeatmapFiles } from './clients/beatmaps.ts';
 import { getOrCreateProfile, openDb } from './db/index.ts';
 import { activeProfileId, getProfile } from './profiles.ts';
 import { Tracker } from './tracker/index.ts';
+import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
@@ -20,6 +21,25 @@ const checkOnly = process.argv.includes('--check-only');
 
 function banner(text: string): void {
   console.log(`\n  ${text}`);
+}
+
+/** Start the pp helper, say whether it worked, and shut it down again. */
+async function reportPpCalculator(): Promise<boolean> {
+  const official = await OfficialCalculator.create();
+  if (official) {
+    console.log("\n  pp: osu!'s official calculator");
+    official.dispose();
+    return true;
+  }
+  console.log('\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating');
+  return false;
+}
+
+/** Name the place this platform actually keeps lazer, rather than Windows' answer always. */
+function lazerSearchHint(): string {
+  if (process.platform === 'win32') return '%APPDATA%/osu';
+  if (process.platform === 'darwin') return '~/Library/Application Support/osu';
+  return '~/.local/share/osu';
 }
 
 function openBrowser(url: string): void {
@@ -43,12 +63,24 @@ async function main(): Promise<void> {
   const config = loadConfig();
   saveConfig(config);
 
-  const installs = detectInstalls();
+  // config.installRoots is tried before anything auto-detected. On macOS and Linux there is
+  // no official osu!stable build to detect, only community Wine wrappers, so this is the
+  // answer for a layout nobody anticipated.
+  const installs = detectInstalls(config.installRoots);
   if (installs.length === 0) {
     banner('No osu! installation found.');
-    console.log('  Looked for osu!lazer (%APPDATA%/osu) and osu!stable (osu!.exe).');
-    console.log(`  Set "installRoots" in ${path.join(dataDir(), 'config.json')} and restart.`);
+    console.log(`  Looked for osu!lazer (${lazerSearchHint()})`);
+    console.log('  and osu!stable (a folder containing osu!.exe).');
+    console.log(`  Set "installRoots" in ${path.join(dataDir(), 'config.json')} and restart:`);
+    console.log('    "installRoots": ["/path/to/osu!"]');
     process.exitCode = 1;
+    /*
+     * A diagnostic that stops at the first problem makes you run it twice. "osu! is not
+     * where I looked" and "the pp helper will not start" are separate faults with separate
+     * fixes, so `--check-only` reports both from one run -- which also lets CI, where there
+     * is never an osu! install, still check that the helper works on that platform.
+     */
+    if (checkOnly) await reportPpCalculator();
     return;
   }
 
@@ -73,16 +105,10 @@ async function main(): Promise<void> {
    * and it doubles as the first thing to run when something looks wrong.
    */
   if (checkOnly) {
-    const official = await OfficialCalculator.create();
-    if (official) {
-      console.log("\n  pp: osu!'s official calculator");
-      official.dispose();
-    } else {
-      console.log('\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating');
-    }
+    const ok = await reportPpCalculator();
     console.log(`  data: ${dataDir()}`);
     db.close();
-    process.exitCode = official ? 0 : 1;
+    process.exitCode = ok ? 0 : 1;
     return;
   }
 
@@ -169,7 +195,7 @@ async function main(): Promise<void> {
     const time = new Date(play.playedAt).toLocaleTimeString();
     console.log(`  [${time}]   --   -- did not finish        ${play.title}`);
   });
-  tracker.on('error', (e) => console.error(`  watcher error: ${e.message}`));
+  tracker.on('error', (e) => console.error(`  watcher error: ${explainWatchError(e)}`));
 
   tracker.start();
   const server = startServer({
