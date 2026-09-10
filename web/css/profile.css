@@ -1160,6 +1160,228 @@
 }
 
 /* ======================================================================== */
+/* Identity: the profile's name, picture and banner                         */
+/* ======================================================================== */
+
+/*
+ * The avatar is a button and the name is a role=button, so both open the editor. They are
+ * styled as themselves rather than as controls -- the affordance is a hover cue and a
+ * tooltip, because osu!'s own header has no buttons here and this page follows it.
+ */
+.profile-info__avatar {
+  position: relative;
+  display: block;
+}
+
+.profile-info__avatar::after {
+  content: "Edit";
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 4px 0;
+  background-color: hsla(var(--hsl-b6), 0.8);
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.profile-info__avatar:hover::after,
+.profile-info__avatar:focus-visible::after {
+  opacity: 1;
+}
+
+.profile-info__name {
+  cursor: pointer;
+}
+
+.profile-info__name:hover {
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+}
+
+.identity-heading {
+  margin: 18px 0 4px;
+  font-size: var(--fs-title-small);
+  font-weight: 700;
+}
+
+.identity-images {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.identity-image {
+  min-width: 0;
+}
+
+.identity-image__label {
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+  margin-bottom: 4px;
+}
+
+.identity-image__preview {
+  background-color: hsl(var(--hsl-b6));
+  background-size: cover;
+  background-position: center;
+  border-radius: var(--radius-base);
+  overflow: hidden;
+}
+
+.identity-image__preview--avatar {
+  width: 74px;
+  height: 74px;
+  border-radius: 14px;
+}
+
+.identity-image__preview--avatar img,
+.identity-image__preview--avatar svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.identity-image__preview--cover {
+  height: 74px;
+}
+
+/* An empty banner has no image to show, so it says what will be there instead. */
+.identity-image__preview--empty::after {
+  content: "the cover art of your best play";
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 0 10px;
+  text-align: center;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.identity-image__actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.identity-image__actions button {
+  padding: 5px 9px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+  font-size: var(--fs-normal);
+}
+
+.identity-image__actions button:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.identity-image__actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.identity-link {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.identity-link input {
+  flex: 1;
+  min-width: 0;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 6px 8px;
+  font: inherit;
+}
+
+.identity-link button {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+.identity-link button:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.identity-found:not(:empty) {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* A looked-up account, shown before anything is applied: look first, then use. */
+.identity-candidate,
+.identity-linked,
+.identity-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  font-size: var(--fs-normal-2);
+  text-align: left;
+}
+
+.identity-suggestion:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.identity-suggestion span {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.identity-candidate__avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  object-fit: cover;
+  background-color: hsl(var(--hsl-b6));
+  flex: none;
+}
+
+.identity-candidate__detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.identity-candidate__detail span {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.identity-candidate button,
+.identity-linked button {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+.identity-candidate button:hover,
+.identity-linked button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.identity-linked {
+  margin-left: auto;
+  gap: 6px;
+}
+
+/* ======================================================================== */
 /* Score actions: pin, reorder, remove                                      */
 /* ======================================================================== */
 

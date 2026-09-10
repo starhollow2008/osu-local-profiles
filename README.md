@@ -126,6 +126,12 @@ Two hosts are contacted, both public and unauthenticated, and both optional:
 |---|---|---|
 | `assets.ppy.sh` | beatmap cover art, keyed by the beatmapset id already resolved offline | the placeholder colour shows instead |
 | `data.ppy.sh` | the rank-curve dumps, only when you run `npm run rank:refresh` by hand | nothing; the checked-in curves keep working |
+| `osu.ppy.sh` | one page fetch when you press **Look up** in Edit profile, to find a name, picture and banner | it says so; type a name and upload an image instead |
+
+The profile lookup reads the public profile page -- the same user object osu!'s API returns
+for `/users/{user}`, which the page embeds in order to render itself. One request per press
+of the button, never on a timer, and what it finds is copied into `data/` so it is never
+fetched twice.
 
 Rank estimation was the one feature that looked like it would need the API, and it does not:
 the rankings endpoint only exposes the top 10,000 anyway, which never covers a fresh
@@ -193,6 +199,24 @@ leaving the destructive button as the only one that worked. No unit test would c
   known-correct values, so the other three inherit that caveat.
 - Only the local `.osu` files you already have can be used for pp; a map you have never
   downloaded cannot be calculated offline.
+
+## Editing the profile
+
+**Options -> Edit profile**, or click the avatar or the name.
+
+- **Name** -- renames the profile. Nothing it has tracked changes.
+- **Picture** and **Banner** -- upload a PNG, JPEG, WebP or GIF, or borrow them from an
+  osu! account. Both are stored per profile, so two playstyles are two identities.
+- **Borrow from an osu! account** -- type a username, a user id, or a link to a profile.
+  Pressing **Look up** shows what it found; pressing **Use this** copies the picture and
+  banner in.
+
+If osu! is signed in, its username is offered as a suggestion, read from the client's own
+config file with no network at all. It only ever prefills: a fresh profile is a different
+identity by definition, so it is never adopted without being asked for.
+
+Nothing here is required. With no picture the page draws an avatar from the profile's name,
+and the banner falls back to the cover art of the profile's best play.
 
 ## Pinning and removing scores
 

@@ -20,6 +20,7 @@
       <div class="menu-wrap">
         <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
         <div class="menu" id="optionsMenu" hidden>
+          <button id="optIdentity" type="button">Edit profile&hellip;</button>
           <button id="optSettings" type="button">Settings&hellip;</button>
           <button id="optProfiles" type="button">Profiles&hellip;</button>
           <button id="optBackfill" type="button">Import past plays&hellip;</button>
@@ -37,9 +38,11 @@
 
   <div class="profile-info__details band">
     <div class="band__inner profile-info__details-inner">
-      <div class="profile-info__avatar" id="avatar"></div>
+      <button class="profile-info__avatar" id="avatar" type="button"
+              title="Change this profile's picture"></button>
       <div class="profile-info__info">
-        <h1 class="profile-info__name u-ellipsis u-text-shadow" id="pname">Fresh Profile</h1>
+        <h1 class="profile-info__name u-ellipsis u-text-shadow" id="pname"
+            role="button" tabindex="0" title="Rename this profile">Fresh Profile</h1>
         <div class="profile-info__flags u-text-shadow" id="pflags"></div>
       </div>
       <nav class="game-mode" id="modes" aria-label="Game mode"></nav>
@@ -148,6 +151,66 @@
   <button type="button" data-act="move-down" role="menuitem">Move down</button>
   <div class="sep"></div>
   <button type="button" class="danger" data-act="hide" role="menuitem">Remove from profile</button>
+</div>
+
+<!-- Outside every dialog: the picker is opened from script, and is never seen. -->
+<input type="file" id="identityFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+
+<div class="backdrop" id="identityModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="identityTitle">
+    <h3 id="identityTitle">Edit profile</h3>
+    <p>
+      The name, picture and banner for <b id="identityProfileName">this profile</b>. None of
+      this is required &mdash; a fresh profile starts with a drawn avatar and the cover art
+      of its best play.
+    </p>
+
+    <label class="field">
+      <span>Name</span>
+      <input type="text" id="identityName" maxlength="60">
+    </label>
+    <div class="setting__hint" id="identityNameHint">
+      What this profile is called. Renaming it changes nothing it has tracked.
+    </div>
+
+    <div class="identity-images">
+      <div class="identity-image">
+        <div class="identity-image__label">Picture</div>
+        <div class="identity-image__preview identity-image__preview--avatar" id="identityAvatar"></div>
+        <div class="identity-image__actions">
+          <button type="button" data-upload="avatar">Upload&hellip;</button>
+          <button type="button" data-clear="avatar">Remove</button>
+        </div>
+      </div>
+      <div class="identity-image">
+        <div class="identity-image__label">Banner</div>
+        <div class="identity-image__preview identity-image__preview--cover" id="identityCover"></div>
+        <div class="identity-image__actions">
+          <button type="button" data-upload="cover">Upload&hellip;</button>
+          <button type="button" data-clear="cover">Remove</button>
+        </div>
+      </div>
+    </div>
+
+    <h4 class="identity-heading">Borrow from an osu! account</h4>
+    <p class="setting__hint">
+      Optional, and never automatic. Looking one up makes a single request to
+      <code>osu.ppy.sh</code> when you press the button; the picture and banner are then
+      copied here, so the page still works with no network. No login and no API key.
+    </p>
+    <div class="identity-link">
+      <input type="text" id="identityQuery" placeholder="username, user id, or profile link">
+      <button type="button" id="identityLookup">Look up</button>
+    </div>
+    <div class="identity-found" id="identityFound"></div>
+
+    <div class="profile-hint" id="identityHint">&nbsp;</div>
+
+    <div class="actions">
+      <button id="identityClose" type="button">Close</button>
+      <button id="identitySave" class="primary" type="button">Save name</button>
+    </div>
+  </div>
 </div>
 
 <div class="toast" id="toast"></div>

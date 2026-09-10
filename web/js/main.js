@@ -370,6 +370,266 @@ document.addEventListener('keydown', (e) => {
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
   if (!$('playMenu').hidden) closePlayMenu();
+  if (!$('identityModal').hidden) closeIdentity();
+});
+
+/* ---------------------------------------------------------------- identity */
+
+/*
+ * The profile's name, picture and banner, and the optional osu! account they can be
+ * borrowed from.
+ *
+ * Four sources, in the order they cost the user anything: what osu! is signed in as (read
+ * from its own config file, no network), a looked-up account, a file from disk, or nothing
+ * at all -- which is the default, and draws an avatar from the profile's name.
+ */
+
+let identitySuggestions = { sessions: [], linked: null };
+/** Which image an "Upload..." press is choosing a file for. */
+let uploadKind = null;
+
+function identityHint(message, isError = false) {
+  const el = $('identityHint');
+  el.textContent = message;
+  el.classList.toggle('profile-hint--error', isError);
+}
+
+async function identityAction(payload) {
+  const r = await fetch('/api/identity', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error ?? 'that did not work');
+  return d;
+}
+
+/** Cache-busted, because the file behind these URLs is replaced in place. */
+function renderIdentityPreviews() {
+  const stamp = Date.now();
+  $('identityAvatar').innerHTML = profile?.hasAvatar
+    ? `<img src="/api/image/avatar?v=${stamp}" alt="">`
+    : generatedAvatar(profile?.name ?? '');
+  $('identityCover').style.backgroundImage = profile?.hasCover
+    ? `url('/api/image/cover?v=${stamp}')`
+    : 'none';
+  $('identityCover').classList.toggle('identity-image__preview--empty', !profile?.hasCover);
+
+  for (const kind of ['avatar', 'cover']) {
+    const has = kind === 'avatar' ? profile?.hasAvatar : profile?.hasCover;
+    $('identityModal').querySelector(`[data-clear="${kind}"]`).disabled = !has;
+  }
+}
+
+/** What can be offered without touching the network: the osu! session, and any link. */
+function renderIdentitySuggestions() {
+  const bits = [];
+  for (const session of identitySuggestions.sessions ?? []) {
+    bits.push(
+      `<button type="button" class="identity-suggestion" data-query="${escapeHtml(session.username)}">
+         Use <b>${escapeHtml(session.username)}</b>
+         <span>signed in to osu!${escapeHtml(session.client)}</span>
+       </button>`,
+    );
+  }
+  if (identitySuggestions.linked) {
+    bits.push(
+      `<div class="identity-linked">
+         Linked to <b>${escapeHtml(identitySuggestions.linked.username)}</b>
+         (#${fmt(identitySuggestions.linked.id)})
+         <button type="button" id="identityUnlink">Unlink</button>
+       </div>`,
+    );
+  }
+  $('identityFound').innerHTML = bits.join('');
+}
+
+async function openIdentity() {
+  setMenuOpen(false);
+  $('identityProfileName').textContent = profile?.name ?? 'this profile';
+  $('identityName').value = profile?.name ?? '';
+  $('identityQuery').value = '';
+  identityHint(' ');
+  renderIdentityPreviews();
+  $('identityFound').innerHTML = '';
+  $('identityModal').hidden = false;
+  $('identityClose').focus();
+
+  try {
+    identitySuggestions = await identityAction({ action: 'suggestions' });
+    // Only render if the dialog is still open: reading osu!'s config is cheap but not free.
+    if (!$('identityModal').hidden) renderIdentitySuggestions();
+  } catch {
+    /* suggestions are a convenience; typing a name always works */
+  }
+}
+
+const closeIdentity = () => {
+  $('identityModal').hidden = true;
+};
+
+$('optIdentity').onclick = openIdentity;
+$('identityClose').onclick = closeIdentity;
+$('identityModal').onclick = (e) => {
+  if (e.target === $('identityModal')) closeIdentity();
+};
+$('avatar').onclick = openIdentity;
+$('pname').onclick = openIdentity;
+$('pname').onkeydown = (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    openIdentity();
+  }
+};
+
+/* Renaming here is the same operation the Profiles dialog performs. */
+$('identitySave').onclick = async () => {
+  const name = $('identityName').value.trim();
+  if (!name) {
+    identityHint('Give the profile a name.', true);
+    return;
+  }
+  if (name === profile?.name) {
+    identityHint('That is already its name.');
+    return;
+  }
+  try {
+    await profileAction({ action: 'rename', id: profile.id, name });
+    await loadState();
+    $('identityProfileName').textContent = name;
+    renderIdentityPreviews();
+    toast(`Renamed to "${name}"`);
+    identityHint(' ');
+  } catch (err) {
+    identityHint(err.message, true);
+  }
+};
+
+$('identityName').onkeydown = (e) => {
+  if (e.key === 'Enter') $('identitySave').click();
+};
+
+/* --- images ------------------------------------------------------------- */
+
+$('identityModal').addEventListener('click', async (e) => {
+  const upload = e.target.closest('[data-upload]');
+  if (upload) {
+    uploadKind = upload.dataset.upload;
+    $('identityFile').value = '';
+    $('identityFile').click();
+    return;
+  }
+
+  const clear = e.target.closest('[data-clear]');
+  if (clear) {
+    try {
+      await identityAction({ action: 'clear-image', kind: clear.dataset.clear });
+      await loadState();
+      renderIdentityPreviews();
+      await loadProfile();
+      identityHint('Removed.');
+    } catch (err) {
+      identityHint(err.message, true);
+    }
+    return;
+  }
+
+  const suggestion = e.target.closest('[data-query]');
+  if (suggestion) {
+    $('identityQuery').value = suggestion.dataset.query;
+    $('identityLookup').click();
+    return;
+  }
+
+  if (e.target.id === 'identityUnlink') {
+    try {
+      await identityAction({ action: 'unlink' });
+      identitySuggestions.linked = null;
+      renderIdentitySuggestions();
+      identityHint('Unlinked. The picture and banner already copied here are kept.');
+    } catch (err) {
+      identityHint(err.message, true);
+    }
+  }
+});
+
+/*
+ * The file goes up as a raw PUT rather than a multipart form: there is one file and no
+ * other fields, so multipart would only mean writing a parser for a body we already have.
+ * The server sniffs the bytes -- the type the browser reports is not evidence.
+ */
+$('identityFile').onchange = async () => {
+  const file = $('identityFile').files?.[0];
+  const kind = uploadKind;
+  if (!file || !kind) return;
+
+  identityHint(`Uploading ${file.name}...`);
+  try {
+    const r = await fetch(`/api/image/${kind}`, { method: 'PUT', body: file });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'upload failed');
+    await loadState();
+    renderIdentityPreviews();
+    await loadProfile();
+    identityHint('Saved.');
+  } catch (err) {
+    identityHint(err.message, true);
+  }
+};
+
+/* --- borrowing from an osu! account ------------------------------------- */
+
+$('identityLookup').onclick = async () => {
+  const query = $('identityQuery').value.trim();
+  if (!query) {
+    identityHint('Type a username, a user id, or a link to a profile.', true);
+    return;
+  }
+
+  $('identityLookup').disabled = true;
+  identityHint(`Looking up "${query}" on osu.ppy.sh...`);
+  try {
+    const { user } = await identityAction({ action: 'lookup', query });
+    // Shown before anything is applied: one press to look, another to use what was found.
+    $('identityFound').innerHTML = `<div class="identity-candidate">
+      <img class="identity-candidate__avatar" src="${escapeHtml(user.avatarUrl ?? '')}" alt="">
+      <div class="identity-candidate__detail">
+        <b>${escapeHtml(user.username)}</b>
+        <span>#${fmt(user.id)}${user.countryCode ? ` &middot; ${escapeHtml(user.countryCode)}` : ''}</span>
+      </div>
+      <button type="button" id="identityUse">Use this</button>
+    </div>`;
+    identityHint('Found. "Use this" copies the picture and banner here.');
+  } catch (err) {
+    $('identityFound').innerHTML = '';
+    identityHint(err.message, true);
+  } finally {
+    $('identityLookup').disabled = false;
+  }
+};
+
+$('identityFound').addEventListener('click', async (e) => {
+  if (!e.target.closest('#identityUse')) return;
+  const query = $('identityQuery').value.trim();
+
+  identityHint('Copying the picture and banner...');
+  try {
+    const d = await identityAction({ action: 'link', query });
+    identitySuggestions.linked = { id: d.user.id, username: d.user.username };
+    await loadState();
+    renderIdentityPreviews();
+    renderIdentitySuggestions();
+    await loadProfile();
+    identityHint(
+      d.failures?.length
+        ? `Linked to ${d.user.username}, but ${d.failures.join('; ')}`
+        : `Linked to ${d.user.username}.`,
+      Boolean(d.failures?.length),
+    );
+  } catch (err) {
+    identityHint(err.message, true);
+  }
 });
 
 /* ---------------------------------------------------------------- settings */
@@ -1117,6 +1377,7 @@ es.addEventListener('profiles', () => {
 // Settings only change the header, but a second tab open on the same profile should not
 // be left showing the old country.
 es.addEventListener('settings', () => loadState());
+es.addEventListener('identity', () => loadState());
 // Pin, unpin and remove all change what the page should be showing.
 es.addEventListener('scores', () => {
   loadProfile();

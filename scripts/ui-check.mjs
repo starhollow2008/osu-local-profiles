@@ -189,6 +189,53 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nedit profile dialog');
+check('the identity dialog is hidden on load', await shown('identityModal'), 'none');
+// The avatar and the name are the affordance -- osu!'s own header has no button here.
+check(
+  'the avatar opens it',
+  await evaluate(`(() => {
+    document.getElementById('avatar').click();
+    return getComputedStyle(document.getElementById('identityModal')).display;
+  })()`),
+  'grid',
+);
+check(
+  'it is prefilled with the profile name',
+  await evaluate(
+    "document.getElementById('identityName').value === document.getElementById('pname').textContent",
+  ),
+  true,
+);
+check(
+  'both images offer upload and remove',
+  // No nested template literals here: the inner one would interpolate in this one.
+  await evaluate(
+    "['avatar', 'cover'].every((k) => " +
+      "document.querySelector('[data-upload=' + JSON.stringify(k) + ']') && " +
+      "document.querySelector('[data-clear=' + JSON.stringify(k) + ']'))",
+  ),
+  true,
+);
+// The file picker must never be visible: it is opened from script.
+check('the file picker stays out of the layout', await shown('identityFile'), 'none');
+check(
+  'looking up an account needs a press, and says so',
+  await evaluate(
+    "document.querySelector('.identity-heading + .setting__hint').textContent.includes('when you press the button')",
+  ),
+  true,
+);
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes the identity dialog', await shown('identityModal'), 'none');
+
+await evaluate("document.getElementById('pname').click()");
+check('the name opens it too', await shown('identityModal'), 'grid');
+await evaluate("document.getElementById('identityClose').click()");
+check('Close closes it', await shown('identityModal'), 'none');
+
 console.log('\nsettings dialog');
 check('settings dialog is hidden on load', await shown('settingsModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");

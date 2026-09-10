@@ -17,8 +17,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.2  | Include pp for unranked **mods**              | done   |
 | 5.3  | Include pp for unranked **maps**              | done   |
 | 5.4  | Score actions: pin, reorder, hide             | done   |
-| 5.5  | Editable identity + linked osu! account       | in progress |
-| 5.6  | `me!` section                                 | todo   |
+| 5.5  | Editable identity + linked osu! account       | done   |
+| 5.6  | `me!` section                                 | in progress |
 | 5.7  | Draggable section order                       | todo   |
 | 5.8  | Medals                                        | todo   |
 | 5.9  | Share: screenshot and standalone HTML         | todo   |
@@ -239,7 +239,7 @@ from every section and from the totals, and a hidden score can be restored.
 
 ## 5.5 — Editable identity, and linking an official osu! account
 
-**Status:** in progress
+**Status:** done
 
 **Goal.** Profile name, avatar and banner become click-to-edit, with four sources each:
 the local osu! session, a typed username / id / profile link, a manual file upload, or the
@@ -251,11 +251,12 @@ linked account set in Settings.
   state.
 - **Network layering, in order of preference** — each step is optional and degrades:
   1. Avatar: `https://a.ppy.sh/<id>` needs no credentials at all. Cached to `data/`.
-  2. Username/banner: osu! API v2, only if the user pastes a client id + secret into
-     Settings (their own OAuth app; documented in the README).
-  3. No credentials: fetch the public profile page once and read its embedded JSON. Clearly
-     labelled as best-effort, one request, cached, never on a timer.
-  4. Nothing works: manual entry and file upload always available.
+  2. **The OAuth layer turned out to be unnecessary and was dropped.** The public profile
+     page redirects username -> id and embeds the whole public user object (id, username,
+     `avatar_url`, `cover_url`, `country_code`) as `data-initial-data` -- the same data the
+     API's `/users/{user}` returns. So there is no client id, no secret, and nothing for the
+     user to register. Verified against a real profile.
+  3. Nothing works: manual entry and file upload are always available.
 - Fetched images are **copied into `data/`** so the page stays complete offline, and so a
   packaged build carries its own identity.
 - **The local osu! session**: osu!stable stores the username in `osu!.<user>.cfg`
@@ -274,7 +275,7 @@ typing. With a linked account, avatar and banner appear and are cached.
 
 ## 5.6 — `me!` section
 
-**Status:** todo
+**Status:** in progress
 
 **Goal.** The description box from the official profile page, click-to-edit, per profile.
 

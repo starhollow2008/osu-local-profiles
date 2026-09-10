@@ -28,6 +28,17 @@ import {
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { eligibilityOf } from '../calc/eligibility.ts';
+import { detectLocalSessions } from '../clients/session.ts';
+import { downloadImage, lookupUser } from '../clients/osu-web.ts';
+import {
+  clearImage,
+  findImage,
+  imageState,
+  MIME_FOR_EXTENSION,
+  saveImage,
+  sniffImage,
+  type ImageKind,
+} from '../identity.ts';
 import {
   applyScoreAction,
   hiddenCount,
@@ -35,6 +46,9 @@ import {
   reorderPins,
   type ScoreAction,
 } from '../scores.ts';
+
+/** Upload ceiling for an avatar or banner; anything larger is a mistake. */
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
@@ -49,16 +63,6 @@ const MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
-};
-
-/**
- * Images the user can drop into `data/` to personalise the profile, in preference order.
- * Nothing is required: without them the page draws its own avatar and uses the cover of
- * the profile's best play.
- */
-const LOCAL_IMAGES: Record<string, string[]> = {
-  avatar: ['avatar.png', 'avatar.jpg', 'avatar.jpeg', 'avatar.webp'],
-  cover: ['cover.jpg', 'cover.png', 'cover.jpeg', 'cover.webp'],
 };
 
 export interface ServerOptions {
@@ -91,13 +95,6 @@ export function startServer(opts: ServerOptions): http.Server {
   /** How this profile counts scores right now. Read per request, never captured. */
   const rules = () => eligibilityOf(settingsFor(current()));
 
-  const localImage = (kind: string): string | null => {
-    for (const name of LOCAL_IMAGES[kind] ?? []) {
-      const file = path.join(opts.dataDir, name);
-      if (fs.existsSync(file)) return file;
-    }
-    return null;
-  };
 
   const broadcast = (event: string, data: unknown) => {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -158,8 +155,7 @@ export function startServer(opts: ServerOptions): http.Server {
           tagline: settings.tagline,
           createdAt: profile.createdAt,
           trackingSince: profile.trackingSince,
-          hasAvatar: localImage('avatar') !== null,
-          hasCover: localImage('cover') !== null,
+          ...imageState(opts.dataDir, profile.id),
         },
         profiles: listProfiles(opts.db),
         tracking: opts.tracker.isTracking,
@@ -208,10 +204,10 @@ export function startServer(opts: ServerOptions): http.Server {
       });
     }
 
-    // data/avatar.* and data/cover.*, served only if the user put one there.
+    // This profile's avatar or banner, served only if it has one.
     const image = /^\/api\/image\/(avatar|cover)$/.exec(url.pathname);
-    if (image) {
-      const file = localImage(image[1]!);
+    if (image && req.method !== 'PUT') {
+      const file = findImage(opts.dataDir, current(), image[1] as ImageKind);
       if (!file) {
         res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
         return;
@@ -279,6 +275,146 @@ export function startServer(opts: ServerOptions): http.Server {
           return json(res, { ok: true, ...result });
         } catch (e) {
           return json(res, { error: (e as Error).message }, 500);
+        }
+      });
+    }
+
+    /*
+     * Uploading an avatar or a banner.
+     *
+     * A raw PUT rather than a multipart form: the page has one file and no other fields, so
+     * multipart would mean writing a parser to recover a body we already have. The bytes are
+     * sniffed rather than trusted -- the content-type is whatever the page chose to send.
+     */
+    if (image && req.method === 'PUT') {
+      const kind = image[1] as ImageKind;
+      const chunks: Buffer[] = [];
+      let size = 0;
+      let aborted = false;
+
+      req.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        size += chunk.length;
+        if (size > MAX_UPLOAD_BYTES) {
+          aborted = true;
+          json(res, { error: 'that image is too large (8MB max)' }, 413);
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      req.on('end', () => {
+        if (aborted) return;
+        const bytes = Buffer.concat(chunks);
+        const extension = sniffImage(bytes);
+        if (!extension) {
+          return json(res, { error: 'that file is not a PNG, JPEG, WebP or GIF' }, 400);
+        }
+        try {
+          saveImage(opts.dataDir, current(), kind, bytes, extension);
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 500);
+        }
+        broadcast('identity', { kind });
+        return json(res, { ok: true, ...imageState(opts.dataDir, current()) });
+      });
+      return;
+    }
+
+    /*
+     * Identity: the profile's name, avatar and banner, and the optional osu! account they
+     * can be borrowed from.
+     *
+     * Every network action here happens because a button was pressed, makes one request,
+     * and copies what it finds into `data/`. Nothing is fetched on a schedule, and with no
+     * network the upload and typing paths still work. See src/clients/osu-web.ts.
+     */
+    if (url.pathname === '/api/identity' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        const action = String(body['action'] ?? '');
+        const id = current();
+
+        try {
+          switch (action) {
+            /** What can be offered without touching the network. */
+            case 'suggestions': {
+              return json(res, {
+                sessions: detectLocalSessions(opts.installs),
+                linked: (() => {
+                  const settings = settingsFor(id);
+                  return settings.linkedUserId > 0
+                    ? { id: settings.linkedUserId, username: settings.linkedUsername }
+                    : null;
+                })(),
+              });
+            }
+
+            /** One request, on an explicit press, showing what was found before using it. */
+            case 'lookup': {
+              const user = await lookupUser(String(body['query'] ?? ''));
+              return json(res, { ok: true, user });
+            }
+
+            /**
+             * Adopt a looked-up account: remember it, and copy its pictures in. The name is
+             * *not* changed -- renaming a profile is a separate, deliberate act.
+             */
+            case 'link': {
+              const user = await lookupUser(String(body['query'] ?? ''));
+              updateSettings(
+                opts.db,
+                id,
+                { linkedUserId: user.id, linkedUsername: user.username },
+                configFallbacks,
+              );
+
+              // Best effort: a linked account with an unreachable image is still linked.
+              const failures: string[] = [];
+              for (const [kind, source] of [
+                ['avatar', user.avatarUrl],
+                ['cover', user.coverUrl],
+              ] as const) {
+                if (!source || body[kind] === false) continue;
+                try {
+                  const downloaded = await downloadImage(source);
+                  saveImage(opts.dataDir, id, kind, downloaded.bytes, downloaded.extension);
+                } catch (e) {
+                  failures.push(`${kind}: ${(e as Error).message}`);
+                }
+              }
+
+              broadcast('identity', { linked: user.id });
+              return json(res, {
+                ok: true,
+                user,
+                failures,
+                settings: settingsFor(id),
+                ...imageState(opts.dataDir, id),
+              });
+            }
+
+            case 'unlink': {
+              updateSettings(opts.db, id, { linkedUserId: 0, linkedUsername: '' }, configFallbacks);
+              broadcast('identity', { linked: 0 });
+              return json(res, { ok: true, settings: settingsFor(id) });
+            }
+
+            case 'clear-image': {
+              const kind = String(body['kind'] ?? '');
+              if (kind !== 'avatar' && kind !== 'cover') {
+                return json(res, { error: 'kind must be "avatar" or "cover"' }, 400);
+              }
+              clearImage(opts.dataDir, id, kind);
+              broadcast('identity', { kind });
+              return json(res, { ok: true, ...imageState(opts.dataDir, id) });
+            }
+
+            default:
+              return json(res, { error: `unknown action ${JSON.stringify(action)}` }, 400);
+          }
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
         }
       });
     }

@@ -48,6 +48,14 @@ export interface Settings {
    * unsubmitted one exists only on this machine.
    */
   includeUnrankedMaps: UnrankedMapStatus[];
+  /**
+   * An osu! account this profile borrows its name, avatar and banner from. 0 for none,
+   * which is the default and stays the default -- a fresh profile is a different identity
+   * by definition, so it is never linked without being asked for.
+   */
+  linkedUserId: number;
+  /** The username that id had when it was looked up, so the link reads as a name. */
+  linkedUsername: string;
 }
 
 /**
@@ -98,6 +106,17 @@ const DEFS: Defs = {
   unrankedModPp: {
     default: 'without-the-mod',
     coerce: (raw) => (raw === 'as-played' ? 'as-played' : 'without-the-mod'),
+  },
+  linkedUserId: {
+    default: 0,
+    coerce: (raw) => {
+      const id = Math.floor(Number(raw));
+      return Number.isFinite(id) && id > 0 ? id : 0;
+    },
+  },
+  linkedUsername: {
+    default: '',
+    coerce: (raw) => cleanText(raw, 32),
   },
   includeUnrankedMaps: {
     default: [],

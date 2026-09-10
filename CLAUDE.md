@@ -115,6 +115,19 @@ store no pp and say so loudly.
 osu! computes accuracy itself during decoding and returns it; `test/official.test.ts` asserts
 our `src/calc/grade.ts` implementation agrees with it on both a lazer and a stable replay.
 
+## The osu! account link needs no API and no credentials
+
+`osu.ppy.sh/users/<name>` redirects to the numeric id and embeds the whole public user
+object -- id, username, `avatar_url`, `cover_url`, `country_code` -- in the page as a
+`data-initial-data` attribute, HTML escaped. That is the same data the API's `/users/{user}`
+returns, so the OAuth application, client id and secret an API call would need are all
+avoidable. This is what keeps the project's "no login anywhere" promise true.
+
+It is a private detail of osu-web and may change, so `src/clients/osu-web.ts` fails loudly
+with a message worth reading rather than returning an empty user. Every path through it runs
+because a button was pressed, makes one request, and copies what it finds into `data/`.
+Nothing is on a timer -- see `docs/reference-links.md` for why that matters.
+
 ## Global rank is estimated from a sampled curve, and says so
 
 osu!'s rankings API only exposes the top 10,000, which never covers a fresh profile. The
@@ -180,6 +193,9 @@ src/calc/eligibility.ts  the single definition of "this score counts toward pp"
 src/settings.ts        per-profile settings, stored one row per key
 src/tracker/recompute.ts  recalculate stored scores in place from their replays
 src/scores.ts          pin, order pins, remove a score from the profile (a hide)
+src/identity.ts        per-profile avatar and banner files in data/
+src/clients/osu-web.ts optional, on-demand profile lookup (no API, no credentials)
+src/clients/session.ts the username osu! is signed in as, from its own config file
 tools/PpCalculator/    .NET helper wrapping osu!'s real difficulty/pp code
 src/http/              JSON API + SSE
 web/index.html         Phase 1 UI (plain; Vite + React planned for Phase 2)

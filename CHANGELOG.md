@@ -42,6 +42,24 @@ Phase 5 is planned feature by feature in [docs/roadmap.md](docs/roadmap.md).
   draft nobody finished, and a never-submitted one exists only on your machine.
 - Independent of the mod setting: a Loved map played with Relax needs both before it counts.
 
+### Editing the profile
+
+- **Options -> Edit profile**, or click the avatar or the name. Sets the profile's name,
+  picture and banner.
+- Pictures and banners are **per profile** rather than per install, so two playstyles are
+  two identities. A hand-placed `data/avatar.png` from before this still works, as the
+  fallback for any profile that has not set its own.
+- Upload a PNG, JPEG, WebP or GIF. Uploads are sniffed rather than trusted: the type the
+  browser reports is whatever the page chose to send.
+- **Borrow from an osu! account** by username, user id or profile link. It shows what it
+  found before applying anything, then copies the picture and banner into `data/` so the
+  page still works with no network afterwards.
+- **Still no login and no API key.** The lookup reads the public profile page, which embeds
+  the same user object osu!'s API returns. One request per button press, never on a timer.
+- If osu! is signed in, its username is offered as a suggestion, read from the client's own
+  config file with no network. It only prefills: a fresh profile is a different identity by
+  definition, so it is never adopted without being asked for.
+
 ### Pinning and removing scores
 
 - Every score row has a **⋯** menu, matching the one on osu!'s own profile.
