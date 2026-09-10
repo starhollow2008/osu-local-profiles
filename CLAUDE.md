@@ -2,7 +2,7 @@
 
 ## Current work
 
-v1.0.0 shipped. Ongoing work is **Phase 5**, planned in [docs/roadmap.md](docs/roadmap.md) —
+**v1.3.0 shipped.** Ongoing work is **Phase 5**, planned in [docs/roadmap.md](docs/roadmap.md) —
 read it before starting anything new. It holds one entry per feature with its design
 decisions, the files it touches, and a status column that is the resume point if a session
 is interrupted mid-feature. Update the status as you go.
@@ -318,6 +318,50 @@ Linux that is the normal case for osu!stable: there is no official build, only W
 wrappers. It had been documented and printed in the "no osu! found" message while being read
 by nothing at all.
 
+## The updater rewrites the app's own directory
+
+`src/update/` and `scripts/apply-update.mjs` replace the install in place. Four properties
+make that safe, and none of them is optional:
+
+- **`data/` is never touched.** `dataDir()` is `<install>/data`, so the database, settings
+  and images sit *inside* the thing being replaced. The swap enumerates the install's other
+  top-level entries and steps around that one. Anything that changes where data lives, or
+  how the swap enumerates, has to keep this true.
+- **Nothing is deleted.** Outgoing files are *moved* to `.rollback-<stamp>/`. A swap that
+  dies half way then leaves both halves on disk instead of a hole. `pruneRollbacks` clears
+  them after a week, at startup, because "it booted" is the only evidence that matters.
+- **Nothing is swapped until the new build is verified**: the download's size before it is
+  unpacked, then the unpacked tree's shape and the version its `package.json` claims.
+- **A source checkout refuses.** `start.bat` runs `node src/main.ts` from the repository, so
+  an "update" there would overwrite a working tree with a release zip. Both `.git` and a
+  missing bundled runtime are checked; either test alone can be fooled.
+
+**The swap runs from the *staged* build, using the staged build's own runtime.** On Windows
+the running `node.exe` is locked by the process that would replace it, so nothing inside the
+app can do this. It follows that a release installs itself with *its own* updater, which is
+why `scripts/apply-update.mjs` is copied into every package — a build that does not ship it
+cannot be updated *from*, and `applyUpdate` says so rather than staging a swap with no
+swapper.
+
+**Relaunch goes through `cmd`'s `start`, and the quoting is load-bearing.** Spawning the
+runtime directly is simpler and wrong: `detached` maps to DETACHED_PROCESS on Windows, so
+the app comes back running, tracking and with no console at all. The launcher is called
+`Start osu! fresh profile.bat`, so an unquoted path runs a program called `Start` — which
+is what the first attempt did, caught only because the swap was tested end to end.
+
+The zip reader is ours (`src/update/zip.ts`) because no dependency was available and
+shelling out to Windows' `tar.exe` would put the riskiest path in the app behind a binary
+that exists on one OS. It refuses zip64 rather than half-reading it, refuses any entry whose
+path escapes the target — this runs on a file fetched over the network — and handles the
+**backslash separators this project's own packager writes**: a release archive says
+`osu-fresh-profile-1.3.0-win-x64
+ode.exe`.
+
+The check is one request at startup, never a timer, and `checkForUpdates: false` turns off
+the app's only outgoing request. A failed check shows nothing: no network, a private
+repository and a rate limit are all ordinary, and none is a reason to put an error where a
+button would go.
+
 ## Design constraints worth preserving
 
 - **No native modules in the Node process.** `node:sqlite` is built in, `rosu-pp-js` is
@@ -369,6 +413,8 @@ src/clients/session.ts the username osu! is signed in as, from its own config fi
 src/clients/lazer-log.ts  lazer's own log, the only record of a play that left no replay
 src/tracker/log-watcher.ts  follows the live session log from its current end
 src/tracker/incomplete.ts   an abandoned play -> a tracked one
+src/update/            check GitHub releases, unpack a release, hand off the swap
+scripts/apply-update.mjs   the detached swapper; ships inside every package
 tools/PpCalculator/    .NET helper wrapping osu!'s real difficulty/pp code
 src/http/              JSON API + SSE
 web/index.html         Phase 1 UI (plain; Vite + React planned for Phase 2)

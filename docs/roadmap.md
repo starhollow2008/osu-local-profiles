@@ -926,4 +926,8 @@ ode.exe`. Read to the letter that
   release, in `test/update.test.ts`.
 
 **Still unverified:** downloading a real release of *this* project, which needs the
-repository to be public and a release newer than the running build.
+repository to be **public** and a release newer than the running build. v1.3.0 is the first
+build that ships `scripts/apply-update.mjs`, so it is the first that can be updated *from* --
+a 1.2.0 install has no updater to run and must be replaced by hand. The first real exercise
+of this path will therefore be a 1.3.0 install offered a 1.4.0 release, against a public
+repository.
