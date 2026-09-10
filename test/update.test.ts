@@ -12,7 +12,7 @@ import {
   type Release,
 } from '../src/update/github.ts';
 import { extractZip, readZipEntries } from '../src/update/zip.ts';
-import { blockedReason } from '../src/update/index.ts';
+import { blockedReason, pruneUpdateLeftovers } from '../src/update/index.ts';
 
 /*
  * The update path replaces the app's own files, so the parts of it that can be checked
@@ -191,4 +191,51 @@ test('a packaged build can be updated', () => {
   fs.writeFileSync(path.join(dir, 'node'), '');
   assert.equal(blockedReason(dir, 'linux'), null);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/* -------------------------------------------------------------- leftovers */
+
+test('startup clears both things an update leaves behind', () => {
+  /*
+   * Each is a whole copy of the app, around 200MB. The rollback is visible beside the app;
+   * the staged tree hides inside data/, where it reads as user data. One real update left
+   * 406MB of them behind before this existed.
+   */
+  const dir = tmp();
+  const data = path.join(dir, 'data');
+  fs.mkdirSync(path.join(dir, '.rollback-2026-01-01T00-00-00'), { recursive: true });
+  fs.writeFileSync(path.join(dir, '.rollback-2026-01-01T00-00-00', 'node.exe'), 'old runtime');
+  fs.mkdirSync(path.join(data, 'update', '1.4.0'), { recursive: true });
+  fs.writeFileSync(path.join(data, 'update', '1.4.0', 'node.exe'), 'staged runtime');
+  fs.writeFileSync(path.join(data, 'profiles.db'), 'PRECIOUS');
+  fs.writeFileSync(path.join(data, 'update.log'), 'OK: updated to 1.4.0');
+
+  const result = pruneUpdateLeftovers(dir, data);
+
+  assert.equal(fs.existsSync(path.join(dir, '.rollback-2026-01-01T00-00-00')), false);
+  assert.equal(fs.existsSync(path.join(data, 'update')), false);
+  assert.equal(result.removed.length, 2);
+  assert.ok(result.bytes > 0);
+
+  // The database is the whole point of stepping around data/, and update.log is the record
+  // of what the update did -- neither is a leftover.
+  assert.equal(fs.readFileSync(path.join(data, 'profiles.db'), 'utf8'), 'PRECIOUS');
+  assert.equal(fs.readFileSync(path.join(data, 'update.log'), 'utf8'), 'OK: updated to 1.4.0');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a clean install has nothing to clear and says so', () => {
+  const dir = tmp();
+  const data = path.join(dir, 'data');
+  fs.mkdirSync(data, { recursive: true });
+  const result = pruneUpdateLeftovers(dir, data);
+  assert.deepEqual(result.removed, []);
+  assert.equal(result.bytes, 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('a missing install directory is not a startup failure', () => {
+  // This runs before anything else at startup; it must never be the reason the app dies.
+  const result = pruneUpdateLeftovers(path.join(tmp(), 'gone'), path.join(tmp(), 'gone'));
+  assert.deepEqual(result.removed, []);
 });

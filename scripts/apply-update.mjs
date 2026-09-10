@@ -10,8 +10,11 @@
  *
  * - **`data/` is not touched.** It sits inside the install directory and holds the database,
  *   the profile images and config.json. Losing it would be losing everything the app is for.
- * - **Nothing is deleted.** The outgoing files are *moved* into `.rollback-<stamp>/`. If
- *   this process dies half way, both halves are still on disk and recoverable by hand.
+ * - **Nothing is deleted until the replacement is in place.** The outgoing files are *moved*
+ *   into `.rollback-<stamp>/`, so a crash part way through leaves both halves on disk and
+ *   recoverable by hand. Once the new build is on disk and its manifest reads back, that
+ *   window has closed and the copy is removed -- it is ~200MB, and it was insurance against
+ *   a risk that has passed.
  *
  * Invoked by src/update/index.ts; not meant to be run directly.
  *
@@ -166,6 +169,27 @@ async function main() {
 
   const installed = JSON.parse(fs.readFileSync(path.join(installDir, 'package.json'), 'utf8'));
   say(`installed ${installed.version}`);
+
+  /*
+   * The rollback has done its job, so it goes.
+   *
+   * It exists for the window between "the old files have been moved aside" and "the new
+   * ones are all in place" -- a crash in there would otherwise leave a hole where the app
+   * used to be. That window closed on the line above: the new build is on disk and its
+   * manifest reads back. Keeping the copy past this point costs ~200MB of the user's disk
+   * to insure against a risk that has already passed, and the way back from a *bad* release
+   * is to download the previous one again, not to keep a spare copy of it forever.
+   *
+   * Deleted here rather than at the next startup so it never exists at rest at all. A
+   * failure to delete is not a failure of the update: `pruneUpdateLeftovers` sweeps
+   * whatever is left the next time the app starts.
+   */
+  try {
+    fs.rmSync(rollback, { recursive: true, force: true });
+    say('removed the rollback copy; the update is complete');
+  } catch (e) {
+    say(`could not remove the rollback copy (${e.message}); it will go on next start`);
+  }
 
   if (archive) fs.rmSync(archive, { force: true });
 

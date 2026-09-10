@@ -13,8 +13,10 @@ import { extractZip } from './zip.ts';
  * 1. **`data/` is never touched.** It lives *inside* the install (see `config.dataDir`), so
  *    the swap works on the install's other top-level entries and steps around that one.
  *    Everything the user has -- the database, their avatar, their config -- is in there.
- * 2. **Nothing is deleted.** The files being replaced are *moved* into `.rollback-<stamp>/`,
- *    so a swap that dies half way leaves both halves on disk instead of a hole.
+ * 2. **Nothing is deleted while it could still be needed.** The files being replaced are
+ *    *moved* into `.rollback-<stamp>/`, so a swap that dies half way leaves both halves on
+ *    disk instead of a hole. The swap removes that copy once the new build is verified in
+ *    place, and `pruneUpdateLeftovers` sweeps anything a failed swap left, at startup.
  * 3. **Nothing is swapped until the new build is verified on disk**: downloaded, unpacked,
  *    and checked to be the version it claimed with the files an install needs.
  *
@@ -243,31 +245,65 @@ export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
 }
 
 /**
- * Remove the rollback copies a previous update left behind.
+ * Delete what an update leaves behind, at startup.
  *
- * Called at startup: reaching this line means the swapped-in build boots, which is the only
- * evidence that matters. A week's grace is kept anyway, because "it starts" and "it works"
- * are not the same claim and the folder is the only way back.
+ * Two things accumulate, and both are a whole copy of the app -- around 200MB each:
+ *
+ * - **`.rollback-*` beside the app.** The swap deletes its own rollback as soon as the new
+ *   build is in place, so one only survives to be found here if the swap died before
+ *   finishing, or if the *previous* version's updater did not clean up. Either way, this
+ *   process starting means the install works, and the copy has nothing left to protect.
+ * - **`data/update/`**, where the release was unpacked before being swapped in. The swap
+ *   cannot delete this itself: it is *running from it*, and on Windows its own `node.exe`
+ *   is locked for as long as it lives. So the app that comes back afterwards does it.
+ *
+ * Failure is ignored on purpose. A locked file is not worth refusing to start over, and
+ * the next launch tries again.
  */
-export function pruneRollbacks(dir = installDir(), maxAgeMs = 7 * 24 * 60 * 60 * 1000): number {
-  let removed = 0;
-  let entries: fs.Dirent[];
+export function pruneUpdateLeftovers(
+  dir = installDir(),
+  data = path.join(installDir(), 'data'),
+): { removed: string[]; bytes: number } {
+  const removed: string[] = [];
+  let bytes = 0;
+
+  const sizeOf = (target: string): number => {
+    let total = 0;
+    try {
+      for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
+        const full = path.join(target, entry.name);
+        total += entry.isDirectory() ? sizeOf(full) : fs.statSync(full).size;
+      }
+    } catch {
+      /* unreadable is fine; this number is only for the log line */
+    }
+    return total;
+  };
+
+  const drop = (target: string, label: string): void => {
+    try {
+      if (!fs.existsSync(target)) return;
+      bytes += sizeOf(target);
+      fs.rmSync(target, { recursive: true, force: true });
+      removed.push(label);
+    } catch {
+      /* see above */
+    }
+  };
+
   try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name.startsWith('.rollback-')) {
+        drop(path.join(dir, entry.name), entry.name);
+      }
+    }
   } catch {
-    return 0;
+    /* no install directory to read is not a startup failure */
   }
 
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !entry.name.startsWith('.rollback-')) continue;
-    const full = path.join(dir, entry.name);
-    try {
-      if (Date.now() - fs.statSync(full).mtimeMs < maxAgeMs) continue;
-      fs.rmSync(full, { recursive: true, force: true });
-      removed += 1;
-    } catch {
-      // A locked file is not worth failing a startup over; it will be tried again.
-    }
-  }
-  return removed;
+  // `data/update.log` is a *file* and is deliberately kept: it is the record of what the
+  // last update did. Only the `update/` directory beside it goes.
+  drop(path.join(data, 'update'), 'data/update');
+
+  return { removed, bytes };
 }

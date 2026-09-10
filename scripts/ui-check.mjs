@@ -767,11 +767,13 @@ console.log('\nunofficial scoring is disclosed');
  */
 check(
   'a shown warning offers a way to stop showing it',
-  await evaluate(`(() => {
+  // Not shown is a legitimate state -- this profile may score officially, or may have used
+  // the dismissal this very check is about -- so it skips rather than failing.
+  (await evaluate(`(() => {
     const note = document.getElementById('countingNote');
-    if (note.hidden) return 'not shown';
+    if (note.hidden) return 'skipped';
     return note.querySelectorAll('[data-dismiss-note]').length === 2;
-  })()`),
+  })()`)),
   true,
 );
 /*

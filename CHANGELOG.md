@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- **An update no longer leaves 400MB behind.** Updating to 1.3.0 left *two* whole copies of
+  the app on disk: the `.rollback-` folder beside it, and a staged copy inside
+  `data/update/` that was never cleaned up at all. On a real install that was **406MB**.
+  - The rollback is now deleted by the update itself, the moment the new version is in place
+    and verified. It still exists during the swap -- that is the window where an interrupted
+    update would otherwise leave a hole -- so an update that is cut short can still be undone
+    by hand. It just no longer sits there afterwards.
+  - The staged copy is cleared at the next start, because the updater is running from it and
+    cannot delete itself.
+  - Starting the app also clears anything an earlier version left, and says how much it
+    reclaimed. Upgrading from 1.3.0 will tidy up after 1.3.0 on its own.
+  - `data/update.log` is kept: it is the record of what the last update did.
+
 ## 1.3.0
 
 ### The page looks like osu!'s

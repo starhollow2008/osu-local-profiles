@@ -948,6 +948,36 @@ The test is `scratchpad/update-e2e.mjs`; it is not in the repository because it 
 swap: **copy a package, lower its version, let it update itself, then check that a value
 that exists only in `data/` survived.**
 
+### What the first real update got wrong: 400MB of leftovers
+
+Shipped in 1.3.0 and found by running it. An update left **two whole copies of the app**
+on a 628MB install:
+
+| | |
+|---|---|
+| the app | ~203MB |
+| `.rollback-<stamp>` beside it | ~203MB, kept for **7 days** |
+| `data/update/<version>` | ~203MB, **never cleaned up at all** |
+
+The rollback was noticed; the staged tree was not, because it hides inside `data/` where it
+reads as user data.
+
+- **The rollback now goes as soon as the new build is in place and its manifest reads back.**
+  It exists for the window between "old files moved aside" and "new files all copied in" --
+  a crash in there is the only thing it protects against, and that window has closed by then.
+  Keeping ~200MB at rest to insure against a risk that has passed is not a trade worth
+  making, and the way back from a *bad* release is to download the previous one, which is
+  public. The mid-swap safety is unchanged: an interrupted update still leaves both halves.
+- **The staged tree cannot be deleted by the swap**, because the swap is *running from it*
+  and on Windows its own `node.exe` is locked for as long as it lives. So the app that comes
+  back afterwards does it: `pruneUpdateLeftovers` runs at startup, clears `data/update/` and
+  any `.rollback-*` still present, and prints how much it reclaimed.
+- `data/update.log` is kept -- it is a *file* beside that directory, and the record of what
+  the last update did.
+
+This also means **upgrading from 1.3.0 tidies up after 1.3.0**, which is what makes the
+fix reach installs that already have the leftovers.
+
 **One thing that remains true:** a **1.2.0** install cannot use the button, because it has
 no `scripts/apply-update.mjs` inside it to run. v1.3.0 is the first build that can be
 updated *from*, so 1.2.0 users must download 1.3.0 by hand once.

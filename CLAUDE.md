@@ -327,9 +327,12 @@ make that safe, and none of them is optional:
   and images sit *inside* the thing being replaced. The swap enumerates the install's other
   top-level entries and steps around that one. Anything that changes where data lives, or
   how the swap enumerates, has to keep this true.
-- **Nothing is deleted.** Outgoing files are *moved* to `.rollback-<stamp>/`. A swap that
-  dies half way then leaves both halves on disk instead of a hole. `pruneRollbacks` clears
-  them after a week, at startup, because "it booted" is the only evidence that matters.
+- **Nothing is deleted while it could still be needed.** Outgoing files are *moved* to
+  `.rollback-<stamp>/`, so a swap that dies half way leaves both halves on disk instead of a
+  hole. That window closes the moment the new build is on disk and its manifest reads back,
+  and the swap deletes the copy right there -- it is **~200MB**, and keeping it at rest
+  insures against a risk that has already passed. The way back from a *bad* release is to
+  download the previous one, not to keep a spare copy of it forever.
 - **Nothing is swapped until the new build is verified**: the download's size before it is
   unpacked, then the unpacked tree's shape and the version its `package.json` claims.
 - **A source checkout refuses.** `start.bat` runs `node src/main.ts` from the repository, so
@@ -364,6 +367,16 @@ published one, start it, and let it update itself. Put a value in that copy's
 `data/config.json` that exists nowhere in the release archive -- the port is ideal -- and
 check the app comes back using it. That is what proves `data/` survived, rather than
 assuming it.
+
+**An update leaves two ~200MB copies of the app behind, and both must be swept.** The
+rollback is the visible one; the other is the staged tree in `data/update/`, which hides
+where it reads as user data -- one real update left **406MB** between them before this was
+fixed. The swap deletes its own rollback, but it *cannot* delete the staged tree: it is
+running from it, and on Windows its own `node.exe` is locked for as long as it lives. So
+`pruneUpdateLeftovers` runs at startup and clears whatever is there -- the staged tree
+always, and any `.rollback-*` a failed swap or an older version left. It keeps
+`data/update.log`, which is a *file* beside that directory and is the record of what the
+last update did.
 
 The check is one request at startup, never a timer, and `checkForUpdates: false` turns off
 the app's only outgoing request. A failed check shows nothing: no network, a private

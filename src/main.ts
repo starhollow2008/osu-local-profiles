@@ -8,7 +8,7 @@ import { activeProfileId, getProfile } from './profiles.ts';
 import { Tracker } from './tracker/index.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
-import { checkForUpdate, pruneRollbacks } from './update/index.ts';
+import { checkForUpdate, pruneUpdateLeftovers } from './update/index.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
@@ -232,12 +232,22 @@ async function main(): Promise<void> {
   if (config.openBrowser) openBrowser(url);
 
   /*
-   * Tidy away the safety copy a previous update left, then ask once whether there is a
-   * newer release. Both are deliberately after the banner and the browser: neither is
-   * allowed to delay the app being usable, and a failed check is not worth a word on
-   * screen -- the page simply has no update button to show.
+   * Tidy away what a previous update left, then ask once whether there is a newer release.
+   * Both are deliberately after the banner and the browser: neither is allowed to delay the
+   * app being usable, and a failed check is not worth a word on screen -- the page simply
+   * has no update button to show.
+   *
+   * The cleanup *is* worth a word, because it is hundreds of megabytes and silently
+   * reclaiming that much disk should not be invisible.
    */
-  pruneRollbacks();
+  const leftovers = pruneUpdateLeftovers();
+  if (leftovers.removed.length > 0) {
+    console.log(
+      `  Cleaned up after the last update: ${leftovers.removed.join(', ')}` +
+        ` (${(leftovers.bytes / 1024 / 1024).toFixed(0)}MB)
+`,
+    );
+  }
   if (config.checkForUpdates) {
     void checkForUpdate().then((u) => {
       if (u.available) console.log(`  Update available: ${u.latestVersion} (see the page)

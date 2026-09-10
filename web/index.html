@@ -390,8 +390,9 @@
     <p class="update-versions" id="updateVersions"></p>
     <p>
       Your tracked scores, settings and profile pictures are kept — they live in
-      <code>data/</code>, which an update never touches. The files being replaced are moved
-      to a <code>.rollback</code> folder beside the app rather than deleted.
+      <code>data/</code>, which an update never touches. The files being replaced are set
+      aside until the new version is in place, so an update that is interrupted can be
+      undone rather than leaving a half-installed app.
     </p>
     <p id="updateNotes"></p>
     <div class="profile-hint" id="updateHint">&nbsp;</div>
