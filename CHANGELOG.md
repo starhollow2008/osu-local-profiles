@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **The rank graph and stats band is darker, as on osu!.** It shared the header's and the
+  level bar's hue, so the top of the page read as one block. It is now osu!'s darker page
+  colour between the two, and the stats card stands out on it as the lighter panel it is on
+  osu!.
+
 - **Renaming your first profile no longer brings an empty copy back.** The app re-created a
   profile under the name in `data/config.json` on every start, so after renaming the first
   one, the next launch quietly added an empty profile under its old name. It now only uses

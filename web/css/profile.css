@@ -333,10 +333,16 @@
 /* Detail block: ranks, chart, grade counts, stats                          */
 /* ======================================================================== */
 
+/*
+ * The rank graph and stats band. osu-web gives `.profile-detail` no background of its own:
+ * it sits in `.osu-page--generic-compact`, whose default is --hsl-b5, so the band is darker
+ * than the b3 header above it and the b3 level bar below -- and the b4 stats card reads as
+ * the lighter panel on it. It was b3 here, which merged the band into both neighbours.
+ */
 .profile-detail {
   padding-top: 10px;
   padding-bottom: 10px;
-  background-color: hsl(var(--hsl-b3));
+  background-color: hsl(var(--hsl-b5));
   box-shadow: inset 0 2px 3px -1px rgba(0, 0, 0, 0.25);
 }
 

@@ -156,7 +156,8 @@ is behind a user preference and is *not* what the live page shows.
       .profile-info__name                  font-size 24px desktop
       .profile-info__flags                 country flag + name
 
-.profile-detail                            padding 10px var(--page-gutter)
+.profile-detail                            padding 10px var(--page-gutter); no bg of its own --
+                                           shows .osu-page--generic-compact's default, b5
   .profile-detail-stats                    grid: 1fr auto auto on desktop
     <div>
       .profile-detail-stats__chart-numbers--top

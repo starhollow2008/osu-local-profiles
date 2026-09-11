@@ -1190,6 +1190,10 @@ check('page background is b6', await bg('body'), await literal('hsl(333, 10%, 10
 check('header is b3', await bg('.profile-info'), await literal('hsl(333, 10%, 25%)'));
 check('section panel is b4', await bg('.page-extra'), await literal('hsl(333, 10%, 20%)'));
 check('stats box is b4', await bg('.profile-stats'), await literal('hsl(333, 10%, 20%)'));
+// The graph and stats band is osu-page's b5: darker than the b3 header and level bar either
+// side of it, so it reads as its own region, with the b4 stats card lighter on top.
+check('stats band is b5', await bg('.profile-detail'), await literal('hsl(333, 10%, 15%)'));
+check('level bar is b3', await bg('.profile-detail-bar'), await literal('hsl(333, 10%, 25%)'));
 
 console.log('\nthe page rendered');
 check('four game modes', await evaluate("document.querySelectorAll('#modes a').length"), 4);
