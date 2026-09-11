@@ -150,6 +150,26 @@ CREATE TABLE IF NOT EXISTS incomplete_plays (
 CREATE INDEX IF NOT EXISTS incomplete_profile_played
   ON incomplete_plays (profile_id, mode, played_at DESC);
 
+-- The profile's Favorite Beatmaps, as osu! keeps favourites per account. This app's own:
+-- nothing here is ever written to osu!. Kept by a reset, like the profile's settings --
+-- they are curation, not tracked plays -- and removed with the profile.
+CREATE TABLE IF NOT EXISTS favorite_beatmapsets (
+  profile_id    INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  beatmapset_id INTEGER NOT NULL,
+  favorited_at  INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, beatmapset_id)
+);
+
+-- A beatmapset as osu.ppy.sh describes it, fetched once when it is favourited: star ratings
+-- and modes for every difficulty, and the explicit / spotlight / featured-artist flags that
+-- nothing on this machine records. JSON, trimmed to what the card draws (see
+-- src/clients/osu-web.ts). Shared by every profile.
+CREATE TABLE IF NOT EXISTS beatmapset_details (
+  beatmapset_id INTEGER PRIMARY KEY,
+  data          TEXT    NOT NULL,
+  fetched_at    INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS snapshots (
   id           INTEGER PRIMARY KEY,
   profile_id   INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

@@ -58,6 +58,11 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     this.opts = opts;
   }
 
+  /** The beatmap resolver the tracker ingests with, shared so nothing opens online.db twice. */
+  get beatmaps(): BeatmapResolver {
+    return this.opts.resolver;
+  }
+
   get isTracking(): boolean {
     return this.enabled;
   }

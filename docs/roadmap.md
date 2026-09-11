@@ -32,6 +32,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.17 | osu! parity: header, Scores, medals, badges   | done   |
 | 5.18 | Rename to **osu! local profiles**             | done   |
 | 5.19 | Open in browser on start, and a menu toggle   | done   |
+| 5.20 | Beatmaps section: Favorite Beatmaps           | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1161,3 +1162,75 @@ branches correctly"; it branched correctly and then failed on the one platform v
 - **1.6.0, not a replacement 1.5.0.** The updater only offers a *higher* version, so an
   install already on 1.5.0 would never have received a changed 1.5.0 -- and replacing the
   published archive would have swapped the build verified end to end for one that was not.
+
+---
+
+## 5.20 — Beatmaps section: Favorite Beatmaps
+
+**Status: done** (unreleased).
+
+**Goal.** osu!'s **Beatmaps** section with its **Favorite Beatmaps** subsection: osu-web's
+beatmapset card (cover strip, faded cover behind the info, title, artist, mapper, status
+pill, a coloured dot per difficulty per mode, explicit / featured artist / spotlight badges,
+a difficulty popup on hovering the dots, and a heart + download strip on hovering the card),
+6 cards at first, then 50, then 50 more at a time. Scores and Recent Plays rows gain
+**Favorite this beatmap** in their menu.
+
+### Established before building
+
+- **osu-web, read rather than guessed** (sparse checkout now also takes
+  `resources/js/beatmapset-panel`, `resources/js/utils` and `resources/lang/en`):
+  `beatmapset-panel/index.tsx` + `.less` (100px card on desktop, 10px radius, b2 panel,
+  a 90px `list` cover strip, the `card` cover behind a b2 -> b2/0.8 gradient that becomes
+  b4 on hover, a 10px b3 menu strip that widens to 30px on hover, stats row hidden until
+  hover); `beatmaps-popup.tsx` (below the card, 2px h1 outline round card + popup, 100ms
+  show / 500ms hide); `difficulty-badge`; `beatmapset-status--panel`; `beatmapset-badge`;
+  `page-extra__beatmapsets` (two columns on desktop, so osu!'s "3 rows" is 6 cards).
+- **The difficulty colour** is `getDiffColour`: an 11-stop ramp (0.1 -> 9 stars,
+  `#4290FB` ... `#000000`) interpolated in gamma-2.2 RGB, `#AAAAAA` below 0.1; text is
+  black below 6.5 stars and `#F6F05C` above.
+- **Status and badge colours** are osu-web's palette: a hue per name (lime 90, pink 333,
+  blue 200, orange 45, darkorange 20, green 125) at fixed saturation/lightness steps
+  (1 = 100%/70%, 2 = 80%/60%); status text is b3, graveyard is b1 on black.
+- **lazer's `online.db`** lists every difficulty of a set (`osu_beatmaps` with filenames,
+  so versions), its mapper (`users`), status and dates -- but no star ratings, modes, or
+  explicit / featured artist / spotlight flags.
+- **`osu.ppy.sh/beatmapsets/<id>` embeds `json-beatmapset`** with all of it: per-difficulty
+  `difficulty_rating`, `mode`, `version`; `nsfw`, `spotlight`, `track_id` (featured
+  artist); `status`, counts, dates, `covers`. Verified with one request against set 8495.
+
+### Decisions
+
+- **Favourites are per profile**, as osu!'s are per account, and are this app's own: nothing
+  is written to osu!. Stored as `favorite_beatmapsets(profile_id, beatmapset_id,
+  favorited_at)`; deleting a profile takes them with it; resetting a profile keeps them,
+  as it keeps its settings -- they are curation, not tracked plays.
+- **One request, when the button is pressed**, the `osu-web.ts` rule: favouriting fetches
+  that set's page once and caches the trimmed JSON in `beatmapset_details` (shared across
+  profiles). Nothing is fetched on a timer or on page view. If osu.ppy.sh cannot be reached
+  the favourite is still saved and the card is built from local data -- `online.db`, the
+  beatmap cache and the profile's own scores (whose star ratings are osu!'s own) -- and the
+  next favourite action retries a few missing ones.
+- **Covers stay remote** (`assets.ppy.sh`), as Most Played's do: a failed request leaves
+  the panel colour, and the card is complete without them.
+- **Only beatmaps with a beatmapset id can be favourited** -- a never-submitted map has no
+  card to show and nothing to link to, so the menu does not offer it.
+- **Wording is the user's**: "Favorite Beatmaps" / "Favorite this beatmap" (osu-web says
+  "Favourite"). The card's own labels (status, "mapped by", badges) follow osu-web.
+- **Left out on purpose**: audio preview, the video/storyboard icons, hype and nomination
+  counts, and osu-web's mobile expand button (touch shows the menu instead).
+
+### What was checked
+
+- `test/favorites.test.ts`: per-profile favourites, paging order, osu!'s details shared by
+  profiles, the local fallback (a DT score's star rating is *not* taken as the difficulty's;
+  an HD one is), profile deletion, `extractBeatmapset` against a saved page shape, the
+  difficulty colour ramp, grouping, and escaping in the card.
+- `npm run ui`: the heading, six cards at most before "show more", 100px cards, the popup
+  opening under the card at its width and closing after the pointer leaves, the menu strip
+  showing, **the rows fitting the card** (the first build overflowed: the page's 1.5 line
+  height makes five rows taller than 100px, so the card sets 1.25), and the row menus
+  offering Favorite/Unfavorite -- only that, on an unfinished play.
+- Real sets favourited on this machine all fetched their details from osu.ppy.sh, and
+  screenshots of the section at rest, hovered and with the popup open were compared against
+  osu!'s own card.

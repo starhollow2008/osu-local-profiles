@@ -166,6 +166,12 @@
     <h3 class="title title--sub">Recent Plays<span class="title__count" id="recentCount">0</span></h3>
     <div id="recentPlays"></div>
   </section>
+
+  <section class="page-extra" id="section-beatmaps">
+    <h2 class="title">Beatmaps</h2>
+    <h3 class="title title--sub title--sub-first">Favorite Beatmaps<span class="title__count" id="favoriteCount">0</span></h3>
+    <div id="favoriteBeatmaps"></div>
+  </section>
 </main>
 
 <!--
@@ -177,7 +183,9 @@
   <button type="button" data-act="unpin" role="menuitem">Unpin</button>
   <button type="button" data-act="move-up" role="menuitem">Move up</button>
   <button type="button" data-act="move-down" role="menuitem">Move down</button>
-  <div class="sep"></div>
+  <button type="button" data-act="favorite" role="menuitem">Favorite this beatmap</button>
+  <button type="button" data-act="unfavorite" role="menuitem">Unfavorite this beatmap</button>
+  <div class="sep" data-sep="hide"></div>
   <button type="button" class="danger" data-act="hide" role="menuitem">Remove from profile</button>
 </div>
 
@@ -186,6 +194,10 @@
   same reason as the menu above: it has to escape the section that would clip it.
 -->
 <div class="medal-tooltip" id="medalTooltip" role="tooltip" hidden></div>
+
+<!-- osu-web's beatmaps popup: a Favorite Beatmaps card's difficulties, opened by hovering
+     its row of dots. One for the page, placed under whichever card asked for it. -->
+<div class="beatmaps-popup" id="beatmapsPopup" hidden></div>
 
 <!-- Outside every dialog: the picker is opened from script, and is never seen. -->
 <input type="file" id="identityFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>

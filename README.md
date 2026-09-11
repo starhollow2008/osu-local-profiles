@@ -400,6 +400,21 @@ thirty seconds counts thirty seconds rather than the whole map.
 - A beatmap's length runs from its first object to the end of its last, read once from the
   `.osu` file. A slider's tail at the very end of a map is not included.
 
+## Favorite Beatmaps
+
+The **Beatmaps** section, as osu! has it. Open the **...** menu on any row in **Scores** or
+**Recent Plays** and choose **Favorite this beatmap**; it appears as osu!'s beatmap card,
+with its cover, status, a coloured dot per difficulty, and the Explicit / Featured Artist /
+Spotlight badges. Hover the dots for every difficulty's name and star rating, and the card
+for the heart (unfavourite) and the download link.
+
+Favourites belong to the profile, as osu!'s belong to an account, and are never sent to
+osu!. Favouriting makes **one request** to `osu.ppy.sh` for that beatmap's details, which
+are then kept, so the card works offline. With no connection the favourite is still saved,
+and the card shows what your machine knows -- every difficulty from lazer's `online.db`,
+with a star rating only where one of your own scores gives it -- until a later favourite,
+made online, fills it in.
+
 ## Rearranging the page
 
 Hover a section and use the arrows in its top-right corner, or drag it by the grip beside

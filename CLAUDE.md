@@ -188,6 +188,18 @@ submission, capped at the map length. Rows from before `started_at` existed coun
 -- do not "estimate" them. Beatmap lengths are read lazily from the `.osu` into
 `beatmaps.length_ms`, with 0 meaning unreadable, so no file is ever parsed twice.
 
+## Favorite Beatmaps come from one request per favourite
+
+`osu.ppy.sh/beatmapsets/<id>` embeds the whole set as `<script id="json-beatmapset">` --
+every difficulty's star rating and mode, `nsfw`, `spotlight`, `track_id` (featured
+artist) -- which nothing on this machine records (`online.db` has every difficulty and its
+mapper, but no ratings, modes or badges). So favouriting fetches that page once, because the
+button was pressed, and caches the trimmed result in `beatmapset_details`; the card is
+drawn from it forever after, offline. Without it, `localCard` in `src/favorites.ts` builds
+one from `online.db`, the beatmap cache and the profile's own scores -- taking a score's
+star rating only when its mods leave the rating alone, since a stored rating includes the
+mods. Favourites are per profile, survive a reset, and are never written to osu!.
+
 ## The osu! account link needs no API and no credentials
 
 `osu.ppy.sh/users/<name>` redirects to the numeric id and embeds the whole public user

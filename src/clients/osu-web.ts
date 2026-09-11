@@ -184,3 +184,132 @@ export async function downloadImage(url: string): Promise<DownloadedImage> {
 
   return { bytes, extension };
 }
+
+/* ------------------------------------------------------------------ beatmapsets */
+
+/** A ruleset as osu-web names it; `fruits` is osu!catch. */
+export type OsuWebMode = 'osu' | 'taiko' | 'fruits' | 'mania';
+
+export interface BeatmapsetDifficulty {
+  id: number;
+  mode: OsuWebMode;
+  /** osu!'s own current star rating for the difficulty. */
+  stars: number;
+  version: string;
+}
+
+/**
+ * A beatmapset as the Favorite Beatmaps card needs it: exactly the fields the card draws,
+ * trimmed from osu-web's `json-beatmapset` so the cache holds nothing it does not use.
+ */
+export interface BeatmapsetDetails {
+  id: number;
+  title: string;
+  artist: string;
+  creator: string;
+  userId: number;
+  /** osu-web's status name: ranked, approved, qualified, loved, pending, wip, graveyard. */
+  status: string;
+  /** Explicit content. */
+  nsfw: boolean;
+  spotlight: boolean;
+  /** Set when the song is from osu!'s Featured Artist library. */
+  featuredArtist: boolean;
+  favouriteCount: number;
+  playCount: number;
+  /** The date the card shows: when it was ranked or loved, else when it was last updated. */
+  date: string | null;
+  difficulties: BeatmapsetDifficulty[];
+}
+
+const MODES: readonly OsuWebMode[] = ['osu', 'taiko', 'fruits', 'mania'];
+
+/** Statuses whose card shows `ranked_date`; the rest show `last_updated` (osu-web's map). */
+const RANKED_DATE_STATUSES = new Set(['ranked', 'approved', 'loved', 'qualified']);
+
+/**
+ * The beatmapset osu-web renders its page from, reduced to `BeatmapsetDetails`.
+ *
+ * `osu.ppy.sh/beatmapsets/<id>` embeds the whole set as JSON in
+ * `<script id="json-beatmapset">` -- every difficulty's star rating and mode, the explicit,
+ * spotlight and featured-artist flags -- which is what the API's `/beatmapsets/{id}` would
+ * return. Like the profile payload it is a private detail of osu-web, so a page in any other
+ * shape is null rather than half-read. Pure, so it can be tested on a saved page.
+ */
+export function extractBeatmapset(html: string): BeatmapsetDetails | null {
+  const match = /<script id="json-beatmapset" type="application\/json">\s*([\s\S]*?)\s*<\/script>/.exec(html);
+  if (!match) return null;
+
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(match[1]!) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+
+  const str = (v: unknown) => (typeof v === 'string' ? v : null);
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+  const id = num(raw['id']);
+  const title = str(raw['title']);
+  const artist = str(raw['artist']);
+  const status = str(raw['status']);
+  if (id === null || title === null || artist === null || status === null) return null;
+
+  const difficulties = (Array.isArray(raw['beatmaps']) ? raw['beatmaps'] : []).flatMap(
+    (b): BeatmapsetDifficulty[] => {
+      const beatmap = b as Record<string, unknown>;
+      const mode = str(beatmap['mode']) as OsuWebMode | null;
+      const bid = num(beatmap['id']);
+      const stars = num(beatmap['difficulty_rating']);
+      const version = str(beatmap['version']);
+      if (mode === null || !MODES.includes(mode) || bid === null || stars === null || version === null) {
+        return [];
+      }
+      return [{ id: bid, mode, stars, version }];
+    },
+  );
+
+  const date = RANKED_DATE_STATUSES.has(status) ? str(raw['ranked_date']) : str(raw['last_updated']);
+
+  return {
+    id,
+    title,
+    artist,
+    creator: str(raw['creator']) ?? '',
+    userId: num(raw['user_id']) ?? 0,
+    status,
+    nsfw: raw['nsfw'] === true,
+    spotlight: raw['spotlight'] === true,
+    featuredArtist: raw['track_id'] != null,
+    favouriteCount: num(raw['favourite_count']) ?? 0,
+    playCount: num(raw['play_count']) ?? 0,
+    date: date ?? str(raw['last_updated']),
+    difficulties,
+  };
+}
+
+/**
+ * One request for one beatmapset, made because the user favourited it.
+ *
+ * Throws with a message worth showing; the caller keeps the favourite regardless and falls
+ * back to what is on this machine.
+ */
+export async function fetchBeatmapset(beatmapsetId: number): Promise<BeatmapsetDetails> {
+  if (!Number.isInteger(beatmapsetId) || beatmapsetId <= 0) throw new Error('not a beatmapset id');
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`https://osu.ppy.sh/beatmapsets/${beatmapsetId}`, 'text/html');
+  } catch {
+    throw new Error('could not reach osu.ppy.sh');
+  }
+  if (response.status === 404) throw new Error('osu! has no beatmapset with that id');
+  if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+
+  const details = extractBeatmapset(await response.text());
+  if (!details) {
+    throw new Error('the beatmapset page was not in the shape expected; osu! may have changed it');
+  }
+  return details;
+}

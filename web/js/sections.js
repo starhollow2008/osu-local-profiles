@@ -158,8 +158,8 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
    * page and put each of them inside a container that clips them.
    */
   const menu = actions
-    ? `<button class="play-detail__menu" type="button" data-play-menu
-         data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}"
+    ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="score"
+         data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}" data-set="${play.beatmapsetId ?? ''}"
          aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
     : '';
 
@@ -208,7 +208,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
  * row is built to look like what it is: the beatmap and when, dimmed, and *no* zeroes
  * standing in for numbers nobody knows.
  */
-export function incompleteRow(play) {
+export function incompleteRow(play, { actions = false } = {}) {
   const artist = play.artist
     ? ` <small class="play-detail__artist">by ${escapeHtml(play.artist)}</small>`
     : '';
@@ -240,6 +240,15 @@ export function incompleteRow(play) {
             title="Started but not finished - quit, retried, or failed. osu! counts this toward your play count, but there is no score to show: lazer only saves a replay for a map played to the end.">Didn&rsquo;t finish</span>
     </div>
     <div class="play-detail__mods-pp">${attempts}</div>
+    ${
+      // Only the beatmap can be acted on here -- there is no score to pin or remove -- so
+      // the menu is offered only when there is a beatmapset to favourite.
+      actions && play.beatmapsetId
+        ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="incomplete"
+             data-id="${play.id}" data-set="${play.beatmapsetId}"
+             aria-haspopup="true" aria-label="Options for this beatmap" title="Options">&#8943;</button>`
+        : ''
+    }
   </div>
 </div>`;
 }
@@ -285,7 +294,7 @@ export function playList(plays, options = {}) {
     return `<div class="u-empty">${escapeHtml(options.empty ?? 'Nothing here yet.')}</div>`;
   }
   return `<div class="play-detail-list">${plays
-    .map((p) => (p.kind === 'incomplete' ? incompleteRow(p) : playRow(p, options)))
+    .map((p) => (p.kind === 'incomplete' ? incompleteRow(p, options) : playRow(p, options)))
     .join('')}</div>`;
 }
 

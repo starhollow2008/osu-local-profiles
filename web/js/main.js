@@ -14,6 +14,7 @@ import {
   medalBadge,
 } from './badges.js';
 import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
+import { beatmapsPopupContent, favoriteList } from './beatmapsets.js';
 import {
   aboutHtml,
   activityList,
@@ -32,6 +33,7 @@ const SECTIONS = [
   ['top_ranks', 'Scores'],
   ['medals', 'Medals'],
   ['historical', 'Historical'],
+  ['beatmaps', 'Beatmaps'],
 ];
 
 /* The five grades osu! counts on a profile. XH/X and SH/S are the silver variants. */
@@ -139,11 +141,20 @@ const SETTINGS_FIELDS = [
  */
 const PAGE_FIRST = 5;
 const PAGE_STEP = 25;
-const PAGED = ['events', 'top', 'mostPlayed', 'recent'];
 
-const shown = Object.fromEntries(PAGED.map((s) => [s, PAGE_FIRST]));
+/*
+ * Favorite Beatmaps pages as osu!'s does: its cards sit two to a row, so osu!'s three rows
+ * are six cards, and "show more" goes to 25 rows (50 cards) and then 25 rows at a time.
+ */
+const PAGE_SIZES = { favorites: [6, 50] };
+const PAGED = ['events', 'top', 'mostPlayed', 'recent', 'favorites'];
+const firstPage = (section) => PAGE_SIZES[section]?.[0] ?? PAGE_FIRST;
+const pageStep = (section) => PAGE_SIZES[section]?.[1] ?? PAGE_STEP;
+
+const shown = Object.fromEntries(PAGED.map((s) => [s, firstPage(s)]));
 const resetPaging = () => {
-  for (const section of PAGED) shown[section] = PAGE_FIRST;
+  // Favourites belong to the profile rather than a mode, so a mode switch leaves them be.
+  for (const section of PAGED) if (section !== 'favorites') shown[section] = firstPage(section);
 };
 
 let mode = 0;
@@ -669,6 +680,16 @@ async function loadProfile() {
       empty: 'Nothing yet - go set a play.',
     }) + showMore('recent', data.recent.length, shown.recent, recentTotal);
 
+  // Favorite Beatmaps. An empty list is just the heading and its 0, as on osu!.
+  favoriteSetIds = new Set(data.favoriteIds ?? []);
+  favoriteCards = new Map((data.favorites ?? []).map((c) => [c.id, c]));
+  const favoritesTotal = totalFor('favorites', data.favorites ?? []);
+  $('favoriteCount').textContent = fmt(favoritesTotal);
+  hideBeatmapsPopup();
+  $('favoriteBeatmaps').innerHTML =
+    favoriteList(data.favorites) +
+    showMore('favorites', (data.favorites ?? []).length, shown.favorites, favoritesTotal);
+
   // Every render above replaced markup wholesale, which discards the nodes any previous
   // hover listener was attached to. Re-arming here rather than per chart keeps it to one
   // call that cannot be forgotten when a chart moves.
@@ -880,7 +901,7 @@ $('updateConfirm').onclick = async () => {
 const EXPORT_STRIP = [
   '#optionsBtn', '.menu-wrap', '#toggle', '.backdrop', '#playMenu', '#toast',
   '#identityFile', '.section-order', '.play-detail__menu', '.play-detail__grip',
-  '#aboutEdit', '#medalTooltip', 'script',
+  '#aboutEdit', '#medalTooltip', '#beatmapsPopup', '[data-unfavorite]', 'script',
 ];
 
 /**
@@ -1187,7 +1208,8 @@ document.addEventListener('click', async (e) => {
   const section = button.dataset.showMore;
   if (!PAGED.includes(section)) return;
 
-  shown[section] = shown[section] < PAGE_STEP ? PAGE_STEP : shown[section] + PAGE_STEP;
+  const step = pageStep(section);
+  shown[section] = shown[section] < step ? step : shown[section] + step;
   button.disabled = true;
   await loadProfile();
 });
@@ -1793,6 +1815,122 @@ $('settingsSave').onclick = async () => {
 
 let pinnedIds = [];
 
+/* ------------------------------------------------------- favorite beatmaps */
+
+/*
+ * Favouriting is the profile's own list, never written to osu!. Adding asks osu.ppy.sh for
+ * the set's details once (star ratings, modes, badges); offline the favourite is still kept
+ * and its card is drawn from what is on this machine.
+ */
+
+/** Every favourited set id, for labelling the row menus. */
+let favoriteSetIds = new Set();
+/** The cards on the page, by set id, for the difficulty popup to read from. */
+let favoriteCards = new Map();
+
+async function favoriteAction(action, beatmapsetId) {
+  if (!beatmapsetId) return;
+  try {
+    const r = await fetch('/api/favorites', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action, beatmapsetId }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'that did not work');
+    favoriteSetIds = new Set(d.favorites);
+    toast(
+      action === 'remove'
+        ? 'Removed from Favorite Beatmaps'
+        : d.detailsError
+          ? `Added to Favorite Beatmaps - ${d.detailsError}, so it shows what is on this machine for now`
+          : 'Added to Favorite Beatmaps',
+    );
+    await loadProfile();
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+// The heart on a card: unfavourite it, as osu!'s does for your own favourites.
+document.addEventListener('click', (e) => {
+  const heart = e.target.closest('[data-unfavorite]');
+  if (!heart) return;
+  e.preventDefault();
+  void favoriteAction('remove', Number(heart.dataset.unfavorite));
+});
+
+/*
+ * The difficulty popup, osu-web's `beatmaps-popup`: hovering a card's row of dots opens it
+ * under the card after 100ms, and leaving closes it after 500ms unless the pointer has
+ * moved onto the popup itself. Placed in page coordinates, so it scrolls with its card.
+ */
+let popupFor = null;
+let popupTimer = null;
+/** What the pending timer will do, so a countdown to close is not restarted by every move. */
+let popupPending = null;
+
+function hideBeatmapsPopup() {
+  clearTimeout(popupTimer);
+  popupTimer = null;
+  popupPending = null;
+  $('beatmapsPopup').hidden = true;
+  document.querySelector('.beatmapset-panel--popup-open')?.classList.remove('beatmapset-panel--popup-open');
+  popupFor = null;
+}
+
+function showBeatmapsPopup(panel) {
+  const card = favoriteCards.get(Number(panel.dataset.setId));
+  if (!card) return;
+  const popup = $('beatmapsPopup');
+  if (popupFor !== panel) {
+    hideBeatmapsPopup();
+    popup.innerHTML = beatmapsPopupContent(card);
+    popupFor = panel;
+    panel.classList.add('beatmapset-panel--popup-open');
+  }
+  const box = panel.getBoundingClientRect();
+  popup.style.left = `${box.left + window.scrollX}px`;
+  popup.style.top = `${box.bottom + window.scrollY}px`;
+  popup.style.width = `${box.width}px`;
+  popup.hidden = false;
+}
+
+const schedulePopup = (what, fn, ms) => {
+  if (popupPending === what) return;
+  clearTimeout(popupTimer);
+  popupPending = what;
+  popupTimer = setTimeout(() => {
+    popupPending = null;
+    popupTimer = null;
+    fn();
+  }, ms);
+};
+
+const cancelPopupTimer = () => {
+  clearTimeout(popupTimer);
+  popupTimer = null;
+  popupPending = null;
+};
+
+document.addEventListener('mouseover', (e) => {
+  const dots = e.target.closest?.('[data-beatmaps-popup]');
+  if (dots) {
+    const panel = dots.closest('.beatmapset-panel');
+    if (popupFor === panel && !$('beatmapsPopup').hidden) cancelPopupTimer();
+    else schedulePopup(`show:${panel.dataset.setId}`, () => showBeatmapsPopup(panel), 100);
+    return;
+  }
+  // On the popup, or anywhere on the card that owns it: keep it, as osu!'s does.
+  if (e.target.closest?.('#beatmapsPopup') || (popupFor !== null && popupFor.contains(e.target))) {
+    if (popupPending === 'hide') cancelPopupTimer();
+    return;
+  }
+  if (popupFor !== null) schedulePopup('hide', hideBeatmapsPopup, 500);
+  else if (popupPending !== null) cancelPopupTimer();
+});
+window.addEventListener('resize', hideBeatmapsPopup);
+
 async function scoreAction(payload) {
   const r = await fetch('/api/scores', {
     method: 'POST',
@@ -1807,27 +1945,44 @@ async function scoreAction(payload) {
 function closePlayMenu() {
   $('playMenu').hidden = true;
   $('playMenu').dataset.id = '';
+  $('playMenu').dataset.key = '';
 }
+
+/** Which row a menu belongs to. Kind and id together: an incomplete play's id can equal a score's. */
+const menuKey = (button) => `${button.dataset.kind ?? 'score'}:${button.dataset.id}`;
 
 /**
  * Open the shared popover beside the button that asked for it.
  *
  * Positioned in viewport coordinates and clamped to the right edge, because the row it
  * belongs to is inside a panel that would otherwise clip it.
+ *
+ * A score row gets everything; an unfinished play has no score, so it offers only the
+ * beatmap. Favouriting is offered wherever there is a beatmapset -- a never-submitted map has
+ * none, and nothing to show a card for.
  */
 function openPlayMenu(button) {
   const menu = $('playMenu');
   const id = Number(button.dataset.id);
+  const isScore = (button.dataset.kind ?? 'score') === 'score';
   const pinned = button.dataset.pinned === '1';
   const index = pinnedIds.indexOf(id);
+  const setId = Number(button.dataset.set) || null;
+  const favourite = setId !== null && favoriteSetIds.has(setId);
 
   menu.dataset.id = String(id);
-  menu.querySelector('[data-act="pin"]').hidden = pinned;
-  menu.querySelector('[data-act="unpin"]').hidden = !pinned;
+  menu.dataset.key = menuKey(button);
+  menu.dataset.set = setId === null ? '' : String(setId);
+  menu.querySelector('[data-act="pin"]').hidden = !isScore || pinned;
+  menu.querySelector('[data-act="unpin"]').hidden = !isScore || !pinned;
   // Reordering only means something for a pin that has somewhere to go.
-  menu.querySelector('[data-act="move-up"]').hidden = !pinned || index <= 0;
+  menu.querySelector('[data-act="move-up"]').hidden = !isScore || !pinned || index <= 0;
   menu.querySelector('[data-act="move-down"]').hidden =
-    !pinned || index < 0 || index >= pinnedIds.length - 1;
+    !isScore || !pinned || index < 0 || index >= pinnedIds.length - 1;
+  menu.querySelector('[data-act="favorite"]').hidden = setId === null || favourite;
+  menu.querySelector('[data-act="unfavorite"]').hidden = setId === null || !favourite;
+  menu.querySelector('[data-act="hide"]').hidden = !isScore;
+  menu.querySelector('[data-sep="hide"]').hidden = !isScore;
 
   menu.hidden = false;
   const box = button.getBoundingClientRect();
@@ -1840,7 +1995,7 @@ document.addEventListener('click', (e) => {
   const button = e.target.closest('[data-play-menu]');
   if (button) {
     e.stopPropagation();
-    const open = !$('playMenu').hidden && $('playMenu').dataset.id === button.dataset.id;
+    const open = !$('playMenu').hidden && $('playMenu').dataset.key === menuKey(button);
     closePlayMenu();
     if (!open) openPlayMenu(button);
     return;
@@ -1852,8 +2007,14 @@ $('playMenu').onclick = async (e) => {
   const button = e.target.closest('[data-act]');
   if (!button) return;
   const id = Number($('playMenu').dataset.id);
+  const setId = Number($('playMenu').dataset.set);
   const act = button.dataset.act;
   closePlayMenu();
+
+  if (act === 'favorite' || act === 'unfavorite') {
+    await favoriteAction(act === 'favorite' ? 'add' : 'remove', setId);
+    return;
+  }
 
   try {
     if (act === 'move-up' || act === 'move-down') {
@@ -2355,6 +2516,8 @@ es.addEventListener('app-config', (e) => {
   renderOpenBrowser();
 });
 // Pin, unpin and remove all change what the page should be showing.
+// Another tab favouriting or unfavouriting changes this one's cards and menus.
+es.addEventListener('favorites', () => loadProfile());
 es.addEventListener('scores', () => {
   loadProfile();
   loadState();

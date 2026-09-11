@@ -49,6 +49,15 @@ export const UNRANKED_MAP_STATUSES = {
 
 export type UnrankedMapStatus = keyof typeof UNRANKED_MAP_STATUSES;
 
+/** One difficulty of a beatmapset, as lazer's `online.db` records it. */
+export interface OnlineSetBeatmap {
+  beatmapId: number;
+  md5: string | null;
+  version: string | null;
+  userId: number | null;
+  status: number | null;
+}
+
 export interface ResolvedBeatmap {
   md5: string;
   osuPath: string | null;
@@ -294,6 +303,53 @@ export class BeatmapResolver {
         .prepare('SELECT checksum FROM osu_beatmaps WHERE beatmap_id = ?')
         .get(beatmapId) as { checksum: string | null } | undefined;
       if (row?.checksum) return row.checksum;
+    }
+    return null;
+  }
+
+  /**
+   * Every difficulty of a beatmapset that lazer's `online.db` knows, for a Favorite
+   * Beatmaps card built without a network. `online.db` has no star ratings or modes, only
+   * ids, checksums, the `.osu` filename (which carries the difficulty name) and the status.
+   */
+  beatmapsInSet(beatmapsetId: number): OnlineSetBeatmap[] {
+    for (const online of this.onlineDbs) {
+      const rows = online
+        .prepare(
+          `SELECT beatmap_id, checksum, filename, user_id, approved
+             FROM osu_beatmaps WHERE beatmapset_id = ?`,
+        )
+        .all(beatmapsetId) as {
+        beatmap_id: number;
+        checksum: string | null;
+        filename: string | null;
+        user_id: number | null;
+        approved: number | null;
+      }[];
+      if (rows.length === 0) continue;
+      return rows.map((r) => ({
+        beatmapId: r.beatmap_id,
+        md5: r.checksum,
+        // `Artist - Title (Creator) [Version].osu`: the version is the last bracketed part.
+        version: /\[([^\]]*)\]\.osu$/i.exec(r.filename ?? '')?.[1] ?? null,
+        userId: r.user_id,
+        status: r.approved,
+      }));
+    }
+    return [];
+  }
+
+  /** A mapper's username from `online.db`'s `users` table, or null. */
+  username(userId: number): string | null {
+    for (const online of this.onlineDbs) {
+      try {
+        const row = online.prepare('SELECT username FROM users WHERE user_id = ?').get(userId) as
+          | { username: string }
+          | undefined;
+        if (row?.username) return row.username;
+      } catch {
+        /* an older online.db without the table */
+      }
     }
     return null;
   }

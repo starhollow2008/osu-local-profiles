@@ -50,7 +50,20 @@ import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { eligibilityOf } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
-import { downloadImage, lookupUser } from '../clients/osu-web.ts';
+import { downloadImage, fetchBeatmapset, lookupUser } from '../clients/osu-web.ts';
+import {
+  addFavorite,
+  detailsFor,
+  favoriteCount,
+  favoriteIds,
+  listFavorites,
+  missingDetails,
+  removeFavorite,
+  saveDetails,
+} from '../favorites.ts';
+
+/** How many favourites still missing osu!'s details any favourite action retries. */
+const FAVORITE_RETRIES = 3;
 import {
   clearImage,
   findImage,
@@ -299,6 +312,9 @@ export function startServer(opts: ServerOptions): http.Server {
           settingsFor(current()).showIncompleteInRecent,
         ),
         mostPlayed: mostPlayed(opts.db, current(), mode, page('mostPlayed', 15)),
+        // Favourites are the profile's, not a mode's, exactly as osu!'s are the account's.
+        favorites: listFavorites(opts.db, current(), page('favorites', 6), opts.tracker.beatmaps),
+        favoriteIds: favoriteIds(opts.db, current()),
         /*
          * How many rows each of those sections has in full, so the headings can show a real
          * count and "show more" can know when to stop offering. Top Ranks is capped at 100
@@ -309,6 +325,7 @@ export function startServer(opts: ServerOptions): http.Server {
           recent: recentPlayTotal(opts.db, current(), mode),
           mostPlayed: mostPlayedTotal(opts.db, current(), mode),
           events: history.eventsTotal,
+          favorites: favoriteCount(opts.db, current()),
         },
         ppHistory: history.pp,
         // osu-web charts global rank here, so do the same wherever a curve exists.
@@ -575,6 +592,56 @@ export function startServer(opts: ServerOptions): http.Server {
         } catch (e) {
           return json(res, { error: (e as Error).message }, 400);
         }
+      });
+    }
+
+    /*
+     * Favorite Beatmaps: add or remove a set from this profile's favourites.
+     *
+     * Adding makes one request to osu.ppy.sh for the set's details, because the button was
+     * pressed -- the rule src/clients/osu-web.ts keeps. The favourite is saved first and
+     * regardless: offline, the card is built from what is on this machine. Any action also
+     * retries a few favourites still missing their details, so an offline favourite fills in
+     * the next time one is pressed with a connection, still without anything on a timer.
+     */
+    if (url.pathname === '/api/favorites' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        const action = String(body['action'] ?? '');
+        const id = Number(body['beatmapsetId']);
+        if (!Number.isInteger(id) || id <= 0) {
+          return json(res, { error: 'a beatmapset id is needed' }, 400);
+        }
+        if (action !== 'add' && action !== 'remove') {
+          return json(res, { error: 'action must be add or remove' }, 400);
+        }
+
+        if (action === 'remove') {
+          removeFavorite(opts.db, current(), id);
+        } else {
+          addFavorite(opts.db, current(), id);
+        }
+
+        let detailsError: string | null = null;
+        const wanted = action === 'add' && detailsFor(opts.db, id) === null ? [id] : [];
+        for (const missing of missingDetails(opts.db, current(), FAVORITE_RETRIES)) {
+          if (!wanted.includes(missing)) wanted.push(missing);
+        }
+        for (const setId of wanted) {
+          try {
+            saveDetails(opts.db, await fetchBeatmapset(setId));
+          } catch (e) {
+            if (setId === id) detailsError = (e as Error).message;
+            // Offline is offline for every set; asking again for the rest only waits longer.
+            if ((e as Error).message === 'could not reach osu.ppy.sh') break;
+          }
+        }
+
+        broadcast('favorites', { action, beatmapsetId: id });
+        return json(res, {
+          ok: true,
+          favorites: favoriteIds(opts.db, current()),
+          detailsError,
+        });
       });
     }
 

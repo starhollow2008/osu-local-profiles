@@ -201,6 +201,93 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nfavorite beatmaps');
+check(
+  'the Beatmaps section has its Favorite Beatmaps heading',
+  await evaluate("document.querySelector('#section-beatmaps h3.title').firstChild.textContent.trim()"),
+  'Favorite Beatmaps',
+);
+// osu! opens with three rows of two.
+check(
+  'at most six cards before "show more"',
+  await evaluate("document.querySelectorAll('#favoriteBeatmaps .beatmapset-panel').length <= 6"),
+  true,
+);
+check(
+  'the difficulty popup is hidden on load',
+  await shown('beatmapsPopup'),
+  'none',
+);
+const fav = await evaluate(`(async () => {
+  const panel = document.querySelector('#favoriteBeatmaps .beatmapset-panel');
+  if (!panel) return null;
+  const row = panel.querySelector('[data-beatmaps-popup]');
+  row.scrollIntoView({ block: 'center' });
+  await new Promise((r) => setTimeout(r, 50));
+  row.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 300));
+  const popup = document.getElementById('beatmapsPopup');
+  const stats = panel.querySelector('.beatmapset-panel__info-row--stats').getBoundingClientRect();
+  const extra = row.getBoundingClientRect();
+  const p = popup.getBoundingClientRect();
+  const c = panel.getBoundingClientRect();
+  const result = {
+    height: c.height,
+    open: getComputedStyle(popup).display !== 'none',
+    rows: popup.querySelectorAll('.beatmaps-popup-item').length,
+    under: Math.abs(p.top - c.bottom) < 2 && Math.abs(p.width - c.width) < 2,
+    menu: getComputedStyle(panel.querySelector('.beatmapset-panel__menu')).opacity,
+    // Everything the card shows while open has to fit inside it without overlapping.
+    fits: stats.bottom <= extra.top + 1 && extra.bottom <= c.bottom + 1,
+  };
+  document.body.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 650));
+  result.closes = getComputedStyle(popup).display === 'none';
+  return result;
+})()`);
+if (fav === null) {
+  for (const name of ['cards are 100px', 'hovering the difficulties opens the popup', 'it lists them',
+    'it sits under the card, the same width', 'the heart and download show', 'the rows fit the card',
+    'it closes after the pointer leaves']) check(name, SKIP);
+} else {
+  check("cards are osu!'s 100px", fav.height, 100);
+  check('hovering the difficulties opens the popup', fav.open, true);
+  check('it lists them', fav.rows > 0, true);
+  check('it sits under the card, the same width', fav.under, true);
+  check('the heart and download show', fav.menu, '1');
+  check('the rows fit the card', fav.fits, true);
+  check('it closes after the pointer leaves', fav.closes, true);
+}
+check(
+  'a score row offers to favourite or unfavourite its beatmap',
+  await evaluate(`(() => {
+    const button = document.querySelector('#topRanks [data-play-menu][data-set]:not([data-set=""])');
+    if (!button) return ${JSON.stringify('skipped')};
+    button.click();
+    const menu = document.getElementById('playMenu');
+    const fav = !menu.querySelector('[data-act="favorite"]').hidden;
+    const unfav = !menu.querySelector('[data-act="unfavorite"]').hidden;
+    document.body.click();
+    return fav !== unfav;
+  })()`),
+  true,
+);
+
+// An unfinished play has no score to pin or remove: its menu is the beatmap's alone.
+check(
+  "an unfinished play's menu offers only its beatmap",
+  await evaluate(`(() => {
+    const button = document.querySelector('#recentPlays [data-play-menu][data-kind="incomplete"]');
+    if (!button) return ${JSON.stringify('skipped')};
+    button.click();
+    const visible = [...document.querySelectorAll('#playMenu [data-act]')]
+      .filter((b) => !b.hidden).map((b) => b.dataset.act).join(',');
+    document.body.click();
+    return visible === 'favorite' || visible === 'unfavorite';
+  })()`),
+  true,
+);
+
 console.log('\nopen in browser on start');
 // Read, flip, read back from the server, flip back: the check must leave config.json as it
 // found it, since it runs against a real install.
@@ -1217,7 +1304,7 @@ check(
   await evaluate(
     "[...document.querySelectorAll('.page-extra')].map((s) => s.id).sort().join(',')",
   ),
-  'section-historical,section-me,section-medals,section-recent,section-top_ranks',
+  'section-beatmaps,section-historical,section-me,section-medals,section-recent,section-top_ranks',
 );
 // osu-web's own names: `extra.top_ranks.title` is "Scores", its pinned list "Pinned Scores".
 check(

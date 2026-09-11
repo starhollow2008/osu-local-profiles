@@ -1451,7 +1451,8 @@
 .export-mode .tracking-pill,
 .export-mode .section-order,
 .export-mode .play-detail__menu,
-.export-mode .play-detail__grip {
+.export-mode .play-detail__grip,
+.export-mode [data-unfavorite] {
   display: none !important;
 }
 
@@ -2654,4 +2655,466 @@
 
 .site-footer__note {
   margin-left: auto;
+}
+
+/* ======================================================================== */
+/* Beatmaps: Favorite Beatmaps                                              */
+/* ======================================================================== */
+
+/*
+ * osu-web's `beatmapset-panel`, `beatmapset-cover`, `beatmapset-status`, `beatmapset-badge`,
+ * `beatmaps-popup` and `difficulty-badge`, with their numbers (docs/roadmap.md 5.20). Two
+ * columns on desktop, as `page-extra__beatmapsets` has them.
+ */
+.page-extra__beatmapsets {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  .page-extra__beatmapsets {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.beatmapset-panel {
+  --info-bg: linear-gradient(0.25turn, hsl(var(--hsl-b2)), hsla(var(--hsl-b2), 0.8));
+  --menu-bg: hsl(var(--hsl-b3));
+  --menu-container-width: 10px;
+  --menu-opacity: 0;
+  --play-width: 90px;
+  --stats-opacity: 0;
+  --transition: all 150ms ease-in-out;
+
+  position: relative;
+  height: 100px;
+  min-width: 0;
+  border-radius: 10px;
+  background-color: hsl(var(--hsl-b2));
+  font-size: var(--fs-normal);
+  /* The page's 1.5 would make five rows taller than the card: title, artist, mapper, the
+     stats that appear on hover, and the difficulty row all have to fit in 100px. */
+  line-height: 1.25;
+  isolation: isolate;
+}
+
+/* The hover state, and the same while the difficulty popup is open under the card. */
+.beatmapset-panel:hover,
+.beatmapset-panel:focus-within,
+.beatmapset-panel--popup-open {
+  --info-bg: linear-gradient(0.25turn, hsl(var(--hsl-b4)), hsla(var(--hsl-b4), 0.8));
+  --menu-opacity: 1;
+  --menu-container-width: 30px;
+  --stats-opacity: 1;
+}
+
+/* A touchscreen cannot hover, so the menu there is simply always open. */
+@media (hover: none) {
+  .beatmapset-panel {
+    --menu-opacity: 1;
+    --menu-container-width: 30px;
+    --stats-opacity: 1;
+  }
+}
+
+/* While the popup is open, square off the card's bottom corners so the two read as one. */
+.beatmapset-panel--popup-open {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.beatmapset-panel__cover-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.beatmapset-panel__cover-col {
+  position: relative;
+}
+
+.beatmapset-panel__cover-col--play {
+  width: calc(var(--play-width) + 10px);
+  flex: none;
+}
+
+.beatmapset-panel__cover-col--info {
+  flex: 1;
+  margin-right: 10px;
+}
+
+/*
+ * The cover: the panel colour, with osu!'s art over it where it loads. At 2x where the
+ * screen wants it, as osu-web's `image-set` does.
+ */
+.beatmapset-cover {
+  position: absolute;
+  inset: 0;
+  background-color: hsl(var(--hsl-b3));
+}
+
+.beatmapset-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: image-set(var(--bg) 1x, var(--bg-2x, var(--bg)) 2x);
+  background-position: center;
+  background-size: cover;
+}
+
+.beatmapset-panel__content {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.beatmapset-panel__play-container {
+  width: var(--play-width);
+  flex: none;
+}
+
+.beatmapset-panel__info {
+  flex: 1;
+  min-width: 10px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 10px 6px;
+  border-radius: 9px 0 0 9px;
+  background: var(--info-bg);
+  transition: var(--transition);
+}
+
+.beatmapset-panel__info-row {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.beatmapset-panel__info-row--title {
+  font-size: var(--fs-title-small-4);
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+.beatmapset-panel__info-row--artist {
+  font-size: var(--fs-title-small);
+  font-weight: 600;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+.beatmapset-panel__info-row--mapper {
+  margin-top: auto;
+  color: hsl(var(--hsl-c2));
+  font-weight: 600;
+}
+
+.beatmapset-panel__info-row--stats {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  margin-bottom: 2px;
+  opacity: var(--stats-opacity);
+  transition: var(--transition);
+}
+
+.beatmapset-panel__info-row--extra {
+  align-items: center;
+  margin: 0 -3px;
+  color: #fff;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.beatmapset-panel__main-link,
+.beatmapset-panel__main-link:hover {
+  color: #fff;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.beatmapset-panel__mapper-link {
+  color: hsl(var(--hsl-c1));
+  pointer-events: auto;
+}
+
+.beatmapset-panel__mapper-link:hover {
+  text-decoration: underline;
+}
+
+.beatmapset-panel__badge-container {
+  position: relative;
+  bottom: 0.2em;
+  margin-left: auto;
+  flex-shrink: 0;
+  display: flex;
+}
+
+.beatmapset-panel__stats-item {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  pointer-events: auto;
+}
+
+.beatmapset-panel__stats-item-icon {
+  display: flex;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  color: hsl(var(--hsl-c2));
+}
+
+.beatmapset-panel__extra-item {
+  display: flex;
+  margin: 0 3px;
+}
+
+.beatmapset-panel__extra-item--dots {
+  align-items: center;
+}
+
+.beatmapset-panel__beatmap-icon {
+  display: flex;
+  width: 14px;
+  height: 14px;
+  margin-right: 2px;
+}
+
+.beatmapset-panel__beatmap-dot {
+  width: 6px;
+  height: 12px;
+  margin-right: 1px;
+  border-radius: 10000px;
+  background-color: var(--bg);
+}
+
+/* A difficulty whose rating is not known on this machine: an outline, not a false colour. */
+.beatmapset-panel__beatmap-dot--unknown {
+  background-color: transparent;
+  box-shadow: inset 0 0 0 1px hsl(var(--hsl-c2));
+}
+
+.beatmapset-panel__beatmap-count {
+  font-weight: 600;
+}
+
+.beatmapset-panel .icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The strip on the right: 10px of b3 at rest, 30px with the heart and download on hover. */
+.beatmapset-panel__menu-container {
+  position: relative;
+  flex: none;
+  width: var(--menu-container-width);
+  border-radius: 0 10px 10px 0;
+  background-color: var(--menu-bg);
+  transition: var(--transition);
+}
+
+.beatmapset-panel__menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  overflow: hidden;
+  opacity: var(--menu-opacity);
+  transition: var(--transition);
+  pointer-events: auto;
+}
+
+.beatmapset-panel__menu-item {
+  display: flex;
+  justify-content: center;
+  width: 20px;
+  padding: 3px 4px;
+  border: 0;
+  background: none;
+  color: hsl(var(--hsl-l1));
+  cursor: pointer;
+}
+
+.beatmapset-panel__menu-item:hover {
+  color: hsl(var(--hsl-c1));
+}
+
+.beatmapset-panel__menu-item .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* osu-web's `beatmapset-status--panel`, in each status's own colour. */
+.beatmapset-status {
+  padding: 0 5px;
+  border-radius: 10000px;
+  font-size: var(--fs-normal);
+  font-weight: 800;
+  line-height: 14px;
+  text-transform: uppercase;
+  color: hsl(var(--hsl-b3));
+  background-color: hsl(var(--hsl-b4));
+}
+
+.beatmapset-status--ranked,
+.beatmapset-status--approved {
+  background-color: hsl(90, 100%, 70%);
+}
+
+.beatmapset-status--loved {
+  background-color: hsl(333, 100%, 70%);
+}
+
+.beatmapset-status--qualified {
+  background-color: hsl(200, 100%, 70%);
+}
+
+.beatmapset-status--pending {
+  background-color: hsl(45, 100%, 70%);
+}
+
+.beatmapset-status--wip {
+  background-color: hsl(20, 100%, 70%);
+}
+
+.beatmapset-status--graveyard {
+  background-color: #000;
+  color: hsl(var(--hsl-b1));
+}
+
+/* osu-web's `beatmapset-badge`: Explicit in orange, Featured Artist blue, Spotlight green. */
+.beatmapset-badge {
+  margin-left: 5px;
+  padding: 0.2em 1em;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-small);
+  font-weight: 400;
+  text-transform: uppercase;
+  text-decoration: none;
+  white-space: nowrap;
+  text-shadow: none;
+  pointer-events: auto;
+}
+
+.beatmapset-badge--nsfw {
+  color: hsl(45, 80%, 60%);
+}
+
+.beatmapset-badge--featured_artist {
+  color: hsl(200, 80%, 60%);
+}
+
+.beatmapset-badge--spotlight {
+  color: hsl(125, 80%, 60%);
+}
+
+a.beatmapset-badge--spotlight:hover {
+  color: hsl(125, 100%, 70%);
+}
+
+/*
+ * osu-web's `beatmaps-popup`: under the card, the full width of it, and outlined together
+ * with it in the highlight colour. One element for the page, positioned by main.js.
+ */
+.beatmaps-popup {
+  position: absolute;
+  z-index: 30;
+  padding: 10px 0;
+  border-radius: 0 0 10px 10px;
+  background-color: hsl(var(--hsl-b2));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.beatmaps-popup::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(100% + 100px);
+  border: 2px solid hsl(var(--hsl-h1));
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.beatmaps-popup__content {
+  display: grid;
+  gap: 10px;
+  max-height: 50vh;
+  overflow: auto;
+  padding: 2px 5px;
+}
+
+.beatmaps-popup__group {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.beatmaps-popup-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  text-decoration: none;
+}
+
+.beatmaps-popup-item:hover .beatmaps-popup-item__version {
+  text-decoration: underline;
+}
+
+.beatmaps-popup-item__icon {
+  display: flex;
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.beatmaps-popup-item .icon {
+  width: 100%;
+  height: 100%;
+}
+
+/* osu-web's `difficulty-badge`: a pill in the difficulty's colour, star and rating. */
+.difficulty-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0 0.5em;
+  border-radius: 10000px;
+  background-color: var(--bg);
+  font-weight: 700;
+  font-size: var(--fs-normal);
+  line-height: 18px;
+}
+
+.difficulty-badge__icon {
+  display: flex;
+  width: 0.6em;
+  height: 0.6em;
+  margin-right: 0.4em;
+}
+
+.difficulty-badge__icon .icon {
+  width: 100%;
+  height: 100%;
+}
+
+.difficulty-badge__rating {
+  min-width: calc(0.67em * 3 + 0.25em);
 }

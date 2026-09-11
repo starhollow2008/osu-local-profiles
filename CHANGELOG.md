@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Beatmaps: Favorite Beatmaps**, the section from osu!'s own profile page. Favourite any
+  beatmap from the **...** menu on a row in Scores or Recent Plays, and it appears as osu!'s
+  card: its cover, title, artist and mapper, its status, a dot for every difficulty in its
+  colour, and osu!'s Explicit, Featured Artist and Spotlight badges. Hover the dots to see
+  every difficulty's name and star rating; hover the card for the heart (unfavourite) and
+  download. Six at first, then 50 at a time, as on osu!.
+  - Favourites are each profile's own, and never sent to osu!. Favouriting asks
+    osu.ppy.sh for that beatmap's details once; with no connection it is still saved, and
+    the card shows what is on your machine until it can be filled in.
+
 - **The rank graph and stats band is darker, as on osu!.** It shared the header's and the
   level bar's hue, so the top of the page read as one block. It is now osu!'s darker page
   colour between the two, and the stats card stands out on it as the lighter panel it is on
