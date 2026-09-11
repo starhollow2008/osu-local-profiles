@@ -33,6 +33,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.18 | Rename to **osu! local profiles**             | done   |
 | 5.19 | Open in browser on start, and a menu toggle   | done   |
 | 5.20 | Beatmaps section: Favorite Beatmaps           | done   |
+| 5.21 | View Details (score card) and Download Replay | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1253,3 +1254,89 @@ a difficulty popup on hovering the dots, and a heart + download strip on hoverin
 - Real sets favourited on this machine all fetched their details from osu.ppy.sh, and
   screenshots of the section at rest, hovered and with the popup open were compared against
   osu!'s own card.
+
+---
+
+## 5.21 — View Details (score card) and Download Replay
+
+**Status:** done -- not yet released.
+
+**Goal.** Two entries from osu-web's score menu (`components/play-detail-menu.tsx`), in its
+order after Pin: **View Details**, osu!'s score page (`osu.ppy.sh/scores/<id>`), and
+**Download Replay**, the score's `.osr` saved by the browser.
+
+### Established before building
+
+- **osu-web, read rather than guessed** (sparse checkout now also takes
+  `resources/js/scores-show` and `resources/js/scores`): `main.tsx` (beatmap strip, info
+  band, stats band), `info.tsx` (cover under b6/0.75; tower, dial, player, buttons),
+  `dial.tsx` (200px; inner ring r68-73 split at the grade cutoffs in rank colours; outer
+  r75-100 filled with the accuracy in a blue-1 -> lime-1 gradient, rest b6; grade at 50px in
+  `@font-grade` with a c1 glow), `tower.tsx` (SS..D, reached grade bright, below it 0.4,
+  above it 0.1 and greyscale), `player.tsx` (22px mods, 70px/300 total score, `Played by` /
+  `Submitted on` / `Played on`), `buttons.tsx` (`btn-osu-big--rounded` Download Replay and a
+  35px menu circle), `stats.tsx` (360px user card; Accuracy / Max Combo / pp, then the
+  judgements, then `value/maximum` rows shown only when the maximum is above 0).
+- **`utils/score-helper.ts`** supplies the statistics mapping per ruleset (`slider end` is
+  `small_tick_hit + slider_tail_hit`), the grade cutoffs (`current` and `legacy`, citing the
+  ppy/osu processors), and `displayAccuracy = min(accuracy, the grade's upper cutoff)` -- so an
+  A with 97.99% fills the ring only to 95%. Accuracy is floored to 4 decimals, as osu! shows it.
+- **A stable score shows a big letter, not the dial** (`legacy_score_id != null`). Verified
+  on the user's own stable score on osu.ppy.sh, screenshotted for reference.
+- **The score page is hue 200**: osu-web's `section_to_hue_map` puts scores under *beatmaps*.
+- **osu-web names a download `solo-replay-<mode>_<beatmap>_<scoreid>.osr`** and serves it as
+  `application/x-osu-replay` (`ScoresController::download`).
+- **lazer names an exported replay** `<user> playing <artist> - <title> (<mapper>)
+  [<version>] (<yyyy-MM-dd_HH-mm>).osr`, local time, invalid filename characters stripped
+  (`LegacyScoreExporter`, `GetDisplayTitle`, `GetValidFilename` in ppy/osu).
+- **The file in lazer's store is the `.osr` byte for byte**, so it can be served as it is.
+
+### Decisions
+
+- **A card over the profile, not a new page.** The user leaned that way, and it keeps the
+  page exactly where it was -- scroll position, expanded sections -- which a navigation would
+  lose. Closed by the X, Escape, or a click on the backdrop beside it.
+- **Re-hued to 200 through `.hue-scope`.** A custom property that refers to `--base-hue` is
+  resolved where it is declared, so the b/h/l tokens are now declared on `:root, .hue-scope`
+  and the card sets its own hue. osu-web's named palette (`--hsl-blue-1`, `--hsl-lime-1`, ...)
+  is added to `tokens.css` for the dial and the judgement colours.
+- **Global Rank and "Watched" are left out**, per the project's offline convention and the
+  user's own suggestion: both come from osu!'s leaderboards. The user card's online dot says
+  whether the profile is tracking, since a local profile has no presence.
+- **The filename is lazer's export name, not osu-web's.** osu-web's needs an online score id,
+  which most local scores lack (offline, or stable). The player is the profile's name.
+- **Download Replay is offered when a replay was recorded** (`replay_path`), and the file's
+  existence is checked when it is asked for. The page sends a HEAD first and shows a toast if
+  the file is gone, because a failed download is otherwise reported only in the browser's
+  download list. The route takes a score id, never a path, and only serves this profile's
+  visible scores.
+- **The difficulty badge is the difficulty's own rating**, never a modded score's: osu!'s from
+  a favourited set's cached details, else any score on it whose mods leave the rating alone
+  (`ratingNeutral`, shared with Favorite Beatmaps), else no badge.
+- **Full combo** uses the medals' definition (`max_combo >= beatmap_max_combo`), so the lime
+  combo and the FC medals cannot disagree; unknown when the beatmap's maximum is.
+- **A stable score's statistics** are derived from its six counters with lazer's own mapping
+  per ruleset (`legacyStatistics`); it has no maxima, so, as on osu!, only the judgements show.
+- **The stable grade letter is drawn**, not copied: osu-web's `legacy-ranking-*.png` is
+  stable's skin artwork. F keeps the dial, since osu-web has no F letter.
+- **The card's own menu** is the same shared `#playMenu`, minus View Details, Download Replay
+  and Move up/down. Pinning from it refreshes the card; removing the score closes it.
+- **pp in the card explains itself exactly as the row does** -- `ppNotes` in `sections.js` is
+  now shared, so the `*` and the uncounted grey cannot drift between the two.
+
+### What was checked
+
+- `test/score-details.test.ts` (10 tests): legacy statistics per ruleset, the statistics
+  mapping against a real lazer score's JSON, dial clamping and cutoffs, escaping in the card,
+  the download button only when the file exists, stable letter vs dial, the detail's fields,
+  the difficulty-rating fallbacks, the filename and its RFC 5987 header, and the routes over
+  HTTP -- detail, HEAD, the bytes themselves, and 404s.
+- `npm run ui`: **215/215**, 14 new -- the card hidden on load, the menu offering both items,
+  the card opening at <= 1000px with a 200px dial and 32x16 tower badges, the hue measured
+  against a probe, its own menu without the two items, Escape closing the menu before the
+  card, backdrop click and the X, and the replay answering HEAD.
+- A real browser download from both the row menu and the card's button: the file arrived as
+  `Tangy playing Taylor Swift - Cruel Summer (funny) [Seolv's Hard] (2026-09-10_20-36).osr`,
+  **SHA-256 identical to the file in lazer's store**.
+- Screenshots of a lazer score, a simulated stable SS, all eight stable letters, and the card
+  at phone width, compared with the real score page.

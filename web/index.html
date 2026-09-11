@@ -181,6 +181,8 @@
 <div class="play-menu" id="playMenu" role="menu" hidden>
   <button type="button" data-act="pin" role="menuitem">Pin to profile</button>
   <button type="button" data-act="unpin" role="menuitem">Unpin</button>
+  <button type="button" data-act="details" role="menuitem">View Details</button>
+  <button type="button" data-act="replay" role="menuitem">Download Replay</button>
   <button type="button" data-act="move-up" role="menuitem">Move up</button>
   <button type="button" data-act="move-down" role="menuitem">Move down</button>
   <button type="button" data-act="favorite" role="menuitem">Favorite this beatmap</button>
@@ -198,6 +200,18 @@
 <!-- osu-web's beatmaps popup: a Favorite Beatmaps card's difficulties, opened by hovering
      its row of dots. One for the page, placed under whichever card asked for it. -->
 <div class="beatmaps-popup" id="beatmapsPopup" hidden></div>
+
+<!--
+  View Details: osu!'s score page, as a card over the profile rather than a page of its own,
+  so closing it puts you back exactly where you were. The X, Escape and a click beside the
+  card all close it.
+-->
+<div class="backdrop" id="scoreModal" hidden>
+  <div class="score-modal hue-scope" role="dialog" aria-modal="true" aria-label="Score details">
+    <button type="button" class="score-modal__close" id="scoreClose" aria-label="Close" title="Close">&times;</button>
+    <div id="scoreCard"></div>
+  </div>
+</div>
 
 <!-- Outside every dialog: the picker is opened from script, and is never seen. -->
 <input type="file" id="identityFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>

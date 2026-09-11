@@ -108,6 +108,41 @@ export function aboutHtml(text) {
 }
 
 /**
+ * Why a play's pp reads the way it does, shared by the row and the View Details card so the
+ * two can never explain the same number differently.
+ */
+export function ppNotes(play) {
+  if (play.pp == null) {
+    // No pp at all: an unranked map or mod combination before the settings allowed it, or a
+    // beatmap that was never downloaded so there is no local .osu to calculate from.
+    return {
+      none: play.ranked ? 'no pp -- the beatmap file was not found locally' : 'unranked',
+      uncounted: false,
+      unofficial: false,
+      notes: [],
+    };
+  }
+
+  const notes = [];
+  const uncounted = play.counted === false;
+  const unofficial = play.ppBasis === 'without-unranked-mods';
+  if (uncounted) {
+    notes.push(
+      play.passed === false
+        ? 'A failed play never counts toward pp.'
+        : 'This does not count toward the profile: osu! would not rank it, and the settings do not include it.',
+    );
+  }
+  if (unofficial) {
+    notes.push(
+      'Priced with Relax or Autopilot removed, as if the mod had not been on. ' +
+        'osu! never awards this, and it flatters the score.',
+    );
+  }
+  return { none: null, uncounted, unofficial, notes };
+}
+
+/**
  * The pp figure for one play, and why it is what it is.
  *
  * There are more cases here than on osu!, because this profile can be configured to count
@@ -116,34 +151,19 @@ export function aboutHtml(text) {
  * page must not do.
  */
 function ppCell(play) {
-  // No pp at all: an unranked map or mod combination before the settings allowed it, or a
-  // beatmap that was never downloaded so there is no local .osu to calculate from.
-  if (play.pp == null) {
-    return `<div class="play-detail__pp play-detail__pp--none" title="${
-      play.ranked ? 'no pp -- the beatmap file was not found locally' : 'unranked'
-    }">-</div>`;
+  const why = ppNotes(play);
+  if (why.none !== null) {
+    return `<div class="play-detail__pp play-detail__pp--none" title="${why.none}">-</div>`;
   }
 
   const classes = ['play-detail__pp'];
-  const notes = [];
+  const notes = why.notes;
   let marker = '';
 
-  if (play.counted === false) {
-    classes.push('play-detail__pp--uncounted');
-    notes.push(
-      play.passed === false
-        ? 'A failed play never counts toward pp.'
-        : 'This does not count toward the profile: osu! would not rank it, and the settings do not include it.',
-    );
-  }
-
-  if (play.ppBasis === 'without-unranked-mods') {
+  if (why.uncounted) classes.push('play-detail__pp--uncounted');
+  if (why.unofficial) {
     classes.push('play-detail__pp--unofficial');
     marker = '<span class="play-detail__pp-mark" aria-hidden="true">*</span>';
-    notes.push(
-      'Priced with Relax or Autopilot removed, as if the mod had not been on. ' +
-        'osu! never awards this, and it flatters the score.',
-    );
   }
 
   const title = notes.length ? ` title="${escapeHtml(notes.join(' '))}"` : '';
@@ -183,7 +203,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
   const menu = actions
     ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="score"
          data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}" data-set="${play.beatmapsetId ?? ''}"
-         aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
+         data-replay="${play.hasReplay ? 1 : 0}" aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
     : '';
 
   // The drag handle is a convenience; the menu's Move up / Move down do the same job for

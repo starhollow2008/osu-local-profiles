@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **View Details**, from the **...** menu on any score in Scores or Recent Plays: the score
+  as osu!'s own score page shows it, in a card over the profile. The beatmap and its
+  difficulty, the cover, the grade tower, osu!'s accuracy dial -- or the big grade letter for a
+  score set on osu!stable, as on osu! -- the mods, total score, when and on which client it was
+  played, and accuracy, max combo, pp and every judgement, slider ends and spinners included.
+  Close it with the X, Escape, or a click beside it. Global Rank and the watch count are left
+  out: they come from osu!'s leaderboards, which a local profile does not have.
+- **Download Replay**, in the same menu and on the card: saves the score's replay to your
+  Downloads folder, byte for byte the file osu! wrote, named as osu!lazer names an exported
+  replay. Offered whenever osu! recorded a replay for the score.
+
 ## 1.7.0
 
 - **Beatmaps: Favorite Beatmaps**, the section from osu!'s own profile page. Favourite any

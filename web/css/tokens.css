@@ -12,10 +12,19 @@
  * There are two dark families and they are NOT interchangeable. d1-d6 are 20%
  * saturation; b1-b6 are 10%. The profile page is built on b*. Phase 1's page used d*
  * throughout, which is why it read as too saturated next to the real site.
+ *
+ * The hue is set once and the tokens are declared again on `.hue-scope`. A custom property
+ * that refers to another is resolved where it is *declared*, so setting --base-hue on an
+ * element changes nothing inside it unless the tokens are re-declared there too. That is how
+ * a part of the page can take another of osu!'s section hues: the View Details card is 200,
+ * osu!'s beatmaps section, because that is where osu! puts its score page.
  */
 :root {
   --base-hue: 333; /* osu! pink */
+}
 
+:root,
+.hue-scope {
   --hsl-p: var(--base-hue), 100%, 50%;
   --hsl-h1: var(--base-hue), 100%, 70%;
   --hsl-h2: var(--base-hue), 50%, 45%;
@@ -42,6 +51,20 @@
   --hsl-b4: var(--base-hue), 10%, 20%;
   --hsl-b5: var(--base-hue), 10%, 15%;
   --hsl-b6: var(--base-hue), 10%, 10%;
+}
+
+:root {
+  /*
+   * osu-web's "basic" colour theme: a fixed hue per name at four saturation/lightness steps
+   * (1 = 100%/70%, 2 = 80%/60%), independent of the page's hue. Only the ones in use.
+   */
+  --hsl-blue-1: 200, 100%, 70%;
+  --hsl-blue-2: 200, 80%, 60%;
+  --hsl-lime-1: 90, 100%, 70%;
+  --hsl-lime-2: 90, 80%, 60%;
+  --hsl-green-1: 125, 100%, 70%;
+  --hsl-orange-1: 45, 100%, 70%;
+  --hsl-red-1: 360, 100%, 70%;
 
   /* Fixed named colours, independent of the hue. */
   --yellow: #ffcc22;

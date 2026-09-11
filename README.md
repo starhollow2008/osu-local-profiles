@@ -422,6 +422,29 @@ and the card shows what your machine knows -- every difficulty from lazer's `onl
 with a star rating only where one of your own scores gives it -- until a later favourite,
 made online, fills it in.
 
+## View Details and Download Replay
+
+Two more entries in a score's **⋯** menu, in the order osu! has them.
+
+**View Details** opens the score as osu!'s score page does, in a card over the profile: the
+beatmap and its difficulty, the cover, the grade tower, osu!'s accuracy dial (or, for a
+score set on osu!stable, the big grade letter osu! shows instead), the mods and total score,
+who played it and when and on which client, and accuracy, max combo, pp and every judgement
+-- great / ok / meh / miss, plus slider ticks, slider ends and spinners against what the map
+had. Close it with the X, Escape, or a click beside it; the page underneath is exactly as you
+left it. Its own **⋯** has Pin and the rest, as the one on osu!'s score page does.
+
+Two things from osu!'s page are not there, because they are facts about osu!'s leaderboards
+and a local profile has none: the score's **Global Rank**, and how many times the replay was
+**watched**.
+
+**Download Replay** saves the score's replay to your Downloads folder like any download --
+the exact file osu! wrote, so it can be dragged back into osu! to watch. It is named the way
+osu!lazer names a replay it exports, e.g. `Tangy playing Taylor Swift - Cruel Summer (funny)
+[Seolv's Hard] (2026-09-10_20-36).osr`. It is offered for any finished score whose replay
+osu! recorded; an unfinished play never has one. If osu! has since deleted the file, the page
+says so rather than starting a download that fails.
+
 ## Rearranging the page
 
 Hover a section and use the arrows in its top-right corner, or drag it by the grip beside

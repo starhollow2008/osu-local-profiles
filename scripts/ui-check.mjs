@@ -926,6 +926,124 @@ await evaluate("document.querySelector('#recentPlays [data-play-menu]')?.click()
 await evaluate('document.body.click()');
 check('clicking elsewhere closes it', await shown('playMenu'), 'none');
 
+/*
+ * View Details and Download Replay (roadmap 5.21). The card is a `.backdrop`, which is the
+ * element the [hidden] trap was found on, so its visibility is checked the same way.
+ */
+console.log('\nview details');
+check('the score card is hidden on load', await shown('scoreModal'), 'none');
+
+// Opens the first score in Recent Plays and waits for its card; null when there is none.
+const openCard = `(async () => {
+  const button = document.querySelector('#recentPlays [data-play-menu][data-kind=score]');
+  if (!button) return null;
+  button.click();
+  const menu = document.getElementById('playMenu');
+  const offered = {
+    details: !menu.querySelector('[data-act=details]').hidden,
+    replay: !menu.querySelector('[data-act=replay]').hidden,
+    hasReplay: button.dataset.replay === '1',
+  };
+  menu.querySelector('[data-act=details]').click();
+  for (let i = 0; i < 40 && !document.querySelector('#scoreCard .score-page'); i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  return JSON.stringify(offered);
+})()`;
+const escape = () =>
+  evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+
+const offered = await evaluate(openCard);
+if (offered === null) {
+  for (const name of ['the menu offers View Details', 'and Download Replay exactly when there is one',
+    'View Details opens the card', "it is osu!'s page, 1000px at most", 'the dial or letter is 200px',
+    "the grade tower is osu!'s 32x16 badges", "it takes osu!'s beatmaps hue, not the profile's",
+    "its own menu has neither View Details nor Download Replay", 'Escape closes that menu first',
+    'a second Escape closes the card', 'clicking beside the card closes it', 'the X closes it',
+    'the replay is there to download']) check(name, SKIP);
+} else {
+  const o = JSON.parse(offered);
+  check('the menu offers View Details', o.details, true);
+  check('and Download Replay exactly when there is one', o.replay, o.hasReplay);
+  check('View Details opens the card', await shown('scoreModal'), 'grid');
+  check(
+    "it is osu!'s page, 1000px at most",
+    await evaluate(`(() => {
+      const w = document.querySelector('.score-modal').getBoundingClientRect().width;
+      return w > 0 && w <= 1000;
+    })()`),
+    true,
+  );
+  check(
+    'the dial or letter is 200px',
+    await evaluate("document.querySelector('.score-dial, .legacy-rank')?.getBoundingClientRect().width"),
+    200,
+  );
+  check(
+    "the grade tower is osu!'s 32x16 badges",
+    await evaluate(`(() => {
+      const r = [...document.querySelectorAll('.score-tower .score-rank')].map((e) => e.getBoundingClientRect());
+      return r.length === 6 && r.every((b) => b.width === 32 && b.height === 16);
+    })()`),
+    true,
+  );
+  // Compared against a probe rather than a literal, so a browser's hsl() rounding is not
+  // what the check measures.
+  check(
+    "it takes osu!'s beatmaps hue, not the profile's",
+    await evaluate(`(() => {
+      const probe = document.createElement('div');
+      probe.style.backgroundColor = 'hsl(200, 10%, 20%)';
+      document.body.append(probe);
+      const want = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return getComputedStyle(document.querySelector('.score-beatmap')).backgroundColor === want;
+    })()`),
+    true,
+  );
+  check(
+    'its own menu has neither View Details nor Download Replay',
+    await evaluate(`(() => {
+      document.querySelector('.score-buttons [data-play-menu]').click();
+      const menu = document.getElementById('playMenu');
+      if (getComputedStyle(menu).display === 'none') return 'did not open';
+      return menu.querySelector('[data-act=details]').hidden && menu.querySelector('[data-act=replay]').hidden;
+    })()`),
+    true,
+  );
+  await escape();
+  check(
+    'Escape closes that menu first',
+    `${await shown('playMenu')} ${await shown('scoreModal')}`,
+    'none grid',
+  );
+  await escape();
+  check('a second Escape closes the card', await shown('scoreModal'), 'none');
+
+  await evaluate(openCard);
+  // On the backdrop itself -- beside the card, not on it.
+  await evaluate("document.getElementById('scoreModal').click()");
+  check('clicking beside the card closes it', await shown('scoreModal'), 'none');
+
+  await evaluate(openCard);
+  await evaluate("document.getElementById('scoreClose').click()");
+  check('the X closes it', await shown('scoreModal'), 'none');
+
+  check(
+    'the replay is there to download',
+    o.hasReplay
+      ? await evaluate(`(async () => {
+          const id = document.querySelector('#recentPlays [data-play-menu][data-kind=score]').dataset.id;
+          const r = await fetch('/api/scores/' + id + '/replay', { method: 'HEAD' });
+          return r.status === 200 && (r.headers.get('content-disposition') ?? '').startsWith('attachment;');
+        })()`)
+      : SKIP,
+    true,
+  );
+}
+
+console.log('\npinned scores');
+
 check(
   'Pinned Scores is there, above Best Performance',
   await evaluate(`(() => {

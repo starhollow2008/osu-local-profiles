@@ -3242,3 +3242,578 @@ a.beatmapset-badge--spotlight:hover {
 .difficulty-badge__rating {
   min-width: calc(0.67em * 3 + 0.25em);
 }
+
+/* ======================================================================== */
+/* View Details: osu!'s score page, as a card over the profile               */
+/* ======================================================================== */
+
+/*
+ * osu-web's `scores-show` page and its `score-*.less`, measured values throughout (see
+ * docs/roadmap.md 5.21). The card is re-hued to 200, osu!'s beatmaps section, because that
+ * is where osu! serves a score page; `.hue-scope` in tokens.css re-derives the b/h/l tokens
+ * from it. The width is osu-web's 1000px `osu-page`.
+ */
+.score-modal {
+  --base-hue: 200;
+  position: relative;
+  width: 100%;
+  max-width: var(--container);
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  border-radius: var(--radius-large);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.75);
+}
+
+.score-modal__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  line-height: 1;
+  color: hsl(var(--hsl-c1));
+  background-color: hsla(var(--hsl-b6), 0.75);
+  transition: background-color 120ms ease-in-out;
+}
+
+.score-modal__close:hover {
+  background-color: hsl(var(--hsl-b6));
+}
+
+.score-modal__loading {
+  padding: 60px var(--gutter);
+  text-align: center;
+  color: hsl(var(--hsl-l1));
+}
+
+/* `score-beatmap`: the title strip. */
+.score-beatmap {
+  padding: 10px var(--gutter);
+  background-color: hsl(var(--hsl-b4));
+}
+
+.score-beatmap__title {
+  font-size: var(--fs-title);
+  font-weight: 400;
+  margin: 0 0 10px;
+  /* Clear of the close button. */
+  padding-right: 30px;
+}
+
+.score-beatmap__artist {
+  font-size: var(--fs-large);
+}
+
+.score-beatmap__link-plain,
+.score-beatmap__link-plain:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+.score-beatmap__detail {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: var(--fs-title-small-3);
+  min-width: 0;
+}
+
+/* `beatmap-list-item--inline`: mode, difficulty badge, then the version and its mapper. */
+.beatmap-list-item {
+  display: inline-grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.4em;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.beatmap-list-item__col--icon {
+  display: grid;
+  place-items: center;
+  font-size: 1.25em;
+  width: 1em;
+}
+
+.beatmap-list-item__col--icon .icon {
+  width: 1em;
+  height: 1em;
+}
+
+.beatmap-list-item__col--main {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.beatmap-list-item__version-link,
+.beatmap-list-item__version-link:hover {
+  color: #fff;
+  text-decoration: none;
+}
+
+.beatmap-list-item__mapper {
+  color: hsl(var(--hsl-c2));
+  font-size: 0.87em;
+}
+
+.beatmap-list-item__mapper-link {
+  color: inherit;
+}
+
+/* `score-info`: the cover band with the tower, the dial, the score and the buttons. */
+.score-info {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 240px;
+  padding: 10px calc(var(--gutter) - 10px);
+}
+
+.score-info__cover {
+  position: absolute;
+  inset: 0;
+  background-color: hsl(var(--hsl-b4));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.score-info__cover::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background-color: hsla(var(--hsl-b6), 0.75);
+}
+
+.score-info__item {
+  position: relative;
+  flex: 1;
+  margin: 10px;
+}
+
+.score-info__item--dial {
+  display: flex;
+  margin: 0 15px;
+}
+
+/* `score-tower`: SS down to D, 32x16 each. */
+.score-tower {
+  display: flex;
+  flex-direction: row-reverse;
+  margin: -5px;
+}
+
+.score-tower__item {
+  margin: 5px;
+}
+
+.score-tower__item--missed {
+  filter: grayscale(1);
+  opacity: 0.1;
+}
+
+.score-tower__item--passed {
+  opacity: 0.4;
+}
+
+.score-rank {
+  width: 32px;
+  height: 16px;
+}
+
+.score-rank svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* `score-dial`: 200px, the grade in the middle at @font-size--large-4 with a c1 glow. */
+.score-dial {
+  position: relative;
+  width: 200px;
+  height: 200px;
+}
+
+.score-dial__layer {
+  position: absolute;
+  inset: 0;
+}
+
+.score-dial__layer svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.score-dial__layer--grade {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-grade);
+  font-size: 50px;
+  font-weight: 900;
+  text-shadow: 0 0 10px hsl(var(--hsl-c1));
+}
+
+/* `legacy-rank`: a stable score's letter, in the dial's 200px and 20px above and below. */
+.legacy-rank {
+  width: 200px;
+  height: 160px;
+  margin: 20px 0;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+}
+
+.legacy-rank svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* `score-player`: mods at 22px, the total score, then who, when and where. */
+.score-player {
+  width: 250px;
+  max-width: 100%;
+}
+
+.score-player__mods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  font-size: 22px;
+}
+
+.score-player__row--score {
+  display: grid;
+}
+
+.score-player__score {
+  font-size: 50px;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.score-player__row--player {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 15px 0;
+  font-size: var(--fs-normal);
+}
+
+/* `score-buttons` and `btn-osu-big--rounded`. */
+.score-buttons {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-osu-big {
+  display: inline-block;
+  padding: 5px;
+  border-radius: var(--radius-base);
+  background: hsl(var(--hsl-h2));
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background-color 120ms;
+}
+
+.btn-osu-big:hover,
+.btn-osu-big:focus-visible {
+  background: hsl(var(--hsl-h1));
+  color: hsl(var(--hsl-c1));
+  text-decoration: none;
+}
+
+.btn-osu-big--rounded {
+  padding: 10px 15px;
+  border-radius: 100000px;
+}
+
+.score-buttons__menu {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  background-color: hsla(var(--hsl-b6), 0.75);
+  transition: background-color 120ms ease-in-out;
+}
+
+.score-buttons__menu:hover {
+  background-color: hsl(var(--hsl-l1));
+}
+
+.score-buttons__menu-button {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-title-small-3);
+  line-height: 1;
+}
+
+.score-buttons__menu:hover .score-buttons__menu-button {
+  color: hsl(var(--hsl-b6));
+}
+
+/* `user-card`: 120px, 10px corners, the cover under a b5 wash. */
+.user-card {
+  position: relative;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  border-radius: 10px;
+  background-color: hsl(var(--hsl-b4));
+}
+
+.user-card__background-container,
+.user-card__background,
+.user-card__background-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+.user-card__background {
+  background-size: cover;
+  background-position: center;
+}
+
+.user-card__background-overlay {
+  background: hsla(var(--hsl-b5), 0.6);
+}
+
+.user-card__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.user-card__content {
+  padding: 10px;
+}
+
+.user-card__content--details {
+  display: grid;
+  grid-template-columns: minmax(min-content, auto) 1fr;
+}
+
+.user-card__content--status {
+  display: flex;
+  align-items: center;
+  padding-top: 0;
+}
+
+.user-card__avatar-space {
+  width: 60px;
+  height: 60px;
+  flex: none;
+}
+
+.user-card__avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: hsl(var(--hsl-b4));
+}
+
+.user-card__avatar > img,
+.user-card__avatar > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-card__details {
+  display: grid;
+  grid-template-rows: 26px 1fr;
+  margin-left: 10px;
+  min-width: 0;
+}
+
+.user-card__icons {
+  display: flex;
+}
+
+.user-card__icon--flag {
+  display: flex;
+  font-size: 26px;
+}
+
+.user-card__icon--flag .flag-country {
+  position: relative;
+  border-radius: 3px;
+}
+
+.user-card__username-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.user-card__status {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.user-card__status-icon-container {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 60px;
+}
+
+.user-card__status-icon {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  border: 4px solid #000;
+}
+
+.user-card__status-icon--online {
+  border-color: var(--green-light);
+}
+
+.user-card__status-messages {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  margin-left: 10px;
+  font-size: var(--fs-title-small);
+}
+
+/* `score-stats`: the user card, then accuracy / combo / pp over the judgements. */
+.score-stats {
+  display: flex;
+  flex-direction: column;
+  padding: 20px var(--gutter);
+}
+
+.score-stats__group {
+  display: grid;
+  gap: 10px;
+  margin: 5px;
+}
+
+.score-stats__group-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 2px;
+}
+
+.score-stats__stat {
+  flex: 1;
+  max-width: 50%;
+  display: flex;
+  flex-direction: column;
+  text-align: center;
+}
+
+.score-stats__stat-row {
+  padding: 0 10px;
+  font-size: var(--fs-large);
+  line-height: normal;
+}
+
+.score-stats__stat-row--label {
+  font-size: var(--fs-normal);
+  background-color: hsl(var(--hsl-b6));
+  border-radius: 10000px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.score-stats__stat-row--perfect {
+  color: hsl(var(--hsl-lime-1));
+}
+
+.score-stats__stat-row--maximum {
+  font-size: var(--fs-normal);
+}
+
+/* osu-web's `hit-stat-colours`, which are ppy/osu's own judgement colours. */
+.score-stats__stat-row--hit-great,
+.score-stats__stat-row--hit-large_tick_hit,
+.score-stats__stat-row--hit-small_tick_hit { color: hsl(var(--hsl-blue-2)); }
+.score-stats__stat-row--hit-perfect { color: hsl(var(--hsl-blue-1)); }
+.score-stats__stat-row--hit-good { color: hsl(var(--hsl-green-1)); }
+.score-stats__stat-row--hit-ok { color: hsl(var(--hsl-lime-2)); }
+.score-stats__stat-row--hit-meh { color: hsl(var(--hsl-orange-1)); }
+.score-stats__stat-row--hit-miss { color: hsl(var(--hsl-red-1)); }
+.score-stats__stat-row--hit-small_tick_miss { color: hsl(var(--hsl-f1)); }
+
+/* The same departures a row's pp shows, the same way. */
+.score-stats__pp--uncounted {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-stats__pp--unofficial {
+  color: var(--rank-b);
+}
+
+.score-stats__pp-mark {
+  font-size: var(--fs-normal);
+  vertical-align: super;
+  margin-left: 1px;
+}
+
+@media (min-width: 900px) {
+  .score-info {
+    flex-direction: row;
+  }
+
+  .score-info__item {
+    flex: none;
+  }
+
+  .score-info__item--player {
+    flex: 1;
+  }
+
+  .score-info__item--buttons {
+    position: absolute;
+    right: var(--gutter);
+    bottom: 20px;
+    margin: 0;
+  }
+
+  .score-tower {
+    flex-direction: column;
+  }
+
+  .score-player {
+    width: auto;
+  }
+
+  .score-player__score {
+    font-size: 70px;
+  }
+
+  .score-stats {
+    flex-direction: row;
+  }
+
+  .score-stats__group--user-card {
+    width: 360px;
+  }
+
+  .score-stats__group--stats {
+    margin-left: auto;
+  }
+}

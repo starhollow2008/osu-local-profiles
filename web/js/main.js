@@ -15,6 +15,7 @@ import {
 } from './badges.js';
 import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
 import { beatmapsPopupContent, favoriteList, previewUrl } from './beatmapsets.js';
+import { scoreCard } from './score-card.js';
 import {
   aboutHtml,
   activityList,
@@ -229,12 +230,17 @@ function renderIdentity() {
 function renderCover(top) {
   const el = $('cover');
   if (profile?.hasCover) {
+    coverImage = '/api/image/cover';
     el.style.setProperty('--cover', "url('/api/image/cover')");
     return;
   }
   const url = coverUrl(top?.[0]?.beatmapsetId, 'cover@2x');
+  coverImage = url;
   el.style.setProperty('--cover', url ? `url('${url}')` : 'none');
 }
+
+/** Whatever the header's cover is showing, so the score card's user card can show it too. */
+let coverImage = null;
 
 function renderModes() {
   $('modes').innerHTML = MODE_NAMES.map((name, i) => {
@@ -786,6 +792,8 @@ document.addEventListener('click', () => setMenuOpen(false));
 $('optionsMenu').onclick = (e) => e.stopPropagation();
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  // The score card's own menu closes first; a second Escape closes the card.
+  if (!$('scoreModal').hidden && $('playMenu').hidden) closeScoreCard();
   setMenuOpen(false);
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
@@ -2043,16 +2051,23 @@ function openPlayMenu(button) {
   const index = pinnedIds.indexOf(id);
   const setId = Number(button.dataset.set) || null;
   const favourite = setId !== null && favoriteSetIds.has(setId);
+  // The score card's own menu: it is already the details, and has the download as a button.
+  const inCard = button.dataset.context === 'card';
 
   menu.dataset.id = String(id);
   menu.dataset.key = menuKey(button);
   menu.dataset.set = setId === null ? '' : String(setId);
+  menu.dataset.context = inCard ? 'card' : 'row';
   menu.querySelector('[data-act="pin"]').hidden = !isScore || pinned;
   menu.querySelector('[data-act="unpin"]').hidden = !isScore || !pinned;
-  // Reordering only means something for a pin that has somewhere to go.
-  menu.querySelector('[data-act="move-up"]').hidden = !isScore || !pinned || index <= 0;
+  // osu-web's order: pin, View Details, Download Replay -- the last only when the score has
+  // a replay, which an unfinished play never does.
+  menu.querySelector('[data-act="details"]').hidden = !isScore || inCard;
+  menu.querySelector('[data-act="replay"]').hidden = !isScore || inCard || button.dataset.replay !== '1';
+  // Reordering only means something for a pin that has somewhere to go, in the list itself.
+  menu.querySelector('[data-act="move-up"]').hidden = !isScore || inCard || !pinned || index <= 0;
   menu.querySelector('[data-act="move-down"]').hidden =
-    !isScore || !pinned || index < 0 || index >= pinnedIds.length - 1;
+    !isScore || inCard || !pinned || index < 0 || index >= pinnedIds.length - 1;
   menu.querySelector('[data-act="favorite"]').hidden = setId === null || favourite;
   menu.querySelector('[data-act="unfavorite"]').hidden = setId === null || !favourite;
   menu.querySelector('[data-act="hide"]').hidden = !isScore;
@@ -2082,9 +2097,18 @@ $('playMenu').onclick = async (e) => {
   if (!button) return;
   const id = Number($('playMenu').dataset.id);
   const setId = Number($('playMenu').dataset.set);
+  const fromCard = $('playMenu').dataset.context === 'card';
   const act = button.dataset.act;
   closePlayMenu();
 
+  if (act === 'details') {
+    void openScoreCard(id);
+    return;
+  }
+  if (act === 'replay') {
+    void downloadReplay(id);
+    return;
+  }
   if (act === 'favorite' || act === 'unfavorite') {
     await favoriteAction(act === 'favorite' ? 'add' : 'remove', setId);
     return;
@@ -2103,11 +2127,114 @@ $('playMenu').onclick = async (e) => {
       if (act === 'hide') toast('Removed from this profile - undo it in Settings');
       if (act === 'pin') toast('Pinned');
     }
+    // A removed score has no details left to show; a pinned one's card has to say so.
+    if (fromCard) {
+      if (act === 'hide') closeScoreCard();
+      else void openScoreCard(id);
+    }
     await Promise.all([loadProfile(), loadState()]);
   } catch (err) {
     toast(err.message);
   }
 };
+
+/* ------------------------------------------------------------ score card */
+
+/*
+ * View Details. osu! opens a score in a page of its own; here it is a card over the profile,
+ * so closing it leaves the page exactly as it was -- scrolled to the same row, with the same
+ * sections expanded. Built by web/js/score-card.js from `/api/scores/<id>`.
+ */
+let scoreCardId = null;
+
+function scoreCardOwner() {
+  const code = profile?.country ? profile.country.toUpperCase() : '';
+  return {
+    name: profile?.name ?? '',
+    avatar: profile?.hasAvatar
+      ? `<img src="/api/image/avatar" alt="">`
+      : generatedAvatar(profile?.name ?? ''),
+    country: code,
+    countryName: code ? countryName(code) : '',
+    cover: coverImage,
+    tracking,
+  };
+}
+
+async function openScoreCard(id) {
+  const opening = scoreCardId !== id;
+  scoreCardId = id;
+  if (opening) {
+    $('scoreCard').innerHTML = '<div class="score-modal__loading">Loading&hellip;</div>';
+    $('scoreModal').hidden = false;
+    $('scoreClose').focus();
+  }
+  try {
+    const r = await fetch(`/api/scores/${id}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
+    // Closed, or another score opened, while this one was on its way.
+    if (scoreCardId !== id) return;
+    $('scoreCard').innerHTML = scoreCard(d.score, scoreCardOwner());
+  } catch (err) {
+    if (scoreCardId !== id) return;
+    closeScoreCard();
+    toast(err.message);
+  }
+}
+
+function closeScoreCard() {
+  scoreCardId = null;
+  $('scoreModal').hidden = true;
+  $('scoreCard').innerHTML = '';
+  if (!$('playMenu').hidden && $('playMenu').dataset.context === 'card') closePlayMenu();
+}
+
+$('scoreClose').onclick = closeScoreCard;
+// A click beside the card -- on the backdrop itself, not anything on it -- closes it.
+$('scoreModal').onclick = (e) => {
+  if (e.target === $('scoreModal')) closeScoreCard();
+};
+// The menu is placed in window coordinates, so it cannot follow the card as it scrolls.
+$('scoreModal').querySelector('.score-modal').addEventListener('scroll', () => {
+  if (!$('playMenu').hidden) closePlayMenu();
+});
+
+/*
+ * Download Replay: the replay file, saved by the browser like any download.
+ *
+ * Asked about first, because a download that fails is reported only in the browser's own
+ * download list -- "Failed - No file" -- and never on the page. A replay can vanish from
+ * under a score: osu! owns that file and may delete it.
+ */
+async function downloadReplay(id) {
+  const url = `/api/scores/${id}/replay`;
+  try {
+    const head = await fetch(url, { method: 'HEAD' });
+    if (!head.ok) {
+      // HEAD carries no body; the same request as a GET says why.
+      const d = await fetch(url).then((r) => r.json()).catch(() => ({}));
+      throw new Error(d.error ?? 'the replay could not be downloaded');
+    }
+  } catch (err) {
+    toast(err.message);
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = url;
+  // Empty: the server's Content-Disposition names the file, as lazer names an exported one.
+  a.download = '';
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-replay-download]');
+  if (!link) return;
+  e.preventDefault();
+  void downloadReplay(Number(link.dataset.replayDownload));
+});
 
 /*
  * Dragging to reorder pins. Native HTML5 drag and drop, no library: the list is short, and

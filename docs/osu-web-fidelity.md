@@ -16,6 +16,7 @@ git clone --depth 1 --filter=blob:none --sparse https://github.com/ppy/osu-web.g
 cd reference/osu-web
 git sparse-checkout set resources/css resources/js/profile-page resources/js/components \
     resources/js/beatmapset-panel resources/js/utils resources/js/core/osu-audio resources/lang/en \
+    resources/js/scores-show resources/js/scores \
     resources/views/users public/images/badges public/images/flags database
 ```
 
@@ -67,6 +68,8 @@ allows redistribution.
 | most played | `.beatmap-playcount` | `profile-page/beatmap-playcount.tsx`, `bem/beatmap-playcount.less` |
 | play history chart | `#playHistory` | `profile-page/chart.tsx`, `profile-page/historical.tsx` |
 | medals | `.medals` | `profile-page/medals.tsx`, `bem/profile-badges.less` |
+| score row menu | `#playMenu` | `components/play-detail-menu.tsx` |
+| View Details card | `#scoreModal`, `web/js/score-card.js` | `scores-show/*.tsx`, `bem/score-{beatmap,info,tower,dial,player,buttons,stats}.less`, `bem/user-card.less`, `bem/legacy-rank.less`, `utils/score-helper.ts` |
 
 ## Known deltas
 
@@ -91,6 +94,16 @@ a bug, not a decision.
 - **Customised-mod cog** sits inside the badge instead of overhanging its top-right corner,
   because each badge is its own SVG and overhanging would make a customised mod a different
   size from its neighbours.
+- **The score card is a card, not a page.** osu! opens a score at `/scores/<id>`; here it
+  is a dialog over the profile, so closing it leaves the page as it was. It drops osu-web's
+  site header, and it is re-hued to 200 (osu-web's `section_to_hue_map` puts scores under
+  *beatmaps*), which is why it is blue on a pink page -- as the real one is.
+- **The score card's Global Rank and "Watched" rows** are left out: both are facts about
+  osu!'s leaderboards. The user card's online dot says whether the profile is tracking.
+- **A stable score's big grade letter** is osu-web's `legacy-ranking-*.png`, stable's
+  default-skin artwork. It is drawn here instead -- the grade's colour top to bottom under a
+  white outline, in `--font-grade`, at osu!'s 200x160 -- so the shape of each letter is the
+  fallback face's, not stable's.
 - **Country rank** is not shown at all — see `CLAUDE.md`. Not a fidelity gap; a deliberate
   refusal to fabricate a number.
 

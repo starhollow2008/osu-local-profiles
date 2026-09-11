@@ -54,6 +54,11 @@ export interface Play {
   ppBasis: 'as-played' | 'without-unranked-mods' | null;
   /** Pinned to the profile by the user, so the row's menu offers to unpin it. */
   pinned: boolean;
+  /**
+   * Whether a replay file was recorded for this score, so the row's menu can offer to
+   * download it. The file itself is checked when it is asked for: osu! can delete it.
+   */
+  hasReplay: boolean;
 }
 
 export interface MostPlayed {
@@ -105,6 +110,7 @@ function playColumns(e: Eligibility): string {
         ${countsSql(e)} AS counts,
         s.pp_nomod IS NOT NULL AS has_nomod,
         s.pinned_at IS NOT NULL AS pinned,
+        s.replay_path IS NOT NULL AS has_replay,
         b.beatmapset_id, b.artist, b.title, b.version, b.creator`;
 }
 
@@ -144,6 +150,7 @@ function toPlay(r: Row, e: Eligibility): Play {
     weightedPp: null,
     counted: r['counts'] === 1,
     pinned: r['pinned'] === 1,
+    hasReplay: r['has_replay'] === 1,
     ppBasis:
       r['pp'] === null
         ? null
@@ -303,6 +310,27 @@ export function pinnedPlays(
     .all(profileId, mode) as Row[];
 
   return rows.map((r) => toPlay(r, e));
+}
+
+/**
+ * One visible score, exactly as a row would show it -- the pp, stars and eligibility follow
+ * the same settings. Null when it is not this profile's, or has been removed.
+ */
+export function playById(
+  db: Db,
+  profileId: number,
+  id: number,
+  e: Eligibility = VANILLA,
+): Play | null {
+  const row = db
+    .prepare(
+      `SELECT ${playColumns(e)}, ${ppColumn(e)} AS pp
+         FROM scores s
+         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE s.id = ? AND s.profile_id = ? AND ${visibleSql()}`,
+    )
+    .get(id, profileId) as Row | undefined;
+  return row ? toPlay(row, e) : null;
 }
 
 /**

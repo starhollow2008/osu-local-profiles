@@ -193,7 +193,7 @@ function fromDetails(d: BeatmapsetDetails, favoritedAt: number): FavoriteCard {
  */
 const RATING_NEUTRAL_MODS = new Set(['NF', 'SD', 'PF', 'HD', 'CL', 'MR', 'TD', 'SV2']);
 
-function ratingNeutral(modsJson: string): boolean {
+export function ratingNeutral(modsJson: string): boolean {
   try {
     const mods = JSON.parse(modsJson) as LazerMod[];
     return mods.every((m) => RATING_NEUTRAL_MODS.has(m.acronym));

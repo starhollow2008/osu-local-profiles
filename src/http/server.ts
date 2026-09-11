@@ -75,9 +75,12 @@ import {
 } from '../identity.ts';
 import {
   applyScoreAction,
+  attachmentHeader,
   hiddenCount,
   hiddenScores,
   reorderPins,
+  replayDownload,
+  scoreDetail,
   type ScoreAction,
 } from '../scores.ts';
 
@@ -593,6 +596,45 @@ export function startServer(opts: ServerOptions): http.Server {
           return json(res, { error: (e as Error).message }, 400);
         }
       });
+    }
+
+    /*
+     * One score, for the View Details card, and its replay file, for Download Replay.
+     *
+     * The replay is streamed from wherever osu! keeps it -- lazer's file store or stable's
+     * Data/r -- as an attachment, so the browser saves it to Downloads like any download.
+     * The request names a score id, never a path: see `replayDownload`. HEAD answers the
+     * same question without the file, which is how the page checks before it starts a
+     * download that would otherwise fail silently in the browser's download bar.
+     */
+    const scoreRoute = /^\/api\/scores\/(\d+)(\/replay)?$/.exec(url.pathname);
+    if (scoreRoute && (req.method === 'GET' || req.method === 'HEAD')) {
+      const id = Number(scoreRoute[1]);
+
+      if (!scoreRoute[2]) {
+        const detail = scoreDetail(opts.db, current(), id, rules());
+        return detail ? json(res, { score: detail }) : json(res, { error: `no score ${id} on this profile` }, 404);
+      }
+
+      const player = getProfile(opts.db, current())?.name ?? 'player';
+      const found = replayDownload(opts.db, current(), id, player);
+      if ('error' in found) return json(res, { error: found.error }, 404);
+
+      fs.stat(found.path, (err, stat) => {
+        if (err) return json(res, { error: 'the replay could not be read' }, 404);
+        res.writeHead(200, {
+          // osu-web's own type for a replay download.
+          'content-type': 'application/x-osu-replay',
+          'content-length': stat.size,
+          'content-disposition': attachmentHeader(found.fileName),
+          'cache-control': 'no-store',
+        });
+        if (req.method === 'HEAD') return res.end();
+        fs.createReadStream(found.path)
+          .on('error', () => res.destroy())
+          .pipe(res);
+      });
+      return;
     }
 
     /*

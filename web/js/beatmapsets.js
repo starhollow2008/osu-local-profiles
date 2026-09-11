@@ -62,14 +62,14 @@ const svg = (body, viewBox = '0 0 16 16') =>
  * The four rulesets, drawn plainly: a hit circle, a drum face, falling fruit, and columns.
  * Not osu!'s own ruleset glyphs, which are its artwork.
  */
-const MODE_ICON = {
+export const MODE_ICON = {
   osu: svg('<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/>'),
   taiko: svg('<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 2.5v11" stroke="currentColor" stroke-width="2"/>'),
   fruits: svg('<circle cx="5" cy="5.5" r="2.4" fill="currentColor"/><circle cx="11" cy="5.5" r="2.4" fill="currentColor"/><circle cx="8" cy="11" r="2.4" fill="currentColor"/>'),
   mania: svg('<rect x="2" y="2" width="3" height="12" rx="1" fill="currentColor"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/>'),
 };
 
-const MODE_NAME = { osu: 'osu!', taiko: 'osu!taiko', fruits: 'osu!catch', mania: 'osu!mania' };
+export const MODE_NAME = { osu: 'osu!', taiko: 'osu!taiko', fruits: 'osu!catch', mania: 'osu!mania' };
 
 const ICON = {
   heart: svg('<path d="M8 14.2 2.3 8.6A3.6 3.6 0 0 1 8 4.1a3.6 3.6 0 0 1 5.7 4.5z" fill="currentColor"/>'),
@@ -271,6 +271,15 @@ const STATUS_LABEL = {
 /** osu-web's `formatStarRating`: two decimals. */
 const stars = (n) => (n == null ? '?' : n.toFixed(2));
 
+/** osu-web's `difficulty-badge`: the star rating on a pill in its own difficulty colour. */
+export function difficultyBadge(rating) {
+  const bg = getDiffColour(rating) ?? 'hsl(var(--hsl-b5))';
+  return `<span class="difficulty-badge" style="--bg: ${bg}; color: ${getDiffTextColour(rating)}">
+              <span class="difficulty-badge__icon">${ICON.star}</span>
+              <span class="difficulty-badge__rating">${stars(rating)}</span>
+            </span>`;
+}
+
 /**
  * osu-web's `beatmaps-popup`: every difficulty, grouped by ruleset, each with its mode, a
  * star-rating pill in its own colour, and its name.
@@ -281,13 +290,9 @@ export function beatmapsPopupContent(card) {
       ([mode, list]) => `<div class="beatmaps-popup__group">${list
         .map((d) => {
           const href = d.id ? `https://osu.ppy.sh/beatmaps/${d.id}` : `https://osu.ppy.sh/beatmapsets/${card.id}`;
-          const bg = getDiffColour(d.stars) ?? 'hsl(var(--hsl-b5))';
           return `<a class="beatmaps-popup-item" href="${href}" target="_blank" rel="noreferrer noopener">
             <span class="beatmaps-popup-item__icon" title="${escapeHtml(MODE_NAME[mode])}">${MODE_ICON[mode]}</span>
-            <span class="difficulty-badge" style="--bg: ${bg}; color: ${getDiffTextColour(d.stars)}">
-              <span class="difficulty-badge__icon">${ICON.star}</span>
-              <span class="difficulty-badge__rating">${stars(d.stars)}</span>
-            </span>
+            ${difficultyBadge(d.stars)}
             <span class="beatmaps-popup-item__version u-ellipsis">${escapeHtml(d.version)}</span>
           </a>`;
         })

@@ -476,7 +476,8 @@ src/calc/official.ts   JSON-lines client for the .NET calculator
 src/calc/eligibility.ts  the single definition of "this score counts toward pp"
 src/settings.ts        per-profile settings, stored one row per key
 src/tracker/recompute.ts  recalculate stored scores in place from their replays
-src/scores.ts          pin, order pins, remove a score from the profile (a hide)
+src/scores.ts          pin, order pins, remove a score (a hide); View Details data, replay download
+web/js/score-card.js   View Details: osu!'s score page as a card (dial, tower, stats)
 src/calc/medals.ts     medals, derived from scores; definitions from osu!'s own list
 src/http/screenshot.ts full-page PNG via an already-installed Chrome/Edge over CDP
 src/identity.ts        per-profile avatar and banner files in data/
