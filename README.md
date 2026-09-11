@@ -35,10 +35,10 @@ rollback folder and the unpacked download, around 400MB between them. The rollba
 lasts only as long as the update itself, and the app clears anything left over when it
 starts, including what 1.3.0 left.
 
-**v1.5.0** renames the app **osu! local profiles** (it was *osu! fresh profile*), and brings
-the page closer to osu!'s own: Medals, pp and Total Play Time under the rank graph, a
-Scores section, and a Medals section laid out as osu!'s with its hover card. Installs of
-1.3.0 and 1.4.0 update to it with the button as usual.
+**v1.5.0** gives the app its name, **osu! local profiles**, and brings the page closer to
+osu!'s own: Medals, pp and Total Play Time under the rank graph, a Scores section, and a
+Medals section laid out as osu!'s with its hover card. Installs of 1.3.0 or 1.4.0 need to
+download a newer version once by hand; from 1.5.0 the update button works as usual.
 
 **v1.6.0** makes starting the app open the page in your browser, which it was meant to do
 all along and on Windows never did, and adds **Options -> Open in browser on start** to turn

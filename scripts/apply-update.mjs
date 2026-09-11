@@ -112,15 +112,7 @@ function move(from, to) {
  * tracking, and invisible.
  */
 function relaunch() {
-  // The names before 1.5.0 come last: a swap always installs the new launcher, so they only
-  // matter if that copy somehow failed and the old one is all there is.
-  const launcher = [
-    'Start osu! local profiles.bat',
-    'Start osu! local profiles.command',
-    'start.sh',
-    'Start osu! fresh profile.bat',
-    'Start osu! fresh profile.command',
-  ]
+  const launcher = ['Start osu! local profiles.bat', 'Start osu! local profiles.command', 'start.sh']
     .map((name) => path.join(installDir, name))
     .find((file) => fs.existsSync(file));
 

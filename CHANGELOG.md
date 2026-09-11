@@ -18,10 +18,10 @@ The app, the repository and every download are now **osu! local profiles**. The 
 `Start osu! local profiles.bat` (`.command` on macOS). Nothing about your data changes: it
 stays in `data/`, and an update never touches that folder.
 
-**Updating from 1.3.0 or 1.4.0 still works with the button.** Those versions look for a
-download with the old name, so every release now carries the same archive under both
-names. Your install keeps its folder name -- rename the folder yourself if you like, with
-the app closed -- and a shortcut to the old launcher needs pointing at the new one.
+**Updating from 1.3.0 or 1.4.0 means downloading this version once by hand**: unzip it and
+copy your existing `data/` folder into it. Those versions look for a download under the
+app's previous name, which releases no longer carry. From 1.5.0 on, the update button works
+as before.
 
 ### The page matches osu!'s more closely
 
@@ -330,7 +330,7 @@ item that cannot be verified on the development machine.
 - **Still no login and no API key.** The lookup reads the public profile page, which embeds
   the same user object osu!'s API returns. One request per button press, never on a timer.
 - If osu! is signed in, its username is offered as a suggestion, read from the client's own
-  config file with no network. It only prefills: a fresh profile is a different identity by
+  config file with no network. It only prefills: a local profile is a different identity by
   definition, so it is never adopted without being asked for.
 
 ### Pinning and removing scores

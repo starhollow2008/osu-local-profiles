@@ -905,12 +905,11 @@ either side of it is exercised -- see **What was actually tested** below.
   refuses zip64 rather than half-reading it, and refuses any entry whose path escapes the
   target -- this runs on a file fetched over the network.
 - **Backslash separators had to be handled.** This project's own packager writes them: a
-  release archive says `osu-fresh-profile-1.2.0-win-x64
-ode.exe`. Read to the letter that
+  release archive says `osu-local-profiles-<version>-win-x64\node.exe`. Read to the letter that
   is one very long filename.
 - **Relaunch goes through `cmd`'s `start`.** Spawning the runtime directly is simpler and
   wrong: `detached` maps to DETACHED_PROCESS on Windows, so the app would come back running,
-  tracking and *invisible*. The launcher is called `Start osu! fresh profile.bat`, so the
+  tracking and *invisible*. The launcher is called `Start osu! local profiles.bat`, so the
   quoting is the difficulty -- an unquoted path runs a program called `Start`, which is
   exactly what the first attempt did.
 - **One request, at startup.** Not a timer, for the reason in `docs/reference-links.md`.
@@ -1064,60 +1063,61 @@ is what caught the favicon.
 
 ## 5.18 — Rename to osu! local profiles
 
-**Status: done** -- released as 1.5.0 (2026-09-11) and verified end to end from a real
-1.4.0 install. The local checkout folder and its Claude memory directory were renamed to
-`Desktop\osu! local profiles` by the user afterwards.
+**Status: done** -- released as 1.5.0 (2026-09-11). The local checkout folder and its
+Claude memory directory were renamed to `Desktop\osu! local profiles` by the user
+afterwards. **The user wants this to be the only name anywhere**: after 1.6.0 the previous
+name was removed from the code, the docs, and every GitHub release -- titles, notes and
+download files. Do not reintroduce it, not even as a compatibility alias.
 
 ### Decisions
 
-- **Existing installs must keep updating, and they can.** Renaming a GitHub repository
-  redirects its old URLs, the API included, and `fetch` follows the redirect -- so a 1.3.0
-  or 1.4.x install still finds the newest release. What it would *not* find is the file:
-  those versions ask for exactly `osu-fresh-profile-<v>-<target>.zip`. So
-  `scripts/package.mjs` writes the archive twice, byte-identical, and **a release must
-  attach both**. That is safe because 1.4.0's `extractZip` strips the top folder whatever
-  it is called (checked against the v1.4.0 tag), `verifyStaged` checks contents not names,
-  and the swap is run by the *new* build's `apply-update.mjs`, which installs and relaunches
-  `Start osu! local profiles.bat`.
-- **Do not create a new repository at the old name.** That would break the redirect and
-  strand every older install. Delete-and-recreate instead of rename would do the same.
+- **For 1.5.0 and 1.6.0, older installs were bridged, and then deliberately not.**
+  Renaming a GitHub repository redirects its old URLs, the API included, and `fetch`
+  follows the redirect -- so a 1.3.0 or 1.4.x install still finds the newest release. What
+  it cannot find is the file: those versions ask for an archive under the app's previous
+  name, exactly. So 1.5.0 and 1.6.0 were published with the same archive under both names,
+  and a real 1.4.0 install updated itself to 1.5.0 that way (below). **At the user's request
+  the duplicates were then deleted and the compatibility code removed**, accepting the cost:
+  a 1.3.0 or 1.4.x install is no longer offered updates and must download a newer version
+  once by hand. 1.5.0 and later look for `osu-local-profiles-<version>-<target>.zip` and
+  are unaffected.
+- **Do not create a new repository at the previous name.** The redirect is still what lets
+  anything pointing at the old URL find this one.
+- **The archives of 1.0.0-1.4.0 still say the previous name inside** -- their top folder and
+  their launcher are what those builds shipped. Their download files and release titles were
+  renamed; their contents were not rebuilt, and their notes describe the launcher without
+  naming the file.
 - **What cannot be renamed for the user**: an existing install's own folder (it is the
-  running app, and `data/` is inside it), and any shortcut they made to the old launcher,
-  which the swap replaces.
-- **Compatibility names that stay on purpose**: `LEGACY_ASSET_PREFIX` in
-  `src/update/github.ts` (new builds also accept the old asset name), the old launcher names
-  at the end of `apply-update.mjs`'s relaunch list, and the legacy zip copy. Past CHANGELOG
-  entries and roadmap records keep the names things actually had.
-- **"Fresh profile" in prose** became "local profile" where it named what the app makes,
-  and "new profile" where it meant a brand-new player (the rank-curve notes). "Erase and
-  start fresh" is a verb and stays. The first profile's default name is `Local Profile`;
-  existing profiles keep theirs.
+  running app, and `data/` is inside it), and any shortcut they made to the launcher, which
+  an update replaces.
+- **Prose** that used the previous name as a noun for what the app makes now says "local
+  profile", and "new profile" where it meant a brand-new player (the rank-curve notes).
+  "Erase and start fresh" is a verb and stays. The first profile's default name is
+  `Local Profile`; existing profiles keep theirs.
 
 ### How it was finished, and verified
 
 1. `gh repo rename osu-local-profiles`, then `git remote set-url origin
    https://github.com/jonathant09/osu-local-profiles.git`. Straight after the rename, the
-   exact request a 1.4.0 install makes -- the old repo path, its own user agent -- answered
-   **200 via redirect** with the latest release.
+   exact request a 1.4.0 install makes -- the old repository path, its own user agent --
+   answered **200 via redirect** with the latest release.
 2. CI went red on macOS only, **twice in a row**, and not because of the rename:
    `a play appended to the live log is picked up` appended the instant its watcher started,
    and the first `fs.watch` in a process is when libuv starts macOS's FSEvents thread. The
    previous commit, re-run on the same day's runners, was green -- so the suite's timing had
    shifted enough to lose a race that test had always been running. Fixed in the test
    (f18c350); the app reads by byte offset and is not exposed. **Green on all three after.**
-3. v1.5.0 published with both archives, byte-identical at 87,068,311 bytes.
-4. **The bridge, end to end, 14/14.** The genuine 1.4.0 release, downloaded through the
-   repository's *old* name and unzipped untouched, was given port 7334, the profile name
-   `Bridge Canary` and a canary file -- all only in its own `data/`. It found 1.5.0,
-   offered it, installed it, and came back as 1.5.0 on 7334 under `Bridge Canary` with the
-   canary intact, `Start osu! local profiles.bat` in place of the old launcher, no
-   `.rollback-` folder, and `data/update.log` recording the update and the relaunch via the
-   new launcher. The harness is `scratchpad/bridge-e2e.mjs`, not in the repository for the
+3. **The bridge, end to end, 14/14.** The genuine 1.4.0 release, unzipped untouched, was
+   given port 7334, the profile name `Bridge Canary` and a canary file -- all only in its
+   own `data/`. It found 1.5.0, offered it, installed it, and came back as 1.5.0 on 7334
+   under `Bridge Canary` with the canary intact, `Start osu! local profiles.bat` in place of
+   its old launcher, no `.rollback-` folder, and `data/update.log` recording the update and
+   the relaunch. The harness is `scratchpad/bridge-e2e.mjs`, not in the repository for the
    same reason as 5.16's: it downloads 83MB and needs a published release. A first run
    indexes ~63k beatmap files before it listens, so give it minutes, not seconds.
-
-**Keep attaching both zips to every release.** There is no way to know when the last 1.3.0
-or 1.4.x install is gone, and the second file costs nothing but upload time.
+4. **After 1.6.0, the scrub**: the duplicate archives on 1.5.0 and 1.6.0 deleted; the
+   single archives of 1.0.0-1.4.0 renamed; every release title and every set of notes
+   rewritten and checked to contain no trace of the previous name.
 
 ---
 

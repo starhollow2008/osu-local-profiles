@@ -2,10 +2,11 @@
 
 ## Current work
 
-**v1.6.0 shipped.** The app is now **osu! local profiles** (it was osu! fresh profile until
-1.5.0), at `github.com/jonathant09/osu-local-profiles`. **Every release must attach both
-zips `npm run package` writes** -- the second, old-named one is what 1.3.0/1.4.x installs
-look for; see roadmap 5.18. Ongoing work is **Phase 5**, planned in
+**v1.6.0 shipped.** The app is **osu! local profiles**, at
+`github.com/jonathant09/osu-local-profiles`, and the user wants that to be the only name
+anywhere -- the previous one was scrubbed from the code, docs and every GitHub release. Do
+not reintroduce it, including as a compatibility alias (roadmap 5.18). Ongoing work is
+**Phase 5**, planned in
 [docs/roadmap.md](docs/roadmap.md) —
 read it before starting anything new. It holds one entry per feature with its design
 decisions, the files it touches, and a status column that is the resume point if a session
@@ -396,8 +397,7 @@ shelling out to Windows' `tar.exe` would put the riskiest path in the app behind
 that exists on one OS. It refuses zip64 rather than half-reading it, refuses any entry whose
 path escapes the target — this runs on a file fetched over the network — and handles the
 **backslash separators this project's own packager writes**: a release archive says
-`osu-local-profiles-1.5.0-win-x64
-ode.exe`.
+`osu-local-profiles-1.5.0-win-x64\node.exe`.
 
 **This path has been run end to end against the real public repository** -- see
 `docs/roadmap.md` 5.16. The way to re-verify it after changing anything here, without

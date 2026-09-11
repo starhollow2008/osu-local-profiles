@@ -8,7 +8,6 @@ import {
   assetFor,
   assetNameFor,
   compareVersions,
-  LEGACY_ASSET_PREFIX,
   parseRepo,
   type Release,
 } from '../src/update/github.ts';
@@ -66,32 +65,6 @@ test('a release with no build for this platform offers nothing', () => {
   assert.equal(assetFor(release, 'win32', 'x64')?.name, 'osu-local-profiles-1.5.0-win-x64.zip');
   // A macOS user must not be handed a Windows build because it was the only asset there.
   assert.equal(assetFor(release, 'darwin', 'arm64'), null);
-});
-
-/*
- * The rename to osu! local profiles. A release carries each archive under both names, so
- * that 1.3.0 and 1.4.x -- which look for the old name only -- can still update themselves.
- */
-test('the archive is found under its old name too, and the new name wins', () => {
-  const legacyOnly: Release = {
-    version: '1.5.0',
-    releaseUrl: 'https://example.invalid',
-    assets: [{ name: 'osu-fresh-profile-1.5.0-win-x64.zip', url: 'https://example.invalid/old', size: 1 }],
-  };
-  assert.equal(assetFor(legacyOnly, 'win32', 'x64')?.url, 'https://example.invalid/old');
-
-  const both: Release = {
-    ...legacyOnly,
-    assets: [
-      ...legacyOnly.assets,
-      { name: 'osu-local-profiles-1.5.0-win-x64.zip', url: 'https://example.invalid/new', size: 1 },
-    ],
-  };
-  assert.equal(assetFor(both, 'win32', 'x64')?.url, 'https://example.invalid/new');
-  assert.equal(
-    assetNameFor('1.5.0', 'win32', 'x64', LEGACY_ASSET_PREFIX),
-    'osu-fresh-profile-1.5.0-win-x64.zip',
-  );
 });
 
 /* --------------------------------------------------------------------- zip */

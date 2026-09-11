@@ -59,40 +59,16 @@ export function compareVersions(a: string, b: string): number {
   return left.pre < right.pre ? -1 : 1;
 }
 
-/** The name every archive carries, as `scripts/package.mjs` writes it. */
-export const ASSET_PREFIX = 'osu-local-profiles';
-
-/**
- * The name the app went by before 1.5.0. Installs of 1.3.0 and 1.4.x look for *only* this
- * name, so `scripts/package.mjs` also writes a copy of each archive under it, and a release
- * must carry both for those installs to update themselves -- see docs/roadmap.md 5.18.
- */
-export const LEGACY_ASSET_PREFIX = 'osu-fresh-profile';
-
 /** The archive this platform would install, named as `scripts/package.mjs` names it. */
-export function assetNameFor(
-  version: string,
-  platform: string,
-  arch: string,
-  prefix: string = ASSET_PREFIX,
-): string {
+export function assetNameFor(version: string, platform: string, arch: string): string {
   const cpu = arch === 'arm64' ? 'arm64' : 'x64';
   const os = platform === 'win32' ? 'win' : platform === 'darwin' ? 'osx' : 'linux';
-  return `${prefix}-${version}-${os}-${cpu}.zip`;
+  return `osu-local-profiles-${version}-${os}-${cpu}.zip`;
 }
 
-/**
- * This platform's archive in a release: the current name, or failing that the legacy one.
- * The fallback costs nothing and means a release that only carries the old name -- one built
- * before the rename -- is still recognised.
- */
 export function assetFor(release: Release, platform: string, arch: string): ReleaseAsset | null {
-  for (const prefix of [ASSET_PREFIX, LEGACY_ASSET_PREFIX]) {
-    const wanted = assetNameFor(release.version, platform, arch, prefix).toLowerCase();
-    const found = release.assets.find((a) => a.name.toLowerCase() === wanted);
-    if (found) return found;
-  }
-  return null;
+  const wanted = assetNameFor(release.version, platform, arch).toLowerCase();
+  return release.assets.find((a) => a.name.toLowerCase() === wanted) ?? null;
 }
 
 /**
