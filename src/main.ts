@@ -2,10 +2,10 @@ import path from 'node:path';
 import { loadConfig, saveConfig, dataDir } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { detectInstalls } from './clients/detect.ts';
-import { BeatmapResolver, indexBeatmapFiles } from './clients/beatmaps.ts';
+import { BeatmapResolver } from './clients/beatmaps.ts';
 import { openDb } from './db/index.ts';
 import { activeProfileId, getProfile, seedFirstProfile } from './profiles.ts';
-import { Tracker } from './tracker/index.ts';
+import { Tracker, type IndexState } from './tracker/index.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
 import { checkForUpdate, pruneUpdateLeftovers } from './update/index.ts';
@@ -99,20 +99,6 @@ async function main(): Promise<void> {
     return;
   }
 
-  // The MD5 -> path index is what lets a score be matched to its beatmap offline.
-  banner('Indexing local beatmaps (first run takes a minute)...');
-  const roots = installs.flatMap((i) => i.beatmapRoots);
-  let lastReport = 0;
-  const { scanned, indexed } = indexBeatmapFiles(db, roots, (s) => {
-    if (s - lastReport >= 10000) {
-      lastReport = s;
-      process.stdout.write(`\r  scanned ${s} new files...`);
-    }
-  });
-  const totalIndexed = (db.prepare('SELECT COUNT(*) AS n FROM osu_files').get() as { n: number }).n;
-  process.stdout.write('\r');
-  console.log(`  ${totalIndexed} beatmaps indexed (${indexed} new, ${scanned} files examined)`);
-
   // There is no fallback calculator on purpose: a second implementation would disagree
   // by a few percent and leave one profile holding scores computed two different ways.
   const official = await OfficialCalculator.create();
@@ -183,6 +169,40 @@ async function main(): Promise<void> {
     console.log(`  [${time}]   --   -- did not finish        ${play.title}`);
   });
   tracker.on('error', (e) => console.error(`  watcher error: ${explainWatchError(e)}`));
+
+  /*
+   * The MD5 -> path index is what lets a score be matched to its beatmap offline. It runs
+   * beside the page rather than before it: on a first launch it opens every file in osu!'s
+   * folder once, which on a big library read cold can take a long time, and a page that
+   * would not load until then looks broken. Plays set meanwhile wait in the tracker's queue
+   * and are added, with pp, as soon as it finishes; the page shows the progress.
+   *
+   * Started before the watchers, so no play can reach the queue ahead of it.
+   */
+  const roots = installs.flatMap((i) =>
+    i.beatmapRoots.map((p) => ({ path: p, byExtension: i.kind === 'stable' })),
+  );
+  let lastLine = 0;
+  const onIndexing = (s: IndexState) => {
+    // Only a first run, or one that has turned out slow, is worth a line.
+    if (!s.active || !s.visible || Date.now() - lastLine < 2000) return;
+    lastLine = Date.now();
+    const where =
+      s.phase === 'counting'
+        ? `looking through osu!'s files (${s.total.toLocaleString()} so far)`
+        : `${Math.floor((s.scanned / Math.max(1, s.total)) * 100)}% of ${s.total.toLocaleString()} files`;
+    console.log(`  indexing beatmaps: ${where}${s.waiting ? `, ${s.waiting} play(s) waiting` : ''}`);
+  };
+  tracker.on('indexing', onIndexing);
+  void tracker.indexBeatmaps(roots).then(() => {
+    tracker.off('indexing', onIndexing);
+    const s = tracker.indexState;
+    if (s.error) console.log(`  beatmap index failed: ${s.error}`);
+    else if (s.indexed > 0 || s.firstRun) {
+      const total = (db.prepare('SELECT COUNT(*) AS n FROM osu_files').get() as { n: number }).n;
+      console.log(`  ${total.toLocaleString()} beatmaps indexed (${s.indexed.toLocaleString()} new)\n`);
+    }
+  });
 
   tracker.start();
   const server = startServer({

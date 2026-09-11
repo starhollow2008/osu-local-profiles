@@ -134,7 +134,11 @@ Then open <http://localhost:7272>. Play osu! and scores appear as you set them.
 Closing the window stops tracking. The page also has a pause button if you want to keep it
 open without recording.
 
-**First run takes about a minute** while it indexes your local beatmaps. Later runs are fast.
+**The page opens straight away, even on the first run.** The first time, the app reads your
+osu! folder once to match each score to its beatmap -- seconds on some machines, longer on a
+big library. A bar at the top of the page shows how far it has got, and anything you play
+meanwhile is held and added, with pp, as soon as it finishes. Later runs only look for new
+beatmaps, which normally takes under a second.
 
 ## How it works
 

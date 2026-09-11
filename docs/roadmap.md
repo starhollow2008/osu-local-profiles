@@ -37,6 +37,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.22 | Floating audio player; pause resumes          | done   |
 | 5.23 | Score links, pages and screenshots            | done   |
 | 5.24 | Performance and cleanup pass                  | done   |
+| 5.25 | Beatmap index in the background, with progress | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1540,3 +1541,55 @@ launcher on every update and so reaches everyone who presses the button.
 name with the canary intact and no leftovers -- and this time the process listening on its
 port was the install's own `node.exe` (`.\node.exe src\main.ts`), where 1.8.0's relaunch had
 been `C:\Program Files\nodejs\node.exe`. The fix reached the one path that exposed the bug.
+
+---
+
+## 5.25 — The beatmap index in the background, with progress on the page
+
+**Status:** done.
+
+**Goal.** A first launch shows the page at once instead of waiting for the beatmap index,
+says on the page what is happening, and loses nothing played meanwhile.
+
+### Why the index exists, and what it cost
+
+A replay names its beatmap by MD5; lazer stores files under their SHA-256, so the only way
+from one to the other without lazer's Realm database is to read the store once. It feeds pp
+and stars (the calculator needs the `.osu`), titles, Total Play Time and an unfinished play's
+ruleset. Measured here: 63,515 files, 12,691 beatmaps, 18GB -- **8.7s warm, ~140s on a first
+cold read** -- and `main.ts` ran it *before* starting the server, so a first launch was a page
+that would not load. Extrapolated, a library of ~200k difficulties (~1M files) is 30-40
+minutes cold on an SSD and plausibly hours on a hard drive.
+
+### Decisions
+
+- **Start the page and tracker first; index beside them.** `indexBeatmapFiles` is async, works
+  in 25ms slices, and commits before each pause (shared connection -- see `CLAUDE.md`).
+- **Count first, then index**, so the page shows a real percentage: counting is a directory
+  listing, cheap next to opening files. The bar sweeps while counting.
+- **Plays wait; they are not resolved early.** `resolve()` caches a miss permanently, so a
+  score resolved mid-index would never get pp. `Tracker.indexBeatmaps` chains the index onto
+  the ingest queue *before* `tracker.start()`, and every ingest path -- replays, logged
+  plays, imports, recompute, profile switches -- already runs through that queue. The page
+  counts how many are waiting.
+- **The notice shows on a first run, or when a re-check takes over 1.5s**, never on an
+  ordinary start (the re-check is normally ~0.5s). It sticks to the top of the window, says
+  that scores are held and will get pp, and on finishing becomes a toast and a reload.
+- **osu!stable: `.osu` by name.** stable names every beatmap `*.osu`, so nothing else in
+  `Songs` is opened -- it used to sniff every audio file and background too. lazer keeps
+  sniffing, since its files have no extension.
+
+### What was checked
+
+- `test/beatmap-index.test.ts`: lazer sniffed by content; stable opening only `.osu` names
+  (an mp3 and a jpg never recorded); a re-run doing nothing and not counting as a first run;
+  a second writer on the same connection running *throughout* an index of 1,500 files with
+  no "transaction within a transaction" and no rows lost; and nothing queued behind the
+  index running before it finishes.
+- A real first launch on this machine's 63,515-file store, from an empty `data/`: **the page
+  answered in 129ms** (it used to be 9s at best), the API stayed at ~60ms throughout, the
+  notice read "Finding your beatmaps -- 22% -- 14,404 of 63,515 files", the console tracked it
+  to "12,691 beatmaps indexed", and the notice was gone when it finished. Restarting the same
+  copy showed no notice at all.
+- `npm run check` 253/253; `npm run ui` 229/229, including that the notice is hidden once the
+  index exists.

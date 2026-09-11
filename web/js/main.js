@@ -714,6 +714,7 @@ async function loadState() {
   } this session`;
 
   setTracking(s.tracking);
+  renderIndexing(s.indexing);
   renderIdentity();
   // Never clobber what is being typed: a 15-second poll must not swallow a draft.
   if (!editingAbout) renderAbout();
@@ -742,6 +743,58 @@ $('toggle').onclick = async () => {
     toast(err.message);
   }
 };
+
+/* ---------------------------------------------------------- beatmap index */
+
+/*
+ * The notice for the beatmap index, which runs beside the page. On a first launch the app
+ * reads osu!'s whole folder once to match scores to their beatmaps; until it has, a new
+ * score cannot be priced, so it is held rather than stored without pp. Without this the
+ * page would just look broken: a score set, and nothing appearing.
+ *
+ * The server decides `visible` -- always on a first run, otherwise only once a routine
+ * re-check has taken long enough to be worth mentioning.
+ */
+let indexShown = false;
+
+function renderIndexing(state) {
+  if (!state) return;
+  const show = state.active && state.visible;
+  $('indexNotice').hidden = !show;
+  $('indexNotice').classList.toggle('index-notice--counting', show && state.phase === 'counting');
+
+  if (show) {
+    indexShown = true;
+    $('indexTitle').textContent = state.firstRun ? 'Finding your beatmaps' : 'Updating the beatmap index';
+    const done = state.total > 0 ? Math.min(1, state.scanned / state.total) : 0;
+    $('indexDetail').textContent =
+      state.phase === 'counting'
+        ? `Looking through osu!'s files... ${fmt(state.total)} so far`
+        : `${Math.floor(done * 100)}% - ${fmt(state.scanned)} of ${fmt(state.total)} files`;
+    $('indexFill').style.setProperty('--fill', state.phase === 'counting' ? '30%' : `${done * 100}%`);
+    const waiting = state.waiting > 0
+      ? ` ${fmt(state.waiting)} play${state.waiting === 1 ? ' is' : 's are'} waiting to be added.`
+      : '';
+    $('indexNote').textContent =
+      (state.firstRun
+        ? "This happens once: the app reads your osu! folder to match each score to its beatmap. "
+        : 'New beatmaps were found in your osu! folder. ') +
+      'The page works meanwhile. Scores you set now are held and added, with pp, as soon as ' +
+      `it finishes.${waiting}`;
+    return;
+  }
+
+  // It was on screen and has finished: say so once, and show whatever it was holding back.
+  if (indexShown && !state.active) {
+    indexShown = false;
+    toast(
+      state.error
+        ? `The beatmap index stopped: ${state.error}`
+        : `Beatmaps ready${state.indexed ? ` - ${fmt(state.indexed)} indexed` : ''}`,
+    );
+    void loadProfile();
+  }
+}
 
 /* ---------------------------------------------------------- options menu */
 
@@ -877,7 +930,7 @@ const EXPORT_STRIP = [
   '#optionsBtn', '.menu-wrap', '#toggle', '.backdrop', '#playMenu', '#toast',
   '#identityFile', '.section-order', '.play-detail__menu', '.play-detail__grip',
   '#aboutEdit', '#medalTooltip', '#beatmapsPopup', '[data-unfavorite]', '[data-audio-play]',
-  '.beatmapset-panel__play-progress', '.audio-player-floating', 'script',
+  '.beatmapset-panel__play-progress', '.audio-player-floating', '#indexNotice', 'script',
 ];
 
 /**
@@ -2735,6 +2788,7 @@ es.addEventListener('profiles', () => {
 });
 // Settings only change the header, but a second tab open on the same profile should not
 // be left showing the old country.
+es.addEventListener('indexing', (e) => renderIndexing(JSON.parse(e.data)));
 es.addEventListener('settings', () => loadState());
 es.addEventListener('identity', () => loadState());
 // A second tab should not be left showing the switch the wrong way round.

@@ -1,7 +1,13 @@
 import { EventEmitter } from 'node:events';
 import type { Db } from '../db/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
-import { BeatmapResolver, indexOneFile } from '../clients/beatmaps.ts';
+import {
+  BeatmapResolver,
+  indexBeatmapFiles,
+  indexOneFile,
+  type IndexProgress,
+  type IndexRoot,
+} from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
 import { LogWatcher } from './log-watcher.ts';
 import { logDirOf, type ResolvedLoggedPlay } from '../clients/lazer-log.ts';
@@ -27,7 +33,26 @@ export interface TrackerEvents {
   incomplete: [IngestedIncomplete];
   skip: [{ reason: string }];
   error: [Error];
+  /** How far the beatmap index has got; sent while it runs and once when it finishes. */
+  indexing: [IndexState];
 }
+
+/** The beatmap index, as the page shows it. */
+export interface IndexState extends IndexProgress {
+  active: boolean;
+  /** Whether the page should say so: always on a first run, otherwise only once it is slow. */
+  visible: boolean;
+  /** Plays that arrived meanwhile and are held until the index can price them. */
+  waiting: number;
+  error: string | null;
+}
+
+/**
+ * How long a routine re-check of the index may take before the page mentions it. Every start
+ * walks the store for new beatmaps, which is normally well under a second, and a notice that
+ * flashes up and vanishes on every launch would only teach people to ignore it.
+ */
+const QUIET_INDEX_MS = 1500;
 
 export interface BackfillResult {
   imported: number;
@@ -52,6 +77,17 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   /** Serialises ingestion so two replays landing together cannot interleave writes. */
   private queue: Promise<void> = Promise.resolve();
   private added = 0;
+  private index: IndexState = {
+    active: false,
+    visible: false,
+    phase: 'indexing',
+    scanned: 0,
+    total: 0,
+    indexed: 0,
+    firstRun: false,
+    waiting: 0,
+    error: null,
+  };
 
   constructor(opts: TrackerOptions) {
     super();
@@ -69,6 +105,59 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   get scoresAdded(): number {
     return this.added;
+  }
+
+  get indexState(): IndexState {
+    return { ...this.index };
+  }
+
+  /**
+   * Build the beatmap index in the background, and hold every play until it is done.
+   *
+   * The index is what turns a score's beatmap into a `.osu` file, and so into pp, a title and
+   * a length. Resolving a beatmap before its file is indexed would cache "not found" for good
+   * and leave that score without pp -- so the queue waits on this, and a score set during a
+   * first launch is added, priced, the moment the index finishes rather than being lost or
+   * stored without pp. The page is up meanwhile and says what is happening.
+   */
+  indexBeatmaps(roots: IndexRoot[]): Promise<void> {
+    const started = performance.now();
+    let lastEmit = 0;
+    this.index = { ...this.index, active: true, visible: false, error: null };
+    const report = (final = false) => {
+      this.index.visible =
+        this.index.active && (this.index.firstRun || performance.now() - started > QUIET_INDEX_MS);
+      const now = performance.now();
+      if (final || now - lastEmit >= 250) {
+        lastEmit = now;
+        this.emit('indexing', this.indexState);
+      }
+    };
+
+    const run = indexBeatmapFiles(this.opts.db, roots, (p) => {
+      Object.assign(this.index, p);
+      report();
+    }).then(
+      () => undefined,
+      (e: unknown) => {
+        this.index.error = (e as Error).message;
+        this.emit('error', e as Error);
+      },
+    ).finally(() => {
+      this.index.active = false;
+      this.index.waiting = 0;
+      report(true);
+    });
+
+    this.queue = this.queue.then(() => run);
+    return run;
+  }
+
+  /** A play has arrived and is queued; while the index runs, the page counts it as waiting. */
+  private arrived(): void {
+    if (!this.index.active) return;
+    this.index.waiting++;
+    this.emit('indexing', this.indexState);
   }
 
   /**
@@ -250,6 +339,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * writes, so the two must never be in flight together.
    */
   private handleLoggedPlays(plays: ResolvedLoggedPlay[]): void {
+    this.arrived();
     this.queue = this.queue
       .then(() => {
         for (const play of plays) {
@@ -270,6 +360,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   }
 
   private handleReplay(file: string): void {
+    this.arrived();
     this.queue = this.queue
       .then(async () => {
         const result = await ingestReplayFile(file, {

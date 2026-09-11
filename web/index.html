@@ -56,6 +56,22 @@
   </div>
 </header>
 
+<!--
+  The beatmap index, while it runs. On a first launch the app reads osu!'s whole folder once
+  to match scores to beatmaps; the page works meanwhile, and this says why a score set now
+  takes a while to appear. Kept at the top of the window while it shows, wherever you are.
+-->
+<div class="index-notice band" id="indexNotice" role="status" aria-live="polite" hidden>
+  <div class="band__inner index-notice__inner">
+    <div class="index-notice__head">
+      <strong class="index-notice__title" id="indexTitle">Finding your beatmaps</strong>
+      <span class="index-notice__detail" id="indexDetail"></span>
+    </div>
+    <div class="bar index-notice__bar"><div class="bar__fill" id="indexFill"></div></div>
+    <div class="index-notice__note" id="indexNote"></div>
+  </div>
+</div>
+
 <section class="profile-detail band">
   <div class="band__inner profile-detail-stats">
     <div>

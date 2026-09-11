@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **The page opens straight away on a first launch.** The app used to read your whole osu!
+  folder before showing anything -- a few seconds on some machines, possibly an hour on a
+  very large library -- with nothing but a line in the console to say why. It now does that
+  in the background, with a progress bar at the top of the page. Scores you set meanwhile
+  are held and added, with pp, as soon as it finishes; nothing is lost or left without pp.
+- **osu!stable: indexing opens only beatmap files.** It used to open every file in `Songs`
+  -- audio, backgrounds, hitsounds -- to check whether it was a beatmap.
+
 ## 1.8.1
 
 - **The Windows launcher always starts the app's own Node runtime.** It named `node.exe`

@@ -114,22 +114,64 @@ function* walk(dir: string): Generator<string> {
   }
 }
 
+/** A folder to index, and whether its beatmaps can be told apart by name. */
+export interface IndexRoot {
+  path: string;
+  /**
+   * osu!stable's `Songs` names every beatmap `*.osu`, so nothing else there needs opening --
+   * most of a set is audio, images and hitsounds. lazer's store names files by hash, with no
+   * extension at all, so there every file has to be sniffed.
+   */
+  byExtension: boolean;
+}
+
+export interface IndexProgress {
+  /** `counting` walks the folders to learn how much there is; `indexing` does the work. */
+  phase: 'counting' | 'indexing';
+  /** Files dealt with so far, already-known ones included. */
+  scanned: number;
+  /** Files there are to deal with; known once counting finishes. */
+  total: number;
+  /** New beatmaps added to the index this run. */
+  indexed: number;
+  /** Nothing had been indexed before this run: a first launch, or a fresh data folder. */
+  firstRun: boolean;
+}
+
+/**
+ * How long the indexer works before letting everything else run. It shares the event loop
+ * with the page's server and the tracker, so a long unbroken run would freeze both.
+ */
+const SLICE_MS = 25;
+
+const breathe = () => new Promise<void>((resolve) => setImmediate(resolve));
+
+const isOsuName = (file: string) => file.toLowerCase().endsWith('.osu');
+
 /**
  * Build (or top up) the MD5 -> path index of local .osu files.
  *
  * lazer names every stored file by its SHA-256, so a score's beatmap MD5 cannot be turned
  * into a path without either this index or lazer's Realm database. Files in the store are
  * content-addressed and therefore immutable, so anything already indexed is never re-read.
+ *
+ * It runs *beside* the app rather than before it: on a first launch it has to open every
+ * file in the store once, which is seconds on a warm disk but can be an hour on a very large
+ * library read cold. So the work is done in slices of `SLICE_MS`, each committed before the
+ * pause -- the connection is shared, and a transaction left open across a pause would swallow
+ * whatever else wrote in it. Anything that needs the index waits for this promise; see
+ * `Tracker.indexBeatmaps`.
  */
-export function indexBeatmapFiles(
+export async function indexBeatmapFiles(
   db: Db,
-  roots: string[],
-  onProgress?: (scanned: number, indexed: number) => void,
-): { scanned: number; indexed: number } {
+  roots: IndexRoot[],
+  onProgress?: (progress: IndexProgress) => void,
+): Promise<{ scanned: number; indexed: number }> {
   const known = new Set<string>();
   for (const r of db.prepare('SELECT path FROM osu_files').all() as { path: string }[]) {
     known.add(r.path);
   }
+  const firstRun = known.size === 0;
   for (const r of db.prepare('SELECT path FROM not_beatmaps').all() as { path: string }[]) {
     known.add(r.path);
   }
@@ -139,42 +181,74 @@ export function indexBeatmapFiles(
   );
   const insertSkip = db.prepare('INSERT OR REPLACE INTO not_beatmaps (path, size) VALUES (?, ?)');
 
-  let scanned = 0;
-  let indexed = 0;
-  db.exec('BEGIN');
-  try {
+  const progress: IndexProgress = { phase: 'counting', scanned: 0, total: 0, indexed: 0, firstRun };
+  const candidates = function* (): Generator<string> {
     for (const root of roots) {
-      for (const file of walk(root)) {
-        if (known.has(file)) continue;
-        scanned++;
-        let size = 0;
+      for (const file of walk(root.path)) if (!root.byExtension || isOsuName(file)) yield file;
+    }
+  };
+
+  let sliceStart = performance.now();
+  let inTransaction = false;
+  const pauseIfDue = async () => {
+    if (performance.now() - sliceStart < SLICE_MS) return;
+    if (inTransaction) {
+      db.exec('COMMIT');
+      inTransaction = false;
+    }
+    onProgress?.({ ...progress });
+    await breathe();
+    sliceStart = performance.now();
+  };
+  const write = (statement: typeof insertOsu, ...values: (string | number)[]) => {
+    if (!inTransaction) {
+      db.exec('BEGIN');
+      inTransaction = true;
+    }
+    statement.run(...values);
+  };
+
+  try {
+    // Counting first costs a directory listing, which is cheap next to opening files, and
+    // is what lets the page show how far along it is rather than a spinner.
+    for (const _file of candidates()) {
+      progress.total++;
+      await pauseIfDue();
+    }
+
+    progress.phase = 'indexing';
+    for (const file of candidates()) {
+      progress.scanned++;
+      if (!known.has(file)) {
+        let size = -1;
         try {
           size = fs.statSync(file).size;
         } catch {
-          continue;
+          /* gone since it was listed */
         }
-
-        if (!isBeatmapFile(file)) {
-          insertSkip.run(file, size);
-        } else {
+        if (size >= 0 && !isBeatmapFile(file)) {
+          write(insertSkip, file, size);
+        } else if (size >= 0) {
           try {
             const md5 = crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex');
-            insertOsu.run(file, md5, size, Date.now());
-            indexed++;
+            write(insertOsu, file, md5, size, Date.now());
+            progress.indexed++;
           } catch {
             /* unreadable, skip */
           }
         }
-        if (scanned % 2000 === 0) onProgress?.(scanned, indexed);
       }
+      await pauseIfDue();
     }
-    db.exec('COMMIT');
+    if (inTransaction) db.exec('COMMIT');
   } catch (e) {
-    db.exec('ROLLBACK');
+    if (inTransaction) db.exec('ROLLBACK');
     throw e;
   }
-  onProgress?.(scanned, indexed);
-  return { scanned, indexed };
+  // A folder can change while it is walked; the bar ends full either way.
+  progress.total = progress.scanned;
+  onProgress?.({ ...progress });
+  return { scanned: progress.scanned, indexed: progress.indexed };
 }
 
 /** Add a single newly-seen file to the index (used by the watcher). */

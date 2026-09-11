@@ -52,8 +52,16 @@ per score. Values are in `HIT_VALUES` in `src/calc/grade.ts`.
 
 **lazer stores files by SHA-256, not by beatmap MD5.** A score names its beatmap by MD5, so
 matching it to a local `.osu` requires the MD5 index in `osu_files` (see
-`src/clients/beatmaps.ts`). Building it means sniffing every file in the store (~63k files,
-~40s once); entries are immutable so nothing is ever re-read.
+`src/clients/beatmaps.ts`). Building it means sniffing every file in the store once (~63k
+files here: 9s warm, ~140s on a first, cold read); entries are immutable so nothing is ever
+re-read. osu!stable's `Songs` is filtered by the `.osu` extension instead, which lazer's
+hash-named files do not have.
+
+**The index runs beside the app, never before it** (roadmap 5.25). `indexBeatmapFiles` works
+in 25ms slices and **commits before every pause**: the connection is shared, and a transaction
+held open across a pause would swallow whatever else wrote meanwhile. `Tracker.indexBeatmaps`
+puts it at the head of the ingest queue *before the watchers start*, because `resolve()`
+caches a miss for good -- a score resolved mid-index would never get pp.
 
 **`online.db` is a plain SQLite file** shipped by lazer:
 `osu_beatmaps(beatmap_id, beatmapset_id, checksum, approved, ...)`, ~234k rows, `checksum`

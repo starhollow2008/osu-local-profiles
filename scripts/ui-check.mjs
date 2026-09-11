@@ -143,6 +143,16 @@ const check = (name, actual, expected) => {
 
 console.log('\non load');
 check('reset dialog is hidden', await shown('resetModal'), 'none');
+// The beatmap index notice is for a first launch or a slow re-check, never a normal start.
+check(
+  'the beatmap index notice is not shown once the index exists',
+  await evaluate(`(async () => {
+    const s = (await (await fetch('/api/state')).json()).indexing;
+    if (s.active) return 'skipped';
+    return getComputedStyle(document.getElementById('indexNotice')).display;
+  })()`),
+  'none',
+);
 check('options menu is hidden', await shown('optionsMenu'), 'none');
 
 console.log('\nafter clicking Options');

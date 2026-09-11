@@ -173,6 +173,8 @@ export function startServer(opts: ServerOptions): http.Server {
   // told about it -- it just has nothing to put in a toast beyond which map it was.
   opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
+  // The beatmap index runs beside the page; it shows the progress while plays wait on it.
+  opts.tracker.on('indexing', (state) => broadcast('indexing', state));
 
   /*
    * The profile page's expensive half, remembered until the database changes.
@@ -301,6 +303,8 @@ export function startServer(opts: ServerOptions): http.Server {
         profiles: listProfiles(opts.db),
         tracking: opts.tracker.isTracking,
         scoresThisSession: opts.tracker.scoresAdded,
+        // A page opened mid-index shows where it has got to, not only what arrives next.
+        indexing: opts.tracker.indexState,
         // Scores ingested before the eligibility columns existed. Non-zero means the
         // Settings dialog should offer a recompute rather than silently under-reporting.
         staleScores: opts.tracker.staleScores,

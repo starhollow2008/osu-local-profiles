@@ -4112,3 +4112,73 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
 .export-mode .score-modal--page {
   border-radius: 0;
 }
+
+/* ======================================================================== */
+/* The beatmap index notice (this app's own, not osu-web's)                 */
+/* ======================================================================== */
+
+/*
+ * Shown while the beatmap index runs on a first launch, or when a routine re-check turns out
+ * slow. It sticks to the top of the window so it is there wherever the page is scrolled --
+ * someone who has just set a score and is looking at Recent Plays is exactly who needs it.
+ */
+.index-notice {
+  position: sticky;
+  top: 0;
+  z-index: 45;
+  padding-block: 10px;
+  background-color: hsl(var(--hsl-b4));
+  border-bottom: 2px solid hsl(var(--hsl-h1));
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.index-notice__inner {
+  display: grid;
+  gap: 6px;
+}
+
+.index-notice__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+.index-notice__title {
+  font-size: var(--fs-title-small);
+}
+
+.index-notice__detail {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.index-notice__note {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal);
+}
+
+/* While the files are still being counted there is no percentage yet: the bar sweeps. */
+.index-notice--counting .bar__fill {
+  width: 30%;
+  animation: index-sweep 1.4s ease-in-out infinite;
+}
+
+@keyframes index-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(333%); }
+}
+
+.index-notice--counting .index-notice__bar {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .index-notice--counting .bar__fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+  }
+}
