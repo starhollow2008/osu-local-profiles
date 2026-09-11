@@ -1485,6 +1485,10 @@ async function renderRemovedScores() {
             </div>
           </div>
           <button type="button" data-restore="${h.id}">Put back</button>
+          <button type="button" class="removed-row__delete" data-delete="${h.id}"
+                  title="Delete permanently" aria-label="Delete permanently">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="2" rx="1" fill="currentColor"/></svg>
+          </button>
         </div>`,
       )
       .join('');
@@ -1493,7 +1497,51 @@ async function renderRemovedScores() {
   }
 }
 
+/**
+ * Deleting cannot be undone, so it takes a second press: the first turns the button into
+ * the question, and it goes back after a few seconds if the answer never comes. Nothing
+ * blocks the page the way a confirm() box would.
+ */
+function armed(button, question) {
+  if (button.dataset.armed === '1') return true;
+  button.dataset.armed = '1';
+  button.dataset.label = button.innerHTML;
+  button.classList.add('is-armed');
+  button.textContent = question;
+  setTimeout(() => {
+    if (!button.isConnected || button.dataset.armed !== '1') return;
+    button.dataset.armed = '0';
+    button.classList.remove('is-armed');
+    button.innerHTML = button.dataset.label;
+  }, 4000);
+  return false;
+}
+
+async function deleteRemoved(payload, button) {
+  button.disabled = true;
+  try {
+    const d = await scoreAction(payload);
+    toast(d.deleted === 1 ? 'Score deleted permanently' : `${fmt(d.deleted)} scores deleted permanently`);
+    await Promise.all([loadState(), loadProfile()]);
+    await renderRemovedScores();
+  } catch (err) {
+    settingsHint(err.message, true);
+    button.disabled = false;
+  }
+}
+
+$('removedDeleteAll').onclick = () => {
+  const button = $('removedDeleteAll');
+  if (!armed(button, `Delete all ${fmt(hiddenScoreCount)} for good?`)) return;
+  void deleteRemoved({ action: 'delete-all-removed' }, button);
+};
+
 $('removedList').onclick = async (e) => {
+  const doomed = e.target.closest('[data-delete]');
+  if (doomed) {
+    if (armed(doomed, 'Delete?')) void deleteRemoved({ action: 'delete', id: Number(doomed.dataset.delete) }, doomed);
+    return;
+  }
   const button = e.target.closest('[data-restore]');
   if (!button) return;
   button.disabled = true;

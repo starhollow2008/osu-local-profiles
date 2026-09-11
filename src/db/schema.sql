@@ -176,4 +176,14 @@ CREATE TABLE IF NOT EXISTS beatmapset_details (
   fetched_at    INTEGER NOT NULL
 );
 
+-- Scores deleted for good from Settings' Removed scores. The row is gone; only its dedupe key
+-- is kept, because the replay is still in osu!'s file store and would otherwise be ingested
+-- again as a brand new score -- the reason a removal is a hide in the first place.
+CREATE TABLE IF NOT EXISTS deleted_scores (
+  profile_id INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  dedupe_key TEXT    NOT NULL,
+  deleted_at INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, dedupe_key)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

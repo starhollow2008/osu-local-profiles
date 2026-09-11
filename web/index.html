@@ -408,9 +408,13 @@
       <h4>Removed scores<span class="title__count" id="removedCount">0</span></h4>
       <p class="setting__hint">
         Removing a score never deletes it. Put one back and it returns to every section and
-        to the totals.
+        to the totals. The red minus deletes one for good: it cannot be put back, and its
+        replay is never imported again.
       </p>
       <div class="removed-list" id="removedList"></div>
+      <div class="removed-scores__actions">
+        <button type="button" class="danger-button" id="removedDeleteAll">Delete all permanently</button>
+      </div>
     </div>
 
     <div class="removed-scores pp-calculator" id="ppCalculator">

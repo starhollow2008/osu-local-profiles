@@ -7,9 +7,11 @@ import { openDb, getOrCreateProfile } from '../src/db/index.ts';
 import { createProfile } from '../src/profiles.ts';
 import {
   applyScoreAction,
+  deleteRemovedScores,
   hiddenCount,
   hiddenScores,
   reorderPins,
+  wasDeleted,
 } from '../src/scores.ts';
 import {
   computeStats,
@@ -323,4 +325,55 @@ test('an unknown action is refused rather than ignored', () => {
   } finally {
     h.cleanup();
   }
+});
+
+/* ------------------------------------------------------- deleting for good */
+
+test('only a removed score can be deleted for good', () => {
+  const h = harness();
+  const id = h.add();
+  // Deleting is the second, deliberate step after a removal, never a shortcut past it.
+  assert.throws(() => deleteRemovedScores(h.db, h.profileId, [id]), /only a removed score/);
+  assert.equal(h.db.prepare('SELECT COUNT(*) AS n FROM scores').get()!['n'], 1);
+  h.cleanup();
+});
+
+test('a deleted score is gone, and its replay is remembered so it cannot come back', () => {
+  const h = harness();
+  const id = h.add();
+  const key = (h.db.prepare('SELECT dedupe_key FROM scores WHERE id = ?').get(id) as { dedupe_key: string }).dedupe_key;
+  applyScoreAction(h.db, h.profileId, id, 'hide');
+
+  assert.equal(deleteRemovedScores(h.db, h.profileId, [id]), 1);
+  assert.equal(h.db.prepare('SELECT COUNT(*) AS n FROM scores WHERE id = ?').get(id)!['n'], 0);
+  assert.equal(hiddenCount(h.db, h.profileId), 0);
+  // What ingest and Import past plays check before taking the replay back.
+  assert.equal(wasDeleted(h.db, h.profileId, key), true);
+  assert.equal(wasDeleted(h.db, h.profileId, 'some-other-key'), false);
+  h.cleanup();
+});
+
+test('deleting all takes every removed score and nothing else', () => {
+  const h = harness();
+  const kept = h.add();
+  const a = h.add();
+  const b = h.add();
+  applyScoreAction(h.db, h.profileId, a, 'hide');
+  applyScoreAction(h.db, h.profileId, b, 'hide');
+
+  assert.equal(deleteRemovedScores(h.db, h.profileId, 'all'), 2);
+  const left = (h.db.prepare('SELECT id FROM scores').all() as { id: number }[]).map((r) => r.id);
+  assert.deepEqual(left, [kept]);
+  h.cleanup();
+});
+
+test("another profile's removed score cannot be deleted from this one", () => {
+  const h = harness();
+  const id = h.add();
+  applyScoreAction(h.db, h.profileId, id, 'hide');
+  const other = createProfile(h.db, 'Second');
+  assert.throws(() => deleteRemovedScores(h.db, other.id, [id]), /no such score/);
+  assert.equal(deleteRemovedScores(h.db, other.id, 'all'), 0);
+  assert.equal(hiddenCount(h.db, h.profileId), 1);
+  h.cleanup();
 });

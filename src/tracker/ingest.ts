@@ -1,3 +1,4 @@
+import { wasDeleted } from '../scores.ts';
 import fs from 'node:fs';
 import type { Db } from '../db/index.ts';
 import { parseReplay, type ReplayScore, type Ruleset } from '../osr.ts';
@@ -45,7 +46,7 @@ export interface IngestedScore {
 
 export type IngestOutcome =
   | { status: 'added'; score: IngestedScore }
-  | { status: 'skipped'; reason: 'too-old' | 'duplicate' | 'unparseable' | 'not-passed' };
+  | { status: 'skipped'; reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed' };
 
 /** A replay identifies itself; fall back to map+time for stable replays with no hash. */
 export function dedupeKey(score: ReplayScore): string {
@@ -75,6 +76,8 @@ export async function ingestScore(
     .prepare('SELECT id FROM scores WHERE profile_id = ? AND dedupe_key = ?')
     .get(ctx.profileId, key);
   if (already) return { status: 'skipped', reason: 'duplicate' };
+  // Deleted for good from Settings: the replay is still on disk, and must stay out.
+  if (wasDeleted(ctx.db, ctx.profileId, key)) return { status: 'skipped', reason: 'deleted' };
 
   const mode = score.mode;
   const beatmap = ctx.resolver.resolve(score.beatmapMD5);

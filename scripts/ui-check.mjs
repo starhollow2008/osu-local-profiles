@@ -907,6 +907,42 @@ await evaluate(`(() => {
 })()`);
 check('backdrop click closes the settings dialog', await shown('settingsModal'), 'none');
 
+/*
+ * Deleting a removed score for good. The check presses a minus *once*: that must only ask,
+ * never delete -- this runs against a real profile, and the second press would be real.
+ */
+if (await evaluate('Number(document.getElementById("removedCount")?.textContent || 0) > 0 || true')) {
+  await evaluate("document.getElementById('optionsBtn').click()");
+  await evaluate("document.getElementById('optSettings').click()");
+  await sleep(700);
+  const removed = JSON.parse(await evaluate(`(() => {
+    const rows = [...document.querySelectorAll('#removedList .removed-row')];
+    const minus = rows.map((r) => r.querySelector('[data-delete]')).filter(Boolean);
+    const first = minus[0];
+    const before = first ? first.textContent.trim() : null;
+    first?.click();
+    return JSON.stringify({
+      rows: rows.length,
+      minus: minus.length,
+      red: first ? parseInt(getComputedStyle(first).backgroundColor.slice(4), 10) > 150 : null,
+      asked: first ? first.textContent.trim() : null,
+      before,
+      still: document.querySelectorAll('#removedList .removed-row').length,
+      all: !!document.getElementById('removedDeleteAll'),
+    });
+  })()`));
+  if (removed.rows === 0) {
+    console.log('  SKIP  no removed scores on this profile to check the delete buttons against');
+  } else {
+    check('every removed score has a delete button', removed.minus, removed.rows);
+    check('and it is red', removed.red, true);
+    check('the first press only asks', removed.asked, 'Delete?');
+    check('and deletes nothing', removed.still, removed.rows);
+    check('there is a button to delete them all', removed.all, true);
+  }
+  await evaluate("document.getElementById('settingsCancel').click()");
+}
+
 console.log('\nprofiles dialog');
 check('profiles dialog is hidden on load', await shown('profilesModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");

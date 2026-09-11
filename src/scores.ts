@@ -16,6 +16,10 @@ import type { PpPart } from './calc/official.ts';
  * Keeping the row with `hidden_at` set means the removal sticks, costs nothing, and can be
  * undone. Every query filters on it at the source; see `visibleSql` in calc/eligibility.ts.
  *
+ * A removed score can then be deleted for good (`deleteRemovedScores`), and that keeps the
+ * same promise another way: the row goes, its `dedupe_key` stays in `deleted_scores`, and
+ * ingest refuses anything listed there.
+ *
  * Pins are per mode, as on osu!, and a pinned score does not have to be in the top 100 --
  * pinning is how you show a play you are proud of that pp does not reward.
  */
@@ -146,6 +150,51 @@ export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenScor
     playedAt: r['played_at'] as number,
     hiddenAt: r['hidden_at'] as number,
   }));
+}
+
+/**
+ * Delete removed scores for good -- the ones listed, or every one when `ids` is 'all'.
+ *
+ * Only a score that has already been removed can go: deleting is the second, deliberate step
+ * after a removal, never a shortcut past it. Returns how many were deleted.
+ */
+export function deleteRemovedScores(db: Db, profileId: number, ids: number[] | 'all', now = Date.now()): number {
+  const wanted = ids === 'all' ? null : [...new Set(ids.map(Number).filter(Number.isInteger))];
+  if (wanted !== null && wanted.length === 0) return 0;
+
+  const rows = db
+    .prepare(
+      `SELECT id, dedupe_key, hidden_at FROM scores
+        WHERE profile_id = ? ${wanted === null ? 'AND hidden_at IS NOT NULL' : `AND id IN (${wanted.map(() => '?').join(',')})`}`,
+    )
+    .all(profileId, ...(wanted ?? [])) as { id: number; dedupe_key: string; hidden_at: number | null }[];
+
+  if (wanted !== null) {
+    if (rows.length !== wanted.length) throw new Error('no such score on this profile');
+    if (rows.some((r) => r.hidden_at === null)) throw new Error('only a removed score can be deleted');
+  }
+
+  db.exec('BEGIN');
+  try {
+    const remember = db.prepare(
+      'INSERT OR IGNORE INTO deleted_scores (profile_id, dedupe_key, deleted_at) VALUES (?, ?, ?)',
+    );
+    const drop = db.prepare('DELETE FROM scores WHERE id = ?');
+    for (const r of rows) {
+      remember.run(profileId, r.dedupe_key, now);
+      drop.run(r.id);
+    }
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return rows.length;
+}
+
+/** Whether a replay with this key was deleted from the profile, and must not come back. */
+export function wasDeleted(db: Db, profileId: number, dedupeKey: string): boolean {
+  return db.prepare('SELECT 1 AS hit FROM deleted_scores WHERE profile_id = ? AND dedupe_key = ?').get(profileId, dedupeKey) !== undefined;
 }
 
 export function hiddenCount(db: Db, profileId: number): number {

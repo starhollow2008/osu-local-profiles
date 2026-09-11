@@ -2180,6 +2180,53 @@
   background-color: hsl(var(--hsl-b2));
 }
 
+/* Delete for good: a red minus, osu!'s own red, which turns into its question when pressed. */
+.removed-row .removed-row__delete {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  color: #fff;
+  background-color: hsl(var(--hsl-red-1, 0 60% 50%));
+}
+
+.removed-row .removed-row__delete svg {
+  width: 14px;
+  height: 14px;
+}
+
+.removed-row .removed-row__delete:hover,
+.removed-row .removed-row__delete.is-armed {
+  background-color: hsl(0 70% 55%);
+}
+
+.removed-row .removed-row__delete.is-armed {
+  width: auto;
+  padding: 0 10px;
+  border-radius: var(--radius-base);
+  font-size: var(--fs-normal);
+}
+
+.removed-scores__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.danger-button {
+  padding: 5px 12px;
+  border-radius: var(--radius-base);
+  color: #fff;
+  background-color: hsl(0 60% 45%);
+}
+
+.danger-button:hover,
+.danger-button.is-armed {
+  background-color: hsl(0 70% 55%);
+}
+
 .backdrop {
   position: fixed;
   inset: 0;

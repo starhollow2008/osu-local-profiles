@@ -1,3 +1,4 @@
+import { wasDeleted } from '../scores.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
@@ -119,6 +120,8 @@ export async function scanForReplays(
       if (seenKeys.has(key)) continue;
       seenKeys.add(key);
 
+      // Deleted for good from Settings: not offered, and not counted as already tracked.
+      if (wasDeleted(db, profileId, key)) continue;
       const already = isStored.get(profileId, key) !== undefined;
 
       candidates.push({ file: entry.path, playedAt, mode: score.mode, duplicate: already });

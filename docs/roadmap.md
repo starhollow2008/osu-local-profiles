@@ -46,6 +46,11 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.31 | Sessions                                      | todo   |
 | 5.32 | Goals and challenges                          | todo   |
 | 5.33 | A page for each beatmap                       | todo   |
+| 5.34 | me! editor: osu!'s BBCode toolbar, pasted images | todo |
+| 5.35 | Favourites: import, first-run reminder, shared across profiles | todo |
+| 5.36 | Import from an osu! profile (Options menu)    | todo   |
+| 5.37 | Delete removed scores permanently             | todo   |
+| 5.38 | An interactive HTML export, fit to host       | todo   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1722,3 +1727,71 @@ Fun, built-in goals or challenges a player can take on and track locally.
 
 A page per beatmap gathering every play this profile has on it, as the score page does for a
 score.
+
+## 5.34 — me! editor: osu!'s BBCode toolbar, pasted images
+
+**Status:** todo.
+
+The user asked for osu!'s me! editor: its toolbar, and images pasted straight in. This
+reverses the plain-text decision of 5.6, at the user's request.
+
+- **Toolbar exactly as osu-web's `bbcode-editor.tsx`** (and the user's screenshot): Bold,
+  Italic, Strike Out, Header, Link, Spoiler Box, Numbered List, List, Image, Image Map, a
+  Font Size pill (Tiny 50 / Small 85 / Normal 100 / Large 150), Help (osu! wiki BBCode), then
+  Cancel, Preview, Save. Each button wraps the selection the way osu-web's `post-box` does.
+  Icons are our own inline SVGs, not Font Awesome.
+- **Our own renderer, `web/js/bbcode.js`.** Tag *semantics* are osu!'s (values: which tags,
+  size clamped 30..200, list/box/spoiler/imagemap shapes); no code is taken from osu-web's
+  AGPL `BBCodeFromDB.php`. The input is escaped first and never parsed as HTML; every tag
+  emitted is ours, and every attribute is checked (colours by pattern, URLs by scheme).
+  That matters because imported text can be someone else's.
+- **Images**: pasted or dropped images are stored in `data/` per profile and referenced as
+  `[img]/api/about-image/...[/img]`. The Image button opens a file chooser when nothing is
+  selected.
+- `aboutMe` grows to 60,000 characters (osu!'s me! pages are often long).
+
+## 5.35 — Favourites: import, first-run reminder, shared across profiles
+
+**Status:** todo.
+
+- **Import** from any osu! account: `osu.ppy.sh/users/<id>/beatmapsets/favourite?limit&offset`
+  answers JSON without credentials (verified 2026-09-11), each set carrying the same fields
+  as `json-beatmapset`. So one request per 100 favourites fills both the list and the card
+  details; nothing is fetched per set. Merges; osu!'s order is kept.
+- **Reminder** in Favorite Beatmaps, shaped like the counting note: how to favourite, and
+  an Import button, with Don't show again and an X (`showFavoritesHint`, per profile). Shown
+  only while the list is empty.
+- **Shared across profiles, on by default** (`sharedFavorites` in `config.json`, since it
+  is an install's choice, not a profile's). A table of its own
+  (`shared_favorite_beatmapsets`); switching on merges every profile's list into it,
+  switching off copies it into every profile, so nothing is lost either way.
+
+## 5.36 — Import from an osu! profile (Options menu)
+
+**Status:** todo.
+
+One dialog, from Options, never a prompt at start-up (the user's call). Look up an account;
+choose what to copy: avatar, banner, flag and me! (checked by default) and favourite beatmaps
+(unchecked). Importing links the profile to that account. Every request is made because the
+button was pressed. The me! text comes from `user.page.raw` in the same payload the lookup
+already reads.
+
+## 5.37 — Delete removed scores permanently
+
+**Status:** todo.
+
+Settings' Removed scores gets a red minus per score and "Delete all permanently". This keeps
+the rule that a removal must stick: the row goes, but its `dedupe_key` stays in
+`deleted_scores`, which ingest and Import past plays both check. A reset clears those
+records too, since a reset is a fresh start.
+
+## 5.38 — An interactive HTML export, fit to host
+
+**Status:** todo.
+
+The old export was a static clone of the page: nothing could be clicked. The new one is
+the real page. It carries its CSS, its own modules (bundled by `web/js/bundle.js`, a small
+purpose-built bundler) and a snapshot of the API answers, with a stand-in `fetch` serving
+the snapshot. Show more, mode tabs, View Details, medal cards, charts and previews work;
+anything that would change the profile is hidden. One file, so it can be hosted anywhere
+static -- GitHub Pages, for instance -- as a sample profile.

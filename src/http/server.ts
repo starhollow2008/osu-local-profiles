@@ -75,6 +75,7 @@ import {
 import {
   applyScoreAction,
   attachmentHeader,
+  deleteRemovedScores,
   hiddenCount,
   hiddenScores,
   outdatedPpCount,
@@ -660,6 +661,15 @@ export function startServer(opts: ServerOptions): http.Server {
             reorderPins(opts.db, current(), ids);
           } else if (action === 'list-hidden') {
             return json(res, { hidden: hiddenScores(opts.db, current()) });
+          } else if (action === 'delete' || action === 'delete-all-removed') {
+            // For good: see deleteRemovedScores, and why the key outlives the row.
+            const deleted = deleteRemovedScores(
+              opts.db,
+              current(),
+              action === 'delete' ? [Number(body['id'])] : 'all',
+            );
+            broadcast('scores', { action });
+            return json(res, { ok: true, deleted, hiddenScores: hiddenCount(opts.db, current()) });
           } else {
             applyScoreAction(opts.db, current(), Number(body['id']), action as ScoreAction);
           }
@@ -898,6 +908,8 @@ export function startServer(opts: ServerOptions): http.Server {
           // Abandoned attempts are part of the profile's play count, so a reset that left
           // them behind would clear the scores and still show an evening of plays.
           opts.db.prepare('DELETE FROM incomplete_plays WHERE profile_id = ?').run(current());
+          // A fresh start forgets deletions too; tracking_since keeps the old replays out.
+          opts.db.prepare('DELETE FROM deleted_scores WHERE profile_id = ?').run(current());
           opts.db
             .prepare('UPDATE profiles SET tracking_since = ? WHERE id = ?')
             .run(now, current());
