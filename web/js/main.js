@@ -7,7 +7,6 @@
  */
 import {
   MODE_NAMES,
-  audioTime,
   countryName,
   escapeHtml,
   fmt,
@@ -20,10 +19,9 @@ import {
   generatedAvatar,
   gradeBadge,
   levelBadge,
-  medalBadge,
 } from './badges.js';
 import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
-import { beatmapsPopupContent, favoriteList, previewUrl } from './beatmapsets.js';
+import { favoriteList } from './beatmapsets.js';
 import { scoreCard } from './score-card.js';
 import {
   cardOwner,
@@ -33,6 +31,9 @@ import {
   saveScoreImage,
 } from './score-share.js';
 import { downloadBlob, hint, postJson, toast } from './ui.js';
+import { medalFor, renderMedals } from './medals.js';
+import { setPopupCards } from './beatmaps-popup.js';
+import { syncPlayers } from './audio-player.js';
 import {
   aboutHtml,
   activityList,
@@ -383,240 +384,6 @@ $('countingNote').onclick = async (e) => {
   }
 };
 
-/**
- * The Medals section, laid out as osu-web's `medals-group`: one group, "Skill & Dedication",
- * holding one row of icons per family in osu!'s own `ordering`. There is no text on the
- * page at all -- a medal's name, description and date are in the card that appears on
- * hover, exactly as on osu!.
- *
- * osu!'s own icon is used where it loads, over a generated placeholder that stays visible
- * if it does not -- the same arrangement as beatmap covers, and for the same reason: the
- * page has to be complete with no network.
- */
-
-/*
- * osu!'s groups, in the order its page lists them, each heading its icons and its medals'
- * cards. Within a group every `ordering` is one row: Mod Introduction is a single row, and
- * Skill & Dedication's families are combo 0, plays 1, rank 2, hits 3, pass 4, fc 5.
- */
-const MEDAL_GROUPS = [
-  ['Mod Introduction', ['intro']],
-  ['Skill & Dedication', ['combo', 'plays', 'rank', 'hits', 'pass', 'fc']],
-];
-
-/** Every medal currently on the page, by slug, for the hover card to read from. */
-let medalsBySlug = new Map();
-
-/** What this page last saw earned, so a newly unlocked medal can be announced once. */
-let lastEarned = { mode: null, slugs: new Set() };
-
-/**
- * The card's content, osu-web's `tooltip-achievement`: the group, then the icon, name and
- * description on a darker panel, then when it was achieved -- or "Locked".
- *
- * A rank medal is decided from the current estimated rank rather than replayed play by play,
- * so it has no real date to give; it says what it is instead of borrowing the last play's.
- */
-function medalCard(medal) {
-  let achieved;
-  if (medal.achievedAt === null) {
-    achieved = 'Locked';
-  } else if (!medal.dated) {
-    achieved = 'Achieved &middot; from the estimated rank';
-  } else {
-    achieved = `Achieved on <time datetime="${new Date(medal.achievedAt).toISOString()}"
-      title="${escapeHtml(new Date(medal.achievedAt).toLocaleString())}">${escapeHtml(shortDate(medal.achievedAt))}</time>`;
-  }
-
-  return `<div class="medal-tooltip__grouping">${escapeHtml(medal.grouping ?? 'Skill & Dedication')}</div>
-    <div class="medal-tooltip__middle">
-      <div class="medal-tooltip__badge">${medalBadge(medal, 'tooltip')}</div>
-      <div class="medal-tooltip__name">${escapeHtml(medal.name)}</div>
-      <div class="medal-tooltip__description">${escapeHtml(medal.description)}</div>
-    </div>
-    <div class="medal-tooltip__achieved">
-      <div class="medal-tooltip__date">${achieved}</div>
-    </div>`;
-}
-
-function renderMedals(summary) {
-  if (!summary) return;
-
-  medalsBySlug = new Map(summary.medals.map((m) => [m.slug, m]));
-  announceNewMedals(summary);
-
-  /*
-   * An FC cannot be told from a near-miss without the beatmap's own maximum combo, which
-   * older scores were never given. Say so rather than quietly under-awarding, and point at
-   * the fix.
-   */
-  const note = $('medalsNote');
-  if (summary.fcUnknown > 0) {
-    note.hidden = false;
-    note.textContent =
-      `${fmt(summary.fcUnknown)} play${summary.fcUnknown === 1 ? '' : 's'} ` +
-      `${summary.fcUnknown === 1 ? 'was' : 'were'} tracked before this app recorded each ` +
-      "beatmap's maximum combo, so a full combo cannot be told apart from a near-miss on " +
-      'them. Settings can recalculate those from their replay files.';
-  } else {
-    note.hidden = true;
-  }
-
-  const groups = MEDAL_GROUPS.map(([grouping, families]) => {
-    const rows = families.map((family) => {
-      const medals = summary.medals.filter((m) => m.family === family);
-      if (medals.length === 0) return '';
-      return `<div class="medals-group__medals">${medals.map((m) => medalBadge(m)).join('')}</div>`;
-    }).join('');
-    return rows
-      ? `<div class="medals-group__group">
-          <h3 class="medals-group__title">${escapeHtml(grouping)}</h3>
-          ${rows}
-        </div>`
-      : '';
-  }).join('');
-
-  $('medalGroups').innerHTML = groups
-    ? `<div class="medals-group">${groups}</div>`
-    : '<div class="u-empty">No medals apply to this mode yet.</div>';
-}
-
-/**
- * Say so when a medal is unlocked while the page is open.
- *
- * Only against what this page already saw *in the same mode*: the first render of a mode
- * sets the baseline, so opening the page or switching tabs never announces medals that were
- * earned long ago. The Recent feed is the permanent record; this is the moment itself.
- */
-function announceNewMedals(summary) {
-  const earned = summary.medals.filter((m) => m.achievedAt !== null);
-  const slugs = new Set(earned.map((m) => m.slug));
-
-  if (lastEarned.mode === mode) {
-    const fresh = earned.filter((m) => !lastEarned.slugs.has(m.slug));
-    if (fresh.length === 1) toast(`Medal unlocked: ${fresh[0].name}`);
-    else if (fresh.length > 1) toast(`${fresh.length} medals unlocked: ${fresh.map((m) => m.name).join(', ')}`);
-  }
-  lastEarned = { mode, slugs };
-}
-
-/* ------------------------------------------------------------ medal card */
-
-/*
- * The card that opens over a medal, as osu-web's qtip does: above the icon and centred on
- * it, after a short delay, and kept open while the pointer moves onto the card itself --
- * `hide: { delay: 200, fixed: true }` there. One card serves every medal on the page, in
- * the section and in the Recent feed alike.
- */
-const MEDAL_CARD_DELAY = 200;
-let medalCardFor = null;
-let medalShowTimer = null;
-let medalHideTimer = null;
-
-function positionMedalCard(anchor) {
-  const card = $('medalTooltip');
-  const box = anchor.getBoundingClientRect();
-  const width = card.offsetWidth;
-  const height = card.offsetHeight;
-  const tip = 20;
-
-  // Centred over the icon, but never past either edge of the window; the tip follows the
-  // icon even when the card itself has been pushed sideways.
-  const centre = box.left + box.width / 2;
-  const left = Math.max(8, Math.min(centre - width / 2, window.innerWidth - width - 8));
-  const below = box.top - height - tip < 8;
-  const top = below ? box.bottom + tip : box.top - height - tip;
-
-  card.style.left = `${left}px`;
-  card.style.top = `${top}px`;
-  card.style.setProperty('--tip-x', `${centre - left}px`);
-  card.classList.toggle('medal-tooltip--below', below);
-}
-
-function showMedalCard(anchor) {
-  medalShowTimer = null;
-  const medal = medalsBySlug.get(anchor.dataset.medal);
-  if (!medal) return;
-  cancelMedalHide();
-  const card = $('medalTooltip');
-  if (medalCardFor === anchor && !card.hidden) return;
-
-  medalCardFor = anchor;
-  card.innerHTML = medalCard(medal);
-  card.hidden = false;
-  positionMedalCard(anchor);
-}
-
-function hideMedalCard() {
-  clearTimeout(medalShowTimer);
-  medalShowTimer = null;
-  medalHideTimer = null;
-  $('medalTooltip').hidden = true;
-  medalCardFor = null;
-}
-
-const scheduleMedalHide = () => {
-  clearTimeout(medalShowTimer);
-  medalShowTimer = null;
-  clearTimeout(medalHideTimer);
-  medalHideTimer = setTimeout(hideMedalCard, MEDAL_CARD_DELAY);
-};
-
-const cancelMedalHide = () => {
-  clearTimeout(medalHideTimer);
-  medalHideTimer = null;
-};
-
-document.addEventListener('mouseover', (e) => {
-  const badge = e.target.closest?.('[data-medal]');
-  if (badge) {
-    cancelMedalHide();
-    if (medalCardFor === badge) return;
-    clearTimeout(medalShowTimer);
-    // Moving from one medal straight to the next swaps at once, as osu!'s does.
-    if (!$('medalTooltip').hidden) showMedalCard(badge);
-    else medalShowTimer = setTimeout(() => showMedalCard(badge), MEDAL_CARD_DELAY);
-    return;
-  }
-  if (e.target.closest?.('#medalTooltip')) {
-    cancelMedalHide();
-    return;
-  }
-  // Anywhere else: let an open card go, or cancel one about to open. Otherwise nothing.
-  if ((medalCardFor !== null && medalHideTimer === null) || medalShowTimer !== null) {
-    scheduleMedalHide();
-  }
-});
-
-document.addEventListener('focusin', (e) => {
-  const badge = e.target.closest?.('[data-medal]');
-  if (badge) showMedalCard(badge);
-});
-document.addEventListener('focusout', (e) => {
-  if (e.target.closest?.('[data-medal]')) scheduleMedalHide();
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') hideMedalCard();
-});
-// The card is positioned in window coordinates, so it would drift off its medal.
-window.addEventListener('scroll', hideMedalCard, { passive: true });
-window.addEventListener('resize', hideMedalCard);
-
-/*
- * The drawn placeholder is only there until osu!'s icon arrives. osu!'s icons are not round,
- * so once one has loaded the circle behind it has to go or it shows round the edges. `load`
- * does not bubble, hence the capture.
- */
-document.addEventListener(
-  'load',
-  (e) => {
-    if (e.target instanceof HTMLImageElement && e.target.matches('.badge-achievement__image')) {
-      e.target.closest('.badge-achievement')?.classList.add('badge-achievement--loaded');
-    }
-  },
-  true,
-);
-
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
@@ -645,7 +412,7 @@ async function loadProfile() {
     showMore('events', data.events.length, shown.events, totalFor('events', data.events));
 
   renderCountingNote(data.counting);
-  renderMedals(data.medals);
+  renderMedals(data.medals, mode);
 
   // Held for the menu's Move up / Move down and for drag reordering, both of which work in
   // terms of positions in this list.
@@ -690,10 +457,9 @@ async function loadProfile() {
 
   // Favorite Beatmaps. An empty list is just the heading and its 0, as on osu!.
   favoriteSetIds = new Set(data.favoriteIds ?? []);
-  favoriteCards = new Map((data.favorites ?? []).map((c) => [c.id, c]));
   const favoritesTotal = totalFor('favorites', data.favorites ?? []);
   $('favoriteCount').textContent = fmt(favoritesTotal);
-  hideBeatmapsPopup();
+  setPopupCards(data.favorites ?? []);
   $('favoriteBeatmaps').innerHTML =
     favoriteList(data.favorites) +
     showMore('favorites', (data.favorites ?? []).length, shown.favorites, favoritesTotal);
@@ -1027,7 +793,7 @@ async function buildStandaloneHtml() {
    * card would have said, which is the next best thing for a document.
    */
   for (const badge of clone.querySelectorAll('[data-medal]')) {
-    const medal = medalsBySlug.get(badge.dataset.medal);
+    const medal = medalFor(badge.dataset.medal);
     if (!medal) continue;
     const when = medal.achievedAt === null ? 'Locked' : medal.dated ? `Achieved on ${shortDate(medal.achievedAt)}` : 'Achieved';
     badge.title = `${medal.name}\n${medal.description}\n${when}`;
@@ -1817,8 +1583,6 @@ let pinnedIds = [];
 
 /** Every favourited set id, for labelling the row menus. */
 let favoriteSetIds = new Set();
-/** The cards on the page, by set id, for the difficulty popup to read from. */
-let favoriteCards = new Map();
 
 async function favoriteAction(action, beatmapsetId) {
   if (!beatmapsetId) return;
@@ -1845,347 +1609,6 @@ document.addEventListener('click', (e) => {
   e.preventDefault();
   void favoriteAction('remove', Number(heart.dataset.unfavorite));
 });
-
-/*
- * The difficulty popup, osu-web's `beatmaps-popup`: hovering a card's row of dots opens it
- * under the card after 100ms, and leaving closes it after 500ms unless the pointer has
- * moved onto the popup itself. Placed in page coordinates, so it scrolls with its card.
- */
-let popupFor = null;
-let popupTimer = null;
-/** What the pending timer will do, so a countdown to close is not restarted by every move. */
-let popupPending = null;
-
-function hideBeatmapsPopup() {
-  clearTimeout(popupTimer);
-  popupTimer = null;
-  popupPending = null;
-  $('beatmapsPopup').hidden = true;
-  document.querySelector('.beatmapset-panel--popup-open')?.classList.remove('beatmapset-panel--popup-open');
-  popupFor = null;
-}
-
-function showBeatmapsPopup(panel) {
-  const card = favoriteCards.get(Number(panel.dataset.setId));
-  if (!card) return;
-  const popup = $('beatmapsPopup');
-  if (popupFor !== panel) {
-    hideBeatmapsPopup();
-    popup.innerHTML = beatmapsPopupContent(card);
-    popupFor = panel;
-    panel.classList.add('beatmapset-panel--popup-open');
-  }
-  const box = panel.getBoundingClientRect();
-  popup.style.left = `${box.left + window.scrollX}px`;
-  popup.style.top = `${box.bottom + window.scrollY}px`;
-  popup.style.width = `${box.width}px`;
-  popup.hidden = false;
-}
-
-const schedulePopup = (what, fn, ms) => {
-  if (popupPending === what) return;
-  clearTimeout(popupTimer);
-  popupPending = what;
-  popupTimer = setTimeout(() => {
-    popupPending = null;
-    popupTimer = null;
-    fn();
-  }, ms);
-};
-
-const cancelPopupTimer = () => {
-  clearTimeout(popupTimer);
-  popupTimer = null;
-  popupPending = null;
-};
-
-document.addEventListener('mouseover', (e) => {
-  const dots = e.target.closest?.('[data-beatmaps-popup]');
-  if (dots) {
-    const panel = dots.closest('.beatmapset-panel');
-    if (popupFor === panel && !$('beatmapsPopup').hidden) cancelPopupTimer();
-    else schedulePopup(`show:${panel.dataset.setId}`, () => showBeatmapsPopup(panel), 100);
-    return;
-  }
-  // On the popup, or anywhere on the card that owns it: keep it, as osu!'s does.
-  if (e.target.closest?.('#beatmapsPopup') || (popupFor !== null && popupFor.contains(e.target))) {
-    if (popupPending === 'hide') cancelPopupTimer();
-    return;
-  }
-  if (popupFor !== null) schedulePopup('hide', hideBeatmapsPopup, 500);
-  else if (popupPending !== null) cancelPopupTimer();
-});
-window.addEventListener('resize', hideBeatmapsPopup);
-
-/*
- * The audio preview: osu-web's `osu-audio` player, one clip at a time.
- *
- * Pressing a card's play loads its preview from the top and stops any other. Pressing the
- * playing card again *pauses* it, and pressing it once more carries on from where it was --
- * osu!'s `togglePlay`, not a restart. The floating bar in the corner (#audioPlayer) does the
- * same from its own button, and adds previous / next through the Favorite Beatmaps cards,
- * seeking, volume, mute and autoplay. It slides up while a clip loads or plays and away four
- * seconds after it pauses or ends, exactly as osu-web's `setState` times it.
- *
- * The card and the bar both carry `data-audio-state` and `--progress`, which is all the CSS
- * needs for the pause faces, the ring and the progress bar.
- *
- * The clip is osu!'s own short preview, streamed only when pressed and cached by the browser
- * -- nothing is stored by this app. The volume, mute and autoplay choices are kept in this
- * browser's localStorage, which is where osu-web keeps them for a visitor who is not signed in.
- */
-const AUDIO_HIDE_MS = 4000;
-const AUDIO_PREFS_KEY = 'osu-local-profiles:audio';
-const preview = new Audio();
-preview.preload = 'none';
-
-/** osu!'s defaults: 45% volume, not muted, no autoplay. */
-const audioPrefs = { volume: 0.45, muted: false, autoplay: false };
-try {
-  Object.assign(audioPrefs, JSON.parse(localStorage.getItem(AUDIO_PREFS_KEY) ?? '{}'));
-} catch {
-  /* private mode or a hand-edited value: the defaults stand */
-}
-preview.volume = Math.min(1, Math.max(0, Number(audioPrefs.volume) || 0));
-preview.muted = audioPrefs.muted === true;
-
-function saveAudioPrefs() {
-  audioPrefs.volume = preview.volume;
-  audioPrefs.muted = preview.muted;
-  try {
-    localStorage.setItem(AUDIO_PREFS_KEY, JSON.stringify(audioPrefs));
-  } catch {
-    /* not persisted, but the choice still holds for this visit */
-  }
-}
-
-let previewSet = null;
-let audioState = 'paused';
-let audioFrame = null;
-let hideAudioTimer = null;
-/** Which bar is being dragged, so playback does not fight the pointer for the position. */
-let draggingBar = null;
-
-const audioPlayer = $('audioPlayer');
-
-/** The card for the playing set, found fresh each time: a re-render replaces the element. */
-const previewPanel = () =>
-  previewSet === null ? null : document.querySelector(`#favoriteBeatmaps [data-set-id="${previewSet}"]`);
-
-/** The sets that can be played, in page order: what previous and next walk through. */
-const playableSets = () =>
-  [...document.querySelectorAll('#favoriteBeatmaps [data-audio-play]')].map((b) => Number(b.dataset.audioPlay));
-
-function neighbours() {
-  const sets = playableSets();
-  const i = previewSet === null ? -1 : sets.indexOf(previewSet);
-  return { prev: i > 0 ? sets[i - 1] : null, next: i >= 0 && i < sets.length - 1 ? sets[i + 1] : null };
-}
-
-/** Position, time and duration onto the bar and the playing card. */
-function syncProgress() {
-  const duration = preview.duration;
-  const known = Number.isFinite(duration) && duration > 0;
-  audioPlayer.dataset.audioHasDuration = known ? '1' : '0';
-  if (!known) return;
-  const progress = String(preview.currentTime / duration);
-  if (draggingBar !== 'progress') audioPlayer.style.setProperty('--progress', progress);
-  $('audioSeek').setAttribute('aria-valuenow', String(Math.round(Number(progress) * 100)));
-  previewPanel()?.style.setProperty('--progress', progress);
-  $('audioCurrent').textContent = audioTime(preview.currentTime, duration);
-  $('audioTotal').textContent = audioTime(duration, duration);
-}
-
-/** The volume bar and the speaker icon, from the audio element itself. */
-function syncVolume() {
-  audioPlayer.style.setProperty('--volume', String(preview.volume));
-  $('audioVolume').setAttribute('aria-valuenow', String(Math.round(preview.volume * 100)));
-  // osu-web's `volumeIcon`.
-  audioPlayer.dataset.audioVolume = preview.muted
-    ? 'muted'
-    : preview.volume === 0 ? 'silent' : preview.volume < 0.4 ? 'quiet' : 'normal';
-  $('audioMute').title = preview.muted ? 'Unmute' : 'Mute';
-  audioPlayer.dataset.audioAutoplay = audioPrefs.autoplay ? '1' : '0';
-  $('audioAutoplay').setAttribute('aria-pressed', String(audioPrefs.autoplay));
-}
-
-/** Everything that shows the player's state: the bar, the card, and where prev/next lead. */
-function syncPlayers() {
-  audioPlayer.dataset.audioState = audioState;
-  const panel = previewPanel();
-  if (panel) panel.dataset.audioState = audioState;
-  const { prev, next } = neighbours();
-  audioPlayer.dataset.audioHasPrev = prev === null ? '0' : '1';
-  audioPlayer.dataset.audioHasNext = next === null ? '0' : '1';
-  syncProgress();
-  syncVolume();
-}
-
-function setAudioState(state) {
-  audioState = state;
-  syncPlayers();
-  clearTimeout(hideAudioTimer);
-  if (state === 'playing' || state === 'loading') {
-    audioPlayer.dataset.audioVisible = '1';
-  } else {
-    hideAudioTimer = setTimeout(() => (audioPlayer.dataset.audioVisible = '0'), AUDIO_HIDE_MS);
-  }
-}
-
-/** Keeps the ring and the bar moving smoothly; `timeupdate` fires only a few times a second. */
-function tickAudio() {
-  syncProgress();
-  if (!preview.paused) audioFrame = requestAnimationFrame(tickAudio);
-}
-
-/** Stop and rewind, leaving the card that was playing as a plain card again. */
-function stopPreview() {
-  cancelAnimationFrame(audioFrame);
-  preview.pause();
-  if (Number.isFinite(preview.duration)) preview.currentTime = 0;
-  // State first: it paints the card, which is then cleared rather than left saying "paused".
-  setAudioState('paused');
-  const panel = previewPanel();
-  if (panel) {
-    panel.removeAttribute('data-audio-state');
-    panel.style.removeProperty('--progress');
-  }
-}
-
-async function loadPreview(setId) {
-  stopPreview();
-  previewSet = setId;
-  preview.src = previewUrl(setId);
-  preview.currentTime = 0;
-  audioPlayer.style.setProperty('--progress', '0');
-  setAudioState('loading');
-  try {
-    await preview.play();
-  } catch (err) {
-    // Replaced by another press before it started: nothing went wrong.
-    if (previewSet !== setId || err?.name === 'AbortError') return;
-    stopPreview();
-    previewSet = null;
-    toast("The preview could not be played - it comes from osu.ppy.sh, which may be unreachable");
-  }
-}
-
-/** osu-web's `togglePlay`: pause where it is, or carry on from there. */
-function togglePreview() {
-  if (previewSet === null) return;
-  if (preview.paused) {
-    void preview.play().catch(() => setAudioState('paused'));
-  } else {
-    preview.pause();
-  }
-}
-
-preview.addEventListener('playing', () => {
-  setAudioState('playing');
-  tickAudio();
-});
-preview.addEventListener('pause', () => {
-  // A pause on the way to the end is reported by `ended`, which rewinds as well.
-  if (!preview.ended) setAudioState('paused');
-});
-preview.addEventListener('timeupdate', () => {
-  if (preview.paused) syncProgress();
-});
-preview.addEventListener('ended', () => {
-  const { next } = neighbours();
-  stopPreview();
-  if (next !== null && audioPrefs.autoplay) void loadPreview(next);
-});
-
-document.addEventListener('click', (e) => {
-  const button = e.target.closest('[data-audio-play]');
-  if (!button) return;
-  e.preventDefault();
-  const setId = Number(button.dataset.audioPlay);
-  if (setId === previewSet) togglePreview();
-  else void loadPreview(setId);
-});
-
-$('audioToggle').onclick = togglePreview;
-
-audioPlayer.addEventListener('click', (e) => {
-  const nav = e.target.closest('[data-audio-nav]');
-  if (!nav) return;
-  const { prev, next } = neighbours();
-  const target = nav.dataset.audioNav === 'prev' ? prev : next;
-  if (target !== null) void loadPreview(target);
-});
-
-$('audioMute').onclick = () => {
-  preview.muted = !preview.muted;
-  saveAudioPrefs();
-  syncVolume();
-};
-
-$('audioAutoplay').onclick = () => {
-  audioPrefs.autoplay = !audioPrefs.autoplay;
-  saveAudioPrefs();
-  syncVolume();
-};
-
-/*
- * osu-web's `Slider`: press anywhere on a bar and drag, with the position following the
- * pointer until it is released. Pointer capture covers the mouse and touch in one path.
- * Seeking lands on release, as osu!'s does; the volume follows the pointer as it moves.
- */
-function bindBar(bar, name, onMove, onEnd) {
-  const fraction = (e) => {
-    const r = bar.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
-  };
-  bar.addEventListener('pointerdown', (e) => {
-    if (e.button !== 0) return;
-    if (name === 'progress' && !(preview.duration > 0)) return;
-    e.preventDefault();
-    try {
-      bar.setPointerCapture(e.pointerId);
-    } catch {
-      /* a pointer the browser no longer tracks: the press still counts, only the drag is lost */
-    }
-    draggingBar = name;
-    bar.dataset.audioDragging = '1';
-    onMove(fraction(e));
-  });
-  bar.addEventListener('pointermove', (e) => {
-    if (draggingBar === name) onMove(fraction(e));
-  });
-  const end = (e) => {
-    if (draggingBar !== name) return;
-    draggingBar = null;
-    bar.dataset.audioDragging = '0';
-    onEnd(fraction(e));
-  };
-  bar.addEventListener('pointerup', end);
-  bar.addEventListener('pointercancel', end);
-}
-
-bindBar(
-  $('audioSeek'),
-  'progress',
-  (f) => audioPlayer.style.setProperty('--progress', String(f)),
-  (f) => {
-    // osu! stops just short of the end, so a seek to 100% does not count as finishing.
-    preview.currentTime = f === 1 ? preview.duration - 0.01 : preview.duration * f;
-    syncProgress();
-  },
-);
-
-bindBar(
-  $('audioVolume'),
-  'volume',
-  (f) => {
-    preview.volume = f;
-    syncVolume();
-  },
-  () => saveAudioPrefs(),
-);
-
-syncVolume();
 
 const scoreAction = (payload) => postJson('/api/scores', payload);
 
