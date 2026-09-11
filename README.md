@@ -58,6 +58,10 @@ audio player bar and pause where they left off, and a big profile's page is far 
 **v1.8.1** makes the Windows launcher always start the app's own Node runtime, even on a
 machine where Windows is set not to look in the app's folder for it.
 
+**v1.9.0** opens the page straight away on a first launch: the one-time read of your osu!
+folder now happens in the background, with a progress bar on the page, and anything you play
+meanwhile is added, with pp, as soon as it finishes.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

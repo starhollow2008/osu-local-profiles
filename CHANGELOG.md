@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.9.0
 
 - **The page opens straight away on a first launch.** The app used to read your whole osu!
   folder before showing anything -- a few seconds on some machines, possibly an hour on a

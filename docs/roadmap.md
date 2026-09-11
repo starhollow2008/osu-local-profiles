@@ -1546,7 +1546,7 @@ been `C:\Program Files\nodejs\node.exe`. The fix reached the one path that expos
 
 ## 5.25 — The beatmap index in the background, with progress on the page
 
-**Status:** done.
+**Status:** done -- released as 1.9.0 (2026-09-11).
 
 **Goal.** A first launch shows the page at once instead of waiting for the beatmap index,
 says on the page what is happening, and loses nothing played meanwhile.
