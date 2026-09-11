@@ -1795,3 +1795,12 @@ purpose-built bundler) and a snapshot of the API answers, with a stand-in `fetch
 the snapshot. Show more, mode tabs, View Details, medal cards, charts and previews work;
 anything that would change the profile is hidden. One file, so it can be hosted anywhere
 static -- GitHub Pages, for instance -- as a sample profile.
+
+### 5.34 - 5.38 released as 1.11.0, and the update verified (2026-09-11)
+
+The tag's workflow run built and attached all three archives (win-x64 87MB, osx-arm64 92MB,
+linux-x64 100MB). A genuine 1.10.0 release, given port 7340, the profile name `Update Canary`
+and a canary file in its own `data/`, updated itself to the published 1.11.0 with its own
+button: back within seconds on 7340 under `Update Canary`, canary intact, no `.rollback-`
+folder, no `data/update/`, running on its own bundled `node.exe`, serving the new me! editor
+and the Import from osu! dialog, with favorites shared by default.
