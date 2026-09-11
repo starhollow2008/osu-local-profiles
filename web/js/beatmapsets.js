@@ -77,7 +77,43 @@ const ICON = {
   star: svg('<path d="m8 1.2 2 4.4 4.8.5-3.6 3.2 1 4.7L8 11.6 3.8 14l1-4.7L1.2 6.1 6 5.6z" fill="currentColor"/>'),
   play: svg('<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M6.5 5v6l4.5-3z" fill="hsl(var(--hsl-b2))"/>'),
   check: svg('<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="m4.8 8.2 2.2 2.2 4.2-4.4" fill="none" stroke="hsl(var(--hsl-b2))" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>'),
+  // The preview button's two faces; CSS shows one or the other from the card's audio state.
+  playTriangle: svg('<path d="M4 2.2v11.6c0 .8.9 1.3 1.6.9l9-5.8a1 1 0 0 0 0-1.8l-9-5.8C4.9.9 4 1.4 4 2.2z" fill="currentColor"/>'),
+  pause: svg('<rect x="3" y="2" width="3.6" height="12" rx="1" fill="currentColor"/><rect x="9.4" y="2" width="3.6" height="12" rx="1" fill="currentColor"/>'),
+  film: svg('<rect x="1.5" y="3" width="13" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5 3v10M11 3v10M1.5 8h3.5M11 8h3.5" stroke="currentColor" stroke-width="1.4"/>'),
+  image: svg('<rect x="1.5" y="2.5" width="13" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.5" cy="6.2" r="1.4" fill="currentColor"/><path d="m3 12 3.5-3.5 2 2L11 8l2.5 4z" fill="currentColor"/>'),
 };
+
+/**
+ * osu!'s audio preview for a set: a short clip osu! hosts for every beatmapset, the one its
+ * own card's play button plays. Fetched only when played, and cached by the browser.
+ */
+export const previewUrl = (id) => `https://b.ppy.sh/preview/${id}.mp3`;
+
+/**
+ * The card's left-hand area: osu-web's play button with its progress ring, and the video and
+ * storyboard icons. Like osu!'s, an Explicit set gets no play button by default.
+ */
+function playArea(card) {
+  const icons = [
+    card.video ? `<div class="beatmapset-panel__play-icon" title="This beatmap contains video">${ICON.film}</div>` : '',
+    card.storyboard
+      ? `<div class="beatmapset-panel__play-icon" title="This beatmap contains storyboard">${ICON.image}</div>`
+      : '',
+  ].join('');
+  const play = card.nsfw
+    ? ''
+    : `<button type="button" class="beatmapset-panel__play" data-audio-play="${card.id}"
+         title="Play preview" aria-label="Play the preview of ${escapeHtml(card.title)}">
+         <span class="beatmapset-panel__play-face beatmapset-panel__play-face--play">${ICON.playTriangle}</span>
+         <span class="beatmapset-panel__play-face beatmapset-panel__play-face--pause">${ICON.pause}</span>
+       </button>
+       <div class="beatmapset-panel__play-progress" aria-hidden="true"><div class="beatmapset-panel__ring"></div></div>`;
+  return `<div class="beatmapset-panel__play-container">
+    ${play}
+    ${icons ? `<div class="beatmapset-panel__play-icons">${icons}</div>` : ''}
+  </div>`;
+}
 
 /* ------------------------------------------------------------------------ */
 /* The card                                                                  */
@@ -177,7 +213,7 @@ export function beatmapsetCard(card) {
     </div>
   </a>
   <div class="beatmapset-panel__content">
-    <div class="beatmapset-panel__play-container"></div>
+    ${playArea(card)}
     <div class="beatmapset-panel__info">
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--title">
         ${external(url, 'beatmapset-panel__main-link u-ellipsis', escapeHtml(card.title))}

@@ -46,6 +46,9 @@ export interface FavoriteCard {
   nsfw: boolean;
   spotlight: boolean;
   featuredArtist: boolean;
+  /** Whether the set has a video / a storyboard; null when osu! has not been asked. */
+  video: boolean | null;
+  storyboard: boolean | null;
   favouriteCount: number | null;
   playCount: number | null;
   date: string | null;
@@ -114,14 +117,20 @@ export function detailsFor(db: Db, beatmapsetId: number): BeatmapsetDetails | nu
   }
 }
 
-/** Favourites osu.ppy.sh has not described yet, most recent first -- the ones worth a retry. */
+/**
+ * Favourites osu.ppy.sh has not described yet, most recent first -- the ones worth a retry.
+ *
+ * Includes details cached before the card kept the video and storyboard flags: they are
+ * stale rather than missing, and are refreshed the same way, a few per favourite action.
+ */
 export function missingDetails(db: Db, profileId: number, limit: number): number[] {
   return (
     db
       .prepare(
         `SELECT f.beatmapset_id FROM favorite_beatmapsets f
            LEFT JOIN beatmapset_details d ON d.beatmapset_id = f.beatmapset_id
-          WHERE f.profile_id = ? AND d.beatmapset_id IS NULL
+          WHERE f.profile_id = ?
+            AND (d.beatmapset_id IS NULL OR json_type(d.data, '$.video') IS NULL)
           ORDER BY f.favorited_at DESC LIMIT ?`,
       )
       .all(profileId, limit) as { beatmapset_id: number }[]
@@ -165,6 +174,9 @@ function fromDetails(d: BeatmapsetDetails, favoritedAt: number): FavoriteCard {
     nsfw: d.nsfw,
     spotlight: d.spotlight,
     featuredArtist: d.featuredArtist,
+    // Details cached before these were kept have neither; unknown, not false.
+    video: typeof d.video === 'boolean' ? d.video : null,
+    storyboard: typeof d.storyboard === 'boolean' ? d.storyboard : null,
     favouriteCount: d.favouriteCount,
     playCount: d.playCount,
     date: d.date,
@@ -285,6 +297,8 @@ export function localCard(
     nsfw: false,
     spotlight: false,
     featuredArtist: false,
+    video: null,
+    storyboard: null,
     favouriteCount: null,
     playCount: null,
     date: null,

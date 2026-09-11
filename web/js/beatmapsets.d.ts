@@ -11,5 +11,6 @@ export interface CardDifficulty {
 }
 export function groupDifficulties<T extends CardDifficulty>(difficulties: T[]): Map<string, T[]>;
 export function beatmapsetCard(card: unknown): string;
+export function previewUrl(id: number): string;
 export function beatmapsPopupContent(card: unknown): string;
 export function favoriteList(cards: unknown[] | null | undefined): string;

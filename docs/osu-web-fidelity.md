@@ -15,7 +15,7 @@ them needed a design decision — they needed the file.
 git clone --depth 1 --filter=blob:none --sparse https://github.com/ppy/osu-web.git reference/osu-web
 cd reference/osu-web
 git sparse-checkout set resources/css resources/js/profile-page resources/js/components \
-    resources/js/beatmapset-panel resources/js/utils resources/lang/en \
+    resources/js/beatmapset-panel resources/js/utils resources/js/core/osu-audio resources/lang/en \
     resources/views/users public/images/badges public/images/flags database
 ```
 

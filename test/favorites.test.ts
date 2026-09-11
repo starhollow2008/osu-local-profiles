@@ -20,6 +20,7 @@ import {
   getDiffColour,
   getDiffTextColour,
   groupDifficulties,
+  previewUrl,
 } from '../web/js/beatmapsets.js';
 
 function harness() {
@@ -46,6 +47,8 @@ const details = (id: number, over: Partial<BeatmapsetDetails> = {}): BeatmapsetD
   nsfw: false,
   spotlight: false,
   featuredArtist: false,
+  video: false,
+  storyboard: true,
   favouriteCount: 10,
   playCount: 1000,
   date: '2020-01-01T00:00:00Z',
@@ -148,6 +151,34 @@ test('a favourite osu! could not describe is built from local data, and listed a
   }
 });
 
+/*
+ * Details cached before the card kept video and storyboard have neither. They are stale, so
+ * they are retried like missing ones -- and until then the card says "unknown", not "no".
+ */
+test('details cached without the video and storyboard flags are refreshed, and read as unknown', () => {
+  const h = harness();
+  try {
+    const old = details(4) as Partial<BeatmapsetDetails>;
+    delete old.video;
+    delete old.storyboard;
+    h.db
+      .prepare('INSERT INTO beatmapset_details (beatmapset_id, data, fetched_at) VALUES (4, ?, 0)')
+      .run(JSON.stringify(old));
+    addFavorite(h.db, h.profileId, 4);
+
+    assert.deepEqual(missingDetails(h.db, h.profileId, 5), [4]);
+    const [card] = listFavorites(h.db, h.profileId, 6, null);
+    assert.equal(card!.video, null);
+    assert.equal(card!.storyboard, null);
+
+    saveDetails(h.db, details(4));
+    assert.deepEqual(missingDetails(h.db, h.profileId, 5), []);
+    assert.equal(listFavorites(h.db, h.profileId, 6, null)[0]!.storyboard, true);
+  } finally {
+    h.cleanup();
+  }
+});
+
 test("deleting a profile takes its favourites with it", () => {
   const h = harness();
   try {
@@ -178,6 +209,8 @@ test("the beatmapset page's JSON is reduced to what the card draws", () => {
       nsfw: false,
       spotlight: true,
       track_id: 123,
+      video: true,
+      storyboard: false,
       favourite_count: 19,
       play_count: 22968,
       ranked_date: '2009-08-11T06:51:17Z',
@@ -191,6 +224,8 @@ test("the beatmapset page's JSON is reduced to what the card draws", () => {
   assert.ok(set);
   assert.equal(set.featuredArtist, true, 'a track id means Featured Artist');
   assert.equal(set.spotlight, true);
+  assert.equal(set.video, true);
+  assert.equal(set.storyboard, false);
   assert.equal(set.date, '2009-08-11T06:51:17Z', 'a ranked set shows its ranked date');
   assert.deepEqual(set.difficulties, [{ id: 34843, mode: 'osu', stars: 3.92933, version: 'GATE OPEN!!!!' }]);
 });
@@ -257,4 +292,40 @@ test('the card escapes what osu! sent and shows only the badges that apply', () 
   assert.ok(!html.includes('beatmapset-badge--spotlight'));
   assert.ok(html.includes('beatmapset-status--loved'));
   assert.ok(html.includes('https://osu.ppy.sh/beatmapsets/3/download'));
+});
+
+const cardWith = (over: Record<string, unknown>) =>
+  beatmapsetCard({
+    id: 9,
+    title: 't',
+    artist: 'a',
+    creator: null,
+    userId: null,
+    status: 'ranked',
+    nsfw: false,
+    spotlight: false,
+    featuredArtist: false,
+    video: false,
+    storyboard: false,
+    favouriteCount: null,
+    playCount: null,
+    date: null,
+    difficulties: [],
+    source: 'osu',
+    favoritedAt: 0,
+    ...over,
+  });
+
+test('the play button plays osu!\'s preview, and an Explicit set gets none, as on osu!', () => {
+  assert.ok(cardWith({}).includes('data-audio-play="9"'));
+  assert.equal(previewUrl(9), 'https://b.ppy.sh/preview/9.mp3');
+  assert.ok(!cardWith({ nsfw: true }).includes('data-audio-play'));
+});
+
+test('video and storyboard icons appear only for the sets that have them', () => {
+  assert.ok(!cardWith({}).includes('beatmapset-panel__play-icon'));
+  assert.ok(cardWith({ video: true }).includes('This beatmap contains video'));
+  assert.ok(cardWith({ storyboard: true }).includes('This beatmap contains storyboard'));
+  // Unknown is not the same as yes.
+  assert.ok(!cardWith({ video: null, storyboard: null }).includes('beatmapset-panel__play-icon'));
 });

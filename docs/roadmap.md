@@ -1219,8 +1219,23 @@ a difficulty popup on hovering the dots, and a heart + download strip on hoverin
   card to show and nothing to link to, so the menu does not offer it.
 - **Wording is the user's**: "Favorite Beatmaps" / "Favorite this beatmap" (osu-web says
   "Favourite"). The card's own labels (status, "mapped by", badges) follow osu-web.
-- **Left out on purpose**: audio preview, the video/storyboard icons, hype and nomination
-  counts, and osu-web's mobile expand button (touch shows the menu instead).
+- **Left out on purpose**: hype and nomination counts, and osu-web's mobile expand button
+  (touch shows the menu instead). "Open in osu!" was weighed and declined by the user:
+  lazer turns `osu://b/<id>` (osu-web's own link format, forwarded to the running game by
+  its `OsuSchemeLinkIPCChannel`) into its beatmap *info overlay*, not song select, and
+  nothing short of scripting input into the client would reach song select.
+- **Audio preview and video/storyboard icons, added after.** osu-web's `osu-audio` player
+  (sparse checkout now also takes `resources/js/core/osu-audio`): one clip at a time, at the
+  `audio_volume` default of 0.45; pressing the playing card or the clip ending stops it; the
+  card carries `data-audio-state` and `--progress`. The clip is osu!'s own
+  `b.ppy.sh/preview/<id>.mp3` -- measured at ~100KB and ~10s, served with a week's browser
+  cache -- fetched only when played; nothing is stored. As on osu!, an Explicit set gets no
+  play button (`showAudio`). The ring is `circular-progress--beatmapset-panel`: 50px, a 0.1em
+  highlight-coloured border, drawn here as a masked conic gradient. Video and storyboard are
+  the page JSON's own booleans; details cached before they were kept count as stale, and are
+  refreshed by the same few-per-favourite-action retry, reading as unknown (no icon) until
+  then. Playing the full song from the local install was ruled out: lazer names its files by
+  hash, resolvable only through its Realm database, which this project does not read.
 
 ### What was checked
 

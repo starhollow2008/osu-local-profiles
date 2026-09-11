@@ -11,6 +11,10 @@
   - Favourites are each profile's own, and never sent to osu!. Favouriting asks
     osu.ppy.sh for that beatmap's details once; with no connection it is still saved, and
     the card shows what is on your machine until it can be filled in.
+  - **Play a preview** of any favourite from the play button on its cover, as on osu!: osu!'s
+    own short clip, streamed only when you press play. One plays at a time; press again to
+    stop. Explicit beatmaps have no play button, as on osu!.
+  - **Video and storyboard icons** on the cover of any beatmap that has them.
 - **Sections are ordered me!, Recent, Scores, Historical, Beatmaps, Medals by default.**
   A section added in a new version now joins a rearranged page after the section it follows
   by default, instead of at the very bottom.

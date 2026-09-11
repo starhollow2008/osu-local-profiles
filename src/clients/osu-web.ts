@@ -215,6 +215,9 @@ export interface BeatmapsetDetails {
   spotlight: boolean;
   /** Set when the song is from osu!'s Featured Artist library. */
   featuredArtist: boolean;
+  /** The set ships a background video / a storyboard: the two icons on the card's cover. */
+  video: boolean;
+  storyboard: boolean;
   favouriteCount: number;
   playCount: number;
   /** The date the card shows: when it was ranked or loved, else when it was last updated. */
@@ -282,6 +285,8 @@ export function extractBeatmapset(html: string): BeatmapsetDetails | null {
     nsfw: raw['nsfw'] === true,
     spotlight: raw['spotlight'] === true,
     featuredArtist: raw['track_id'] != null,
+    video: raw['video'] === true,
+    storyboard: raw['storyboard'] === true,
     favouriteCount: num(raw['favourite_count']) ?? 0,
     playCount: num(raw['play_count']) ?? 0,
     date: date ?? str(raw['last_updated']),

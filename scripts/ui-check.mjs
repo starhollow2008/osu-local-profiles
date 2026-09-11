@@ -36,6 +36,8 @@ const chrome = spawn(
     `--remote-debugging-port=${PORT}`,
     `--user-data-dir=${fs.mkdtempSync(path.join(os.tmpdir(), 'ui-check-'))}`,
     '--window-size=1280,900',
+    // The preview check presses play from script, which is not a user gesture.
+    '--autoplay-policy=no-user-gesture-required',
     URL_UNDER_TEST,
   ],
   { stdio: ['ignore', 'pipe', 'pipe'] },
@@ -269,6 +271,51 @@ check(
     const unfav = !menu.querySelector('[data-act="unfavorite"]').hidden;
     document.body.click();
     return fav !== unfav;
+  })()`),
+  true,
+);
+
+/*
+ * The audio preview: osu!'s own clip, one at a time. Pressing play must reach "playing" and
+ * move the ring; pressing again must stop it. Needs osu.ppy.sh, so no network is a skip.
+ */
+const audio = await evaluate(`(async () => {
+  const button = document.querySelector('#favoriteBeatmaps [data-audio-play]');
+  if (!button) return null;
+  const panel = button.closest('.beatmapset-panel');
+  button.click();
+  let state = null;
+  for (let i = 0; i < 40 && state !== 'playing'; i++) {
+    await new Promise((r) => setTimeout(r, 100));
+    state = panel.dataset.audioState ?? null;
+  }
+  if (state !== 'playing') {
+    button.click();
+    return { reached: false };
+  }
+  await new Promise((r) => setTimeout(r, 700));
+  const progress = Number(getComputedStyle(panel).getPropertyValue('--progress'));
+  const ring = getComputedStyle(panel.querySelector('.beatmapset-panel__play-progress')).opacity;
+  button.click();
+  await new Promise((r) => setTimeout(r, 100));
+  return { reached: true, progress, ring, stopped: !panel.hasAttribute('data-audio-state') };
+})()`);
+if (audio === null || audio.reached === false) {
+  for (const name of ['pressing play plays the preview', 'the ring moves', 'it stays visible while playing',
+    'pressing again stops it']) check(name, SKIP);
+} else {
+  check('pressing play plays the preview', audio.reached, true);
+  check('the ring moves', audio.progress > 0, true);
+  check('it stays visible while playing', audio.ring, '1');
+  check('pressing again stops it', audio.stopped, true);
+}
+check(
+  'an Explicit card has no play button',
+  await evaluate(`(() => {
+    const explicit = [...document.querySelectorAll('#favoriteBeatmaps .beatmapset-panel')]
+      .filter((p) => p.querySelector('.beatmapset-badge--nsfw'));
+    if (explicit.length === 0) return ${JSON.stringify('skipped')};
+    return explicit.every((p) => !p.querySelector('[data-audio-play]'));
   })()`),
   true,
 );

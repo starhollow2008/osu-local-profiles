@@ -14,7 +14,7 @@ import {
   medalBadge,
 } from './badges.js';
 import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
-import { beatmapsPopupContent, favoriteList } from './beatmapsets.js';
+import { beatmapsPopupContent, favoriteList, previewUrl } from './beatmapsets.js';
 import {
   aboutHtml,
   activityList,
@@ -691,6 +691,11 @@ async function loadProfile() {
   $('favoriteBeatmaps').innerHTML =
     favoriteList(data.favorites) +
     showMore('favorites', (data.favorites ?? []).length, shown.favorites, favoritesTotal);
+  // A redraw mid-preview would otherwise leave the clip playing behind a card showing play.
+  if (previewSet !== null) {
+    if (previewPanel()) paintPreview(preview.paused ? 'loading' : 'playing');
+    else stopPreview();
+  }
 
   // Every render above replaced markup wholesale, which discards the nodes any previous
   // hover listener was attached to. Re-arming here rather than per chart keeps it to one
@@ -903,7 +908,8 @@ $('updateConfirm').onclick = async () => {
 const EXPORT_STRIP = [
   '#optionsBtn', '.menu-wrap', '#toggle', '.backdrop', '#playMenu', '#toast',
   '#identityFile', '.section-order', '.play-detail__menu', '.play-detail__grip',
-  '#aboutEdit', '#medalTooltip', '#beatmapsPopup', '[data-unfavorite]', 'script',
+  '#aboutEdit', '#medalTooltip', '#beatmapsPopup', '[data-unfavorite]', '[data-audio-play]',
+  '.beatmapset-panel__play-progress', 'script',
 ];
 
 /**
@@ -1922,6 +1928,82 @@ document.addEventListener('mouseover', (e) => {
   else if (popupPending !== null) cancelPopupTimer();
 });
 window.addEventListener('resize', hideBeatmapsPopup);
+
+/*
+ * The audio preview, osu-web's `osu-audio` player: one clip at a time, at osu!'s default
+ * volume (45%). Pressing a card's play starts its preview from the top and stops any other;
+ * pressing it again, or the clip ending, stops it. The card carries `data-audio-state` and
+ * `--progress`, which is all the CSS needs for the pause face and the ring.
+ *
+ * The clip is osu!'s own short preview, streamed only when pressed and cached by the browser
+ * -- nothing is stored by this app.
+ */
+const PREVIEW_VOLUME = 0.45;
+const preview = new Audio();
+preview.preload = 'none';
+preview.volume = PREVIEW_VOLUME;
+let previewSet = null;
+let previewFrame = null;
+
+/** The card for the playing set, found fresh each time: a re-render replaces the element. */
+const previewPanel = () =>
+  previewSet === null ? null : document.querySelector(`#favoriteBeatmaps [data-set-id="${previewSet}"]`);
+
+function paintPreview(state) {
+  const panel = previewPanel();
+  if (!panel) return;
+  if (state === null) {
+    panel.removeAttribute('data-audio-state');
+    panel.style.removeProperty('--progress');
+    return;
+  }
+  panel.dataset.audioState = state;
+  const progress = preview.duration > 0 ? preview.currentTime / preview.duration : 0;
+  panel.style.setProperty('--progress', String(progress));
+}
+
+function stopPreview() {
+  cancelAnimationFrame(previewFrame);
+  preview.pause();
+  paintPreview(null);
+  previewSet = null;
+}
+
+/** Keeps the ring moving smoothly; `timeupdate` alone only fires a few times a second. */
+function tickPreview() {
+  paintPreview(preview.paused ? 'loading' : 'playing');
+  previewFrame = requestAnimationFrame(tickPreview);
+}
+
+async function playPreview(setId) {
+  if (previewSet === setId) {
+    stopPreview();
+    return;
+  }
+  stopPreview();
+  previewSet = setId;
+  preview.src = previewUrl(setId);
+  preview.currentTime = 0;
+  paintPreview('loading');
+  try {
+    await preview.play();
+    if (previewSet === setId) tickPreview();
+  } catch (err) {
+    // Replaced by another press before it started: nothing went wrong.
+    if (previewSet !== setId || err?.name === 'AbortError') return;
+    stopPreview();
+    toast("The preview could not be played - it comes from osu.ppy.sh, which may be unreachable");
+  }
+}
+
+preview.addEventListener('ended', stopPreview);
+
+document.addEventListener('click', (e) => {
+  const button = e.target.closest('[data-audio-play]');
+  if (!button) return;
+  e.preventDefault();
+  void playPreview(Number(button.dataset.audioPlay));
+});
 
 async function scoreAction(payload) {
   const r = await fetch('/api/scores', {

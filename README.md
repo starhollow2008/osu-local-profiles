@@ -405,8 +405,10 @@ thirty seconds counts thirty seconds rather than the whole map.
 The **Beatmaps** section, as osu! has it. Open the **...** menu on any row in **Scores** or
 **Recent Plays** and choose **Favorite this beatmap**; it appears as osu!'s beatmap card,
 with its cover, status, a coloured dot per difficulty, and the Explicit / Featured Artist /
-Spotlight badges. Hover the dots for every difficulty's name and star rating, and the card
-for the heart (unfavourite) and the download link.
+Spotlight badges, and a video or storyboard icon when the set has one. Hover the dots for
+every difficulty's name and star rating, and the card for the heart (unfavourite) and the
+download link. The play button on the cover plays osu!'s own short preview of the song --
+streamed from osu.ppy.sh only when pressed, about 100KB, and never stored.
 
 Favourites belong to the profile, as osu!'s belong to an account, and are never sent to
 osu!. Favouriting makes **one request** to `osu.ppy.sh` for that beatmap's details, which
