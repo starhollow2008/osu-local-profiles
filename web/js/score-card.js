@@ -11,6 +11,7 @@ import { escapeHtml, fmt } from './format.js';
 import { coverUrl, gradeBadge, modList } from './badges.js';
 import { MODE_ICON, MODE_NAME, difficultyBadge } from './beatmapsets.js';
 import { ppNotes } from './sections.js';
+import { assetUrl } from './static-mode.js';
 
 const RULESET = ['osu', 'taiko', 'fruits', 'mania'];
 
@@ -313,7 +314,7 @@ function userCard(who) {
   const flag = who.country
     ? `<div class="user-card__icon user-card__icon--flag"><span class="flag-country" role="img"
          title="${escapeHtml(who.countryName)}" aria-label="${escapeHtml(who.countryName)}"
-         style="background-image: url('/flags/${escapeHtml(who.country.toLowerCase())}.svg')"></span></div>`
+         style="background-image: url('${assetUrl(`/flags/${escapeHtml(who.country.toLowerCase())}.svg`)}')"></span></div>`
     : '';
   const background = who.cover
     ? `<div class="user-card__background" style="background-image: url('${escapeHtml(who.cover)}')"></div>`

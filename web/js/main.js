@@ -5,6 +5,7 @@
  * refetch followed by a re-render of the affected block, which is plenty for a page that
  * changes once every few minutes when a play lands.
  */
+import { assetUrl, isStatic, snapshot } from './static-mode.js';
 import {
   MODE_NAMES,
   countryName,
@@ -32,7 +33,8 @@ import {
 } from './score-share.js';
 import { downloadBlob, hint, postJson, toast } from './ui.js';
 import { bbcodeHtml } from './bbcode.js';
-import { medalFor, renderMedals } from './medals.js';
+import { buildInteractiveHtml } from './share-copy.js';
+import { renderMedals } from './medals.js';
 import { setPopupCards } from './beatmaps-popup.js';
 import { syncPlayers } from './audio-player.js';
 import {
@@ -208,7 +210,7 @@ function renderIdentity() {
   $('pname').textContent = profile.name;
 
   $('avatar').innerHTML = profile.hasAvatar
-    ? `<img src="/api/image/avatar" alt="${escapeHtml(profile.name)}">`
+    ? `<img src="${assetUrl('/api/image/avatar')}" alt="${escapeHtml(profile.name)}">`
     : generatedAvatar(profile.name);
 
   const bits = [];
@@ -220,7 +222,7 @@ function renderIdentity() {
     // leaves the name beside it, which is still the whole answer.
     bits.push(`<span class="profile-info__flag">
       <span class="flag-country" role="img" title="${escapeHtml(name)}" aria-label="${escapeHtml(name)}"
-            style="background-image: url('/flags/${escapeHtml(code.toLowerCase())}.svg')"></span>
+            style="background-image: url('${assetUrl(`/flags/${escapeHtml(code.toLowerCase())}.svg`)}')"></span>
       <span class="profile-info__flag-text">${escapeHtml(name)}</span>
     </span>`);
   }
@@ -235,7 +237,7 @@ function renderIdentity() {
 function renderCover(top) {
   const el = $('cover');
   if (profile?.hasCover) {
-    el.style.setProperty('--cover', "url('/api/image/cover')");
+    el.style.setProperty('--cover', `url('${assetUrl('/api/image/cover')}')`);
     return;
   }
   const url = coverUrl(top?.[0]?.beatmapsetId, 'cover@2x');
@@ -532,6 +534,7 @@ async function loadState() {
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
+  if (isStatic) $('footerVersion').textContent += ` - a copy, as of ${shortDate(Date.parse(snapshot.exportedAt))}`;
   renderUpdate();
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -742,23 +745,13 @@ $('updateConfirm').onclick = async () => {
 /*
  * Two ways to hand this profile to someone else.
  *
- * 1. A standalone .html file. One file, opens anywhere, needs neither this app nor a
- *    network. It is built from the *live page* rather than re-rendered on the server, so
- *    it captures exactly what is on screen -- the section order, the medals, everything --
- *    and cannot drift from it.
+ * 1. A web page: this page as one .html file that works like it -- show more, the mode
+ *    tabs, View Details -- built by share-copy.js, and fit to put online as it is.
  * 2. A PNG, rendered by a browser that is already installed.
  *
  * The live page is never served to anyone else: it can reset and delete profiles, and none
  * of that asks who is calling.
  */
-
-/** Elements that only make sense while you are using the page, not while reading it. */
-const EXPORT_STRIP = [
-  '#optionsBtn', '.menu-wrap', '#toggle', '.backdrop', '#playMenu', '#toast',
-  '#identityFile', '.section-order', '.play-detail__menu', '.play-detail__grip',
-  '#aboutEdit', '#medalTooltip', '#beatmapsPopup', '[data-unfavorite]', '[data-audio-play]',
-  '.beatmapset-panel__play-progress', '.audio-player-floating', '#indexNotice', 'script',
-];
 
 /**
  * `?export=1` is the same page with its controls hidden. The screenshot endpoint loads it,
@@ -767,110 +760,6 @@ const EXPORT_STRIP = [
 function applyExportMode() {
   if (new URLSearchParams(location.search).get('export') !== '1') return;
   document.body.classList.add('export-mode');
-}
-
-/** Read a same-origin file as text, for inlining. */
-async function fetchText(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`could not read ${url}`);
-  return r.text();
-}
-
-/** Read a same-origin image as a data: URI, so the export needs nothing from this app. */
-async function fetchDataUri(url) {
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`could not read ${url}`);
-  const blob = await r.blob();
-  return await new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = () => reject(new Error(`could not encode ${url}`));
-    reader.readAsDataURL(blob);
-  });
-}
-
-/**
- * Build a single self-contained HTML file from the page as it stands.
- *
- * Local images become data: URIs; osu!'s own cover art and medal icons stay as the absolute
- * URLs they already are, so the file is small and shows them to anyone with a connection,
- * and degrades to the drawn placeholders without one. Nothing same-origin is left behind,
- * so no part of the file depends on this app still running.
- */
-async function buildStandaloneHtml() {
-  const clone = document.documentElement.cloneNode(true);
-
-  for (const selector of EXPORT_STRIP) {
-    for (const el of clone.querySelectorAll(selector)) el.remove();
-  }
-  /*
-   * The editor is gone, so the text it was editing must not be left hidden with it -- and
-   * an empty description has nothing to say to a reader, so its whole section goes, tab and
-   * all. "Click to write something" is an instruction to the owner, not to whoever opens
-   * the file.
-   */
-  const about = clone.querySelector('#aboutView');
-  if (about) about.hidden = false;
-  if (about?.classList.contains('about--empty')) {
-    clone.querySelector('#section-me')?.remove();
-    clone.querySelector('#sectionTabs a[href="#section-me"]')?.remove();
-  }
-
-  // Stylesheets become one inline <style>, in the order they were linked.
-  const hrefs = [...clone.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.getAttribute('href'));
-  for (const el of clone.querySelectorAll('link[rel="stylesheet"]')) el.remove();
-  const css = await Promise.all(hrefs.map((href) => fetchText(href)));
-
-  const style = document.createElement('style');
-  style.textContent = [
-    ...css,
-    // The exported file is a document, not an app: nothing in it is interactive.
-    '.section-order, .play-detail__menu, .play-detail__grip { display: none !important; }',
-    '.about { cursor: default; } .about:hover { background: none; }',
-    '.profile-info__avatar::after { display: none; } .profile-info__name { cursor: default; }',
-  ].join('\n');
-  clone.querySelector('head').append(style);
-
-  /*
-   * The file has no script, so there is no medal card in it. A native title carries what the
-   * card would have said, which is the next best thing for a document.
-   */
-  for (const badge of clone.querySelectorAll('[data-medal]')) {
-    const medal = medalFor(badge.dataset.medal);
-    if (!medal) continue;
-    const when = medal.achievedAt === null ? 'Locked' : medal.dated ? `Achieved on ${shortDate(medal.achievedAt)}` : 'Achieved';
-    badge.title = `${medal.name}\n${medal.description}\n${when}`;
-    badge.removeAttribute('tabindex');
-  }
-
-  // Anything served by this app has to be carried, or the file breaks the moment it moves.
-  for (const link of clone.querySelectorAll('link[rel="icon"]')) {
-    try {
-      link.href = await fetchDataUri(link.getAttribute('href'));
-    } catch {
-      link.remove();
-    }
-  }
-  for (const img of clone.querySelectorAll('img[src^="/"], img[src^="./"]')) {
-    try {
-      img.src = await fetchDataUri(img.getAttribute('src'));
-    } catch {
-      img.remove();
-    }
-  }
-  const cover = clone.querySelector('#cover');
-  if (cover && profile?.hasCover) {
-    try {
-      cover.style.setProperty('--cover', `url('${await fetchDataUri('/api/image/cover')}')`);
-    } catch {
-      cover.style.setProperty('--cover', 'none');
-    }
-  }
-
-  const when = new Date().toLocaleString();
-  return `<!doctype html>
-<!-- osu! local profiles - "${profile?.name ?? 'profile'}" as of ${when}. Not an osu! page. -->
-${clone.outerHTML}`;
 }
 
 /** Hand the browser a file to save, without going near the server. */
@@ -904,9 +793,9 @@ $('shareHtml').onclick = async () => {
   $('shareHtml').disabled = true;
   shareHint('Building the page...');
   try {
-    const html = await buildStandaloneHtml();
+    const html = await buildInteractiveHtml((message) => shareHint(message));
     downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safeName()}.html`);
-    shareHint('Saved. That file opens on its own, with or without a connection.');
+    shareHint(`Saved (${fmt(Math.ceil(html.length / 1024))}KB). It works like this page, without this app.`);
   } catch (err) {
     shareHint(err.message, true);
   } finally {
@@ -1145,7 +1034,9 @@ function renderAbout() {
     ? `<div class="bbcode">${html}</div>`
     : '<div class="about__empty">Nothing here yet. Click to write something.</div>';
   $('aboutView').classList.toggle('about--empty', !html);
-  $('aboutView').title = editingAbout ? '' : 'Click to edit';
+  // In a shared copy an empty me! is left out, tab and all: "click to write" is for its owner.
+  document.documentElement.classList.toggle('static-copy--no-me', isStatic && !html);
+  $('aboutView').title = editingAbout || isStatic ? '' : 'Click to edit';
 }
 
 /** Write and Preview: osu-web's two states for the same box. */
@@ -1161,7 +1052,7 @@ function setAboutState(state) {
 }
 
 function openAboutEditor() {
-  if (editingAbout) return;
+  if (editingAbout || isStatic) return;
   editingAbout = true;
   $('aboutText').value = settings.aboutMe ?? '';
   updateAboutCount();
@@ -1341,6 +1232,8 @@ function renderIdentitySuggestions() {
 }
 
 async function openIdentity() {
+  // A shared copy is read-only.
+  if (isStatic) return;
   setMenuOpen(false);
   $('identityProfileName').textContent = profile?.name ?? 'this profile';
   $('identityName').value = profile?.name ?? '';
@@ -1934,6 +1827,8 @@ const menuKey = (button) => `${button.dataset.kind ?? 'score'}:${button.dataset.
  * none, and nothing to show a card for.
  */
 function openPlayMenu(button) {
+  // A shared copy offers only View Details, which an unfinished play does not have.
+  if (isStatic && (button.dataset.kind ?? 'score') !== 'score') return;
   const menu = $('playMenu');
   const id = Number(button.dataset.id);
   const isScore = (button.dataset.kind ?? 'score') === 'score';

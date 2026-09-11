@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+- **me! is written the way osu!'s is**: BBCode, with osu!'s own toolbar (Bold, Italic,
+  Strike Out, Header, Link, Spoiler Box, lists, Image, Image Map, Font Size), a Preview, and
+  images pasted or dropped straight into the box. Anything that is not one of osu!'s tags
+  shows as the characters typed, so a page imported from any osu! profile is safe to show.
+- **Import from osu!** (Options): look an account up and copy what you tick -- avatar,
+  banner, flag and me! by default, favorite beatmaps on request. Never automatic; nothing is
+  asked of osu.ppy.sh until you press a button.
+- **Favorite Beatmaps is one list for every profile** by default (Settings -> Every
+  profile). Switching either way loses nothing. An empty list says how to fill it, with an
+  Import button and Don't show again.
+- **Removed scores can be deleted for good**: a red minus per score, and Delete all
+  permanently. Their replays are never imported again.
+- **The web page export works like the page**: show more, the mode tabs, View Details,
+  the medal cards and the previews all respond, from one file with no app behind it. It
+  holds nothing about your computer, so it can be put online as a sample profile; the README
+  says how.
+
 ## 1.10.0
 
 - **Recent Plays is a section of its own**, near the top of the page under me!, instead of

@@ -46,11 +46,11 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.31 | Sessions                                      | todo   |
 | 5.32 | Goals and challenges                          | todo   |
 | 5.33 | A page for each beatmap                       | todo   |
-| 5.34 | me! editor: osu!'s BBCode toolbar, pasted images | todo |
-| 5.35 | Favourites: import, first-run reminder, shared across profiles | todo |
-| 5.36 | Import from an osu! profile (Options menu)    | todo   |
-| 5.37 | Delete removed scores permanently             | todo   |
-| 5.38 | An interactive HTML export, fit to host       | todo   |
+| 5.34 | me! editor: osu!'s BBCode toolbar, pasted images | done |
+| 5.35 | Favourites: import, first-run reminder, shared across profiles | done |
+| 5.36 | Import from an osu! profile (Options menu)    | done   |
+| 5.37 | Delete removed scores permanently             | done   |
+| 5.38 | An interactive HTML export, fit to host       | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1730,7 +1730,7 @@ score.
 
 ## 5.34 — me! editor: osu!'s BBCode toolbar, pasted images
 
-**Status:** todo.
+**Status:** done -- not yet released.
 
 The user asked for osu!'s me! editor: its toolbar, and images pasted straight in. This
 reverses the plain-text decision of 5.6, at the user's request.
@@ -1752,7 +1752,7 @@ reverses the plain-text decision of 5.6, at the user's request.
 
 ## 5.35 — Favourites: import, first-run reminder, shared across profiles
 
-**Status:** todo.
+**Status:** done -- not yet released.
 
 - **Import** from any osu! account: `osu.ppy.sh/users/<id>/beatmapsets/favourite?limit&offset`
   answers JSON without credentials (verified 2026-09-11), each set carrying the same fields
@@ -1768,7 +1768,7 @@ reverses the plain-text decision of 5.6, at the user's request.
 
 ## 5.36 — Import from an osu! profile (Options menu)
 
-**Status:** todo.
+**Status:** done -- not yet released.
 
 One dialog, from Options, never a prompt at start-up (the user's call). Look up an account;
 choose what to copy: avatar, banner, flag and me! (checked by default) and favourite beatmaps
@@ -1778,7 +1778,7 @@ already reads.
 
 ## 5.37 — Delete removed scores permanently
 
-**Status:** todo.
+**Status:** done -- not yet released.
 
 Settings' Removed scores gets a red minus per score and "Delete all permanently". This keeps
 the rule that a removal must stick: the row goes, but its `dedupe_key` stays in
@@ -1787,7 +1787,7 @@ records too, since a reset is a fresh start.
 
 ## 5.38 — An interactive HTML export, fit to host
 
-**Status:** todo.
+**Status:** done -- not yet released.
 
 The old export was a static clone of the page: nothing could be clicked. The new one is
 the real page. It carries its CSS, its own modules (bundled by `web/js/bundle.js`, a small

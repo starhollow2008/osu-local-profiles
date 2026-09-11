@@ -340,30 +340,59 @@ leaving the destructive button as the only one that worked. No unit test would c
 **Options -> Edit profile**, or click the avatar or the name.
 
 - **Name** -- renames the profile. Nothing it has tracked changes.
-- **Picture** and **Banner** -- upload a PNG, JPEG, WebP or GIF, or borrow them from an
-  osu! account. Both are stored per profile, so two playstyles are two identities.
-- **Borrow from an osu! account** -- type a username, a user id, or a link to a profile.
-  Pressing **Look up** shows what it found; pressing **Use this** copies the picture and
-  banner in.
-
-If osu! is signed in, its username is offered as a suggestion, read from the client's own
-config file with no network at all. It only ever prefills: a local profile is a different
-identity by definition, so it is never adopted without being asked for.
+- **Picture** and **Banner** -- upload a PNG, JPEG, WebP or GIF, or import them from an
+  osu! account (below). Both are stored per profile, so two playstyles are two identities.
 
 Nothing here is required. With no picture the page draws an avatar from the profile's name,
 and the banner falls back to the cover art of the profile's best play.
+
+## Importing from an osu! profile
+
+**Options -> Import from osu!**. Type a username, a user id or a link to a profile, press
+**Look up**, tick what to copy, and press **Import**.
+
+| What | Ticked to begin with |
+| ---- | -------------------- |
+| Avatar | yes |
+| Banner | yes |
+| Flag | yes |
+| me! | yes -- it replaces this profile's me! |
+| Favorite beatmaps | no -- they are added to the list |
+
+Importing also links the profile to that account. It is never automatic, and never asked
+at start-up: nothing is sent to `osu.ppy.sh` until you press a button -- one request to find
+the account, one per picture, and one per hundred favorites. No login and no API key. If
+osu! is signed in on this machine, its username is offered, read from the client's own config
+file with no network at all.
 
 ## Sharing the profile
 
 **Options -> Share this profile.**
 
-- **Save as a web page** -- one `.html` file holding everything on the page. It opens
-  anywhere, needs neither this app nor a connection, and keeps working indefinitely. It is
-  built from the live page rather than re-rendered, so it captures exactly what is on
-  screen, section order included. This is the one that survives.
+- **Save as a web page** -- this page as one `.html` file that **works like it**: show more,
+  the mode tabs, View Details, the medal cards, the charts and the song previews all respond.
+  It opens anywhere, with no app and no connection (osu!'s cover art and previews appear when
+  there is one). Nothing in it can change the profile -- those controls are gone, and the
+  page answers itself from a snapshot taken when it was saved -- and it holds nothing about
+  your computer: no install paths, no other profiles.
 - **Save as an image** -- a full-page PNG, rendered by the Chrome or Edge already on your
   machine. Nothing is bundled: a headless browser would be several times the size of this
   whole app. Without one installed the button says so and points at the HTML export.
+
+### Putting it online, as a sample profile
+
+The saved page is a plain file with everything inside it, so any static web host can serve
+it as it is -- there is nothing to install and nothing to configure. The simplest free one is
+**GitHub Pages**:
+
+1. Create a public repository (or use one you have), and add the saved file to it as
+   `index.html`.
+2. In the repository's **Settings -> Pages**, choose **Deploy from a branch**, pick the
+   branch and `/ (root)`, and save.
+3. A minute later it is at `https://<your-name>.github.io/<repository>/`.
+
+To update it, save a new copy and replace `index.html`. Netlify Drop, Cloudflare Pages and
+any ordinary web space work the same way: upload the one file.
 
 ### The live page is never shared
 
@@ -451,8 +480,14 @@ and a button to play the next favourite automatically when one ends. It goes awa
 seconds after the music stops. The volume, mute and autoplay choices are remembered by your
 browser.
 
-Favourites belong to the profile, as osu!'s belong to an account, and are never sent to
-osu!. Favouriting makes **one request** to `osu.ppy.sh` for that beatmap's details, which
+**Every profile shares one list** by default, since what you like to play does not change
+with how you play it. Turn that off under **Settings -> Every profile** and each profile keeps
+its own copy of the list as it stands; turning it back on merges them. **Import** the
+favorites of any osu! account from **Options -> Import from osu!** -- one request per
+hundred, which carries every card's details. While the list is empty it says how to fill
+it, with **Don't show again** for anyone who would rather not.
+
+Favorites are never sent to osu!. Favouriting makes **one request** to `osu.ppy.sh` for that beatmap's details, which
 are then kept, so the card works offline. With no connection the favourite is still saved,
 and the card shows what your machine knows -- every difficulty from lazer's `online.db`,
 with a star rating only where one of your own scores gives it -- until a later favourite,
@@ -509,10 +544,17 @@ touchscreen, and they cannot half-succeed the way a drag can.
 The description box from osu!'s own profile, at the top of the page. Click it to write
 something; it belongs to the profile, so each playstyle gets its own.
 
-It is **plain text**, not BBCode. Line breaks are kept and bare URLs become links; anything
-else you type appears as the characters you typed. That is deliberate: osu!'s BBCode subset
-is large, and a local profile gains nothing from an HTML sanitiser it would have to get
-exactly right -- and everything to lose by getting it wrong.
+It is written the way osu!'s is: in **BBCode**, with osu!'s own toolbar -- Bold, Italic,
+Strike Out, Header, Link, Spoiler Box, Numbered List, List, Image, Image Map and Font Size,
+each wrapping whatever is selected -- and **Preview** to see it before saving. **Paste or
+drop an image** straight into the box, or press Image with nothing selected, and it is
+stored with the profile. A me! page can be up to 60,000 characters, so one imported from
+osu! arrives whole.
+
+The page is drawn by this app's own renderer rather than by trusting the text: everything
+is escaped first, and only the tags it knows become formatting. A tag it does not know, or
+one left open, shows as the characters you typed -- so a page imported from anyone's osu!
+profile is exactly as safe as one you wrote.
 
 ## Pinning and removing scores
 
@@ -530,6 +572,11 @@ Removing never deletes anything. The score is marked hidden and can be put back 
 file is still in osu!'s store, so a genuinely deleted row would be re-imported the next
 time it was noticed -- and with nothing left to recognise it by, it would come back looking
 like a brand new play.
+
+To get rid of one for good, press the **red minus** beside it in *Removed scores* (it asks
+once more), or **Delete all permanently**. The score is deleted; what is kept is only the
+replay's fingerprint, so the replay still in osu!'s store is never imported again. A reset
+clears those along with everything else.
 
 ## Settings
 

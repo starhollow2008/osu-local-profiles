@@ -476,6 +476,65 @@ check('Escape closes the share dialog', await shown('shareModal'), 'none');
  * `?export=1` hides everything that only makes sense while using the page. The screenshot
  * renderer relies on it, so a control leaking through would end up in someone's image.
  */
+/*
+ * The shared copy: built exactly as Share builds it, then loaded into a frame and used. It
+ * must render the same profile, keep the controls that change it out of sight, carry nothing
+ * about this machine, and -- the point of it -- respond: Show more has to show more.
+ */
+console.log('\nshared copy');
+const sharedCopy = JSON.parse(await evaluate(`(async () => {
+  const { buildInteractiveHtml } = await import('/js/share-copy.js');
+  const html = await buildInteractiveHtml();
+  const frame = document.createElement('iframe');
+  frame.style.cssText = 'position:fixed;left:0;top:0;width:1200px;height:900px;opacity:0;pointer-events:none';
+  document.body.append(frame);
+  const loaded = new Promise((r) => frame.addEventListener('load', r, { once: true }));
+  frame.srcdoc = html;
+  await loaded;
+  const doc = frame.contentDocument;
+  const win = frame.contentWindow;
+  for (let i = 0; i < 100 && doc.body.dataset.rendered !== 'true'; i++) await new Promise((r) => setTimeout(r, 100));
+  const display = (selector) => {
+    const el = doc.querySelector(selector);
+    return el ? win.getComputedStyle(el).display : 'missing';
+  };
+  const snap = JSON.parse(doc.getElementById('snapshot').textContent);
+  const rows = () => doc.querySelectorAll('#recentPlays .play-detail').length;
+  const before = rows();
+  const more = doc.querySelector('#recentPlays [data-show-more]');
+  more?.click();
+  for (let i = 0; i < 30 && rows() === before; i++) await new Promise((r) => setTimeout(r, 100));
+  const out = {
+    rendered: doc.body.dataset.rendered === 'true',
+    sameName: doc.getElementById('pname').textContent === document.getElementById('pname').textContent,
+    sameMedals:
+      doc.querySelectorAll('#medalGroups [data-medal]').length ===
+      document.querySelectorAll('#medalGroups [data-medal]').length,
+    options: display('#optionsBtn'),
+    installs: snap.state.installs.length,
+    me: display('#section-me'),
+    meEmpty: document.getElementById('aboutView').classList.contains('about--empty'),
+    showMore: more ? rows() > before : 'none needed',
+    kb: Math.round(html.length / 1024),
+  };
+  frame.remove();
+  return JSON.stringify(out);
+})()`));
+check('the copy renders on its own', sharedCopy.rendered, true);
+check('as the same profile', sharedCopy.sameName, true);
+check('with the same medals', sharedCopy.sameMedals, true);
+check('and none of the controls that change it', sharedCopy.options, 'none');
+check('it says nothing about where osu! is installed', sharedCopy.installs, 0);
+if (sharedCopy.meEmpty) {
+  check('an empty me! is left out, rather than asking a visitor to write it', sharedCopy.me, 'none');
+}
+if (sharedCopy.showMore === 'none needed') {
+  console.log('  SKIP  show more  (this profile has too few plays to need it)');
+} else {
+  check('show more shows more', sharedCopy.showMore, true);
+}
+console.log(`  (the copy is ${sharedCopy.kb}KB)`);
+
 console.log('\nexport mode');
 check(
   'the page reports when it has finished drawing',

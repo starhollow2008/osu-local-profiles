@@ -5,6 +5,7 @@
  * Every function reports through the page's toast rather than throwing, because each is the
  * whole of what a menu item does.
  */
+import { assetUrl } from './static-mode.js';
 import { generatedAvatar } from './badges.js';
 import { countryName } from './format.js';
 import { downloadBlob, toast } from './ui.js';
@@ -20,10 +21,11 @@ export function cardOwner(owner) {
   const code = owner?.country ? owner.country.toUpperCase() : '';
   return {
     name: owner?.name ?? '',
-    avatar: owner?.avatar ? `<img src="${owner.avatar}" alt="">` : generatedAvatar(owner?.name ?? ''),
+    avatar: owner?.avatar ? `<img src="${assetUrl(owner.avatar)}" alt="">` : generatedAvatar(owner?.name ?? ''),
     country: code,
     countryName: code ? countryName(code) : '',
-    cover: owner?.cover ?? null,
+    // In a saved copy these are carried once by address; see share-copy.js.
+    cover: owner?.cover ? assetUrl(owner.cover) : null,
     tracking: owner?.tracking === true,
   };
 }

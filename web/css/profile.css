@@ -4613,3 +4613,42 @@ s.bbcode-editor__glyph {
 .bbcode-editor__action--save:hover:not(:disabled) {
   background-color: hsl(88, 60%, 56%);
 }
+
+/* ======================================================================== */
+/* A shared copy of the page (static-mode.js, share-copy.js): whatever would */
+/* change the profile is gone; whatever only shows it still works.           */
+/* ======================================================================== */
+
+.static-copy :is(#optionsBtn, .menu-wrap, #toggle, #updateBtn, #indexNotice, #favoritesNote,
+  #aboutEdit, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
+  [data-play-menu][data-context="card"], a[href*="/replay"]) {
+  display: none !important;
+}
+
+/* An empty me! is an invitation to its owner, so a copy leaves it out, tab and all. */
+.static-copy--no-me :is(#section-me, #sectionTabs a[href="#section-me"]) {
+  display: none !important;
+}
+
+/* Rows keep their menu, with View Details the one thing in it. */
+.static-copy #playMenu > :not([data-act="details"]) {
+  display: none !important;
+}
+
+.static-copy .about,
+.static-copy .profile-info__avatar,
+.static-copy .profile-info__name {
+  cursor: default;
+}
+
+.static-copy .about:hover {
+  background: none;
+}
+
+.static-copy .profile-info__avatar::after {
+  display: none;
+}
+
+.static-copy .profile-info__name:hover {
+  text-decoration: none;
+}

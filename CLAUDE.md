@@ -109,6 +109,12 @@ is set instead, and `visibleSql()` in `src/calc/eligibility.ts` filters it out o
 query over `scores`, not just the ones about pp: a removed score has to leave the play
 count and the level bar too, or it has not really been removed.
 
+**Deleting a removed score for good keeps its key.** Settings can delete a removed score
+(`deleteRemovedScores`), and the row really goes -- but its `dedupe_key` is written to
+`deleted_scores` first, and ingest and Import past plays both refuse a key listed there
+(`wasDeleted`). That is what keeps the rule above true. Never delete a score row any
+other way; a reset clears `deleted_scores` with the rest.
+
 **`tools/pp/` shadows the plain build.** `src/calc/official.ts` prefers it, and a stale copy
 there does not fail loudly -- it answers the *old* protocol and quietly returns values
 calculated the old way. After changing `Program.cs`, run `npm run build:pp:local`, not just
@@ -464,6 +470,42 @@ the app's only outgoing request. A failed check shows nothing: no network, a pri
 repository and a rate limit are all ordinary, and none is a reason to put an error where a
 button would go.
 
+## me! is osu!'s BBCode, and never trusted
+
+`web/js/bbcode.js` is this project's own renderer (osu-web's BBCode library is AGPL; only
+the tag *semantics* are taken). me! can be imported from anyone's osu! profile, so the text
+is treated as hostile: it is escaped first and never parsed as HTML, every tag emitted is
+one written in that file, and every argument reaching an attribute is validated (colours by
+pattern, sizes as numbers, links and images by scheme). A tag that fails, or is never
+closed, stays visible text. Keep all three properties when adding a tag, and add a case to
+`test/bbcode.test.ts`. Pasted images live in `data/about-images/<profile>/`, named by
+content (`src/about-images.ts`); `[img]` accepts only that exact local shape.
+
+## The shared web page is the page itself
+
+Share -> Save as a web page (`web/js/share-copy.js`) saves index.html with its CSS, the
+page's own modules bundled into one script by `web/js/bundle.js`, and a snapshot of the
+API's answers. `web/js/static-mode.js` -- main.js's **first** import -- serves the snapshot
+in place of the app (a stand-in `fetch` and a no-op `EventSource`), so the same code runs
+in both. Two consequences:
+
+- **The page's modules must stay bundleable**: named `import { } from './x.js'` and
+  `export function / async function / const / class` only. The bundler refuses anything
+  else by name (and `export let`, whose live binding it cannot keep); `test/bundle.test.ts`
+  bundles the real page and syntax-checks it, and `npm run ui` loads a real copy and clicks
+  Show more in it.
+- **An image the app serves must go through `assetUrl()`** so the copy can carry it. The copy
+  must never contain install paths or other profiles; share-copy.js strips them.
+
+## Favorites are shared by default
+
+`config.sharedFavorites` (default true) puts every profile on `shared_favorite_beatmapsets`;
+`FavoriteScope` in `src/favorites.ts` picks the table. `syncFavoriteSharing` merges the
+per-profile lists into the shared one when sharing is switched on and copies it back when it
+is switched off, once per switch (recorded in `kv`), so nothing is ever lost. Removing a
+shared favorite removes it from every profile's own list too, so switching off cannot bring
+it back.
+
 ## Design constraints worth preserving
 
 - **No native modules in the Node process.** `node:sqlite` is built in and the LZMA codec
@@ -516,6 +558,11 @@ web/score.html         a score's own page, /scores/<id>; web/js/score-page.js dr
 web/js/score-share.js  copy link, save/copy the card as a PNG, download the replay
 web/js/medals.js       the Medals section and the hover card over any medal
 web/js/audio-player.js the beatmap preview player (card button and corner bar)
+web/js/bbcode.js       osu!'s BBCode for me!, escaped first; the editor lives in main.js
+src/about-images.ts    images pasted into me!, stored by content in data/about-images
+web/js/share-copy.js   Save as a web page: the page, bundled, with an API snapshot
+web/js/static-mode.js  in a saved copy, answers the page's requests from the snapshot
+web/js/bundle.js       the few-line bundler share-copy.js uses
 .github/workflows/release.yml  a v* tag builds win/osx/linux zips onto the release
 src/calc/medals.ts     medals, derived from scores; definitions from osu!'s own list
 src/http/screenshot.ts full-page PNG via an already-installed Chrome/Edge over CDP
