@@ -35,6 +35,11 @@ rollback folder and the unpacked download, around 400MB between them. The rollba
 lasts only as long as the update itself, and the app clears anything left over when it
 starts, including what 1.3.0 left.
 
+**v1.5.0** renames the app **osu! local profiles** (it was *osu! fresh profile*), and brings
+the page closer to osu!'s own: Medals, pp and Total Play Time under the rank graph, a
+Scores section, and a Medals section laid out as osu!'s with its hover card. Installs of
+1.3.0 and 1.4.0 update to it with the button as usual.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

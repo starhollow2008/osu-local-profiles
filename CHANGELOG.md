@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.0 (not yet released)
+## 1.5.0
 
 ### A new name: osu! local profiles
 

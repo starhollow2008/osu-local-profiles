@@ -2,10 +2,10 @@
 
 ## Current work
 
-**v1.4.0 shipped; 1.5.0 is ready but not released.** The app is now **osu! local profiles**
-(it was osu! fresh profile until 1.5.0). **5.18 in the roadmap is unfinished**: the GitHub
-repository rename and a 1.5.0 release carrying *both* zip names -- read it before releasing,
-or 1.3.0/1.4.x installs cannot update. Ongoing work is **Phase 5**, planned in
+**v1.5.0 shipped.** The app is now **osu! local profiles** (it was osu! fresh profile until
+1.5.0), at `github.com/jonathant09/osu-local-profiles`. **Every release must attach both
+zips `npm run package` writes** -- the second, old-named one is what 1.3.0/1.4.x installs
+look for; see roadmap 5.18. Ongoing work is **Phase 5**, planned in
 [docs/roadmap.md](docs/roadmap.md) —
 read it before starting anything new. It holds one entry per feature with its design
 decisions, the files it touches, and a status column that is the resume point if a session
