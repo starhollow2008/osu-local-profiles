@@ -35,6 +35,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.20 | Beatmaps section: Favorite Beatmaps           | done   |
 | 5.21 | View Details (score card) and Download Replay | done   |
 | 5.22 | Floating audio player; pause resumes          | done   |
+| 5.23 | Score links, pages and screenshots            | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1397,3 +1398,54 @@ again carries on from there instead of starting over.
   started the next card; Previous went back.
 - `audioTime` against osu-web's four formats in `test/favorites.test.ts`.
 - A zoomed screenshot of the bar compared with the user's own screenshot of osu!'s.
+
+---
+
+## 5.23 — Score links, score pages and score screenshots
+
+**Status:** done -- not yet released.
+
+**Goal.** From a score's View Details card, **Copy link** to a local address -- the
+equivalent of `osu.ppy.sh/scores/<id>` -- that opens the score on a page of its own; and on
+both the pop-up and that page, **Save screenshot** and **Copy screenshot** of the card.
+
+### Decisions
+
+- **The address is `/scores/<id>`**, osu!'s own shape, using the database's score id. Ids are
+  unique across profiles, as osu!'s are across the site, so no profile is named in it.
+- **The link outlives a profile switch.** The read-only score endpoints (`/api/scores/<id>`,
+  its replay and its screenshot) answer as the profile that *owns* the score (`scoreOwner`),
+  using that profile's settings, name, avatar and banner -- `/api/image/*` takes `?profile=`
+  for that. Changing things stays with the active profile, so the page offers Pin only when
+  the score is the active profile's (`owner.active`).
+- **One page for every id**: the server maps `/scores/<digits>` to `web/score.html`, which
+  reads the id from its own address. It carries osu-web's HeaderV4 title for the score page,
+  "performance", a link back to the profile, the card, and the card's menu. Its title is
+  osu-web's `:username on :title [:version]`. The whole page is hue 200, as osu!'s is.
+- **The screenshot is rendered server-side by the installed Chrome/Edge**, the profile PNG's
+  mechanism, from `/scores/<id>?export=1` (the page with its header and buttons off). A
+  browser-side capture was ruled out: the cover is on `assets.ppy.sh`, and a cross-origin
+  image cannot be read back out of a canvas, so the picture would lose the art -- and it would
+  need a library this project does not ship. `capture()` gained `selector`, which sets the
+  viewport to exactly the width asked for (a window of 1000px lost 18px to its frame) and
+  crops to the element: the card comes out at osu!'s **1000px**, nothing around it.
+- **Captures are queued.** Each one starts a throwaway browser on the same debugging port, so
+  two at once (Save then Copy) would collide; the profile PNG shares the queue.
+- **Copying the image hands the clipboard a promise** (`new ClipboardItem({'image/png':
+  promise})`), so the copy still belongs to the click even though the render takes seconds.
+  A browser without image clipboard support is told to use Save instead. Copy link falls
+  back to `execCommand('copy')`.
+- **The PNG is named like the replay** (lazer's export name, `.png`), so the two sort together.
+- **Sharing lives in the card's menu only**, pop-up and page -- the row menu is unchanged, as
+  asked. `web/js/score-share.js` holds all four actions for both.
+
+### What was checked
+
+- `test/score-details.test.ts`: the page route, a non-digit id refused, the owner and replay
+  still answering after `setActiveProfile` moves to another profile (`active: false`), and a
+  removed score's page, detail and screenshot all 404.
+- `npm run ui` **228/228**: the card's menu has the three items and the link serves the page.
+- In a real browser with clipboard permission, from the page *and* the pop-up: Copy link put
+  `http://localhost:7272/scores/42` on the clipboard, Copy screenshot a **1000x529 PNG**, Save
+  screenshot a file named like the replay; the row menu showed none of them. The profile's
+  own PNG still renders after the `capture()` change. The page checked at phone width.

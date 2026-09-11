@@ -70,6 +70,7 @@ allows redistribution.
 | medals | `.medals` | `profile-page/medals.tsx`, `bem/profile-badges.less` |
 | floating audio player | `#audioPlayer`, `.audio-player` | `core/osu-audio/main.ts`, `bem/audio-player.less`, `bem/audio-player-floating.less` |
 | score row menu | `#playMenu` | `components/play-detail-menu.tsx` |
+| score page | `web/score.html`, `web/js/score-page.js` | `scores-show/main.tsx`, `components/header-v4.tsx` |
 | View Details card | `#scoreModal`, `web/js/score-card.js` | `scores-show/*.tsx`, `bem/score-{beatmap,info,tower,dial,player,buttons,stats}.less`, `bem/user-card.less`, `bem/legacy-rank.less`, `utils/score-helper.ts` |
 
 ## Known deltas
@@ -95,10 +96,13 @@ a bug, not a decision.
 - **Customised-mod cog** sits inside the badge instead of overhanging its top-right corner,
   because each badge is its own SVG and overhanging would make a customised mod a different
   size from its neighbours.
-- **The score card is a card, not a page.** osu! opens a score at `/scores/<id>`; here it
-  is a dialog over the profile, so closing it leaves the page as it was. It drops osu-web's
-  site header, and it is re-hued to 200 (osu-web's `section_to_hue_map` puts scores under
-  *beatmaps*), which is why it is blue on a pink page -- as the real one is.
+- **View Details is a card first, and a page second.** osu! opens a score at
+  `/scores/<id>`; here View Details is a dialog over the profile, so closing it leaves the
+  page as it was, and the same card is also served on a page of its own at `/scores/<id>`
+  (the card's Copy link). Neither has osu-web's site navigation; the page keeps only its
+  HeaderV4 title, "performance". Both are re-hued to 200 (osu-web's `section_to_hue_map`
+  puts scores under *beatmaps*), which is why the pop-up is blue on a pink page -- as the
+  real one is.
 - **The score card's Global Rank and "Watched" rows** are left out: both are facts about
   osu!'s leaderboards. The user card's online dot says whether the profile is tracking.
 - **A stable score's big grade letter** is osu-web's `legacy-ranking-*.png`, stable's

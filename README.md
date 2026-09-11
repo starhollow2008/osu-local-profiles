@@ -445,6 +445,14 @@ Two things from osu!'s page are not there, because they are facts about osu!'s l
 and a local profile has none: the score's **Global Rank**, and how many times the replay was
 **watched**.
 
+**Every score has its own page**, as on osu!: `http://localhost:7272/scores/<number>`, this
+app's version of `osu.ppy.sh/scores/<number>`. The card's **⋯** menu -- in the pop-up and on
+that page -- has **Copy link** for the address, and **Save screenshot** / **Copy screenshot**
+for the card as a picture, to your downloads or straight to the clipboard. The picture is
+made by the Chrome or Edge already on your computer, the same way the profile's screenshot
+is, which is what lets it include the beatmap's cover art. A link keeps working after you
+switch profiles; it shows the score as the profile it belongs to.
+
 **Download Replay** saves the score's replay to your Downloads folder like any download --
 the exact file osu! wrote, so it can be dragged back into osu! to watch. It is named the way
 osu!lazer names a replay it exports, e.g. `Tangy playing Taylor Swift - Cruel Summer (funny)

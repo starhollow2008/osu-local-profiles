@@ -134,6 +134,12 @@ export interface ScreenshotOptions {
   /** Debugging port for the throwaway browser instance. */
   port?: number;
   width?: number;
+  /**
+   * Crop to this element instead of taking the whole page. The viewport is then set to
+   * exactly `width` CSS pixels, rather than a window of that size whose frame takes some of
+   * it -- a score card is laid out for osu!'s 1000px and should be captured at 1000px.
+   */
+  selector?: string;
 }
 
 /**
@@ -194,6 +200,15 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
 
     devtools = await Devtools.connect(target.webSocketDebuggerUrl);
 
+    if (options.selector) {
+      await devtools.send('Emulation.setDeviceMetricsOverride', {
+        width,
+        height: 1000,
+        deviceScaleFactor: 1,
+        mobile: false,
+      });
+    }
+
     /*
      * The page renders from three fetches and then draws its charts, so there is no single
      * event that means "done". Poll for the marker the page sets once it has painted, and
@@ -210,20 +225,35 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
     // Cover art and medal icons are remote and load after the markup does.
     await sleep(1200);
 
-    const metrics = (await devtools.send('Page.getLayoutMetrics')) as {
-      result?: { cssContentSize?: { width: number; height: number } };
-    };
-    const size = metrics.result?.cssContentSize ?? { width, height: 2000 };
+    let clip: { x: number; y: number; width: number; height: number };
+    if (options.selector) {
+      const box = (await devtools.send('Runtime.evaluate', {
+        expression: `(() => {
+          const r = document.querySelector(${JSON.stringify(options.selector)})?.getBoundingClientRect();
+          return r ? { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height } : null;
+        })()`,
+        returnByValue: true,
+      })) as { result?: { result?: { value?: typeof clip | null } } };
+      const value = box.result?.result?.value;
+      if (!value || value.width === 0) throw new Error('the page drew nothing to capture');
+      clip = value;
+    } else {
+      const metrics = (await devtools.send('Page.getLayoutMetrics')) as {
+        result?: { cssContentSize?: { width: number; height: number } };
+      };
+      const size = metrics.result?.cssContentSize ?? { width, height: 2000 };
+      clip = { x: 0, y: 0, width: size.width, height: size.height };
+    }
 
     const shot = (await devtools.send('Page.captureScreenshot', {
       format: 'png',
       captureBeyondViewport: true,
       clip: {
-        x: 0,
-        y: 0,
-        width: Math.ceil(size.width),
+        x: Math.floor(clip.x),
+        y: Math.floor(clip.y),
+        width: Math.ceil(clip.width),
         // Chrome refuses very tall captures; 20,000px is far beyond any real profile.
-        height: Math.min(20_000, Math.ceil(size.height)),
+        height: Math.min(20_000, Math.ceil(clip.height)),
         scale: 1,
       },
     })) as { result?: { data?: string } };

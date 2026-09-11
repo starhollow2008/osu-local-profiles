@@ -478,6 +478,8 @@ src/settings.ts        per-profile settings, stored one row per key
 src/tracker/recompute.ts  recalculate stored scores in place from their replays
 src/scores.ts          pin, order pins, remove a score (a hide); View Details data, replay download
 web/js/score-card.js   View Details: osu!'s score page as a card (dial, tower, stats)
+web/score.html         a score's own page, /scores/<id>; web/js/score-page.js drives it
+web/js/score-share.js  copy link, save/copy the card as a PNG, download the replay
 src/calc/medals.ts     medals, derived from scores; definitions from osu!'s own list
 src/http/screenshot.ts full-page PNG via an already-installed Chrome/Edge over CDP
 src/identity.ts        per-profile avatar and banner files in data/

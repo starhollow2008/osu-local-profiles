@@ -4055,3 +4055,76 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
 .audio-player[data-audio-autoplay="1"] .audio-player__autoplay-button {
   opacity: 1;
 }
+
+/* ======================================================================== */
+/* A score's own page: /scores/<id>                                          */
+/* ======================================================================== */
+
+/*
+ * The View Details card on a page of its own, under osu-web's HeaderV4 title for it
+ * ("performance"). The whole page is hue 200, osu!'s beatmaps section, as the real score page
+ * is: `.hue-scope` on <body> re-derives every token from it.
+ */
+.score-show {
+  --base-hue: 200;
+}
+
+.score-show__page {
+  max-width: var(--container);
+  margin: 20px auto 40px;
+}
+
+.score-show__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px var(--gutter);
+  background-color: hsl(var(--hsl-b5));
+  border-radius: var(--radius-large) var(--radius-large) 0 0;
+}
+
+.score-show__title {
+  font-size: var(--fs-large);
+}
+
+.score-show__back {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal-2);
+}
+
+.score-modal--page {
+  max-height: none;
+  overflow: visible;
+  border-radius: 0 0 var(--radius-large) var(--radius-large);
+  box-shadow: none;
+}
+
+/* Narrower than the page: edge to edge, as osu!'s is. */
+@media (max-width: 1040px) {
+  .score-show__page {
+    margin: 0;
+  }
+
+  .score-show__header,
+  .score-modal--page {
+    border-radius: 0;
+  }
+}
+
+/*
+ * What the screenshot renders: the card alone, square-cornered, with nothing to press.
+ * The page's controls mean nothing in a picture.
+ */
+.export-mode.score-show .score-show__page {
+  margin: 0;
+}
+
+.export-mode .score-show__header,
+.export-mode .score-info__item--buttons {
+  display: none;
+}
+
+.export-mode .score-modal--page {
+  border-radius: 0;
+}

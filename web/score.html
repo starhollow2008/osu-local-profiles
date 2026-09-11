@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>score | osu! local profiles</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/base.css">
+<link rel="stylesheet" href="/css/profile.css">
+</head>
+<!--
+  A score's own page: this app's `osu.ppy.sh/scores/<id>`. The same card as View Details,
+  built by web/js/score-card.js. The whole page takes osu!'s beatmaps hue (200), as the real
+  score page does. `?export=1` is the page with its controls off, which is what the
+  screenshot renders.
+-->
+<body class="score-show hue-scope">
+
+<div class="score-show__page">
+  <header class="score-show__header">
+    <!-- osu-web's HeaderV4 title for this page. -->
+    <h1 class="score-show__title">performance</h1>
+    <a class="score-show__back" href="/" id="scoreBack">&lsaquo; back to the profile</a>
+  </header>
+
+  <div class="score-modal score-modal--page" id="scoreCard">
+    <div class="score-modal__loading">Loading&hellip;</div>
+  </div>
+</div>
+
+<!-- The card's ⋯ menu, as the profile's #playMenu is: one popover, placed in window coordinates. -->
+<div class="play-menu" id="scoreMenu" role="menu" hidden>
+  <button type="button" data-act="pin" role="menuitem">Pin to profile</button>
+  <button type="button" data-act="unpin" role="menuitem">Unpin</button>
+  <button type="button" data-act="copy-link" role="menuitem">Copy link</button>
+  <button type="button" data-act="save-image" role="menuitem">Save screenshot</button>
+  <button type="button" data-act="copy-image" role="menuitem">Copy screenshot</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="/js/score-page.js"></script>
+</body>
+</html>

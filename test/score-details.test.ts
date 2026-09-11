@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { openDb, getOrCreateProfile } from '../src/db/index.ts';
-import { createProfile } from '../src/profiles.ts';
+import { createProfile, setActiveProfile } from '../src/profiles.ts';
 import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { Tracker } from '../src/tracker/index.ts';
 import { startServer } from '../src/http/server.ts';
@@ -355,5 +355,37 @@ test('the page can read a score and download its replay', async () => {
     assert.equal((await fetch(`${base}/api/scores/999999`)).status, 404);
     // The route takes an id and nothing else; a path in the URL is simply not a route.
     assert.equal((await fetch(`${base}/api/scores/..%2F..%2Fdata/replay`)).status, 404);
+  });
+});
+
+/*
+ * A score's own page, `/scores/<id>` -- this app's `osu.ppy.sh/scores/<id>`. Its link is
+ * copied to be pasted later, so it has to keep working after the page switches profile.
+ */
+test("a score's link is its own page, and outlives a profile switch", async () => {
+  await withServer(async (base, h) => {
+    const id = h.add({ replay: h.replay('mine.osr') });
+
+    const page = await fetch(`${base}/scores/${id}`);
+    assert.equal(page.status, 200);
+    assert.match(await page.text(), /score-page\.js/);
+    assert.equal((await fetch(`${base}/scores/abc`)).status, 404);
+
+    type Answer = { score: { id: number }; owner: { id: number; name: string; active: boolean; avatar: string | null } };
+    const before = (await (await fetch(`${base}/api/scores/${id}`)).json()) as Answer;
+    assert.deepEqual([before.owner.name, before.owner.active], ['Tangy', true]);
+
+    // Switch to another profile: the score still answers, as Tangy's, and says it is not active.
+    const other = createProfile(h.db, 'Other').id;
+    setActiveProfile(h.db, other);
+    const after = (await (await fetch(`${base}/api/scores/${id}`)).json()) as Answer;
+    assert.equal(after.score.id, id);
+    assert.deepEqual([after.owner.id, after.owner.name, after.owner.active], [h.profileId, 'Tangy', false]);
+    assert.equal((await fetch(`${base}/api/scores/${id}/replay`, { method: 'HEAD' })).status, 200);
+
+    // A removed score has no page to show.
+    applyScoreAction(h.db, h.profileId, id, 'hide');
+    assert.equal((await fetch(`${base}/api/scores/${id}`)).status, 404);
+    assert.equal((await fetch(`${base}/api/scores/${id}/screenshot`)).status, 404);
   });
 });

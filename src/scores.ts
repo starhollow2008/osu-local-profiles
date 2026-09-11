@@ -311,6 +311,20 @@ export function scoreDetail(
   };
 }
 
+/**
+ * Which profile a visible score belongs to.
+ *
+ * A score's link (`/scores/<id>`) has to keep working after the page switches to another
+ * profile -- ids are unique across the whole database, as osu!'s are across its site -- so
+ * the read-only views of a score answer as the profile that owns it, not the active one.
+ */
+export function scoreOwner(db: Db, id: number): number | null {
+  const row = db
+    .prepare(`SELECT s.profile_id FROM scores s WHERE s.id = ? AND ${visibleSql()}`)
+    .get(id) as { profile_id: number } | undefined;
+  return row?.profile_id ?? null;
+}
+
 /* --------------------------------------------------------- Download Replay */
 
 /**

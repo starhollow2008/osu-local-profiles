@@ -80,7 +80,9 @@ import {
   hiddenScores,
   reorderPins,
   replayDownload,
+  replayFileName,
   scoreDetail,
+  scoreOwner,
   type ScoreAction,
 } from '../scores.ts';
 
@@ -175,6 +177,18 @@ export function startServer(opts: ServerOptions): http.Server {
   // told about it -- it just has nothing to put in a toast beyond which map it was.
   opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
+
+  /*
+   * One screenshot at a time. Every capture starts a throwaway browser on the same debugging
+   * port, so two at once -- "Save screenshot" then "Copy screenshot" in quick succession --
+   * would have the second connect to the first's browser, or fail to start at all.
+   */
+  let captures: Promise<unknown> = Promise.resolve();
+  const queueCapture = <T>(job: () => Promise<T>): Promise<T> => {
+    const next = captures.then(job, job);
+    captures = next.catch(() => undefined);
+    return next;
+  };
 
   const json = (res: http.ServerResponse, body: unknown, status = 200) => {
     const text = JSON.stringify(body);
@@ -341,7 +355,10 @@ export function startServer(opts: ServerOptions): http.Server {
     // This profile's avatar or banner, served only if it has one.
     const image = /^\/api\/image\/(avatar|cover)$/.exec(url.pathname);
     if (image && req.method !== 'PUT') {
-      const file = findImage(opts.dataDir, current(), image[1] as ImageKind);
+      // `?profile=` names another profile's, for a score page showing whose score it is.
+      const asked = Number(url.searchParams.get('profile'));
+      const imageProfile = Number.isInteger(asked) && getProfile(opts.db, asked) ? asked : current();
+      const file = findImage(opts.dataDir, imageProfile, image[1] as ImageKind);
       if (!file) {
         res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
         return;
@@ -607,17 +624,76 @@ export function startServer(opts: ServerOptions): http.Server {
      * same question without the file, which is how the page checks before it starts a
      * download that would otherwise fail silently in the browser's download bar.
      */
-    const scoreRoute = /^\/api\/scores\/(\d+)(\/replay)?$/.exec(url.pathname);
+    const scoreRoute = /^\/api\/scores\/(\d+)(\/replay|\/screenshot)?$/.exec(url.pathname);
     if (scoreRoute && (req.method === 'GET' || req.method === 'HEAD')) {
       const id = Number(scoreRoute[1]);
+      // Answered as the profile that owns the score, so its link outlives a profile switch.
+      const ownerId = scoreOwner(opts.db, id);
+      const owner = ownerId === null ? null : getProfile(opts.db, ownerId);
+      if (owner === null) return json(res, { error: `there is no score ${id}` }, 404);
 
       if (!scoreRoute[2]) {
-        const detail = scoreDetail(opts.db, current(), id, rules());
-        return detail ? json(res, { score: detail }) : json(res, { error: `no score ${id} on this profile` }, 404);
+        const detail = scoreDetail(opts.db, owner.id, id, eligibilityOf(settingsFor(owner.id)));
+        if (!detail) return json(res, { error: `there is no score ${id}` }, 404);
+        const images = imageState(opts.dataDir, owner.id);
+        // With no banner of its own, a profile shows its best play's art -- in this mode.
+        const best = images.hasCover
+          ? null
+          : topPlays(opts.db, owner.id, detail.mode, 1, eligibilityOf(settingsFor(owner.id)))[0];
+        return json(res, {
+          score: detail,
+          owner: {
+            id: owner.id,
+            name: owner.name,
+            country: settingsFor(owner.id).country,
+            avatar: images.hasAvatar ? `/api/image/avatar?profile=${owner.id}` : null,
+            cover: images.hasCover
+              ? `/api/image/cover?profile=${owner.id}`
+              : best?.beatmapsetId
+                ? `https://assets.ppy.sh/beatmaps/${best.beatmapsetId}/covers/cover@2x.jpg`
+                : null,
+            active: owner.id === current(),
+            tracking: owner.id === current() && opts.tracker.isTracking,
+          },
+        });
       }
 
-      const player = getProfile(opts.db, current())?.name ?? 'player';
-      const found = replayDownload(opts.db, current(), id, player);
+      /*
+       * The card as a PNG: the score's own page, rendered by an installed browser at osu-web's
+       * 1000px, with the page's controls taken off (`?export=1`). The same mechanism as the
+       * profile's screenshot -- see src/http/screenshot.ts -- queued behind it, because both
+       * drive a throwaway browser on one debugging port.
+       */
+      if (scoreRoute[2] === '/screenshot') {
+        const play = scoreDetail(opts.db, owner.id, id);
+        void queueCapture(() => capture({
+          url: `http://127.0.0.1:${opts.port}/scores/${id}?export=1`,
+          width: 1000,
+          selector: '#scoreCard',
+        }))
+          .then((png) => {
+            // Named as its replay would be, so the two files sort side by side.
+            const name = replayFileName({
+              player: owner.name,
+              artist: play?.artist ?? null,
+              title: play?.title ?? null,
+              creator: play?.creator ?? null,
+              version: play?.version ?? null,
+              playedAt: play?.playedAt ?? Date.now(),
+            }).replace(/\.osr$/, '.png');
+            res.writeHead(200, {
+              'content-type': 'image/png',
+              'content-length': png.length,
+              'content-disposition': attachmentHeader(name),
+              'cache-control': 'no-store',
+            });
+            res.end(req.method === 'HEAD' ? undefined : png);
+          })
+          .catch((e: unknown) => json(res, { error: (e as Error).message }, 503));
+        return;
+      }
+
+      const found = replayDownload(opts.db, owner.id, id, owner.name);
       if ('error' in found) return json(res, { error: found.error }, 404);
 
       fs.stat(found.path, (err, stat) => {
@@ -694,7 +770,7 @@ export function startServer(opts: ServerOptions): http.Server {
     if (url.pathname === '/api/screenshot') {
       void (async () => {
         try {
-          const png = await capture({ url: `http://127.0.0.1:${opts.port}/?export=1` });
+          const png = await queueCapture(() => capture({ url: `http://127.0.0.1:${opts.port}/?export=1` }));
           const stamp = new Date().toISOString().slice(0, 10);
           const profile = getProfile(opts.db, current())!;
           const name = `${profile.name.replace(/[^\w.-]+/g, '-')}-${stamp}.png`;
@@ -1033,7 +1109,15 @@ export function startServer(opts: ServerOptions): http.Server {
     }
 
     // Static files.
-    const rel = url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\/+/, '');
+    /*
+     * A score's own page: this app's `osu.ppy.sh/scores/<id>`. One file for every id; the page
+     * reads the id from its address and asks /api/scores/<id> for the rest.
+     */
+    const rel = url.pathname === '/'
+      ? 'index.html'
+      : /^\/scores\/\d+\/?$/.test(url.pathname)
+        ? 'score.html'
+        : url.pathname.replace(/^\/+/, '');
     const file = path.resolve(webRoot, rel);
     if (!file.startsWith(webRoot)) {
       res.writeHead(403).end('forbidden');

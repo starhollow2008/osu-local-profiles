@@ -12,6 +12,14 @@
 - **Download Replay**, in the same menu and on the card: saves the score's replay to your
   Downloads folder, byte for byte the file osu! wrote, named as osu!lazer names an exported
   replay. Offered whenever osu! recorded a replay for the score.
+- **Every score has its own page**, at `localhost:7272/scores/<number>` -- this app's version of
+  osu!'s `osu.ppy.sh/scores/<number>`. **Copy link** in a score's View Details menu puts the
+  address on the clipboard; paste it into the browser to open the score on a page of its own.
+  The link keeps working after you switch to another profile.
+- **Save screenshot** and **Copy screenshot**, in the same menu on the pop-up and on the
+  score's page: the score card as a picture, cover art and all, saved to your downloads or put
+  straight on the clipboard to paste into a message. Made by the Chrome or Edge already on
+  your computer, as the profile's own screenshot is.
 - **osu!'s audio player bar.** Playing a Favorite Beatmaps preview brings up osu!'s bar in the
   bottom-right corner: previous and next (through your favourites), play / pause, the clip's
   progress and time -- drag it to seek -- a volume slider with mute, and osu!'s "play next

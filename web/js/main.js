@@ -17,6 +17,13 @@ import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
 import { beatmapsPopupContent, favoriteList, previewUrl } from './beatmapsets.js';
 import { scoreCard } from './score-card.js';
 import {
+  cardOwner,
+  copyScoreImage,
+  copyScoreLink,
+  downloadReplay,
+  saveScoreImage,
+} from './score-share.js';
+import {
   aboutHtml,
   activityList,
   beatmapPlaycountList,
@@ -230,17 +237,12 @@ function renderIdentity() {
 function renderCover(top) {
   const el = $('cover');
   if (profile?.hasCover) {
-    coverImage = '/api/image/cover';
     el.style.setProperty('--cover', "url('/api/image/cover')");
     return;
   }
   const url = coverUrl(top?.[0]?.beatmapsetId, 'cover@2x');
-  coverImage = url;
   el.style.setProperty('--cover', url ? `url('${url}')` : 'none');
 }
-
-/** Whatever the header's cover is showing, so the score card's user card can show it too. */
-let coverImage = null;
 
 function renderModes() {
   $('modes').innerHTML = MODE_NAMES.map((name, i) => {
@@ -2256,6 +2258,10 @@ function openPlayMenu(button) {
   // a replay, which an unfinished play never does.
   menu.querySelector('[data-act="details"]').hidden = !isScore || inCard;
   menu.querySelector('[data-act="replay"]').hidden = !isScore || inCard || button.dataset.replay !== '1';
+  // Sharing the score is the details card's: its link is its own page, and the image is it.
+  for (const act of ['copy-link', 'save-image', 'copy-image']) {
+    menu.querySelector(`[data-act="${act}"]`).hidden = !inCard;
+  }
   // Reordering only means something for a pin that has somewhere to go, in the list itself.
   menu.querySelector('[data-act="move-up"]').hidden = !isScore || inCard || !pinned || index <= 0;
   menu.querySelector('[data-act="move-down"]').hidden =
@@ -2298,7 +2304,19 @@ $('playMenu').onclick = async (e) => {
     return;
   }
   if (act === 'replay') {
-    void downloadReplay(id);
+    void downloadReplay(id, toast);
+    return;
+  }
+  if (act === 'copy-link') {
+    void copyScoreLink(id, toast);
+    return;
+  }
+  if (act === 'save-image') {
+    void saveScoreImage(id, toast);
+    return;
+  }
+  if (act === 'copy-image') {
+    void copyScoreImage(id, toast);
     return;
   }
   if (act === 'favorite' || act === 'unfavorite') {
@@ -2339,20 +2357,6 @@ $('playMenu').onclick = async (e) => {
  */
 let scoreCardId = null;
 
-function scoreCardOwner() {
-  const code = profile?.country ? profile.country.toUpperCase() : '';
-  return {
-    name: profile?.name ?? '',
-    avatar: profile?.hasAvatar
-      ? `<img src="/api/image/avatar" alt="">`
-      : generatedAvatar(profile?.name ?? ''),
-    country: code,
-    countryName: code ? countryName(code) : '',
-    cover: coverImage,
-    tracking,
-  };
-}
-
 async function openScoreCard(id) {
   const opening = scoreCardId !== id;
   scoreCardId = id;
@@ -2367,7 +2371,7 @@ async function openScoreCard(id) {
     if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
     // Closed, or another score opened, while this one was on its way.
     if (scoreCardId !== id) return;
-    $('scoreCard').innerHTML = scoreCard(d.score, scoreCardOwner());
+    $('scoreCard').innerHTML = scoreCard(d.score, cardOwner(d.owner));
   } catch (err) {
     if (scoreCardId !== id) return;
     closeScoreCard();
@@ -2392,40 +2396,11 @@ $('scoreModal').querySelector('.score-modal').addEventListener('scroll', () => {
   if (!$('playMenu').hidden) closePlayMenu();
 });
 
-/*
- * Download Replay: the replay file, saved by the browser like any download.
- *
- * Asked about first, because a download that fails is reported only in the browser's own
- * download list -- "Failed - No file" -- and never on the page. A replay can vanish from
- * under a score: osu! owns that file and may delete it.
- */
-async function downloadReplay(id) {
-  const url = `/api/scores/${id}/replay`;
-  try {
-    const head = await fetch(url, { method: 'HEAD' });
-    if (!head.ok) {
-      // HEAD carries no body; the same request as a GET says why.
-      const d = await fetch(url).then((r) => r.json()).catch(() => ({}));
-      throw new Error(d.error ?? 'the replay could not be downloaded');
-    }
-  } catch (err) {
-    toast(err.message);
-    return;
-  }
-  const a = document.createElement('a');
-  a.href = url;
-  // Empty: the server's Content-Disposition names the file, as lazer names an exported one.
-  a.download = '';
-  document.body.append(a);
-  a.click();
-  a.remove();
-}
-
 document.addEventListener('click', (e) => {
   const link = e.target.closest('[data-replay-download]');
   if (!link) return;
   e.preventDefault();
-  void downloadReplay(Number(link.dataset.replayDownload));
+  void downloadReplay(Number(link.dataset.replayDownload), toast);
 });
 
 /*

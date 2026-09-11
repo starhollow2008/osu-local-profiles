@@ -1022,7 +1022,9 @@ if (offered === null) {
   for (const name of ['the menu offers View Details', 'and Download Replay exactly when there is one',
     'View Details opens the card', "it is osu!'s page, 1000px at most", 'the dial or letter is 200px',
     "the grade tower is osu!'s 32x16 badges", "it takes osu!'s beatmaps hue, not the profile's",
-    "its own menu has neither View Details nor Download Replay", 'Escape closes that menu first',
+    "its own menu has neither View Details nor Download Replay",
+    'and has Copy link, Save screenshot and Copy screenshot', "the link is the score's own page",
+    'Escape closes that menu first',
     'a second Escape closes the card', 'clicking beside the card closes it', 'the X closes it',
     'the replay is there to download']) check(name, SKIP);
 } else {
@@ -1072,6 +1074,21 @@ if (offered === null) {
       const menu = document.getElementById('playMenu');
       if (getComputedStyle(menu).display === 'none') return 'did not open';
       return menu.querySelector('[data-act=details]').hidden && menu.querySelector('[data-act=replay]').hidden;
+    })()`),
+    true,
+  );
+  check(
+    'and has Copy link, Save screenshot and Copy screenshot',
+    await evaluate(`[...document.querySelectorAll('#playMenu [data-act]')]
+      .filter((b) => !b.hidden && /^(copy-link|save-image|copy-image)$/.test(b.dataset.act)).length`),
+    3,
+  );
+  check(
+    "the link is the score's own page",
+    await evaluate(`(async () => {
+      const id = document.querySelector('.score-buttons [data-play-menu]').dataset.id;
+      const r = await fetch('/scores/' + id);
+      return r.ok && (await r.text()).includes('/js/score-page.js');
     })()`),
     true,
   );
