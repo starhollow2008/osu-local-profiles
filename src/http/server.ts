@@ -1,3 +1,4 @@
+import { aboutImageFile, saveAboutImage } from '../about-images.ts';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -556,6 +557,55 @@ export function startServer(opts: ServerOptions): http.Server {
         }
         broadcast('identity', { kind });
         return json(res, { ok: true, ...imageState(opts.dataDir, current()) });
+      });
+      return;
+    }
+
+    /*
+     * Images pasted or dropped into the me! editor. Stored per profile and named by their
+     * content (src/about-images.ts), then served back by that name -- always the same bytes,
+     * so the browser may keep them. The upload is the avatar's: a raw PUT, capped and sniffed.
+     */
+    if (url.pathname === '/api/about-image' && req.method === 'PUT') {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      let aborted = false;
+
+      req.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        size += chunk.length;
+        if (size > MAX_UPLOAD_BYTES) {
+          aborted = true;
+          json(res, { error: 'that image is too large (8MB max)' }, 413);
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      req.on('end', () => {
+        if (aborted) return;
+        try {
+          const saved = saveAboutImage(opts.dataDir, current(), Buffer.concat(chunks));
+          if (saved === null) return json(res, { error: 'that file is not a PNG, JPEG, WebP or GIF' }, 400);
+          return json(res, { ok: true, url: saved });
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 500);
+        }
+      });
+      return;
+    }
+
+    const aboutImage =
+      req.method === 'GET' || req.method === 'HEAD' ? aboutImageFile(opts.dataDir, url.pathname) : null;
+    if (aboutImage) {
+      fs.readFile(aboutImage.file, (err, buf) => {
+        if (err) {
+          res.writeHead(404, { 'content-type': 'text/plain' }).end('not found');
+          return;
+        }
+        res.writeHead(200, { 'content-type': aboutImage.mime, 'cache-control': 'max-age=31536000, immutable' });
+        res.end(req.method === 'HEAD' ? undefined : buf);
       });
       return;
     }

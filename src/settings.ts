@@ -60,9 +60,8 @@ export interface Settings {
   /**
    * The profile's own description -- osu!'s "me!" box.
    *
-   * Plain text. osu! itself accepts BBCode, but a local profile gains nothing from an HTML
-   * sanitiser it would have to get exactly right, so this is escaped on the way out and
-   * rendered with line breaks and autolinked URLs and nothing else.
+   * osu!'s BBCode, stored exactly as it was typed or imported. It is never trusted: the page
+   * renders it with web/js/bbcode.js, which escapes everything and emits only its own tags.
    */
   aboutMe: string;
   /**

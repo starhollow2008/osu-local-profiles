@@ -31,11 +31,11 @@ import {
   saveScoreImage,
 } from './score-share.js';
 import { downloadBlob, hint, postJson, toast } from './ui.js';
+import { bbcodeHtml } from './bbcode.js';
 import { medalFor, renderMedals } from './medals.js';
 import { setPopupCards } from './beatmaps-popup.js';
 import { syncPlayers } from './audio-player.js';
 import {
-  aboutHtml,
   activityList,
   beatmapPlaycountList,
   countingNoteText,
@@ -1112,23 +1112,52 @@ document.addEventListener('dragend', () => {
 /* ------------------------------------------------------------------- me! */
 
 /*
- * The profile's own description, click to edit.
+ * The profile's own description: osu!'s me! box, edited the way osu! edits it.
  *
- * Stored and rendered as **plain text**. osu! itself accepts BBCode, but a local profile
- * gains nothing from an HTML sanitiser it would have to get exactly right, and everything
- * to lose by getting it wrong. So: escape everything, keep the line breaks, and turn bare
- * URLs into links. That is the whole feature.
+ * BBCode, with osu-web's toolbar -- every button wraps the selection exactly as osu-web's
+ * post-box does -- a preview, and images pasted or dropped straight in. Rendered by
+ * web/js/bbcode.js, which escapes everything first and emits only tags of its own, so a page
+ * imported from someone else's osu! profile is as safe to show as one typed here.
  */
+
+/** osu-web's post-box: what each toolbar button puts either side of the selection. */
+const BBCODE_BUTTONS = {
+  bold: ['[b]', '[/b]'],
+  italic: ['[i]', '[/i]'],
+  strikethrough: ['[s]', '[/s]'],
+  heading: ['[heading]', '[/heading]'],
+  link: ['[url]', '[/url]'],
+  spoilerbox: ['[box=]', '[/box]'],
+  'list-numbered': ['[list=1]\n[*]', '[/list]'],
+  list: ['[list]\n[*]', '[/list]'],
+  image: ['[img]', '[/img]'],
+  imagemap: ['[imagemap]\nhttps://example.com/image.jpg\n0 10 10 50 https://example.com example\n', '[/imagemap]'],
+};
+
+/** The same cap the server applies (settings.ts), so the box stops where saving would. */
+const ABOUT_LIMIT = 60000;
 
 let editingAbout = false;
 
 function renderAbout() {
-  const text = settings.aboutMe ?? '';
-  $('aboutView').innerHTML = text
-    ? aboutHtml(text)
+  const html = bbcodeHtml(settings.aboutMe ?? '');
+  $('aboutView').innerHTML = html
+    ? `<div class="bbcode">${html}</div>`
     : '<div class="about__empty">Nothing here yet. Click to write something.</div>';
-  $('aboutView').classList.toggle('about--empty', !text);
+  $('aboutView').classList.toggle('about--empty', !html);
   $('aboutView').title = editingAbout ? '' : 'Click to edit';
+}
+
+/** Write and Preview: osu-web's two states for the same box. */
+function setAboutState(state) {
+  $('aboutEdit').dataset.state = state;
+  $('aboutPreviewToggle').textContent = state === 'preview' ? 'Write' : 'Preview';
+  if (state === 'preview') {
+    const html = bbcodeHtml($('aboutText').value);
+    $('aboutPreview').innerHTML = html || '<div class="about__empty">Nothing to preview yet.</div>';
+  } else {
+    $('aboutText').focus();
+  }
 }
 
 function openAboutEditor() {
@@ -1138,7 +1167,7 @@ function openAboutEditor() {
   updateAboutCount();
   $('aboutView').hidden = true;
   $('aboutEdit').hidden = false;
-  $('aboutText').focus();
+  setAboutState('write');
 }
 
 function closeAboutEditor() {
@@ -1151,12 +1180,93 @@ function closeAboutEditor() {
 function updateAboutCount() {
   const used = $('aboutText').value.length;
   // Only worth mentioning as the limit gets close; a counter on an empty box is noise.
-  $('aboutCount').textContent = used > 3000 ? `${fmt(4000 - used)} characters left` : '';
+  $('aboutCount').textContent = used > ABOUT_LIMIT - 5000 ? `${fmt(ABOUT_LIMIT - used)} characters left` : '';
 }
 
-$('aboutView').onclick = openAboutEditor;
+/**
+ * osu-web's insert: the tags either side of the selection, which stays selected with them;
+ * with nothing selected the cursor lands between the two. Typed through execCommand so the
+ * browser's own undo still works, with setRangeText as the fallback.
+ */
+function insertBbcode(open, close = '') {
+  const box = $('aboutText');
+  const start = box.selectionStart;
+  const end = box.selectionEnd;
+  const selected = box.value.slice(start, end);
+  box.focus();
+  box.setSelectionRange(start, end);
+  const text = open + selected + close;
+  if (!document.execCommand('insertText', false, text)) box.setRangeText(text, start, end, 'end');
+  if (start === end) box.setSelectionRange(start + open.length, start + open.length);
+  else box.setSelectionRange(start, start + text.length);
+  updateAboutCount();
+}
+
+/** Upload images and put each in the text where the cursor is. True if there were any. */
+async function uploadAboutImages(files) {
+  const images = [...files].filter((f) => f.type.startsWith('image/'));
+  if (images.length === 0) return false;
+  for (const file of images) {
+    try {
+      const r = await fetch('/api/about-image', { method: 'PUT', body: file });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error ?? 'upload failed');
+      insertBbcode(`[img]${d.url}[/img]`);
+    } catch (err) {
+      toast(`${file.name || 'That image'}: ${err.message}`);
+    }
+  }
+  return true;
+}
+
+// Links, spoiler boxes and players in the page work as themselves; anywhere else edits.
+$('aboutView').onclick = (e) => {
+  if (e.target.closest('a, summary, audio, iframe')) return;
+  openAboutEditor();
+};
 $('aboutText').oninput = updateAboutCount;
 $('aboutCancel').onclick = closeAboutEditor;
+$('aboutPreviewToggle').onclick = () =>
+  setAboutState($('aboutEdit').dataset.state === 'preview' ? 'write' : 'preview');
+
+$('aboutToolbar').addEventListener('click', (e) => {
+  const button = e.target.closest('[data-bb]');
+  if (!button) return;
+  const box = $('aboutText');
+  // With nothing selected, Image asks for a file; pasting and dropping one work as well.
+  if (button.dataset.bb === 'image' && box.selectionStart === box.selectionEnd) {
+    $('aboutImageFile').value = '';
+    $('aboutImageFile').click();
+    return;
+  }
+  const [open, close] = BBCODE_BUTTONS[button.dataset.bb];
+  insertBbcode(open, close);
+});
+
+// osu-web's size select: choosing wraps the selection, then the select goes back to its label.
+$('aboutSize').onchange = () => {
+  const size = $('aboutSize').value;
+  $('aboutSize').value = '';
+  if (size) insertBbcode(`[size=${size}]`, '[/size]');
+};
+
+$('aboutImageFile').onchange = () => void uploadAboutImages($('aboutImageFile').files ?? []);
+
+$('aboutText').addEventListener('paste', (e) => {
+  const files = [...(e.clipboardData?.files ?? [])];
+  if (!files.some((f) => f.type.startsWith('image/'))) return;
+  e.preventDefault();
+  void uploadAboutImages(files);
+});
+$('aboutText').addEventListener('dragover', (e) => {
+  if ([...(e.dataTransfer?.items ?? [])].some((i) => i.kind === 'file')) e.preventDefault();
+});
+$('aboutText').addEventListener('drop', (e) => {
+  const files = [...(e.dataTransfer?.files ?? [])];
+  if (!files.some((f) => f.type.startsWith('image/'))) return;
+  e.preventDefault();
+  void uploadAboutImages(files);
+});
 
 $('aboutText').onkeydown = (e) => {
   // Escape leaves without saving; the page-wide Escape handler must not also fire.

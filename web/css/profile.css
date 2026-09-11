@@ -4294,3 +4294,322 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
 .pp-calculator__outdated button:hover {
   background-color: hsl(var(--hsl-b2));
 }
+
+/* ======================================================================== */
+/* me!: osu!'s BBCode and its editor (values from osu-web's bbcode.less,     */
+/* bbcode-editor.less, bbcode-spoilerbox.less, imagemap.less, btn-circle)    */
+/* ======================================================================== */
+
+.bbcode {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+/* Links look like links wherever BBCode is shown -- the page and the editor's preview alike. */
+.bbcode a {
+  color: hsl(var(--hsl-l1));
+  text-decoration: underline;
+}
+
+.bbcode h2 {
+  margin: 0;
+  font-size: 1.5em;
+  font-weight: 700;
+  color: hsl(var(--hsl-l1));
+}
+
+.bbcode blockquote {
+  position: relative;
+  margin: 0;
+  padding: 0 0 0 20px;
+  color: hsl(var(--hsl-c2, var(--hsl-c1)));
+}
+
+.bbcode blockquote::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  border-radius: 10000px;
+  background-color: currentColor;
+}
+
+.bbcode blockquote h4 {
+  margin: 0 0 10px;
+  font-size: inherit;
+  color: hsl(var(--hsl-c1));
+}
+
+.bbcode img {
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.bbcode ol,
+.bbcode ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-position: outside;
+}
+
+.bbcode ul {
+  list-style-type: disc;
+}
+
+.bbcode pre {
+  margin: 0;
+  padding: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  background-color: hsl(var(--hsl-b5));
+  font: inherit;
+}
+
+.bbcode code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background-color: hsl(var(--hsl-b5));
+}
+
+.bbcode .spoiler {
+  background-color: #000;
+  color: #000;
+}
+
+.bbcode__align-centre,
+.bbcode__align-right {
+  text-align: center;
+}
+
+.bbcode__align-right {
+  text-align: right;
+}
+
+.bbcode__align-centre :is(ol, ul),
+.bbcode__align-right :is(ol, ul) {
+  padding-left: 0;
+  list-style-position: inside;
+}
+
+.bbcode__align-left {
+  text-align: left;
+}
+
+.bbcode__notice {
+  padding: 10px;
+  border: 2px solid hsl(var(--hsl-b1));
+  border-radius: 4px;
+  background-color: hsl(var(--hsl-b5));
+}
+
+.bbcode__youtube {
+  display: block;
+  width: 100%;
+  max-width: 640px;
+  aspect-ratio: 16 / 9;
+  border: 0;
+}
+
+.bbcode audio {
+  max-width: 100%;
+}
+
+.bbcode-spoilerbox > summary {
+  display: inline-flex;
+  max-width: 100%;
+  font-weight: 700;
+  color: hsl(var(--hsl-l1));
+  list-style: none;
+  cursor: pointer;
+}
+
+.bbcode-spoilerbox > summary::-webkit-details-marker {
+  display: none;
+}
+
+.bbcode-spoilerbox > summary::before {
+  content: "\203A";
+  flex: none;
+  width: 20px;
+  color: hsl(var(--hsl-c1));
+  transition: transform 0.12s;
+  transform-origin: 4px 50%;
+}
+
+.bbcode-spoilerbox[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.bbcode-spoilerbox > summary:hover {
+  text-decoration: underline;
+}
+
+.bbcode-spoilerbox__body {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+.imagemap {
+  position: relative;
+  display: inline-block;
+  max-width: max-content;
+  overflow: hidden;
+}
+
+.imagemap__image {
+  display: block;
+  max-width: 100%;
+}
+
+.imagemap__link {
+  position: absolute;
+  display: block;
+}
+
+/* --- the editor --------------------------------------------------------- */
+
+.bbcode-editor__body {
+  min-height: 300px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace !important;
+  font-size: 14px !important;
+}
+
+.bbcode-editor__preview {
+  display: none;
+}
+
+.bbcode-editor[data-state="preview"] .bbcode-editor__body,
+.bbcode-editor[data-state="preview"] .bbcode-editor__toolbar {
+  display: none;
+}
+
+.bbcode-editor[data-state="preview"] .bbcode-editor__preview {
+  display: block;
+  min-height: 150px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding: 6px 0;
+}
+
+.bbcode-editor__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.bbcode-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+}
+
+/* osu-web's btn-circle--bbcode: a 30px circle, transparent until hovered. */
+.bbcode-editor__button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: hsl(var(--hsl-c1));
+  font-size: 13px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+  transition: background-color 120ms ease-in-out;
+}
+
+.bbcode-editor__button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.bbcode-editor__button svg {
+  width: 14px;
+  height: 14px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.bbcode-editor__glyph {
+  font: 900 14px/1 Georgia, "Times New Roman", serif;
+  text-decoration: none;
+}
+
+i.bbcode-editor__glyph {
+  font-style: italic;
+}
+
+s.bbcode-editor__glyph {
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+/* osu-web's bbcode-size-select: a pill on b2 with its label and a chevron. */
+.bbcode-size-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 30px;
+  margin: 2px;
+  padding: 5px 10px 5px 12px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b2));
+  color: hsl(var(--hsl-c1));
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  cursor: pointer;
+}
+
+.bbcode-size-select__chevron {
+  width: 12px;
+  height: 12px;
+}
+
+.bbcode-size-select__select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.bbcode-editor__help {
+  margin: 0 10px;
+  font-size: 14px;
+  color: hsl(var(--hsl-l1));
+}
+
+.bbcode-editor__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* Cancel and Preview in osu!'s blue, Save in its green: pills, as the forum buttons are. */
+.bbcode-editor__action {
+  min-width: 96px;
+  padding: 9px 18px;
+  border-radius: 10000px;
+  background-color: hsl(200, 60%, 50%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bbcode-editor__action:hover:not(:disabled) {
+  background-color: hsl(200, 70%, 60%);
+}
+
+.bbcode-editor__action--save {
+  background-color: hsl(88, 55%, 48%);
+}
+
+.bbcode-editor__action--save:hover:not(:disabled) {
+  background-color: hsl(88, 60%, 56%);
+}

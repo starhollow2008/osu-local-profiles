@@ -714,14 +714,11 @@ check(
 );
 
 /*
- * The description is plain text, escaped on the way out. Markup typed into it must render
- * as the characters it is -- avoiding an HTML sanitiser is the entire reason it is not
- * BBCode, so this is the check that keeps that decision honest.
+ * me! is osu!'s BBCode, rendered by web/js/bbcode.js. Anything that is not one of its tags
+ * must render as the characters it is: HTML typed or imported into it never becomes HTML.
  */
 const aboutFor = (text) =>
-  evaluate(
-    "import('/js/sections.js').then((m) => m.aboutHtml(" + JSON.stringify(text) + "))",
-  );
+  evaluate("import('/js/bbcode.js').then((m) => m.bbcodeHtml(" + JSON.stringify(text) + '))');
 
 const hostile = await aboutFor('<script>alert(1)</script> & <b>bold</b>');
 check('a script tag is escaped, not rendered', hostile.includes('<script>'), false);
@@ -729,13 +726,13 @@ check('and survives as visible text', hostile.includes('&lt;script&gt;'), true);
 check('an ampersand is escaped once', hostile.includes('&amp;'), true);
 
 const paragraphs = await aboutFor('one' + String.fromCharCode(10, 10) + 'two');
-check('a blank line starts a new paragraph', paragraphs, '<p>one</p><p>two</p>');
+check('a blank line is two line breaks, as on osu!', paragraphs, 'one<br><br>two');
 const lineBreak = await aboutFor('one' + String.fromCharCode(10) + 'two');
-check('a single newline is a line break', lineBreak, '<p>one<br>two</p>');
+check('a single newline is a line break', lineBreak, 'one<br>two');
 
 const link = await aboutFor('see https://osu.ppy.sh/users/2 for more');
 check('a bare URL becomes a link', link.includes('href="https://osu.ppy.sh/users/2"'), true);
-check('and it opens safely', link.includes('rel="noreferrer noopener"'), true);
+check('and it opens safely', link.includes('noopener'), true);
 /*
  * Typed anchor markup: the URL inside it is a URL the user wrote, so linking it is the
  * honest plain-text behaviour. What must never happen is the surrounding markup becoming
@@ -759,6 +756,72 @@ check(
 check('and it is still shown', punctuated.includes('</a>, then stop.'), true);
 
 check('nothing at all renders as nothing', await aboutFor(''), '');
+check('a link that could run something stays text', (await aboutFor('[url=javascript:alert(1)]x[/url]')).includes('<a'), false);
+
+console.log('\nme! editor');
+check(
+  "the toolbar is osu!'s, in its order",
+  await evaluate("[...document.querySelectorAll('#aboutToolbar [data-bb]')].map((b) => b.dataset.bb).join(' ')"),
+  'bold italic strikethrough heading link spoilerbox list-numbered list image imagemap',
+);
+check(
+  'then Font Size and Help',
+  await evaluate(`JSON.stringify([
+    [...document.querySelectorAll('#aboutSize option')].filter((o) => o.value).map((o) => o.textContent + ' ' + o.value).join(', '),
+    document.querySelector('#aboutToolbar .bbcode-editor__help').textContent.trim(),
+  ])`),
+  JSON.stringify(['Tiny 50, Small 85, Normal 100, Large 150', 'Help']),
+);
+check(
+  'Bold wraps the selection and keeps it selected, as osu! does',
+  await evaluate(`(() => {
+    document.getElementById('aboutView').click();
+    const box = document.getElementById('aboutText');
+    box.value = 'say hello';
+    box.setSelectionRange(4, 9);
+    document.querySelector('#aboutToolbar [data-bb="bold"]').click();
+    const out = JSON.stringify([box.value, box.value.slice(box.selectionStart, box.selectionEnd)]);
+    document.getElementById('aboutCancel').click();
+    return out;
+  })()`),
+  JSON.stringify(['say [b]hello[/b]', '[b]hello[/b]']),
+);
+check(
+  'with nothing selected the cursor lands between the tags',
+  await evaluate(`(() => {
+    document.getElementById('aboutView').click();
+    const box = document.getElementById('aboutText');
+    box.value = '';
+    box.setSelectionRange(0, 0);
+    document.querySelector('#aboutToolbar [data-bb="heading"]').click();
+    const out = JSON.stringify([box.value, box.selectionStart]);
+    document.getElementById('aboutCancel').click();
+    return out;
+  })()`),
+  JSON.stringify(['[heading][/heading]', 9]),
+);
+check(
+  'Preview shows the page, and hides the text and toolbar',
+  await evaluate(`(() => {
+    document.getElementById('aboutView').click();
+    document.getElementById('aboutText').value = '[b]x[/b]';
+    document.getElementById('aboutPreviewToggle').click();
+    const out = JSON.stringify([
+      document.getElementById('aboutPreview').innerHTML,
+      getComputedStyle(document.getElementById('aboutText')).display,
+      getComputedStyle(document.getElementById('aboutToolbar')).display,
+      document.getElementById('aboutPreviewToggle').textContent,
+    ]);
+    document.getElementById('aboutCancel').click();
+    return out;
+  })()`),
+  JSON.stringify(['<strong>x</strong>', 'none', 'none', 'Write']),
+);
+check(
+  'Save is the green one',
+  await evaluate("parseInt(getComputedStyle(document.getElementById('aboutSave')).backgroundColor.split(',')[1], 10) > 150"),
+  true,
+);
 
 console.log('\nedit profile dialog');
 check('the identity dialog is hidden on load', await shown('identityModal'), 'none');
