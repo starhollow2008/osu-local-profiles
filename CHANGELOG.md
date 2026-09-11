@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.7.0
 
 - **Beatmaps: Favorite Beatmaps**, the section from osu!'s own profile page. Favourite any
   beatmap from the **...** menu on a row in Scores or Recent Plays, and it appears as osu!'s

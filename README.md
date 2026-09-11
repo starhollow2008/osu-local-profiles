@@ -44,6 +44,11 @@ download a newer version once by hand; from 1.5.0 the update button works as usu
 all along and on Windows never did, and adds **Options -> Open in browser on start** to turn
 that off.
 
+**v1.7.0** adds the **Beatmaps** section with **Favorite Beatmaps**: osu!'s own beatmap cards,
+favourited from the menu on any score, with the difficulty popup, audio preview, and the
+Explicit / Featured Artist / Spotlight badges. The rank graph band is osu!'s darker hue, and
+Medals moves to the bottom of the page by default.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
