@@ -1123,7 +1123,9 @@ or 1.4.x install is gone, and the second file costs nothing but upload time.
 
 ## 5.19 — Open in browser on start, and a menu toggle
 
-**Status: done** -- released as 1.6.0.
+**Status: done** -- released as 1.6.0 (2026-09-11). A genuine 1.5.0 install updated itself
+to the published 1.6.0 with the button, **14/14**: back on its own port and profile name,
+canary in `data/` intact, `openBrowser` read from its own config, no rollback left.
 
 Asked for as a new feature: launching the app should open the page in the default browser,
 with an option in the Options menu, on by default.
