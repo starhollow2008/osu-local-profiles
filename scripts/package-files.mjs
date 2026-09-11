@@ -97,7 +97,7 @@ function howToStart(hostOs) {
     '',
     'If it will not run, the executable bit was lost in transit. Restore it with:',
     '',
-    '    chmod +x start.sh node',
+    '    chmod +x start.sh node tools/pp/osu-pp',
   ];
 }
 
@@ -119,8 +119,8 @@ export function readmeFor(hostOs) {
     'move or copy the whole folder and your profiles come with it. Deleting "data" resets',
     'the app to a clean slate.',
     '',
-    'The first run takes about a minute while it indexes your local beatmaps.',
-    'Later runs start immediately.',
+    'The first run reads your local beatmaps once, in the background: the page opens at',
+    'once and shows how far it has got. Later runs only look for new beatmaps.',
     '',
     'Settings are in data/config.json (profile name, port, country, tagline).',
     '',

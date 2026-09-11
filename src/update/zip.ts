@@ -33,7 +33,16 @@ export interface ZipEntry {
   compressedSize: number;
   size: number;
   localHeaderOffset: number;
+  /**
+   * The Unix permission bits, when a Unix `zip` wrote the archive; null otherwise. A macOS or
+   * Linux release is zipped there, and its runtime, launcher and pp helper only run because
+   * this says they are executable -- unpacked without it, an update would relaunch nothing.
+   */
+  mode: number | null;
 }
+
+/** "Version made by" names the host in its high byte; 3 is Unix, where the attributes are a mode. */
+const UNIX_HOST = 3;
 
 function findEndOfCentralDirectory(buf: Buffer): number {
   // The record is 22 bytes plus a comment of up to 64KB, so this is the whole search space.
@@ -89,12 +98,14 @@ export function readZipEntries(buf: Buffer): ZipEntry[] {
       throw new Error(`corrupt central directory at entry ${i + 1} of ${count}`);
     }
 
+    const madeBy = buf.readUInt16LE(offset + 4) >> 8;
     const method = buf.readUInt16LE(offset + 10);
     const compressedSize = buf.readUInt32LE(offset + 20);
     const size = buf.readUInt32LE(offset + 24);
     const nameLength = buf.readUInt16LE(offset + 28);
     const extraLength = buf.readUInt16LE(offset + 30);
     const commentLength = buf.readUInt16LE(offset + 32);
+    const external = buf.readUInt32LE(offset + 38);
     const localHeaderOffset = buf.readUInt32LE(offset + 42);
     const raw = buf.toString('utf8', offset + 46, offset + 46 + nameLength);
 
@@ -108,6 +119,8 @@ export function readZipEntries(buf: Buffer): ZipEntry[] {
       compressedSize,
       size,
       localHeaderOffset,
+      // The mode sits in the top 16 bits; only the permission bits are taken from it.
+      mode: madeBy === UNIX_HOST && external >>> 16 !== 0 ? (external >>> 16) & 0o777 : null,
     });
 
     offset += 46 + nameLength + extraLength + commentLength;
@@ -171,6 +184,8 @@ export function extractZip(file: string, dest: string, stripComponents = 0): num
       throw new Error(`${entry.name} unpacked to ${data.length} bytes, expected ${entry.size}`);
     }
     fs.writeFileSync(target, data);
+    // Windows has no execute bit to set, and a Windows-built archive carries no mode anyway.
+    if (entry.mode !== null && process.platform !== 'win32') fs.chmodSync(target, entry.mode);
     written += 1;
   }
 

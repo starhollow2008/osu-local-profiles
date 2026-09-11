@@ -70,7 +70,7 @@ test('a release with no build for this platform offers nothing', () => {
 /* --------------------------------------------------------------------- zip */
 
 /** Build a zip in memory, so the reader is tested against bytes rather than a fixture. */
-function makeZip(files: { name: string; data: Buffer; store?: boolean }[]): Buffer {
+function makeZip(files: { name: string; data: Buffer; store?: boolean; mode?: number }[]): Buffer {
   const locals: Buffer[] = [];
   const central: Buffer[] = [];
   let offset = 0;
@@ -90,6 +90,11 @@ function makeZip(files: { name: string; data: Buffer; store?: boolean }[]): Buff
 
     const entry = Buffer.alloc(46);
     entry.writeUInt32LE(0x02014b50, 0);
+    // As a Unix `zip` writes it: host 3 in the high byte, the file's mode in the top 16 bits.
+    if (file.mode !== undefined) {
+      entry.writeUInt16LE((3 << 8) | 30, 4);
+      entry.writeUInt32LE(((0o100000 | file.mode) << 16) >>> 0, 38);
+    }
     entry.writeUInt16LE(method, 10);
     entry.writeUInt32LE(body.length, 20);
     entry.writeUInt32LE(file.data.length, 24);
@@ -154,6 +159,32 @@ test('an entry that points outside the target is refused', () => {
 
   assert.throws(() => readZipEntries(fs.readFileSync(file)), /unsafe path/);
   assert.equal(fs.existsSync(path.join(dir, 'escaped.txt')), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('an archive zipped on macOS or Linux keeps its execute bits', () => {
+  // The runtime, the launcher and the pp helper are only runnable because of this. Without
+  // it an update on macOS or Linux would unpack a node binary that cannot be started.
+  const dir = tmp();
+  const file = path.join(dir, 'unix.zip');
+  fs.writeFileSync(
+    file,
+    makeZip([
+      { name: 'root/node', data: Buffer.from('#!'), mode: 0o755 },
+      { name: 'root/README.txt', data: Buffer.from('hi'), mode: 0o644 },
+      { name: 'root/from-windows.txt', data: Buffer.from('hi') },
+    ]),
+  );
+
+  assert.deepEqual(
+    readZipEntries(fs.readFileSync(file)).map((e) => e.mode),
+    [0o755, 0o644, null],
+  );
+  extractZip(file, path.join(dir, 'out'), 1);
+  if (process.platform !== 'win32') {
+    assert.equal(fs.statSync(path.join(dir, 'out', 'node')).mode & 0o777, 0o755);
+    assert.equal(fs.statSync(path.join(dir, 'out', 'README.txt')).mode & 0o777, 0o644);
+  }
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

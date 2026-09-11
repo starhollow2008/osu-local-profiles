@@ -1,0 +1,112 @@
+name: Release
+
+# Pushing a version tag builds the app on each platform it ships for and attaches the three
+# archives to that version's GitHub release.
+#
+# A package can only be built on the system it is for -- it bundles the Node binary that
+# built it (see scripts/package.mjs) -- so each archive comes from a runner of its own OS.
+# The updater looks for exactly these names (assetNameFor in src/update/github.ts).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing tag to build and attach, e.g. v1.10.0. Empty builds all three and releases nothing.'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    strategy:
+      # All or nothing: a release missing one platform's archive is worse than a late one,
+      # because that platform's updater would find a release with nothing for it.
+      fail-fast: true
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: ubuntu-latest
+            rid: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      # This exact Node binary ships inside the archive, so pin it the way a release pins it.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - run: npm ci
+
+      - name: The tag names the version being built
+        if: github.event_name == 'push' || inputs.tag != ''
+        shell: bash
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version=$(node -p "require('./package.json').version")
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::tag $tag does not match package.json version $version"
+            exit 1
+          fi
+
+      # Builds the pp helper, bundles the runtime, starts the result from an unrelated
+      # directory to prove it finds its calculator, and zips it.
+      - run: npm run package -- --rid ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.rid }}
+          path: dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: package
+    # A manual run without a tag is a dry run of the packaging on all three systems.
+    if: github.event_name == 'push' || inputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Create the release, or attach the builds to it
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          ls -l assets
+          if gh release view "$tag" > /dev/null 2>&1; then
+            # Written by hand already: keep its notes, replace any builds of the same name.
+            gh release upload "$tag" assets/*.zip --clobber
+          else
+            node scripts/release-notes.mjs "$version" > notes.md
+            gh release create "$tag" assets/*.zip \
+              --title "osu! local profiles $version" \
+              --notes-file notes.md \
+              --verify-tag
+          fi
