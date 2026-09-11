@@ -103,5 +103,60 @@ for (const [id, mode] of MODES.entries()) {
   );
 }
 
+/*
+ * Mod Introduction: one medal per mod for passing a map with only that mod, and two
+ * lazer-only medals for any Conversion or any Fun mod. The rules are osu!'s own, from
+ * ppy/osu-queue-score-statistics (`ModIntroductionMedalAwarder`,
+ * `LazerModIntroductionMedalAwarder`); which mod each medal is for is keyed here by slug,
+ * because the achievement list says it only in prose. A slug osu! no longer has fails the
+ * build rather than silently dropping a medal.
+ */
+const INTRO_RULES = {
+  'all-intro-suddendeath': { mod: 'SD' },
+  'all-intro-perfect': { mod: 'PF' },
+  'all-intro-hardrock': { mod: 'HR' },
+  'all-intro-doubletime': { mod: 'DT' },
+  'all-intro-nightcore': { mod: 'NC' },
+  'all-intro-hidden': { mod: 'HD' },
+  'all-intro-flashlight': { mod: 'FL' },
+  'all-intro-easy': { mod: 'EZ' },
+  'all-intro-nofail': { mod: 'NF' },
+  'all-intro-halftime': { mod: 'HT' },
+  // osu!standard's own Spun Out (`OsuModSpunOut` in the awarder); no other ruleset has it.
+  'all-intro-spunout': { mod: 'SO', ruleset: 0 },
+  'all-intro-conversion': { type: 'Conversion' },
+  'all-intro-fun': { type: 'Fun' },
+};
+
+const intro = payload.achievements.filter((a) => a.grouping === 'Mod Introduction');
+for (const slug of Object.keys(INTRO_RULES)) {
+  if (!intro.some((a) => a.slug === slug)) throw new Error(`osu! no longer has the medal ${slug}`);
+}
+// osu!'s own order within the group, which is the order of its list.
+table.intro = intro
+  .filter((a) => INTRO_RULES[a.slug])
+  .map((a) => ({ ...describe(a, 0), rule: INTRO_RULES[a.slug] }));
+const unknown = intro.filter((a) => !INTRO_RULES[a.slug]).map((a) => a.slug);
+if (unknown.length) console.warn(`  NOTE: Mod Introduction medals with no rule here: ${unknown.join(', ')}`);
+console.log(`  mod introduction: ${table.intro.length} medals`);
+
+/*
+ * What the rules need to know about mods, per ruleset, from osu-web's `database/mods.json`
+ * (generated from ppy/osu itself): which count as Conversion and as Fun, and which a
+ * "this mod only" medal ignores -- System mods and Classic (`IsPermittedInNoModContext`).
+ * Per ruleset because osu! types them per ruleset: the mania key mods are Conversion, and
+ * osu!standard has Touch Device where the others do not.
+ */
+const mods = await (await fetch('https://raw.githubusercontent.com/ppy/osu-web/master/database/mods.json')).json();
+table.modTypes = {};
+for (const ruleset of mods) {
+  const of = (type) => ruleset.Mods.filter((m) => m.Type === type).map((m) => m.Acronym);
+  table.modTypes[ruleset.RulesetID] = {
+    conversion: of('Conversion'),
+    fun: of('Fun'),
+    ignoredAlone: [...new Set(['CL', ...of('System')])],
+  };
+}
+
 fs.writeFileSync(out, `${JSON.stringify(table, null, 2)}\n`);
 console.log(`\nwrote ${path.relative(root, out)}`);

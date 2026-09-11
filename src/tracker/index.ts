@@ -316,6 +316,29 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     });
   }
 
+  /**
+   * Recalculate one score with the current calculator: a score opened in View Details before
+   * it had a pp breakdown gets one this way, and with it the calculator version, so the parts
+   * always belong to the pp shown beside them. Queued like every other write.
+   */
+  recomputeScore(id: number, profileId: number): Promise<RecomputeResult | null> {
+    return this.enqueue(async () => {
+      if (!this.opts.official) return null;
+      return await recomputeScores({
+        db: this.opts.db,
+        resolver: this.opts.resolver,
+        profileId,
+        official: this.opts.official,
+        ids: [id],
+      });
+    });
+  }
+
+  /** The osu! release the pp calculator comes from, or null when there is no calculator. */
+  get calculatorVersion(): string | null {
+    return this.opts.official?.version ?? null;
+  }
+
   private replayDirs(): string[] {
     return this.opts.installs.map((i) => i.replayDir);
   }

@@ -361,7 +361,7 @@ function ppValue(score) {
   }</span>`;
 }
 
-function stats(score) {
+function stats(score, calculator) {
   const accuracy = flooredAccuracy(score.accuracy);
   const perfect = (on) => (on ? ' score-stats__stat-row--perfect' : '');
   const { basic, extra } = statisticsFor(score);
@@ -385,14 +385,38 @@ function stats(score) {
         )
         .join('')}</div>`
     : '';
-  return `${top}${judgements}${more}`;
+  return `${top}${judgements}${more}${breakdown(score, calculator)}`;
+}
+
+/**
+ * osu!'s own parts of the pp shown -- Aim, Speed, Accuracy, Flashlight Bonus and Reading in
+ * osu!standard, Difficulty and Accuracy in taiko, Difficulty in mania; catch has none -- under
+ * the names osu! gives them, with the osu! release whose calculator produced them. osu!'s
+ * website does not show this; lazer's results screen does, which is where the names are from.
+ */
+function breakdown(score, calculator) {
+  const parts = score.ppBreakdown;
+  if (!parts || parts.length === 0 || score.pp == null) return '';
+  const value = (pp) => (pp < 0.05 ? '0' : fmt(pp, pp < 10 ? 1 : 0));
+  const older = calculator && score.ppVersion && score.ppVersion !== calculator
+    ? ` title="The calculator running now is osu! ${escapeHtml(calculator)}. Recalculate from Settings to update this score."`
+    : '';
+  return `<div class="score-stats__caption">
+    <span>pp breakdown</span>
+    ${score.ppVersion ? `<span class="score-stats__caption-version"${older}>osu! ${escapeHtml(score.ppVersion)}${older ? ' (older)' : ''}</span>` : ''}
+  </div>
+  <div class="score-stats__group-row score-stats__group-row--breakdown"
+       title="The parts osu! calculates this score's pp from. The total is not a plain sum: osu! combines them its own way.">
+    ${parts.map((p) => stat(p.name, `${value(p.pp)}<span class="score-stats__stat-row--maximum">pp</span>`)).join('')}
+  </div>`;
 }
 
 /**
  * The whole card. `score` is a ScoreDetail from src/scores.ts; `who` is the profile as the
- * header shows it: { name, avatar (markup), country, countryName, cover, tracking }.
+ * header shows it: { name, avatar (markup), country, countryName, cover, tracking }; and
+ * `calculator` is the osu! release pricing scores now, to mark a breakdown from another.
  */
-export function scoreCard(score, who) {
+export function scoreCard(score, who, calculator = null) {
   const cover = coverUrl(score.beatmapsetId, 'cover@2x');
   // osu-web shows stable's letter for a stable score; it has no letter for F, so a failed
   // stable score keeps the dial.
@@ -409,7 +433,7 @@ export function scoreCard(score, who) {
   </div>
   <div class="score-stats">
     <div class="score-stats__group score-stats__group--user-card">${userCard(who)}</div>
-    <div class="score-stats__group score-stats__group--stats">${stats(score)}</div>
+    <div class="score-stats__group score-stats__group--stats">${stats(score, calculator)}</div>
   </div>
 </div>`;
 }

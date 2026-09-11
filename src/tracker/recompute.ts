@@ -35,6 +35,8 @@ export interface RecomputeOptions {
   official: OfficialCalculator;
   /** Only rows missing the newer columns, rather than every score. */
   onlyMissing?: boolean;
+  /** Only these scores -- one score's details recalculated as it is opened. */
+  ids?: number[];
   onProgress?: (done: number, total: number) => void;
 }
 
@@ -71,9 +73,10 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
       `SELECT id, replay_path, pp FROM scores
         WHERE profile_id = ? AND replay_path IS NOT NULL
           ${opts.onlyMissing ? `AND ${MISSING_CLAUSE}` : ''}
+          ${opts.ids ? `AND id IN (${opts.ids.map(() => '?').join(',') || 'NULL'})` : ''}
         ORDER BY played_at ASC`,
     )
-    .all(opts.profileId) as { id: number; replay_path: string; pp: number | null }[];
+    .all(opts.profileId, ...(opts.ids ?? [])) as { id: number; replay_path: string; pp: number | null }[];
 
   const update = opts.db.prepare(
     `UPDATE scores
@@ -81,7 +84,7 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
             stars = ?, pp = ?, pp_source = ?,
             pp_nomod = ?, stars_nomod = ?, beatmap_max_combo = ?,
             map_status = ?, mods_ranked = ?, mods_countable = ?, ranked = ?,
-            beatmap_id = ?
+            beatmap_id = ?, pp_parts = ?, pp_nomod_parts = ?, pp_version = ?
       WHERE id = ?`,
   );
 
@@ -128,6 +131,9 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
       modsRanked ? 1 : 0, countable ? 1 : 0,
       awardsPp(beatmap.status) && modsRanked ? 1 : 0,
       beatmap.beatmapId,
+      computed ? JSON.stringify(computed.breakdown) : null,
+      stripped ? JSON.stringify(stripped.breakdown) : null,
+      computed?.version ?? null,
       row.id,
     );
 

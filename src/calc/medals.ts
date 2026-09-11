@@ -2,7 +2,8 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { countsSql, ppColumn, starsColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
 import { estimateRank } from './rank.ts';
-import { bonusPp, weightedTotal } from './pp.ts';
+import { bonusPp, isCustomised, weightedTotal } from './pp.ts';
+import type { LazerMod } from '../osr.ts';
 import definitions from './medal-definitions.json' with { type: 'json' };
 
 /**
@@ -25,7 +26,7 @@ import definitions from './medal-definitions.json' with { type: 'json' };
  *   ingested since that column existed. Older scores can be filled in by a recompute.
  */
 
-export type MedalFamily = 'combo' | 'plays' | 'hits' | 'pass' | 'fc' | 'rank';
+export type MedalFamily = 'combo' | 'plays' | 'hits' | 'pass' | 'fc' | 'rank' | 'intro';
 
 export interface Medal {
   slug: string;
@@ -46,10 +47,12 @@ export interface Medal {
   dated: boolean;
   /** Filled in for an earned medal: the play that earned it, where there is one. */
   earnedOn: string | null;
+  /** osu!'s group for it -- what the section and its medal card are headed. */
+  grouping: MedalGrouping;
 }
 
-/** osu!'s group for every medal this app can award, and what its medal card is headed. */
-export const MEDAL_GROUPING = 'Skill & Dedication';
+/** osu!'s groups for the medals this app can award, in the order osu!'s page lists them. */
+export type MedalGrouping = 'Mod Introduction' | 'Skill & Dedication';
 
 export interface MedalSummary {
   medals: Medal[];
@@ -78,10 +81,107 @@ interface ModeDefinitions {
   fc?: Definition[];
 }
 
+/** Which mod a Mod Introduction medal is for, or which type of mod. */
+export type IntroRule = { mod: string; ruleset?: number } | { type: 'Conversion' | 'Fun' };
+
+interface IntroDefinition extends Definition {
+  rule: IntroRule;
+}
+
+/** Per ruleset, from osu-web's mods.json: which acronyms are which type. */
+export type ModTypes = Record<string, { conversion: string[]; fun: string[]; ignoredAlone: string[] }>;
+
 const TABLE = definitions as {
   rank: Definition[];
   modes: Record<string, ModeDefinitions>;
+  intro: IntroDefinition[];
+  modTypes: ModTypes;
 };
+
+/**
+ * Does this passed score earn this Mod Introduction medal? osu!'s own rules, from
+ * ppy/osu-queue-score-statistics:
+ *
+ * - **One mod** (`ModIntroductionMedalAwarder`): that mod and nothing else, at its default
+ *   settings. System mods and Classic do not count against "nothing else"
+ *   (`IsPermittedInNoModContext`), so a stable score -- which osu! plays with Classic -- and a
+ *   Touch Device play both qualify. Spun Out is osu!standard's alone.
+ * - **Any Conversion / any Fun mod** (`LazerModIntroductionMedalAwarder`): lazer-only, since
+ *   stable has neither kind; osu! does not run it on stable scores at all.
+ */
+export function earnsIntroMedal(
+  rule: IntroRule,
+  mods: readonly LazerMod[],
+  ruleset: number,
+  client: 'lazer' | 'stable',
+  types: ModTypes = TABLE.modTypes,
+): boolean {
+  const known = types[String(ruleset)];
+  if (!known) return false;
+  if ('type' in rule) {
+    const of = rule.type === 'Conversion' ? known.conversion : known.fun;
+    return client === 'lazer' && mods.some((m) => of.includes(m.acronym));
+  }
+  if (rule.ruleset !== undefined && rule.ruleset !== ruleset) return false;
+  const counted = mods.filter((m) => !known.ignoredAlone.includes(m.acronym));
+  return counted.length === 1 && counted[0]!.acronym === rule.mod && !isCustomised(counted[0]!);
+}
+
+/**
+ * The Mod Introduction medals, from every passed score in every mode -- they belong to no
+ * one mode, and osu! shows them whichever mode is open. The date is the first score that
+ * earned each.
+ */
+function introMedals(db: Db, profileId: number): Medal[] {
+  const rows = db
+    .prepare(
+      `SELECT s.played_at, s.mode, s.client, s.mods_json, b.title, b.artist
+         FROM scores s
+         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE s.profile_id = ? AND s.passed = 1 AND ${visibleSql()}
+        ORDER BY s.played_at ASC`,
+    )
+    .all(profileId) as {
+    played_at: number;
+    mode: number;
+    client: string;
+    mods_json: string;
+    title: string | null;
+    artist: string | null;
+  }[];
+
+  const earned = new Map<string, (typeof rows)[number]>();
+  for (const row of rows) {
+    if (earned.size === TABLE.intro.length) break;
+    let mods: LazerMod[] = [];
+    try {
+      mods = JSON.parse(row.mods_json) as LazerMod[];
+    } catch {
+      continue;
+    }
+    const client = row.client === 'stable' ? 'stable' : 'lazer';
+    for (const definition of TABLE.intro) {
+      if (earned.has(definition.slug)) continue;
+      if (earnsIntroMedal(definition.rule, mods, row.mode, client)) earned.set(definition.slug, row);
+    }
+  }
+
+  return TABLE.intro.map((definition) => {
+    const row = earned.get(definition.slug);
+    return {
+      slug: definition.slug,
+      name: definition.name,
+      description: definition.description,
+      icon: definition.icon,
+      family: 'intro' as const,
+      threshold: 0,
+      achievedAt: row?.played_at ?? null,
+      dated: true,
+      earnedOn: row ? [row.artist, row.title].filter(Boolean).join(' - ') || null : null,
+      grouping: 'Mod Introduction' as const,
+    };
+  });
+}
 
 /** One score, reduced to what any medal could possibly need. */
 interface MedalRow {
@@ -235,6 +335,7 @@ export function computeMedals(
         achievedAt: row?.played_at ?? null,
         dated: true,
         earnedOn: row ? title(row) : null,
+        grouping: 'Skill & Dedication',
       });
     }
   };
@@ -253,9 +354,13 @@ export function computeMedals(
         achievedAt: earned ? (rows[rows.length - 1]?.played_at ?? null) : null,
         dated: false,
         earnedOn: null,
+        grouping: 'Skill & Dedication',
       });
     }
   };
+
+  // Mod Introduction first: osu!'s page lists its groups in that order.
+  medals.push(...introMedals(db, profileId));
 
   // osu!'s own `ordering` within Skill & Dedication: combo 0, plays 1, rank 2, hits 3,
   // pass 4, fc 5. Each ordering is one row of medals on osu!'s profile page.

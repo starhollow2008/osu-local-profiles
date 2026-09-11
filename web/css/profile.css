@@ -1478,6 +1478,13 @@
   margin-bottom: 10px;
 }
 
+/* osu-web's desktop gap between groups: Mod Introduction, then Skill & Dedication. */
+@media (min-width: 900px) {
+  .medals-group {
+    gap: 40px;
+  }
+}
+
 .medals-group__group {
   display: grid;
   gap: 10px;
@@ -4181,4 +4188,44 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
     width: 100%;
     opacity: 0.35;
   }
+}
+
+/* The pp breakdown under a score's judgements, and the osu! release it came from. */
+.score-stats__caption {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 4px;
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-normal);
+  text-transform: uppercase;
+}
+
+.score-stats__caption-version {
+  color: hsl(var(--hsl-f1));
+  text-transform: none;
+}
+
+/* Settings: which calculator prices scores, and the way to bring older ones up to date. */
+.pp-calculator__outdated {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.pp-calculator__outdated p {
+  flex: 1;
+  margin: 0;
+}
+
+.pp-calculator__outdated button {
+  flex: none;
+  padding: 5px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+.pp-calculator__outdated button:hover {
+  background-color: hsl(var(--hsl-b2));
 }

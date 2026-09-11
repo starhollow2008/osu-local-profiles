@@ -52,6 +52,12 @@ CREATE TABLE IF NOT EXISTS scores (
   -- from osu!'s own calculators, given a different mod list. See src/calc/pp.ts.
   pp_nomod        REAL,
   stars_nomod     REAL,
+  -- osu!'s own parts of pp and of pp_nomod (Aim, Speed, Accuracy, ...), as JSON, and the osu!
+  -- release whose calculator produced them. The version is what says whether a stored pp is
+  -- the current algorithm's; NULL means it was stored before versions were recorded.
+  pp_parts        TEXT,
+  pp_nomod_parts  TEXT,
+  pp_version      TEXT,
   -- The beatmap's own maximum combo, as osu!'s difficulty calculator reports it. Needed to
   -- tell a full combo from a dropped-slider-end run.
   beatmap_max_combo INTEGER,

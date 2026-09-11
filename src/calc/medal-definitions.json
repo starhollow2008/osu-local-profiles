@@ -1,5 +1,5 @@
 {
-  "builtAt": "2026-09-10",
+  "builtAt": "2026-09-11",
   "source": "osu.ppy.sh profile page achievements payload",
   "rank": [
     {
@@ -680,6 +680,250 @@
           "icon": "https://assets.ppy.sh/medals/web/mania-skill-fc-8.png",
           "threshold": 8
         }
+      ]
+    }
+  },
+  "intro": [
+    {
+      "slug": "all-intro-suddendeath",
+      "name": "Finality",
+      "description": "High stakes, no regrets.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-suddendeath.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "SD"
+      }
+    },
+    {
+      "slug": "all-intro-perfect",
+      "name": "Perfectionist",
+      "description": "Accept nothing but the best.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-perfect.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "PF"
+      }
+    },
+    {
+      "slug": "all-intro-hardrock",
+      "name": "Rock Around The Clock",
+      "description": "You can't stop the rock.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-hardrock.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "HR"
+      }
+    },
+    {
+      "slug": "all-intro-doubletime",
+      "name": "Time And A Half",
+      "description": "Having a right ol' time. One and a half of them, almost.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-doubletime.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "DT"
+      }
+    },
+    {
+      "slug": "all-intro-nightcore",
+      "name": "Sweet Rave Party",
+      "description": "Founded in the fine tradition of changing things that were just fine as they were.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-nightcore.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "NC"
+      }
+    },
+    {
+      "slug": "all-intro-hidden",
+      "name": "Blindsight",
+      "description": "I can see just perfectly.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-hidden.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "HD"
+      }
+    },
+    {
+      "slug": "all-intro-flashlight",
+      "name": "Are You Afraid Of The Dark?",
+      "description": "Harder than it looks, probably because it's hard to look.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-flashlight.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "FL"
+      }
+    },
+    {
+      "slug": "all-intro-easy",
+      "name": "Dial It Right Back",
+      "description": "Sometimes you just want to take it easy.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-easy.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "EZ"
+      }
+    },
+    {
+      "slug": "all-intro-nofail",
+      "name": "Risk Averse",
+      "description": "Safety nets are fun!",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-nofail.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "NF"
+      }
+    },
+    {
+      "slug": "all-intro-halftime",
+      "name": "Slowboat",
+      "description": "You got there. Eventually.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-halftime.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "HT"
+      }
+    },
+    {
+      "slug": "all-intro-spunout",
+      "name": "Burned Out",
+      "description": "One cannot always spin to win.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-spunout.png",
+      "threshold": 0,
+      "rule": {
+        "mod": "SO",
+        "ruleset": 0
+      }
+    },
+    {
+      "slug": "all-intro-conversion",
+      "name": "Gear Shift",
+      "description": "Tailor your experience to your perfect fit.",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-conversion.png",
+      "threshold": 0,
+      "rule": {
+        "type": "Conversion"
+      }
+    },
+    {
+      "slug": "all-intro-fun",
+      "name": "Game Night",
+      "description": "Mum said it's my turn with the beatmap!",
+      "icon": "https://assets.ppy.sh/medals/web/all-intro-fun.png",
+      "threshold": 0,
+      "rule": {
+        "type": "Fun"
+      }
+    }
+  ],
+  "modTypes": {
+    "0": {
+      "conversion": [
+        "TP",
+        "DA",
+        "CL",
+        "RD",
+        "MR",
+        "AL",
+        "SG"
+      ],
+      "fun": [
+        "TR",
+        "WG",
+        "SI",
+        "GR",
+        "DF",
+        "WU",
+        "WD",
+        "BR",
+        "AD",
+        "MU",
+        "NS",
+        "MG",
+        "RP",
+        "AS",
+        "FR",
+        "BU",
+        "SY",
+        "DP",
+        "BM"
+      ],
+      "ignoredAlone": [
+        "CL",
+        "TD",
+        "SV2"
+      ]
+    },
+    "1": {
+      "conversion": [
+        "RD",
+        "DA",
+        "CL",
+        "SW",
+        "SG",
+        "CS"
+      ],
+      "fun": [
+        "WU",
+        "WD",
+        "MU",
+        "AS"
+      ],
+      "ignoredAlone": [
+        "CL",
+        "SV2"
+      ]
+    },
+    "2": {
+      "conversion": [
+        "DA",
+        "CL",
+        "MR"
+      ],
+      "fun": [
+        "WU",
+        "WD",
+        "FF",
+        "MU",
+        "NS",
+        "MF",
+        "SY"
+      ],
+      "ignoredAlone": [
+        "CL",
+        "SV2"
+      ]
+    },
+    "3": {
+      "conversion": [
+        "RD",
+        "DS",
+        "MR",
+        "DA",
+        "CL",
+        "IN",
+        "CS",
+        "HO",
+        "1K",
+        "2K",
+        "3K",
+        "4K",
+        "5K",
+        "6K",
+        "7K",
+        "8K",
+        "9K",
+        "10K"
+      ],
+      "fun": [
+        "WU",
+        "WD",
+        "MU",
+        "AS"
+      ],
+      "ignoredAlone": [
+        "CL",
+        "SV2"
       ]
     }
   }

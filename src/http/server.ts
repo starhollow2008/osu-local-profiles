@@ -77,6 +77,7 @@ import {
   attachmentHeader,
   hiddenCount,
   hiddenScores,
+  outdatedPpCount,
   reorderPins,
   replayDownload,
   replayFileName,
@@ -305,6 +306,18 @@ export function startServer(opts: ServerOptions): http.Server {
         scoresThisSession: opts.tracker.scoresAdded,
         // A page opened mid-index shows where it has got to, not only what arrives next.
         indexing: opts.tracker.indexState,
+        /*
+         * Which osu! release prices scores, and how many of this profile's were priced by a
+         * different one -- after an update that brings a pp rework, the ones still on the old
+         * algorithm, which Settings offers to recalculate.
+         */
+        ppCalculator: {
+          version: opts.tracker.calculatorVersion,
+          outdated:
+            opts.tracker.calculatorVersion === null
+              ? 0
+              : outdatedPpCount(opts.db, profile.id, opts.tracker.calculatorVersion),
+        },
         // Scores ingested before the eligibility columns existed. Non-zero means the
         // Settings dialog should offer a recompute rather than silently under-reporting.
         staleScores: opts.tracker.staleScores,
@@ -676,29 +689,54 @@ export function startServer(opts: ServerOptions): http.Server {
       if (owner === null) return json(res, { error: `there is no score ${id}` }, 404);
 
       if (!scoreRoute[2]) {
-        const detail = scoreDetail(opts.db, owner.id, id, eligibilityOf(settingsFor(owner.id)));
-        if (!detail) return json(res, { error: `there is no score ${id}` }, 404);
-        const images = imageState(opts.dataDir, owner.id);
-        // With no banner of its own, a profile shows its best play's art -- in this mode.
-        const best = images.hasCover
-          ? null
-          : topPlays(opts.db, owner.id, detail.mode, 1, eligibilityOf(settingsFor(owner.id)))[0];
-        return json(res, {
-          score: detail,
-          owner: {
-            id: owner.id,
-            name: owner.name,
-            country: settingsFor(owner.id).country,
-            avatar: images.hasAvatar ? `/api/image/avatar?profile=${owner.id}` : null,
-            cover: images.hasCover
-              ? `/api/image/cover?profile=${owner.id}`
-              : best?.beatmapsetId
-                ? `https://assets.ppy.sh/beatmaps/${best.beatmapsetId}/covers/cover@2x.jpg`
-                : null,
-            active: owner.id === current(),
-            tracking: owner.id === current() && opts.tracker.isTracking,
-          },
-        });
+        void (async () => {
+          const rules = eligibilityOf(settingsFor(owner.id));
+          let detail = scoreDetail(opts.db, owner.id, id, rules);
+          if (!detail) return json(res, { error: `there is no score ${id}` }, 404);
+          /*
+           * A score calculated before breakdowns were kept is recalculated now, with the current
+           * calculator, so its parts belong to the pp shown beside them. Normally a fraction of
+           * a second; never waited on for long, and not at all while the beatmap index still
+           * holds the queue -- the card opens without a breakdown rather than hanging.
+           */
+          if (
+            detail.ppBreakdown === null &&
+            detail.pp !== null &&
+            detail.replayAvailable &&
+            opts.tracker.calculatorVersion !== null &&
+            !opts.tracker.indexState.active
+          ) {
+            await Promise.race([
+              opts.tracker.recomputeScore(id, owner.id),
+              new Promise((resolve) => setTimeout(resolve, 8000)),
+            ]);
+            detail = scoreDetail(opts.db, owner.id, id, rules) ?? detail;
+          }
+          const images = imageState(opts.dataDir, owner.id);
+          // With no banner of its own, a profile shows its best play's art -- in this mode.
+          const best = images.hasCover
+            ? null
+            : topPlays(opts.db, owner.id, detail.mode, 1, rules)[0];
+          return json(res, {
+            score: detail,
+            // What prices scores now, so the card can say when this one came from another.
+            calculator: opts.tracker.calculatorVersion,
+            owner: {
+              id: owner.id,
+              name: owner.name,
+              country: settingsFor(owner.id).country,
+              avatar: images.hasAvatar ? `/api/image/avatar?profile=${owner.id}` : null,
+              cover: images.hasCover
+                ? `/api/image/cover?profile=${owner.id}`
+                : best?.beatmapsetId
+                  ? `https://assets.ppy.sh/beatmaps/${best.beatmapsetId}/covers/cover@2x.jpg`
+                  : null,
+              active: owner.id === current(),
+              tracking: owner.id === current() && opts.tracker.isTracking,
+            },
+          });
+        })().catch((e: unknown) => json(res, { error: (e as Error).message }, 500));
+        return;
       }
 
       /*

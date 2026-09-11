@@ -528,11 +528,11 @@ check(
 
 console.log('\nmedals');
 check(
-  'medals are one Skill & Dedication group',
+  "medals are osu!'s groups, in its order: Mod Introduction, then Skill & Dedication",
   await evaluate(
     "[...document.querySelectorAll('#medalGroups .medals-group__title')].map((t) => t.textContent).join('|')",
   ),
-  'Skill & Dedication',
+  'Mod Introduction|Skill & Dedication',
 );
 check(
   'the section heading carries no count',
@@ -551,7 +551,7 @@ check(
     await new Promise((r) => setTimeout(r, 50));
     return document.getElementById('medalGroups').innerText.replace(/\\s+/g, ' ').trim();
   })()`),
-  'Skill & Dedication',
+  'Mod Introduction Skill & Dedication',
 );
 check(
   'there are no progress bars',
@@ -595,7 +595,8 @@ const card = await evaluate(`(async () => {
   const c = el.getBoundingClientRect();
   return {
     display: getComputedStyle(el).display,
-    grouping: el.querySelector('.medal-tooltip__grouping')?.textContent,
+    grouping: el.querySelector('.medal-tooltip__grouping')?.textContent ===
+      badge.closest('.medals-group__group').querySelector('.medals-group__title').textContent,
     name: el.querySelector('.medal-tooltip__name')?.textContent === badge.getAttribute('aria-label'),
     description: (el.querySelector('.medal-tooltip__description')?.textContent ?? '').length > 0,
     date: /^(Achieved|Locked)/.test(el.querySelector('.medal-tooltip__date')?.textContent.trim() ?? ''),
@@ -605,7 +606,7 @@ const card = await evaluate(`(async () => {
   };
 })()`);
 check('hovering a medal opens its card', card.display, 'block');
-check('the card is headed by the group', card.grouping, 'Skill & Dedication');
+check('the card is headed by the group its medal is in', card.grouping, true);
 check("the card names the medal", card.name, true);
 check('the card describes it', card.description, true);
 check('the card says when it was achieved, or that it is locked', card.date, true);

@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb, getOrCreateProfile } from '../src/db/index.ts';
-import { computeMedals, earnedMedalCount, type Medal } from '../src/calc/medals.ts';
+import { computeMedals, earnedMedalCount, earnsIntroMedal, type Medal } from '../src/calc/medals.ts';
 import { medalEvents } from '../src/calc/history.ts';
 import { VANILLA } from '../src/calc/eligibility.ts';
 import { applyScoreAction } from '../src/scores.ts';
@@ -22,6 +22,8 @@ interface Fixture {
   pp?: number | null;
   md5?: string;
   at?: number;
+  mods?: { acronym: string; settings?: Record<string, unknown> }[];
+  client?: 'lazer' | 'stable';
 }
 
 function harness() {
@@ -38,9 +40,10 @@ function harness() {
          count300, count100, count50, count_geki, count_katu, count_miss,
          accuracy, max_combo, total_score, passed, grade, stars, pp,
          beatmap_max_combo, map_status, mods_ranked, mods_countable, ranked, played_at)
-       VALUES (?,?,?,?,'lazer','[]','None',?,0,0,0,0,?,0.99,?,500000,?,'S',?,?,?,?,1,1,1,?)`,
+       VALUES (?,?,?,?,?,?,'',?,0,0,0,0,?,0.99,?,500000,?,'S',?,?,?,?,1,1,1,?)`,
     ).run(
       profileId, `key-${n}`, f.mode ?? 0, f.md5 ?? `md5-${n}`,
+      f.client ?? 'lazer', JSON.stringify(f.mods ?? []),
       f.hits ?? 100,
       f.miss ?? 0,
       f.combo ?? 100,
@@ -82,8 +85,8 @@ test('an empty profile has every medal locked, and none missing', () => {
   try {
     const summary = h.medals();
     assert.equal(summary.earned, 0);
-    // osu!standard: 4 combo + 4 plays + 10 pass + 10 fc + 4 rank.
-    assert.equal(summary.total, 32);
+    // osu!standard: 13 Mod Introduction, then 4 combo + 4 plays + 10 pass + 10 fc + 4 rank.
+    assert.equal(summary.total, 45);
     assert.ok(summary.medals.every((m) => m.achievedAt === null));
   } finally {
     h.cleanup();
@@ -100,9 +103,9 @@ test('the other modes have the medals osu! actually gives them', () => {
   try {
     for (const mode of [1, 2, 3]) {
       const families = new Set(h.medals(mode).medals.map((m) => m.family));
-      assert.deepEqual([...families].sort(), ['fc', 'hits', 'pass', 'rank']);
-      // 4 hits + 8 pass + 8 fc + 4 rank.
-      assert.equal(h.medals(mode).total, 24);
+      assert.deepEqual([...families].sort(), ['fc', 'hits', 'intro', 'pass', 'rank']);
+      // 13 Mod Introduction (every mode shows them), 4 hits + 8 pass + 8 fc + 4 rank.
+      assert.equal(h.medals(mode).total, 37);
     }
   } finally {
     h.cleanup();
@@ -151,8 +154,9 @@ test("families come in osu!'s own ordering, rank between plays and the star meda
   try {
     h.add({ combo: 250 });
     const families = [...new Set(h.medals().medals.map((m) => m.family))];
-    // Skill & Dedication's `ordering`: combo 0, plays 1, rank 2, hits 3, pass 4, fc 5.
-    assert.deepEqual(families, ['combo', 'plays', 'rank', 'pass', 'fc']);
+    // Mod Introduction's group first, as osu! lists its groups; then Skill & Dedication's
+    // `ordering`: combo 0, plays 1, rank 2, hits 3, pass 4, fc 5.
+    assert.deepEqual(families, ['intro', 'combo', 'plays', 'rank', 'pass', 'fc']);
   } finally {
     h.cleanup();
   }
@@ -196,6 +200,7 @@ test('a rank medal carries no date, so it never slides to the top of Recent', ()
     description: '',
     icon: '',
     family: 'rank',
+    grouping: 'Skill & Dedication',
     threshold: 50_000,
     achievedAt: 5000,
     dated: false,
@@ -368,6 +373,72 @@ test('the earned count agrees with the medals it reports', () => {
     const summary = h.medals();
     assert.equal(summary.earned, summary.medals.filter((m) => m.achievedAt !== null).length);
     assert.equal(summary.total, summary.medals.length);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/* ------------------------------------------------------- mod introduction */
+
+
+/*
+ * Mod Introduction, by osu!'s own rules (ppy/osu-queue-score-statistics): pass a map with
+ * that mod and nothing else, at its defaults -- System mods and Classic aside -- or, in lazer,
+ * with any Conversion or any Fun mod.
+ */
+test('a Mod Introduction medal needs that mod alone, at its defaults', () => {
+  const HR = { mod: 'HR' };
+  const mods = (...a: string[]) => a.map((acronym) => ({ acronym }));
+  assert.equal(earnsIntroMedal(HR, mods('HR'), 0, 'lazer'), true);
+  assert.equal(earnsIntroMedal(HR, mods('HR', 'HD'), 0, 'lazer'), false, 'not alone');
+  assert.equal(earnsIntroMedal(HR, mods(), 0, 'lazer'), false);
+  // Classic and System mods do not count against "alone": a stable score is played with CL.
+  assert.equal(earnsIntroMedal(HR, mods('HR', 'CL'), 0, 'stable'), true);
+  assert.equal(earnsIntroMedal(HR, mods('HR', 'TD'), 0, 'lazer'), true);
+  assert.equal(earnsIntroMedal(HR, mods('HR', 'SV2'), 1, 'lazer'), true);
+  // A customised mod is not the mod at its defaults.
+  assert.equal(
+    earnsIntroMedal({ mod: 'DT' }, [{ acronym: 'DT', settings: { speed_change: 1.2 } }], 0, 'lazer'),
+    false,
+  );
+  // Nightcore is its own medal, not Double Time's.
+  assert.equal(earnsIntroMedal({ mod: 'DT' }, mods('NC'), 0, 'lazer'), false);
+  assert.equal(earnsIntroMedal({ mod: 'NC' }, mods('NC'), 0, 'lazer'), true);
+  // Spun Out is osu!standard's.
+  assert.equal(earnsIntroMedal({ mod: 'SO', ruleset: 0 }, mods('SO'), 0, 'lazer'), true);
+  assert.equal(earnsIntroMedal({ mod: 'SO', ruleset: 0 }, mods('SO'), 1, 'lazer'), false);
+});
+
+test("the Conversion and Fun medals are lazer's, and take the ruleset's own mod types", () => {
+  const conversion = { type: 'Conversion' } as const;
+  const fun = { type: 'Fun' } as const;
+  assert.equal(earnsIntroMedal(conversion, [{ acronym: 'MR' }, { acronym: 'HD' }], 0, 'lazer'), true);
+  assert.equal(earnsIntroMedal(fun, [{ acronym: 'BR' }], 0, 'lazer'), true);
+  // The mania key mods are Conversion in mania.
+  assert.equal(earnsIntroMedal(conversion, [{ acronym: '4K' }], 3, 'lazer'), true);
+  // osu! never runs these on stable scores.
+  assert.equal(earnsIntroMedal(conversion, [{ acronym: 'MR' }], 0, 'stable'), false);
+});
+
+test('Mod Introduction medals are earned from any mode, and only by passes', () => {
+  const h = harness();
+  try {
+    h.add({ mods: [{ acronym: 'HD' }], passed: false });
+    assert.equal(find(h.medals().medals, 'all-intro-hidden').achievedAt, null, 'a failed play does not count');
+
+    const at = 1_700_000_500_000;
+    h.add({ mods: [{ acronym: 'HD' }], mode: 1, at });
+    // Set in taiko, and shown -- earned, with that date -- whichever mode is open.
+    for (const mode of [0, 1, 3]) {
+      const medal = find(h.medals(mode).medals, 'all-intro-hidden');
+      assert.equal(medal.achievedAt, at);
+      assert.equal(medal.grouping, 'Mod Introduction');
+    }
+    // And it is one medal in the header's count, not one per mode it shows in: the total is
+    // the distinct medals earned across all four modes.
+    const distinct = new Set([0, 1, 2, 3].flatMap((mode) => earned(h.medals(mode).medals)));
+    assert.ok(distinct.has('all-intro-hidden'));
+    assert.equal(earnedMedalCount(h.db, h.profileId, VANILLA), distinct.size);
   } finally {
     h.cleanup();
   }

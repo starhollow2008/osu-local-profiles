@@ -11,8 +11,10 @@
 // itself would interpret them, with no branching on our side.
 //
 // Protocol: one JSON request per line on stdin, one JSON response per line on stdout.
-// Staying resident avoids paying ~150ms of runtime startup for every score.
+// Staying resident avoids paying ~150ms of runtime startup for every score. The first line
+// out announces readiness and the osu! version whose calculators these are.
 
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using osu.Game.Beatmaps;
@@ -61,10 +63,20 @@ public static class Program
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    /// <summary>
+    /// The osu! release these calculators come from -- the ppy.osu.Game package version, e.g.
+    /// 2026.730.0 -- so a stored pp value can say which algorithm produced it. The build
+    /// metadata after a '+' is a commit hash, not something a person reads.
+    /// </summary>
+    private static readonly string OsuVersion =
+        typeof(Beatmap).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
+        ?? typeof(Beatmap).Assembly.GetName().Version?.ToString()
+        ?? "unknown";
+
     public static int Main()
     {
         // Announce readiness so the caller does not race the first request.
-        Console.Out.WriteLine("""{"ready":true}""");
+        Console.Out.WriteLine(JsonSerializer.Serialize(new { ready = true, version = OsuVersion }, JsonOptions));
         Console.Out.Flush();
 
         string? line;
@@ -129,6 +141,14 @@ public static class Program
             isLegacy = scoreInfo.IsLegacyScore,
             mods = scoreInfo.Mods.Select(m => m.Acronym).ToArray(),
             pp = performance?.Total,
+            // The pp's own parts -- aim, speed, accuracy, flashlight and reading in
+            // osu!standard -- under the names osu! displays them by. Total is left out: it is
+            // `pp` above. The parts are not a plain sum of it; osu! combines them its own way.
+            breakdown = performance?.GetAttributesForDisplay()
+                .Where(a => a.PropertyName != nameof(performance.Total))
+                .Select(a => new { key = a.PropertyName, name = a.DisplayName, pp = a.Value })
+                .ToArray(),
+            version = OsuVersion,
         };
     }
 

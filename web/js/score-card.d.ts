@@ -28,4 +28,4 @@ export interface CardOwner {
   cover: string | null;
   tracking: boolean;
 }
-export function scoreCard(score: unknown, who: CardOwner): string;
+export function scoreCard(score: unknown, who: CardOwner, calculator?: string | null): string;

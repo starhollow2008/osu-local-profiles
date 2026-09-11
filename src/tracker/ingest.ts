@@ -122,8 +122,8 @@ export async function ingestScore(
          statistics_json, max_statistics_json,
          accuracy, max_combo, total_score, passed, grade, stars, pp, pp_source,
          pp_nomod, stars_nomod, beatmap_max_combo, map_status, mods_ranked, mods_countable,
-         ranked, played_at, online_score_id, replay_path)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         ranked, played_at, online_score_id, replay_path, pp_parts, pp_nomod_parts, pp_version)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       ctx.profileId, key, mode, score.beatmapMD5, beatmap.beatmapId, score.client,
@@ -141,6 +141,9 @@ export async function ingestScore(
       playedAt,
       score.onlineScoreId === null ? null : String(score.onlineScoreId),
       replayPath,
+      computed ? JSON.stringify(computed.breakdown) : null,
+      stripped ? JSON.stringify(stripped.breakdown) : null,
+      computed?.version ?? null,
     );
 
   const id = (ctx.db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;

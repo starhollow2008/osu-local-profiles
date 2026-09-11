@@ -403,6 +403,15 @@
       <div class="removed-list" id="removedList"></div>
     </div>
 
+    <div class="removed-scores pp-calculator" id="ppCalculator">
+      <h4>pp calculator</h4>
+      <p class="setting__hint" id="ppCalculatorVersion"></p>
+      <div class="pp-calculator__outdated" id="ppCalculatorOutdated" hidden>
+        <p class="setting__hint" id="ppCalculatorOutdatedText"></p>
+        <button type="button" id="ppRecalculate">Recalculate them</button>
+      </div>
+    </div>
+
     <div class="profile-hint" id="settingsHint">&nbsp;</div>
 
     <div class="actions">
@@ -516,6 +525,8 @@
 
 <footer class="site-footer">
   <span id="footerVersion">osu! local profiles</span>
+  <span class="site-footer__sep" id="footerPpSep" hidden>&middot;</span>
+  <span id="footerPp" hidden></span>
   <span class="site-footer__sep">&middot;</span>
   <a href="https://github.com/jonathant09/osu-local-profiles" target="_blank" rel="noreferrer noopener">
     Source code (GitHub)

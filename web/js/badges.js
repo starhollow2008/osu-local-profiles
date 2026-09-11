@@ -401,7 +401,7 @@ export function generatedAvatar(name) {
  * Medal colours by family, loosely following osu!'s own: combo and hits are the warm
  * "dedication" side, the skill families are cooler as they get harder.
  */
-const MEDAL_HUE = { combo: 42, plays: 28, hits: 28, rank: 275, pass: 200, fc: 330 };
+const MEDAL_HUE = { combo: 42, plays: 28, hits: 28, rank: 275, pass: 200, fc: 330, intro: 150 };
 
 /**
  * A drawn stand-in for a medal image.

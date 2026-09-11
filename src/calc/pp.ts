@@ -1,5 +1,5 @@
 import type { LazerMod, ReplayScore } from '../osr.ts';
-import type { OfficialCalculator } from './official.ts';
+import type { OfficialCalculator, PpPart } from './official.ts';
 
 /** Each successive play in the top 100 is worth 5% less than the one above it. */
 export const WEIGHT = 0.95;
@@ -99,6 +99,10 @@ export interface PpResult {
   isLegacy: boolean;
   /** True when mods were removed before scoring, so this is not the play as it happened. */
   stripped: boolean;
+  /** osu!'s own parts of `pp` (aim, speed, ...); empty from a helper that sends none. */
+  breakdown: PpPart[];
+  /** The osu! release that calculated it, or null if the helper did not say. */
+  version: string | null;
 }
 
 /**
@@ -136,6 +140,8 @@ export async function calculateScorePp(
     rank: result.rank,
     isLegacy: result.isLegacy,
     stripped: result.stripped,
+    breakdown: result.breakdown,
+    version: official.version,
   };
 }
 

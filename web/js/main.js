@@ -187,6 +187,8 @@ let stats = null;
 let settings = {};
 let counting = null;
 let staleScores = 0;
+/** Which osu! release prices scores, and how many of this profile's another one priced. */
+let ppCalculator = { version: null, outdated: 0 };
 let hiddenScoreCount = 0;
 let sharing = { canScreenshot: false };
 
@@ -385,11 +387,15 @@ $('countingNote').onclick = async (e) => {
  * page has to be complete with no network.
  */
 
-/** osu!'s group name, which heads both the section and every medal card. */
-const MEDAL_GROUPING = 'Skill & Dedication';
-
-/** Families in osu!'s `ordering` within Skill & Dedication; each is one row of icons. */
-const MEDAL_ROWS = ['combo', 'plays', 'rank', 'hits', 'pass', 'fc'];
+/*
+ * osu!'s groups, in the order its page lists them, each heading its icons and its medals'
+ * cards. Within a group every `ordering` is one row: Mod Introduction is a single row, and
+ * Skill & Dedication's families are combo 0, plays 1, rank 2, hits 3, pass 4, fc 5.
+ */
+const MEDAL_GROUPS = [
+  ['Mod Introduction', ['intro']],
+  ['Skill & Dedication', ['combo', 'plays', 'rank', 'hits', 'pass', 'fc']],
+];
 
 /** Every medal currently on the page, by slug, for the hover card to read from. */
 let medalsBySlug = new Map();
@@ -415,7 +421,7 @@ function medalCard(medal) {
       title="${escapeHtml(new Date(medal.achievedAt).toLocaleString())}">${escapeHtml(shortDate(medal.achievedAt))}</time>`;
   }
 
-  return `<div class="medal-tooltip__grouping">${escapeHtml(MEDAL_GROUPING)}</div>
+  return `<div class="medal-tooltip__grouping">${escapeHtml(medal.grouping ?? 'Skill & Dedication')}</div>
     <div class="medal-tooltip__middle">
       <div class="medal-tooltip__badge">${medalBadge(medal, 'tooltip')}</div>
       <div class="medal-tooltip__name">${escapeHtml(medal.name)}</div>
@@ -449,19 +455,22 @@ function renderMedals(summary) {
     note.hidden = true;
   }
 
-  const rows = MEDAL_ROWS.map((family) => {
-    const medals = summary.medals.filter((m) => m.family === family);
-    if (medals.length === 0) return '';
-    return `<div class="medals-group__medals">${medals.map((m) => medalBadge(m)).join('')}</div>`;
+  const groups = MEDAL_GROUPS.map(([grouping, families]) => {
+    const rows = families.map((family) => {
+      const medals = summary.medals.filter((m) => m.family === family);
+      if (medals.length === 0) return '';
+      return `<div class="medals-group__medals">${medals.map((m) => medalBadge(m)).join('')}</div>`;
+    }).join('');
+    return rows
+      ? `<div class="medals-group__group">
+          <h3 class="medals-group__title">${escapeHtml(grouping)}</h3>
+          ${rows}
+        </div>`
+      : '';
   }).join('');
 
-  $('medalGroups').innerHTML = rows
-    ? `<div class="medals-group">
-        <div class="medals-group__group">
-          <h3 class="medals-group__title">${escapeHtml(MEDAL_GROUPING)}</h3>
-          ${rows}
-        </div>
-      </div>`
+  $('medalGroups').innerHTML = groups
+    ? `<div class="medals-group">${groups}</div>`
     : '<div class="u-empty">No medals apply to this mode yet.</div>';
 }
 
@@ -697,6 +706,8 @@ async function loadState() {
   profiles = s.profiles ?? [];
   settings = s.settings ?? {};
   staleScores = s.staleScores ?? 0;
+  ppCalculator = s.ppCalculator ?? ppCalculator;
+  renderPpCalculator();
   hiddenScoreCount = s.hiddenScores ?? 0;
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
@@ -2317,7 +2328,7 @@ async function openScoreCard(id) {
     if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
     // Closed, or another score opened, while this one was on its way.
     if (scoreCardId !== id) return;
-    $('scoreCard').innerHTML = scoreCard(d.score, cardOwner(d.owner));
+    $('scoreCard').innerHTML = scoreCard(d.score, cardOwner(d.owner), d.calculator);
   } catch (err) {
     if (scoreCardId !== id) return;
     closeScoreCard();
@@ -2431,11 +2442,37 @@ function offerRecompute() {
   void runRecompute();
 }
 
-async function runRecompute() {
+/*
+ * Which osu! release prices this profile's scores. After an update that brings an osu! pp
+ * rework, scores priced before it are still on the old algorithm -- ranked and weighted
+ * against new ones -- so Settings says how many, and offers to recalculate them all from
+ * their replays with the calculator that is running now.
+ */
+function renderPpCalculator() {
+  const v = ppCalculator.version;
+  $('footerPp').hidden = $('footerPpSep').hidden = v === null;
+  $('footerPp').textContent = v ? `pp: osu! ${v}` : '';
+  $('ppCalculatorVersion').textContent = v
+    ? `pp is calculated by osu!'s own calculator, from osu! ${v}.`
+    : 'The pp calculator is not available, so new scores are tracked with no pp.';
+  const n = ppCalculator.outdated;
+  $('ppCalculatorOutdated').hidden = !v || n === 0;
+  $('ppCalculatorOutdatedText').textContent =
+    `${fmt(n)} score${n === 1 ? ' was' : 's were'} priced by a different version of it, or before ` +
+    'the version was recorded. Recalculating them from their replays puts every score on the ' +
+    'same algorithm; scores whose replay is gone are left as they are.';
+}
+
+$('ppRecalculate').onclick = () => {
+  closeSettings();
+  void runRecompute(true);
+};
+
+async function runRecompute(all = false) {
   recomputing = true;
   toast('Recalculating stored scores from their replays...');
   try {
-    const d = await postJson('/api/recompute', { confirm: true }, 'recompute failed');
+    const d = await postJson('/api/recompute', { confirm: true, all }, 'recompute failed');
     toast(
       `Recalculated ${fmt(d.updated)} play${d.updated === 1 ? '' : 's'}` +
         (d.gainedPp > 0 ? ` - ${fmt(d.gainedPp)} gained a pp value` : '') +

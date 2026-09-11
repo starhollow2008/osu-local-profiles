@@ -49,6 +49,19 @@ export interface OfficialResult {
   pp: number | null;
   /** True when `stripMods` actually removed something, so the result is not "as played". */
   stripped: boolean;
+  /**
+   * The pp's parts as osu! displays them -- Aim, Speed, Accuracy, Flashlight Bonus and
+   * Reading in osu!standard, Difficulty and Accuracy in taiko, Difficulty in mania, none in
+   * catch. They are not a plain sum of `pp`: osu! combines them its own way.
+   */
+  breakdown: PpPart[];
+}
+
+/** One part of a pp value, under the name osu! itself gives it. */
+export interface PpPart {
+  key: string;
+  name: string;
+  pp: number;
 }
 
 interface Response {
@@ -63,6 +76,7 @@ interface Response {
   mods?: string[];
   pp?: number | null;
   stripped?: boolean;
+  breakdown?: PpPart[];
 }
 
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -98,10 +112,17 @@ export class OfficialCalculator {
   private dead = false;
   /** Surfaced so a failure is reported rather than silently producing no pp. */
   lastError: string | null = null;
+  /**
+   * The osu! release whose calculators the helper wraps (the ppy.osu.Game package version),
+   * stored with every pp value so a score can say which algorithm priced it. Null for a
+   * helper built before it reported one.
+   */
+  readonly version: string | null;
 
-  private constructor(child: ChildProcessWithoutNullStreams, lines: readline.Interface) {
+  private constructor(child: ChildProcessWithoutNullStreams, lines: readline.Interface, version: string | null) {
     this.child = child;
     this.lines = lines;
+    this.version = version;
 
     this.lines.on('line', (line) => {
       const take = this.pending;
@@ -143,27 +164,28 @@ export class OfficialCalculator {
         const child = spawn(command, args, { stdio: ['pipe', 'pipe', 'pipe'] });
         const lines = readline.createInterface({ input: child.stdout });
 
-        const ready = await new Promise<boolean>((resolve) => {
-          const timer = setTimeout(() => resolve(false), STARTUP_TIMEOUT_MS);
+        const ready = await new Promise<{ version: string | null } | null>((resolve) => {
+          const timer = setTimeout(() => resolve(null), STARTUP_TIMEOUT_MS);
           lines.once('line', (line) => {
             clearTimeout(timer);
             try {
-              resolve((JSON.parse(line) as { ready?: boolean }).ready === true);
+              const hello = JSON.parse(line) as { ready?: boolean; version?: string };
+              resolve(hello.ready === true ? { version: hello.version ?? null } : null);
             } catch {
-              resolve(false);
+              resolve(null);
             }
           });
           child.once('error', () => {
             clearTimeout(timer);
-            resolve(false);
+            resolve(null);
           });
           child.once('exit', () => {
             clearTimeout(timer);
-            resolve(false);
+            resolve(null);
           });
         });
 
-        if (ready) return new OfficialCalculator(child, lines);
+        if (ready) return new OfficialCalculator(child, lines, ready.version);
         child.kill();
       } catch {
         /* try the next candidate */
@@ -202,6 +224,7 @@ export class OfficialCalculator {
         mods: response.mods ?? [],
         pp: response.pp ?? null,
         stripped: response.stripped ?? false,
+        breakdown: response.breakdown ?? [],
       };
     };
 

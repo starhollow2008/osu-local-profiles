@@ -4,6 +4,7 @@ import type { Ruleset } from './osr.ts';
 import { playById, type Play } from './calc/stats.ts';
 import { VANILLA, visibleSql, type Eligibility } from './calc/eligibility.ts';
 import { detailsFor, ratingNeutral } from './favorites.ts';
+import type { PpPart } from './calc/official.ts';
 
 /**
  * What the user can do to an individual tracked score: pin it, order the pins, and remove
@@ -181,6 +182,13 @@ export interface ScoreDetail extends Play {
   creatorId: number | null;
   /** Whether the replay file is on disk right now, not just whether one was recorded. */
   replayAvailable: boolean;
+  /**
+   * osu!'s own parts of the pp shown -- the stripped-mod calculation's when that is the pp
+   * shown. Null until the score has been calculated since breakdowns were kept.
+   */
+  ppBreakdown: PpPart[] | null;
+  /** The osu! release whose calculator produced this score's pp; null if not recorded. */
+  ppVersion: string | null;
 }
 
 /**
@@ -217,6 +225,16 @@ export function legacyStatistics(
       };
     default:
       return { great: c.count300, ok: c.count100, meh: c.count50, miss: c.countMiss };
+  }
+}
+
+function parseBreakdown(json: string | null): PpPart[] | null {
+  if (!json) return null;
+  try {
+    const parts = JSON.parse(json) as PpPart[];
+    return Array.isArray(parts) ? parts.filter((p) => typeof p?.pp === 'number' && typeof p.name === 'string') : null;
+  } catch {
+    return null;
   }
 }
 
@@ -276,7 +294,8 @@ export function scoreDetail(
   const row = db
     .prepare(
       `SELECT mode, client, statistics_json, max_statistics_json, beatmap_max_combo, replay_path,
-              count300, count100, count50, count_geki, count_katu, count_miss
+              count300, count100, count50, count_geki, count_katu, count_miss,
+              pp_parts, pp_nomod_parts, pp_version
          FROM scores WHERE id = ?`,
     )
     .get(id) as Record<string, string | number | null>;
@@ -296,6 +315,7 @@ export function scoreDetail(
   const mapMax = row['beatmap_max_combo'] as number | null;
   const replayPath = row['replay_path'] as string | null;
   const details = play.beatmapsetId === null ? null : detailsFor(db, play.beatmapsetId);
+  const parts = row[play.ppBasis === 'without-unranked-mods' ? 'pp_nomod_parts' : 'pp_parts'] as string | null;
 
   return {
     ...play,
@@ -308,6 +328,8 @@ export function scoreDetail(
     difficultyStars: difficultyStars(db, profileId, play.beatmapMd5, mode, play.beatmapId, play.beatmapsetId),
     creatorId: details?.userId ?? null,
     replayAvailable: replayPath !== null && fs.existsSync(replayPath),
+    ppBreakdown: parseBreakdown(parts),
+    ppVersion: (row['pp_version'] as string | null) ?? null,
   };
 }
 
@@ -423,4 +445,21 @@ export function replayDownload(
       playedAt: row['played_at'] as number,
     }),
   };
+}
+
+/**
+ * How many of a profile's scores were priced by a different osu! calculator than `current`, or
+ * before the version was recorded -- after an update that brings a pp rework, the ones still
+ * on the old algorithm. Only scores with a replay count: they are the ones a recalculation
+ * can reach.
+ */
+export function outdatedPpCount(db: Db, profileId: number, current: string): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM scores s
+        WHERE s.profile_id = ? AND s.replay_path IS NOT NULL AND s.pp IS NOT NULL AND ${visibleSql()}
+          AND (s.pp_version IS NULL OR s.pp_version <> ?)`,
+    )
+    .get(profileId, current) as { n: number };
+  return row.n;
 }

@@ -31,7 +31,7 @@ async function load() {
     if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
     score = d.score;
     owner = d.owner;
-    $('scoreCard').innerHTML = scoreCard(score, cardOwner(owner));
+    $('scoreCard').innerHTML = scoreCard(score, cardOwner(owner), d.calculator);
     // osu-web's page title: `:username on :title [:version]`.
     document.title = `${owner.name} on ${score.title ?? 'unknown beatmap'}${
       score.version ? ` [${score.version}]` : ''
