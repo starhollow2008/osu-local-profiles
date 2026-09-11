@@ -75,7 +75,7 @@ Under the rank graph sit osu!'s own three figures: **Medals** (every medal the p
 holds, across all modes), **pp**, and **Total Play Time** -- see below for how that is
 counted.
 
-The long sections -- Recent, Scores, Most Played Beatmaps and Recent Plays -- start at
+The long sections -- Recent Plays, Scores, Milestones and Most Played Beatmaps -- start at
 five rows with a **show more** button, expanding to 25 and then 25 at a time, as on osu!.
 Both charts are hoverable: the rank graph reads out `Global Ranking #120,000` / `40 days
 ago` by day, and Play History reads `Plays 430` / `March 2020` by month.
@@ -381,7 +381,7 @@ taken from its published achievement list by `node scripts/build-medal-table.mjs
 All of them belong to osu!'s **Skill & Dedication** group, so that is the one group shown:
 a row of icons per family, with nothing written beside them. Hover (or tab to) a medal for
 osu!'s card -- the group, the medal's name and description, and the date it was achieved,
-or *Locked*. A newly earned medal also appears in **Recent**, and the page announces it
+or *Locked*. A newly earned medal also appears in **Milestones**, and the page announces it
 when it happens.
 
 What exists is **not the same in every mode**, and that is osu!'s doing rather than a gap

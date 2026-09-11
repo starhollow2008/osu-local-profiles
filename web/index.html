@@ -153,8 +153,20 @@
     </div>
   </section>
 
+  <!--
+    Recent Plays is a section of its own, not a part of Historical as on osu!: on a profile
+    that exists to follow a new playstyle, the plays themselves are what is looked at most,
+    so it can be moved up the page like any other section.
+  -->
+  <section class="page-extra" id="section-recent_plays">
+    <h2 class="title">Recent Plays<span class="title__count" id="recentCount">0</span></h2>
+    <div id="recentPlays"></div>
+  </section>
+
+  <!-- osu!'s "Recent" feed -- medals, new bests, levels -- named for what it holds. The id
+       stays `recent` because saved section orders refer to it. -->
   <section class="page-extra" id="section-recent">
-    <h2 class="title">Recent</h2>
+    <h2 class="title">Milestones</h2>
     <div id="recentActivity"></div>
   </section>
 
@@ -179,8 +191,6 @@
     <div class="page-extra__chart" id="playcountChart"></div>
     <h3 class="title title--sub">Most Played Beatmaps<span class="title__count" id="mostPlayedCount">0</span></h3>
     <div id="mostPlayed"></div>
-    <h3 class="title title--sub">Recent Plays<span class="title__count" id="recentCount">0</span></h3>
-    <div id="recentPlays"></div>
   </section>
 
   <section class="page-extra" id="section-beatmaps">

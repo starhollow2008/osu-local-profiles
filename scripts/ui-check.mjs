@@ -1561,7 +1561,17 @@ check(
   await evaluate(
     "[...document.querySelectorAll('.page-extra')].map((s) => s.id).sort().join(',')",
   ),
-  'section-beatmaps,section-historical,section-me,section-medals,section-recent,section-top_ranks',
+  'section-beatmaps,section-historical,section-me,section-medals,section-recent,section-recent_plays,section-top_ranks',
+);
+check(
+  'Recent Plays is a section of its own, and the feed is called Milestones',
+  await evaluate(`(() => [
+    document.querySelector('#section-recent_plays > h2.title')?.firstChild.textContent.trim(),
+    !!document.querySelector('#section-recent_plays #recentPlays'),
+    !document.querySelector('#section-historical #recentPlays'),
+    document.querySelector('#section-recent > h2.title')?.textContent.trim(),
+  ].join('|'))()`),
+  'Recent Plays|true|true|Milestones',
 );
 // osu-web's own names: `extra.top_ranks.title` is "Scores", its pinned list "Pinned Scores".
 check(

@@ -45,12 +45,19 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
+/*
+ * The sections, in their default order. Recent Plays sits near the top, since following the
+ * plays is what this profile is for; Milestones -- osu!'s "Recent" feed of medals, bests and
+ * levels -- sits under Historical. Both orders at the user's request.
+ */
 const SECTIONS = [
   ['me', 'me!'],
-  ['recent', 'Recent'],
+  ['recent_plays', 'Recent Plays'],
   // The id is kept from when osu! called this Top Ranks: saved section orders refer to it.
   ['top_ranks', 'Scores'],
   ['historical', 'Historical'],
+  // The id is kept from when this was called Recent: saved section orders refer to it.
+  ['recent', 'Milestones'],
   ['beatmaps', 'Beatmaps'],
   // Last by default, at the user's request.
   ['medals', 'Medals'],
@@ -118,7 +125,7 @@ const SETTINGS_FIELDS = [
   {
     key: 'showIncompleteInRecent',
     type: 'choice',
-    label: 'Unfinished plays in Recent',
+    label: 'Unfinished plays in Recent Plays',
     options: [
       ['collapse', 'group retries on one map'],
       ['yes', 'show every attempt'],
@@ -1119,14 +1126,21 @@ $('shareScreenshot').onclick = async () => {
  * Rearranging the profile, the way osu! lets you rearrange your own.
  *
  * The order is a list of section ids in settings, reconciled against SECTIONS on every
- * read: ids that no longer exist are dropped and new ones are appended. That is what makes
- * adding a section later safe -- a saved order from before it existed still works, and the
- * new section simply turns up at the bottom instead of vanishing.
+ * read: ids that no longer exist are dropped, and a new one joins after the section it
+ * follows by default (`reconcileSectionOrder`). That is what makes adding a section later
+ * safe -- a saved order from before it existed still works, with the new section where it
+ * would have been rather than missing.
  */
 
 const DEFAULT_ORDER = SECTIONS.map(([id]) => id);
 
-const reconcileOrder = (saved) => reconcileSectionOrder(saved, DEFAULT_ORDER);
+/** Earlier versions' defaults: a page saved exactly as one of these was never rearranged. */
+const RETIRED_DEFAULT_ORDERS = [
+  ['me', 'recent', 'top_ranks', 'medals', 'historical'], // 1.1.0 - 1.6.0
+  ['me', 'recent', 'top_ranks', 'historical', 'beatmaps', 'medals'], // 1.7.0 - 1.9.0
+];
+
+const reconcileOrder = (saved) => reconcileSectionOrder(saved, DEFAULT_ORDER, RETIRED_DEFAULT_ORDERS);
 
 function currentOrder() {
   return reconcileOrder(settings.sectionOrder);

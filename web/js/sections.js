@@ -51,7 +51,16 @@ export function countingNoteText(counting) {
  * had moved Medals to the bottom, which is the one place it should not be. With nothing it
  * follows present, it goes first.
  */
-export function reconcileSectionOrder(saved, defaultOrder) {
+export function reconcileSectionOrder(saved, defaultOrder, retiredDefaults = []) {
+  /*
+   * A saved order exactly equal to an earlier version's default was not a choice anyone made
+   * -- the page saved it as it stood, after a section was moved and moved back, say. Such a
+   * page gets the current default, which is what it would have shown had nothing been saved;
+   * a page that really was rearranged keeps its arrangement.
+   */
+  const same = (a, b) => a.length === b.length && a.every((id, i) => id === b[i]);
+  if (Array.isArray(saved) && retiredDefaults.some((old) => same(saved, old))) return [...defaultOrder];
+
   const out = [];
   for (const id of saved ?? []) {
     if (defaultOrder.includes(id) && !out.includes(id)) out.push(id);
