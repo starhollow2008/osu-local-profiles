@@ -2,21 +2,15 @@
  * What can be done with one score from its View Details card, wherever the card is shown:
  * the pop-up over the profile and the score's own page (`/scores/<id>`).
  *
- * Every function reports through the `toast` it is given rather than throwing, because each
- * is the whole of what a menu item does.
+ * Every function reports through the page's toast rather than throwing, because each is the
+ * whole of what a menu item does.
  */
 import { generatedAvatar } from './badges.js';
+import { countryName } from './format.js';
+import { downloadBlob, toast } from './ui.js';
 
 /** This app's `osu.ppy.sh/scores/<id>`: the score's own page, on this machine. */
 export const scoreLink = (id) => `${location.origin}/scores/${id}`;
-
-const REGION_NAMES = (() => {
-  try {
-    return new Intl.DisplayNames(undefined, { type: 'region' });
-  } catch {
-    return null;
-  }
-})();
 
 /**
  * The card's user card, from the `owner` /api/scores/<id> sends: the profile the score
@@ -24,17 +18,11 @@ const REGION_NAMES = (() => {
  */
 export function cardOwner(owner) {
   const code = owner?.country ? owner.country.toUpperCase() : '';
-  let countryName = code;
-  try {
-    countryName = (code && REGION_NAMES?.of(code)) || code;
-  } catch {
-    /* an unrecognised code stays itself */
-  }
   return {
     name: owner?.name ?? '',
     avatar: owner?.avatar ? `<img src="${owner.avatar}" alt="">` : generatedAvatar(owner?.name ?? ''),
     country: code,
-    countryName,
+    countryName: code ? countryName(code) : '',
     cover: owner?.cover ?? null,
     tracking: owner?.tracking === true,
   };
@@ -60,7 +48,7 @@ async function writeText(text) {
   if (!ok) throw new Error('the browser would not copy it');
 }
 
-export async function copyScoreLink(id, toast) {
+export async function copyScoreLink(id) {
   const link = scoreLink(id);
   try {
     await writeText(link);
@@ -102,25 +90,18 @@ function fileNameOf(response, fallback) {
  * way to include the beatmap's cover: it comes from osu!'s servers, and a picture of another
  * site's image cannot be read back out of a web page. It takes a few seconds, so say so.
  */
-export async function saveScoreImage(id, toast) {
+export async function saveScoreImage(id) {
   toast('Making the screenshot...');
   try {
     const r = await fetchScreenshot(id);
-    const url = URL.createObjectURL(await r.blob());
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileNameOf(r, `score-${id}.png`);
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    downloadBlob(await r.blob(), fileNameOf(r, `score-${id}.png`));
     toast('Screenshot saved to your downloads');
   } catch (err) {
     toast(err.message);
   }
 }
 
-export async function copyScoreImage(id, toast) {
+export async function copyScoreImage(id) {
   if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
     toast('This browser cannot copy images - use Save screenshot instead');
     return;
@@ -146,7 +127,7 @@ export async function copyScoreImage(id, toast) {
  * download list -- "Failed - No file" -- and never on the page. A replay can vanish from
  * under a score: osu! owns that file and may delete it.
  */
-export async function downloadReplay(id, toast) {
+export async function downloadReplay(id) {
   const url = `/api/scores/${id}/replay`;
   try {
     const head = await fetch(url, { method: 'HEAD' });

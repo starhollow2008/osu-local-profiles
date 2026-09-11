@@ -11,9 +11,8 @@ import type { Medal, MedalFamily } from './medals.ts';
  *
  * All three come from one chronological pass over the profile's scores, because they are
  * answers to the same question: what did this profile look like at each point in time?
- * There is no stored history to read -- `snapshots` only ever gets written going forward,
- * and would be wrong after a reingest -- so it is replayed from the scores themselves,
- * which are the source of truth.
+ * There is no stored history to read -- a stored one would be wrong after a reingest -- so
+ * it is replayed from the scores themselves, which are the source of truth.
  */
 
 export interface PpPoint {
@@ -96,10 +95,36 @@ function monthsBetween(from: number, to: number): number[] {
   return out;
 }
 
-/** Total pp for a set of per-beatmap bests, exactly as `computeStats` derives it. */
-function totalPp(bests: number[]): number {
-  const sorted = [...bests].sort((a, b) => b - a);
-  return weightedTotal(sorted.slice(0, 100)) + bonusPp(sorted.length);
+/**
+ * Total pp for per-beatmap bests already sorted highest first, exactly as `computeStats`
+ * derives it: the weighted top 100, plus the bonus for how many there are.
+ */
+function totalPp(bestsDescending: number[]): number {
+  return weightedTotal(bestsDescending.slice(0, 100)) + bonusPp(bestsDescending.length);
+}
+
+/** Where `value` belongs in a list sorted highest first: after every entry at least as large. */
+function insertionPoint(list: readonly number[], value: number): number {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid]! >= value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/** The first position holding `value` in a list sorted highest first (it must be there). */
+function positionOf(list: readonly number[], value: number): number {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid]! > value) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
 }
 
 export function buildHistory(
@@ -154,6 +179,13 @@ export function buildHistory(
   }
 
   const bestByMap = new Map<string, number>();
+  /*
+   * The same bests, kept sorted highest first as each improves, so a day's total reads the
+   * top 100 instead of re-sorting every map played so far. That re-sort, once per day of
+   * history, was most of what this function cost on a large profile. A map's best only
+   * ever rises, so each improvement is one removal and one insertion.
+   */
+  const ranked: number[] = [];
   const pp: PpPoint[] = [];
   const monthly = new Map<number, number>();
   const events: ActivityEvent[] = [];
@@ -180,7 +212,7 @@ export function buildHistory(
     // One pp point per day: recomputing the weighted total costs a sort, and a chart
     // 90 days wide gains nothing from finer resolution.
     if (pendingDay !== null && day !== pendingDay) {
-      pp.push({ at: pendingDay, pp: totalPp([...bestByMap.values()]) });
+      pp.push({ at: pendingDay, pp: totalPp(ranked) });
     }
     pendingDay = day;
 
@@ -197,7 +229,11 @@ export function buildHistory(
     if (row.counts !== 1 || row.pp === null) continue;
 
     const previous = bestByMap.get(row.beatmap_md5);
-    if (previous === undefined || row.pp > previous) bestByMap.set(row.beatmap_md5, row.pp);
+    if (previous === undefined || row.pp > previous) {
+      bestByMap.set(row.beatmap_md5, row.pp);
+      if (previous !== undefined) ranked.splice(positionOf(ranked, previous), 1);
+      ranked.splice(insertionPoint(ranked, row.pp), 0, row.pp);
+    }
 
     if (row.pp > bestPlay) {
       bestPlay = row.pp;
@@ -211,7 +247,7 @@ export function buildHistory(
     }
   }
 
-  if (pendingDay !== null) pp.push({ at: pendingDay, pp: totalPp([...bestByMap.values()]) });
+  if (pendingDay !== null) pp.push({ at: pendingDay, pp: totalPp(ranked) });
 
   // A stable sort, so a medal earned by the same play as a new best lands after it, the way
   // osu! would announce the score before the medal it unlocked.

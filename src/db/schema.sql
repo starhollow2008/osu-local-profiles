@@ -170,15 +170,4 @@ CREATE TABLE IF NOT EXISTS beatmapset_details (
   fetched_at    INTEGER NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS snapshots (
-  id           INTEGER PRIMARY KEY,
-  profile_id   INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
-  mode         INTEGER NOT NULL,
-  at           INTEGER NOT NULL,
-  total_pp     REAL    NOT NULL,
-  global_rank  INTEGER,
-  accuracy     REAL    NOT NULL,
-  playcount    INTEGER NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

@@ -14,20 +14,12 @@ import {
   downloadReplay,
   saveScoreImage,
 } from './score-share.js';
+import { postJson, toast } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 const id = Number(/^\/scores\/(\d+)/.exec(location.pathname)?.[1]);
 const exporting = new URLSearchParams(location.search).get('export') === '1';
 if (exporting) document.body.classList.add('export-mode');
-
-let toastTimer = null;
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
-}
 
 let owner = null;
 let score = null;
@@ -82,7 +74,7 @@ document.addEventListener('click', (e) => {
   const replay = e.target.closest('[data-replay-download]');
   if (replay) {
     e.preventDefault();
-    void downloadReplay(id, toast);
+    void downloadReplay(id);
     return;
   }
   if (!e.target.closest('#scoreMenu')) closeMenu();
@@ -97,18 +89,12 @@ menu.addEventListener('click', async (e) => {
   const act = e.target.closest('[data-act]')?.dataset.act;
   if (!act) return;
   closeMenu();
-  if (act === 'copy-link') return copyScoreLink(id, toast);
-  if (act === 'save-image') return saveScoreImage(id, toast);
-  if (act === 'copy-image') return copyScoreImage(id, toast);
+  if (act === 'copy-link') return copyScoreLink(id);
+  if (act === 'save-image') return saveScoreImage(id);
+  if (act === 'copy-image') return copyScoreImage(id);
   if (act === 'pin' || act === 'unpin') {
     try {
-      const r = await fetch('/api/scores', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: act, id }),
-      });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? 'that did not work');
+      await postJson('/api/scores', { action: act, id });
       toast(act === 'pin' ? 'Pinned' : 'Unpinned');
       await load();
     } catch (err) {

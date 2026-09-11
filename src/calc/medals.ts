@@ -280,11 +280,20 @@ export function computeMedals(
  *
  * Counted by slug, so a rank medal reached in two modes is still one medal, exactly as osu!
  * awards it once.
+ *
+ * `known` is a mode the caller has already computed -- the page always has the one it is
+ * showing -- so that pass over its scores is not made twice.
  */
-export function earnedMedalCount(db: Db, profileId: number, e: Eligibility = VANILLA): number {
+export function earnedMedalCount(
+  db: Db,
+  profileId: number,
+  e: Eligibility = VANILLA,
+  known?: { mode: Ruleset; summary: MedalSummary },
+): number {
   const earned = new Set<string>();
   for (const mode of [0, 1, 2, 3] as Ruleset[]) {
-    for (const medal of computeMedals(db, profileId, mode, e).medals) {
+    const summary = mode === known?.mode ? known.summary : computeMedals(db, profileId, mode, e);
+    for (const medal of summary.medals) {
       if (medal.achievedAt !== null) earned.add(medal.slug);
     }
   }

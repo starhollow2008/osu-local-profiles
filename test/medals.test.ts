@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
+import { openDb, getOrCreateProfile } from '../src/db/index.ts';
 import { computeMedals, earnedMedalCount, type Medal } from '../src/calc/medals.ts';
 import { medalEvents } from '../src/calc/history.ts';
 import { VANILLA } from '../src/calc/eligibility.ts';

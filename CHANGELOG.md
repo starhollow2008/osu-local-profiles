@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **The profile page is much faster on a big profile.** On a profile of 20,000 scores a page
+  load took about a second, and so did every "show more" -- the page recalculated every
+  total, medal and chart each time. The first load is now about half that, and every request
+  after it answers in a few milliseconds until something actually changes.
+- **The download is 2.6MB smaller**: a set of TypeScript declarations was being shipped with
+  the app's one dependency, and nothing ever used them.
 - **View Details**, from the **...** menu on any score in Scores or Recent Plays: the score
   as osu!'s own score page shows it, in a card over the profile. The beatmap and its
   difficulty, the cover, the grade tower, osu!'s accuracy dial -- or the big grade letter for a

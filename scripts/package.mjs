@@ -89,7 +89,8 @@ fs.copyFileSync(process.execPath, path.join(out, path.basename(process.execPath)
 
 console.log('  copying the app...');
 copyDir(path.join(root, 'src'), path.join(out, 'src'));
-copyDir(path.join(root, 'web'), path.join(out, 'web'));
+// The .d.ts files beside the page's modules exist only so the tests can typecheck them.
+copyDir(path.join(root, 'web'), path.join(out, 'web'), (src) => !src.endsWith('.d.ts'));
 
 /*
  * The one script a release needs at runtime. A build installs the *next* one by running
@@ -102,9 +103,17 @@ fs.copyFileSync(
   path.join(out, 'scripts', 'apply-update.mjs'),
 );
 
-// The one runtime dependency. Everything else in node_modules is types and tooling.
+/*
+ * The one runtime dependency. Everything else in node_modules is types and tooling.
+ *
+ * Copied without its own node_modules: the LZMA codec declares `@types/node` as a runtime
+ * dependency, which put 2.4MB of TypeScript declarations -- 85% of what this copied -- into
+ * every release. Its code requires nothing, which the packaged build's own start-up check
+ * below proves: osr.ts loads it at startup.
+ */
 for (const dep of Object.keys(pkg.dependencies ?? {})) {
-  copyDir(path.join(root, 'node_modules', dep), path.join(out, 'node_modules', dep));
+  const from = path.join(root, 'node_modules', dep);
+  copyDir(from, path.join(out, 'node_modules', dep), (src) => !src.startsWith(path.join(from, 'node_modules')));
 }
 
 // A trimmed manifest: the packaged app never builds, tests or typechecks itself.

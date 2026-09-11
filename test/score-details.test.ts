@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { AddressInfo } from 'node:net';
+import { DatabaseSync } from 'node:sqlite';
 import { openDb, getOrCreateProfile } from '../src/db/index.ts';
 import { createProfile, setActiveProfile } from '../src/profiles.ts';
 import { BeatmapResolver } from '../src/clients/beatmaps.ts';
@@ -355,6 +356,42 @@ test('the page can read a score and download its replay', async () => {
     assert.equal((await fetch(`${base}/api/scores/999999`)).status, 404);
     // The route takes an id and nothing else; a path in the URL is simply not a route.
     assert.equal((await fetch(`${base}/api/scores/..%2F..%2Fdata/replay`)).status, 404);
+  });
+});
+
+/*
+ * /api/profile remembers its expensive aggregates between requests. Whatever writes to the
+ * database -- this connection or another one -- has to show on the very next request, or
+ * the cache is a bug rather than an optimisation.
+ */
+test("the profile's figures follow every write, from any connection", async () => {
+  await withServer(async (base, h) => {
+    type Profile = { stats: { playcount: number }; events: unknown[]; totals: { recent: number } };
+    const profile = async (query = '') =>
+      (await (await fetch(`${base}/api/profile?mode=0${query}`)).json()) as Profile;
+
+    h.add();
+    assert.equal((await profile()).stats.playcount, 1);
+    assert.equal((await profile()).stats.playcount, 1, 'unchanged when nothing was written');
+
+    h.add();
+    assert.equal((await profile()).stats.playcount, 2, 'a write through the app is seen');
+
+    // Another connection, as scripts/reingest.mjs would be.
+    const other = new DatabaseSync(path.join(h.tmp, 'test.db'));
+    other.prepare(
+      `INSERT INTO scores (profile_id, dedupe_key, mode, beatmap_md5, client, mods_json, mods_label,
+         count300, count100, count50, count_geki, count_katu, count_miss, accuracy, max_combo,
+         total_score, passed, grade, played_at)
+       VALUES (?, 'from-elsewhere', 0, 'md5-map', 'lazer', '[]', '', 1, 0, 0, 0, 0, 0, 1, 1, 1, 1, 'X', 1)`,
+    ).run(h.profileId);
+    other.close();
+    const after = await profile();
+    assert.equal(after.stats.playcount, 3, "another connection's write is seen too");
+    assert.equal(after.totals.recent, 3);
+
+    // The event list is paged from the cached history, so a smaller page is just a slice.
+    assert.ok((await profile('&events=1')).events.length <= 1);
   });
 });
 

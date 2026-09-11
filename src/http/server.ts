@@ -47,7 +47,7 @@ import {
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { appVersion } from '../config.ts';
 import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
-import { eligibilityOf } from '../calc/eligibility.ts';
+import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
 import { downloadImage, fetchBeatmapset, lookupUser } from '../clients/osu-web.ts';
@@ -68,7 +68,6 @@ import {
   clearImage,
   findImage,
   imageState,
-  MIME_FOR_EXTENSION,
   saveImage,
   sniffImage,
   type ImageKind,
@@ -157,9 +156,6 @@ export function startServer(opts: ServerOptions): http.Server {
    */
   const configFallbacks: Partial<Settings> = { country: opts.country, tagline: opts.tagline };
   const settingsFor = (profileId: number) => getSettings(opts.db, profileId, configFallbacks);
-  /** How this profile counts scores right now. Read per request, never captured. */
-  const rules = () => eligibilityOf(settingsFor(current()));
-
 
   const broadcast = (event: string, data: unknown) => {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -177,6 +173,52 @@ export function startServer(opts: ServerOptions): http.Server {
   // told about it -- it just has nothing to put in a toast beyond which map it was.
   opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
+
+  /*
+   * The profile page's expensive half, remembered until the database changes.
+   *
+   * Stats, medals (all four modes, for the header's total), the pp history and two totals
+   * each walk every score the profile has in the mode, and together they are nearly all of
+   * what a profile request costs -- most of a second on a profile of 20,000 scores. The page
+   * asks again on every "show more", every live score and every mode switch, while these
+   * numbers change only when something is written.
+   *
+   * So each entry is stamped with SQLite's own record of change: `total_changes()` counts
+   * every row this connection has written -- the tracker, the page's actions and settings
+   * all share it -- and `data_version` moves when another connection commits, such as
+   * `scripts/reingest.mjs` run beside the app. Nothing has to remember to invalidate it,
+   * which is the only way a cache like this stays correct as the code grows.
+   */
+  const cache = new Map<string, { version: string; value: unknown }>();
+  const dataVersion = (): string => {
+    const changes = opts.db.prepare('SELECT total_changes() AS n').get() as { n: number };
+    const version = opts.db.prepare('PRAGMA data_version').get() as { data_version: number };
+    return `${changes.n}:${version.data_version}`;
+  };
+  const remember = <T>(key: string, compute: () => T): T => {
+    const hit = cache.get(key);
+    if (hit && hit.version === dataVersion()) return hit.value as T;
+    const value = compute();
+    // Stamped after computing: reading a beatmap's length for the first time is a write, and
+    // stamping before it would throw this entry away on the very next request.
+    if (cache.size > 64) cache.clear();
+    cache.set(key, { version: dataVersion(), value });
+    return value;
+  };
+
+  const aggregates = (profileId: number, mode: Ruleset, e: Eligibility) =>
+    remember(`aggregates:${profileId}:${mode}:${JSON.stringify(e)}`, () => {
+      const medals = computeMedals(opts.db, profileId, mode, e);
+      return {
+        stats: computeStats(opts.db, profileId, mode, e),
+        medals,
+        medalTotal: earnedMedalCount(opts.db, profileId, e, { mode, summary: medals }),
+        // Every event, newest first; the request slices off the page it asked for.
+        history: buildHistory(opts.db, profileId, mode, Number.POSITIVE_INFINITY, e, medalEvents(medals.medals)),
+        recentTotal: recentPlayTotal(opts.db, profileId, mode),
+        mostPlayedCount: mostPlayedTotal(opts.db, profileId, mode),
+      };
+    });
 
   /*
    * One screenshot at a time. Every capture starts a throwaway browser on the same debugging
@@ -278,7 +320,9 @@ export function startServer(opts: ServerOptions): http.Server {
 
     if (url.pathname === '/api/profile') {
       const mode = (Number(url.searchParams.get('mode') ?? '0') || 0) as Ruleset;
-      const e = rules();
+      const profileId = current();
+      const settings = settingsFor(profileId);
+      const e = eligibilityOf(settings);
 
       /*
        * The paged sections. The page shows five rows of each and asks for more as the user
@@ -293,16 +337,12 @@ export function startServer(opts: ServerOptions): http.Server {
         return Math.min(Math.max(Math.floor(asked), 1), MAX_PAGE);
       };
 
-      const medals = computeMedals(opts.db, current(), mode, e);
-      const history = buildHistory(
-        opts.db,
-        current(),
+      const { stats, medals, medalTotal, history, recentTotal, mostPlayedCount } = aggregates(
+        profileId,
         mode,
-        page('events', 15),
         e,
-        medalEvents(medals.medals),
       );
-      const stats = computeStats(opts.db, current(), mode, e);
+      const rulesKey = `${profileId}:${mode}:${JSON.stringify(e)}`;
       const table = rankTable(mode);
       return json(res, {
         mode,
@@ -317,21 +357,19 @@ export function startServer(opts: ServerOptions): http.Server {
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
         medals,
         // osu!'s header figure: every medal the profile holds, whichever mode is showing.
-        medalTotal: earnedMedalCount(opts.db, current(), e),
-        pinned: pinnedPlays(opts.db, current(), mode, e),
-        top: topPlays(opts.db, current(), mode, page('top', 100), e),
-        recent: recentPlays(
-          opts.db,
-          current(),
-          mode,
-          page('recent', 25),
-          e,
-          settingsFor(current()).showIncompleteInRecent,
+        medalTotal,
+        pinned: remember(`pinned:${rulesKey}`, () => pinnedPlays(opts.db, profileId, mode, e)),
+        top: remember(`top:${rulesKey}:${page('top', 100)}`, () =>
+          topPlays(opts.db, profileId, mode, page('top', 100), e),
         ),
-        mostPlayed: mostPlayed(opts.db, current(), mode, page('mostPlayed', 15)),
+        // Recent Plays reads only the newest rows through an index, so it is not worth keeping.
+        recent: recentPlays(opts.db, profileId, mode, page('recent', 25), e, settings.showIncompleteInRecent),
+        mostPlayed: remember(`mostPlayed:${profileId}:${mode}:${page('mostPlayed', 15)}`, () =>
+          mostPlayed(opts.db, profileId, mode, page('mostPlayed', 15)),
+        ),
         // Favourites are the profile's, not a mode's, exactly as osu!'s are the account's.
-        favorites: listFavorites(opts.db, current(), page('favorites', 6), opts.tracker.beatmaps),
-        favoriteIds: favoriteIds(opts.db, current()),
+        favorites: listFavorites(opts.db, profileId, page('favorites', 6), opts.tracker.beatmaps),
+        favoriteIds: favoriteIds(opts.db, profileId),
         /*
          * How many rows each of those sections has in full, so the headings can show a real
          * count and "show more" can know when to stop offering. Top Ranks is capped at 100
@@ -339,16 +377,17 @@ export function startServer(opts: ServerOptions): http.Server {
          */
         totals: {
           top: Math.min(stats.distinctRankedBeatmaps, TOP_PLAYS),
-          recent: recentPlayTotal(opts.db, current(), mode),
-          mostPlayed: mostPlayedTotal(opts.db, current(), mode),
+          recent: recentTotal,
+          mostPlayed: mostPlayedCount,
           events: history.eventsTotal,
-          favorites: favoriteCount(opts.db, current()),
+          favorites: favoriteCount(opts.db, profileId),
         },
         ppHistory: history.pp,
         // osu-web charts global rank here, so do the same wherever a curve exists.
         rankHistory: history.pp.map((p) => ({ at: p.at, rank: estimateRank(p.pp, mode)?.rank ?? null })),
         monthlyPlaycounts: history.monthlyPlaycounts,
-        events: history.events,
+        // The cached history holds every event; the page asked for this many.
+        events: history.events.slice(0, page('events', 15)),
       });
     }
 
@@ -817,7 +856,6 @@ export function startServer(opts: ServerOptions): http.Server {
           // Abandoned attempts are part of the profile's play count, so a reset that left
           // them behind would clear the scores and still show an evening of plays.
           opts.db.prepare('DELETE FROM incomplete_plays WHERE profile_id = ?').run(current());
-          opts.db.prepare('DELETE FROM snapshots WHERE profile_id = ?').run(current());
           opts.db
             .prepare('UPDATE profiles SET tracking_since = ? WHERE id = ?')
             .run(now, current());

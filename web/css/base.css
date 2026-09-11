@@ -72,11 +72,6 @@ button {
   margin: 0 auto;
 }
 
-.u-gutter {
-  padding-left: var(--gutter);
-  padding-right: var(--gutter);
-}
-
 .u-text-shadow {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
 }

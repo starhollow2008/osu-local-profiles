@@ -1,4 +1,4 @@
-import type { LazerMod, ReplayScore, Ruleset } from '../osr.ts';
+import type { LazerMod, ReplayScore } from '../osr.ts';
 import type { OfficialCalculator } from './official.ts';
 
 /** Each successive play in the top 100 is worth 5% less than the one above it. */

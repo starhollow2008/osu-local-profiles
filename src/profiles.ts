@@ -166,7 +166,7 @@ export function deleteProfile(db: Db, id: number): { deletedScores: number; next
 
   db.exec('BEGIN');
   try {
-    // scores and snapshots are ON DELETE CASCADE, so they go with it.
+    // Everything the profile owns is ON DELETE CASCADE, so it goes with it.
     const changed = db.prepare('DELETE FROM profiles WHERE id = ?').run(id);
     if (changed.changes === 0) throw new Error(`no profile with id ${id}`);
     db.exec('COMMIT');

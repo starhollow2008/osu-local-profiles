@@ -107,15 +107,29 @@ export function daysAgoLabel(ms) {
   return `${fmt(days)} day${days === 1 ? '' : 's'} ago`;
 }
 
-export function dayLabel(ms) {
-  return new Date(ms).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-}
-
 export const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
+
+const REGION_NAMES = (() => {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'region' });
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * `US` -> `United States`. osu! writes the country's name beside the flag rather than its
+ * code, and `Intl.DisplayNames` is built into every browser this page runs in -- so the
+ * names cost no bytes and are already localised. An unrecognised code falls back to
+ * itself rather than being dropped.
+ */
+export function countryName(code) {
+  try {
+    return REGION_NAMES?.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
 
 const pad2 = (n) => String(n).padStart(2, '0');
 

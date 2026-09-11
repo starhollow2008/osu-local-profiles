@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openDb, openReadOnly, getOrCreateProfile, type Db } from '../src/db/index.ts';
+import { openDb, openReadOnly, getOrCreateProfile } from '../src/db/index.ts';
 import { detectInstalls } from '../src/clients/detect.ts';
 import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { Tracker } from '../src/tracker/index.ts';

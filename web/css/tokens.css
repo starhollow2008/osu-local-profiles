@@ -9,9 +9,10 @@
  *     background: hsl(var(--hsl-b4));
  *     background: hsla(var(--hsl-b6), 0.5);
  *
- * There are two dark families and they are NOT interchangeable. d1-d6 are 20%
- * saturation; b1-b6 are 10%. The profile page is built on b*. Phase 1's page used d*
- * throughout, which is why it read as too saturated next to the real site.
+ * osu-web has two dark families and they are NOT interchangeable: d1-d6 at 20% saturation
+ * and b1-b6 at 10%. The profile page is built on b*, so d* is deliberately not declared
+ * here. Phase 1's page used d* throughout, which is why it read as too saturated next to
+ * the real site. Only the tokens something uses are declared.
  *
  * The hue is set once and the tokens are declared again on `.hue-scope`. A custom property
  * that refers to another is resolved where it is *declared*, so setting --base-hue on an
@@ -33,16 +34,7 @@
   --hsl-c2: var(--base-hue), 40%, 90%;
 
   --hsl-l1: var(--base-hue), 40%, 80%;
-  --hsl-l2: var(--base-hue), 40%, 75%;
   --hsl-l3: var(--base-hue), 40%, 70%;
-  --hsl-l4: var(--base-hue), 40%, 50%;
-
-  --hsl-d1: var(--base-hue), 20%, 35%;
-  --hsl-d2: var(--base-hue), 20%, 30%;
-  --hsl-d3: var(--base-hue), 20%, 25%;
-  --hsl-d4: var(--base-hue), 20%, 20%;
-  --hsl-d5: var(--base-hue), 20%, 15%;
-  --hsl-d6: var(--base-hue), 20%, 10%;
 
   --hsl-f1: var(--base-hue), 10%, 60%;
   --hsl-b1: var(--base-hue), 10%, 40%;
@@ -72,11 +64,7 @@
   --yellow-dark: #eeaa00;
   --green: #88b300;
   --green-light: #b3d944;
-  --blue: #66ccff;
-  --pink: #ff66aa;
-  --purple: #8866ee;
   --red: #ed1221;
-  --red-dark: #ba0011;
 
   /* Score ranks -- identical in osu-web's colors.less and ppy/osu's OsuColour.ForRank. */
   --rank-x: #de31ae;
@@ -85,16 +73,6 @@
   --rank-b: #e3b130;
   --rank-c: #ff8e5d;
   --rank-d: #ff5a5a;
-  --rank-f: #3f3f3f;
-
-  /* Mod accent colours, from ppy/osu's OsuColour.ForModType. */
-  --mod-reduction: #b2ff66;
-  --mod-increase: #ff6666;
-  --mod-automation: #66ccff;
-  --mod-conversion: #8c66ff;
-  --mod-fun: #ff66ab;
-  --mod-system: #ffcc22;
-  --mod-unknown: hsl(var(--hsl-b1));
 
   /* Metrics. */
   --gutter: 10px;
@@ -104,19 +82,15 @@
   --box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 
   /* Font sizes, named as osu-web names them. */
-  --fs-tiny: 8px;
   --fs-small: 10px;
   --fs-small-2: 11px;
   --fs-normal: 12px;
   --fs-normal-2: 13px;
   --fs-title-small: 14px;
-  --fs-title-small-2: 15px;
   --fs-title-small-3: 16px;
   --fs-title-small-4: 18px;
   --fs-large: 20px;
   --fs-title: 24px;
-  --fs-large-2: 35px;
-  --fs-large-3: 40px;
   --fs-new-header-title: 30px;
 
   /*

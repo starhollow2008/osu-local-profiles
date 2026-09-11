@@ -42,7 +42,16 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'incomplete_plays', column: 'started_at', definition: 'INTEGER' },
 ];
 
+/**
+ * Tables earlier versions created and nothing reads any more. `snapshots` was meant to record
+ * the profile over time and was never written: history is replayed from the scores instead
+ * (src/calc/history.ts), which a reingest cannot leave stale. Always empty, so dropping it
+ * loses nothing.
+ */
+const RETIRED_TABLES = ['snapshots'];
+
 function migrate(db: Db): void {
+  for (const table of RETIRED_TABLES) db.exec(`DROP TABLE IF EXISTS ${table}`);
   for (const { table, column, definition } of ADDED_COLUMNS) {
     const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
     if (columns.length === 0) continue; // table not created yet

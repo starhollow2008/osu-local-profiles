@@ -5,7 +5,16 @@
  * refetch followed by a re-render of the affected block, which is plenty for a page that
  * changes once every few minutes when a play lands.
  */
-import { MODE_NAMES, audioTime, escapeHtml, fmt, pct, playTimeStrings, shortDate } from './format.js';
+import {
+  MODE_NAMES,
+  audioTime,
+  countryName,
+  escapeHtml,
+  fmt,
+  pct,
+  playTimeStrings,
+  shortDate,
+} from './format.js';
 import {
   coverUrl,
   generatedAvatar,
@@ -23,6 +32,7 @@ import {
   downloadReplay,
   saveScoreImage,
 } from './score-share.js';
+import { downloadBlob, hint, postJson, toast } from './ui.js';
 import {
   aboutHtml,
   activityList,
@@ -181,28 +191,6 @@ let hiddenScoreCount = 0;
 let sharing = { canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
-
-/**
- * `US` -> `United States`. osu! writes the country's name beside the flag rather than its
- * code, and `Intl.DisplayNames` is built into every browser this page runs in -- so the
- * names cost no bytes and are already localised. An unrecognised code falls back to
- * itself rather than being dropped.
- */
-const REGION_NAMES = (() => {
-  try {
-    return new Intl.DisplayNames(undefined, { type: 'region' });
-  } catch {
-    return null;
-  }
-})();
-
-function countryName(code) {
-  try {
-    return REGION_NAMES?.of(code) ?? code;
-  } catch {
-    return code;
-  }
-}
 
 function renderIdentity() {
   if (!profile) return;
@@ -378,13 +366,7 @@ $('countingNote').onclick = async (e) => {
   $('countingNote').hidden = true;
   settings = { ...settings, showCountingNote: false };
   try {
-    const r = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ showCountingNote: false }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'saving that failed');
+    const d = await postJson('/api/settings', { showCountingNote: false }, 'saving that failed');
     settings = d.settings;
   } catch (err) {
     // It is hidden for this view either way; a failed save just means it returns next load.
@@ -754,26 +736,12 @@ function setTracking(on) {
 }
 
 $('toggle').onclick = async () => {
-  const r = await (
-    await fetch('/api/tracking', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ enabled: !tracking }),
-    })
-  ).json();
-  setTracking(r.tracking);
+  try {
+    setTracking((await postJson('/api/tracking', { enabled: !tracking })).tracking);
+  } catch (err) {
+    toast(err.message);
+  }
 };
-
-/* ----------------------------------------------------------------- toast */
-
-let toastTimer;
-function toast(msg) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 4000);
-}
 
 /* ---------------------------------------------------------- options menu */
 
@@ -824,13 +792,7 @@ $('optOpenBrowser').onclick = async () => {
   app = { ...app, config: { ...app.config, openBrowser: next } };
   renderOpenBrowser();
   try {
-    const r = await fetch('/api/app-config', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ openBrowser: next }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'saving that failed');
+    const d = await postJson('/api/app-config', { openBrowser: next }, 'saving that failed');
     app = { ...app, config: d.config };
     renderOpenBrowser();
     toast(next ? 'This page will open when the app starts' : 'The app will start without opening this page');
@@ -887,9 +849,7 @@ $('updateConfirm').onclick = async () => {
   $('updateConfirm').disabled = true;
   $('updateHint').textContent = 'Downloading...';
   try {
-    const r = await fetch('/api/update/apply', { method: 'POST' });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'the update failed');
+    const d = await postJson('/api/update/apply', {}, 'the update failed');
     $('updateHint').textContent = `${d.message} If it does not come back, start it yourself.`;
   } catch (err) {
     $('updateHint').textContent = err.message;
@@ -1034,26 +994,10 @@ ${clone.outerHTML}`;
 }
 
 /** Hand the browser a file to save, without going near the server. */
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  // Revoked on the next tick: revoking immediately can cancel the download in some browsers.
-  setTimeout(() => URL.revokeObjectURL(url), 10_000);
-}
-
 const safeName = () =>
   `${(profile?.name ?? 'profile').replace(/[^\w.-]+/g, '-')}-${new Date().toISOString().slice(0, 10)}`;
 
-function shareHint(message, isError = false) {
-  const el = $('shareHint');
-  el.textContent = message;
-  el.classList.toggle('profile-hint--error', isError);
-}
+const shareHint = (message, isError) => hint('shareHint', message, isError);
 
 function openShare() {
   setMenuOpen(false);
@@ -1176,13 +1120,7 @@ async function saveSectionOrder(order) {
   settings = { ...settings, sectionOrder: order };
   applySectionOrder();
   try {
-    const r = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ sectionOrder: order }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'saving the order failed');
+    const d = await postJson('/api/settings', { sectionOrder: order }, 'saving the order failed');
     settings = d.settings;
   } catch (err) {
     toast(err.message);
@@ -1344,13 +1282,7 @@ $('aboutText').onkeydown = (e) => {
 $('aboutSave').onclick = async () => {
   $('aboutSave').disabled = true;
   try {
-    const r = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ aboutMe: $('aboutText').value }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'saving failed');
+    const d = await postJson('/api/settings', { aboutMe: $('aboutText').value }, 'saving failed');
     settings = d.settings;
     closeAboutEditor();
     toast('Saved');
@@ -1376,22 +1308,8 @@ let identitySuggestions = { sessions: [], linked: null };
 /** Which image an "Upload..." press is choosing a file for. */
 let uploadKind = null;
 
-function identityHint(message, isError = false) {
-  const el = $('identityHint');
-  el.textContent = message;
-  el.classList.toggle('profile-hint--error', isError);
-}
-
-async function identityAction(payload) {
-  const r = await fetch('/api/identity', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error ?? 'that did not work');
-  return d;
-}
+const identityHint = (message, isError) => hint('identityHint', message, isError);
+const identityAction = (payload) => postJson('/api/identity', payload);
 
 /** Cache-busted, because the file behind these URLs is replaced in place. */
 function renderIdentityPreviews() {
@@ -1622,11 +1540,7 @@ $('identityFound').addEventListener('click', async (e) => {
 
 /* ---------------------------------------------------------------- settings */
 
-function settingsHint(message, isError = false) {
-  const el = $('settingsHint');
-  el.textContent = message;
-  el.classList.toggle('profile-hint--error', isError);
-}
+const settingsHint = (message, isError) => hint('settingsHint', message, isError);
 
 /** The control for one field. `settings` holds the cleaned values the server handed back. */
 function settingControl(f) {
@@ -1777,13 +1691,7 @@ $('settingsSave').onclick = async () => {
 
   $('settingsSave').disabled = true;
   try {
-    const r = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(patch),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'saving failed');
+    const d = await postJson('/api/settings', patch, 'saving failed');
 
     // Only free text can be rejected; a checkbox or a select cannot hold a bad value.
     const rejected = SETTINGS_FIELDS.filter(
@@ -1837,13 +1745,7 @@ let favoriteCards = new Map();
 async function favoriteAction(action, beatmapsetId) {
   if (!beatmapsetId) return;
   try {
-    const r = await fetch('/api/favorites', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ action, beatmapsetId }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'that did not work');
+    const d = await postJson('/api/favorites', { action, beatmapsetId });
     favoriteSetIds = new Set(d.favorites);
     toast(
       action === 'remove'
@@ -2207,16 +2109,7 @@ bindBar(
 
 syncVolume();
 
-async function scoreAction(payload) {
-  const r = await fetch('/api/scores', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error ?? 'that did not work');
-  return d;
-}
+const scoreAction = (payload) => postJson('/api/scores', payload);
 
 function closePlayMenu() {
   $('playMenu').hidden = true;
@@ -2304,19 +2197,19 @@ $('playMenu').onclick = async (e) => {
     return;
   }
   if (act === 'replay') {
-    void downloadReplay(id, toast);
+    void downloadReplay(id);
     return;
   }
   if (act === 'copy-link') {
-    void copyScoreLink(id, toast);
+    void copyScoreLink(id);
     return;
   }
   if (act === 'save-image') {
-    void saveScoreImage(id, toast);
+    void saveScoreImage(id);
     return;
   }
   if (act === 'copy-image') {
-    void copyScoreImage(id, toast);
+    void copyScoreImage(id);
     return;
   }
   if (act === 'favorite' || act === 'unfavorite') {
@@ -2400,7 +2293,7 @@ document.addEventListener('click', (e) => {
   const link = e.target.closest('[data-replay-download]');
   if (!link) return;
   e.preventDefault();
-  void downloadReplay(Number(link.dataset.replayDownload), toast);
+  void downloadReplay(Number(link.dataset.replayDownload));
 });
 
 /*
@@ -2489,13 +2382,7 @@ async function runRecompute() {
   recomputing = true;
   toast('Recalculating stored scores from their replays...');
   try {
-    const r = await fetch('/api/recompute', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ confirm: true }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'recompute failed');
+    const d = await postJson('/api/recompute', { confirm: true }, 'recompute failed');
     toast(
       `Recalculated ${fmt(d.updated)} play${d.updated === 1 ? '' : 's'}` +
         (d.gainedPp > 0 ? ` - ${fmt(d.gainedPp)} gained a pp value` : '') +
@@ -2513,11 +2400,7 @@ async function runRecompute() {
 
 let profiles = [];
 
-function profileHint(message, isError = false) {
-  const el = $('profileHint');
-  el.textContent = message;
-  el.classList.toggle('profile-hint--error', isError);
-}
+const profileHint = (message, isError) => hint('profileHint', message, isError);
 
 function renderProfiles() {
   $('profileList').innerHTML = profiles
@@ -2543,13 +2426,7 @@ function renderProfiles() {
 }
 
 async function profileAction(payload) {
-  const r = await fetch('/api/profiles', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error ?? 'that did not work');
+  const data = await postJson('/api/profiles', payload);
   if (data.profiles) {
     profiles = data.profiles;
     renderProfiles();
@@ -2724,13 +2601,7 @@ $('backfillCheck').onclick = async () => {
   $('backfillCheck').disabled = true;
   $('backfillSummary').textContent = 'Scanning your osu! folders...';
   try {
-    const r = await fetch('/api/backfill/preview', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ since }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'preview failed');
+    const d = await postJson('/api/backfill/preview', { since }, 'preview failed');
 
     if (d.importable === 0) {
       resetBackfillPreview(
@@ -2763,13 +2634,7 @@ $('backfillConfirm').onclick = async () => {
   $('backfillCheck').disabled = true;
   $('backfillConfirm').textContent = 'Importing...';
   try {
-    const r = await fetch('/api/backfill', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ since, confirm: true }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'import failed');
+    const d = await postJson('/api/backfill', { since, confirm: true }, 'import failed');
     toast(`Imported ${fmt(d.imported)} past play${d.imported === 1 ? '' : 's'}`);
     closeBackfill();
     await Promise.all([loadProfile(), loadState()]);
@@ -2814,13 +2679,7 @@ $('resetConfirm').onclick = async () => {
   $('resetCancel').disabled = true;
   $('resetConfirm').textContent = 'Erasing...';
   try {
-    const r = await fetch('/api/profile/reset', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ confirm: true }),
-    });
-    const data = await r.json();
-    if (!r.ok) throw new Error(data.error ?? 'reset failed');
+    const data = await postJson('/api/profile/reset', { confirm: true }, 'reset failed');
     toast(`Profile reset - ${data.deleted} play${data.deleted === 1 ? '' : 's'} erased`);
   } catch (err) {
     toast(`Reset failed: ${err.message}`);

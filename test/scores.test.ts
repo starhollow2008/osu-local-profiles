@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
+import { openDb, getOrCreateProfile } from '../src/db/index.ts';
 import { createProfile } from '../src/profiles.ts';
 import {
   applyScoreAction,

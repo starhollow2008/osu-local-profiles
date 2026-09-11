@@ -436,9 +436,13 @@ button would go.
 
 ## Design constraints worth preserving
 
-- **No native modules in the Node process.** `node:sqlite` is built in, `rosu-pp-js` is
-  WASM, the LZMA codec is pure JS — do not introduce `better-sqlite3`, `realm`, or similar.
-  (The .NET helper is a separate process, not a native binding.)
+- **No native modules in the Node process.** `node:sqlite` is built in and the LZMA codec
+  is pure JS (the only runtime dependency) — do not introduce `better-sqlite3`, `realm`, or
+  similar. (The .NET helper is a separate process, not a native binding.)
+- **`/api/profile` caches its aggregates until the database changes** — see `remember` in
+  `src/http/server.ts`. The stamp is SQLite's own `total_changes()` plus `data_version`, so
+  any write invalidates it with nothing to remember. Anything added to that cache must
+  depend only on the database; a value that depends on the clock or a file would go stale.
 - **No API polling in the hot path.** Detection is local. The osu! API is optional
   enrichment only, and the app must keep working with no credentials and no network.
 - **Never scan-and-import on startup.** Only live watch events count. An automatic

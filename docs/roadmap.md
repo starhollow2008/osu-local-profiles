@@ -36,6 +36,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.21 | View Details (score card) and Download Replay | done   |
 | 5.22 | Floating audio player; pause resumes          | done   |
 | 5.23 | Score links, pages and screenshots            | done   |
+| 5.24 | Performance and cleanup pass                  | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1449,3 +1450,65 @@ both the pop-up and that page, **Save screenshot** and **Copy screenshot** of th
   `http://localhost:7272/scores/42` on the clipboard, Copy screenshot a **1000x529 PNG**, Save
   screenshot a file named like the replay; the row menu showed none of them. The profile's
   own PNG still renders after the `capture()` change. The page checked at phone width.
+
+---
+
+## 5.24 — Performance and cleanup pass
+
+**Status:** done -- not yet released.
+
+**Goal.** Review the whole codebase for redundancy, dead weight and speed, without touching
+anything that exists for macOS, Linux or osu!stable.
+
+### Measured first
+
+A synthetic profile of 20,000 scores on 3,000 beatmaps plus 6,000 unfinished plays, timing
+each piece of `/api/profile`. **About one second per request, every request** -- including
+every "show more", every live score and every mode switch, since the page re-asks for the
+whole profile each time. The pp history was 311ms of it, stats 146ms (play time 104ms of
+that), medals 87ms and the header's medal total another 76ms.
+
+### What changed
+
+- **Aggregates are cached until the database changes** (`remember` in `src/http/server.ts`).
+  The stamp is `total_changes()` (every write on the app's one connection) plus
+  `data_version` (commits from another connection, e.g. `reingest.mjs`), so nothing has to
+  remember to invalidate it. Stamped *after* computing, because a first read of a beatmap's
+  length is itself a write. Recent Plays is not cached: it reads a few rows through an index.
+- **The pp history keeps the per-beatmap bests sorted as they change** instead of re-sorting
+  all of them for every day of history. Verified **deep-equal** to the old output on a
+  randomised 20,000-score profile full of tied values.
+- **Play time parses each distinct mod list once**, and fills beatmap lengths without
+  gathering every beatmap the profile has played on every request.
+- **The medal total reuses the mode already computed** instead of computing it twice.
+- **Result**, same benchmark through the real endpoint: 1144 / 1008 / 1012 / 979ms before
+  (first load, again, show more, show more) -> **548 / 8 / 9 / 20ms**, and a write correctly
+  brings back one full recompute. A (profile, mode, time) index was measured and **not**
+  added: within noise, and it would cost every insert.
+- **Dead code**: `dayLabel`; four CSS rules nothing renders; 24 unused design tokens, including
+  `--mod-*`, a second copy of the mod colour table whose real home is `badges.js`; five
+  unused imports; the `snapshots` table, which nothing ever wrote -- dropped on open by
+  `RETIRED_TABLES` (always empty, and an older build recreates its own).
+- **One copy of the page plumbing**: `web/js/ui.js` holds `postJson`, `downloadBlob`,
+  `toast` and `hint`, replacing 15 hand-written POSTs, four identical hint functions and two
+  toasts; `countryName` moved to `format.js` from its two copies.
+- **Packaging**: the LZMA codec lists `@types/node` as a runtime dependency, so 2.4MB of
+  TypeScript declarations -- 85% of the copied dependency -- shipped in every release. Now
+  copied without its nested `node_modules` (231KB, round-trip verified), and the page's
+  test-only `.d.ts` files are left out.
+
+### Looked at and left alone
+
+- The startup index walk of the file store: ~0.45s warm. Skipping directories by mtime would
+  be faster and would be wrong for osu!stable's `Songs`, which changes in place.
+- No timers or polling exist beyond an SSE keep-alive.
+- Everything platform- or stable-specific: detection, Wine paths, the pp helper's pruning,
+  the `cmd` quoting, `fs.watch` path resolution.
+- `scripts/check-replays.mjs` is referenced nowhere but is the tool behind the corpus
+  findings in `CLAUDE.md`, and is not shipped.
+
+### What was checked
+
+`npm run check` 249/249 (a new test that the cache follows writes from this connection and
+another); `npm run ui` 228/228 against the real database; the replay download and the
+copy/save screenshot flows re-run end to end in a real browser.

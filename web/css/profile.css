@@ -660,11 +660,6 @@
   text-decoration: none;
 }
 
-.page-mode__item--active {
-  color: #fff;
-  font-weight: 700;
-}
-
 .user-profile-pages {
   display: grid;
   gap: 10px;
@@ -1281,12 +1276,6 @@
   position: absolute;
   transform: translateX(-50%);
   white-space: nowrap;
-}
-
-.chart__peak {
-  font-size: var(--fs-small);
-  color: hsl(var(--hsl-f1));
-  text-align: right;
 }
 
 /* ======================================================================== */
@@ -2612,11 +2601,6 @@
   width: 10px;
   height: 6px;
   display: block;
-}
-
-/* How many rows are still hidden -- osu-web shows this in brackets after the label. */
-.show-more-link__remaining {
-  color: hsl(var(--hsl-l1));
 }
 
 /* ======================================================================== */

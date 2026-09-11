@@ -84,22 +84,20 @@ export function beatmapLengthMs(text: string): number {
 }
 
 /**
- * Give every beatmap this profile has played a length, reading each `.osu` at most once.
+ * Give every cached beatmap a length, reading each `.osu` at most once.
  *
  * Done lazily rather than at ingest so that beatmaps cached before the column existed are
  * covered too, with no migration pass over the whole store. A file that cannot be read is
  * stored as 0 so it is not retried on every request.
+ *
+ * Every cached beatmap, whoever played it: the cache only holds beatmaps some play has
+ * resolved, so this is bounded. Narrowing it to one profile and mode meant gathering every
+ * beatmap they had played, on every request, to find the few still unread.
  */
-function fillBeatmapLengths(db: Db, profileId: number, mode: Ruleset): void {
+function fillBeatmapLengths(db: Db): void {
   const missing = db
-    .prepare(
-      `SELECT b.md5, b.osu_path FROM beatmaps b
-        WHERE b.length_ms IS NULL AND b.osu_path IS NOT NULL
-          AND b.md5 IN (SELECT beatmap_md5 FROM scores WHERE profile_id = ? AND mode = ?
-                        UNION
-                        SELECT beatmap_md5 FROM incomplete_plays WHERE profile_id = ? AND mode = ?)`,
-    )
-    .all(profileId, mode, profileId, mode) as { md5: string; osu_path: string }[];
+    .prepare('SELECT md5, osu_path FROM beatmaps WHERE length_ms IS NULL AND osu_path IS NOT NULL')
+    .all() as { md5: string; osu_path: string }[];
   if (missing.length === 0) return;
 
   const update = db.prepare('UPDATE beatmaps SET length_ms = ? WHERE md5 = ?');
@@ -116,7 +114,7 @@ function fillBeatmapLengths(db: Db, profileId: number, mode: Ruleset): void {
 
 /** Total seconds played in one mode, scored plays and incomplete ones together. */
 export function playTimeSeconds(db: Db, profileId: number, mode: Ruleset): number {
-  fillBeatmapLengths(db, profileId, mode);
+  fillBeatmapLengths(db);
 
   let ms = 0;
 
@@ -128,15 +126,26 @@ export function playTimeSeconds(db: Db, profileId: number, mode: Ruleset): numbe
     )
     .all(profileId, mode) as { mods_json: string; length_ms: number | null }[];
 
+  // A profile's scores use a handful of distinct mod lists, so each is parsed once.
+  const rates = new Map<string, number>();
+  const rateOf = (json: string): number => {
+    let rate = rates.get(json);
+    if (rate === undefined) {
+      let mods: LazerMod[] = [];
+      try {
+        mods = JSON.parse(json) as LazerMod[];
+      } catch {
+        /* unreadable mods: treat as nomod rather than drop the play */
+      }
+      rate = playRate(mods);
+      rates.set(json, rate);
+    }
+    return rate;
+  };
+
   for (const row of scores) {
     if (!row.length_ms) continue;
-    let mods: LazerMod[] = [];
-    try {
-      mods = JSON.parse(row.mods_json) as LazerMod[];
-    } catch {
-      /* unreadable mods: treat as nomod rather than drop the play */
-    }
-    ms += row.length_ms / playRate(mods);
+    ms += row.length_ms / rateOf(row.mods_json);
   }
 
   const incomplete = db
