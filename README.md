@@ -30,6 +30,11 @@ gold on an SS, and mod badges drawn the way osu! draws them -- and adds a one-cl
 that installs the newest release and restarts, keeping your `data/` folder untouched and the
 files it replaces in a rollback copy.
 
+**v1.4.0** stops an update from leaving copies of the app behind. 1.3.0 left two -- the
+rollback folder and the unpacked download, around 400MB between them. The rollback now
+lasts only as long as the update itself, and the app clears anything left over when it
+starts, including what 1.3.0 left.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

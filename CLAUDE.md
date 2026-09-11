@@ -2,7 +2,7 @@
 
 ## Current work
 
-**v1.3.0 shipped.** Ongoing work is **Phase 5**, planned in [docs/roadmap.md](docs/roadmap.md) —
+**v1.4.0 shipped.** Ongoing work is **Phase 5**, planned in [docs/roadmap.md](docs/roadmap.md) —
 read it before starting anything new. It holds one entry per feature with its design
 decisions, the files it touches, and a status column that is the resume point if a session
 is interrupted mid-feature. Update the status as you go.
