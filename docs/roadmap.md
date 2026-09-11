@@ -1534,3 +1534,9 @@ the system Node, `.\node.exe` ran the bundled one -- and fixed in `scripts/packa
 with the test that claimed "not one from PATH" now actually checking it on Windows. Not in
 1.8.0; released on its own as **1.8.1** the same day, because the updater replaces the
 launcher on every update and so reaches everyone who presses the button.
+
+**Verified by the genuine 1.8.0 updating itself to 1.8.1, from the same kind of shell**
+(NoDefaultCurrentDirectoryInExePath=1). It came back as 1.8.1 on its own port and profile
+name with the canary intact and no leftovers -- and this time the process listening on its
+port was the install's own `node.exe` (`.\node.exe src\main.ts`), where 1.8.0's relaunch had
+been `C:\Program Files\nodejs\node.exe`. The fix reached the one path that exposed the bug.
