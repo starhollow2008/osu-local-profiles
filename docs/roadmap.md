@@ -1678,6 +1678,18 @@ Found while doing it: `src/update/zip.ts` dropped Unix permission bits, so a mac
 update would have unpacked a runtime that could not be executed. It now restores the mode
 when a Unix `zip` wrote the archive.
 
+### Released as 1.10.0, and the update verified (2026-09-11)
+
+The tag's workflow run built and attached all three archives (win-x64 87MB, osx-arm64 92MB,
+linux-x64 100MB); a dry run beforehand confirmed, with the updater's own zip reader, that the
+macOS and Linux archives carry mode 755 on `node`, the launcher and `tools/pp/osu-pp`.
+
+A genuine 1.9.0 release, given port 7339, the profile name `Update Canary` and a canary file
+in its own `data/`, updated itself to the published 1.10.0 with its own button: back within
+seconds on 7339 under `Update Canary`, canary intact, no `.rollback-` folder, no
+`data/update/`, running on its own bundled `node.exe`, serving the new Recent Plays section
+and reporting calculator 2026.730.0.
+
 Intel Macs have no build: GitHub's Intel macOS runners are being retired. The macOS and
 Linux builds still need a real osu! install to be verified (5.10).
 
