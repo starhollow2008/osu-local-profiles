@@ -276,38 +276,102 @@ check(
 );
 
 /*
- * The audio preview: osu!'s own clip, one at a time. Pressing play must reach "playing" and
- * move the ring; pressing again must stop it. Needs osu.ppy.sh, so no network is a skip.
+ * The audio preview and osu-web's floating player. Pressing play must reach "playing", move
+ * the ring and bring the bar up; pressing again must *pause* and keep the place, and once
+ * more carry on from it. Needs osu.ppy.sh, so no network is a skip.
  */
 const audio = await evaluate(`(async () => {
-  const button = document.querySelector('#favoriteBeatmaps [data-audio-play]');
-  if (!button) return null;
+  const w = (ms) => new Promise((r) => setTimeout(r, ms));
+  const buttons = [...document.querySelectorAll('#favoriteBeatmaps [data-audio-play]')];
+  if (buttons.length === 0) return null;
+  const button = buttons[0];
   const panel = button.closest('.beatmapset-panel');
+  const bar = document.getElementById('audioPlayer');
+  const out = { hiddenBefore: getComputedStyle(bar).opacity === '0' };
+  const progressOf = (el) => Number(getComputedStyle(el).getPropertyValue('--progress'));
+  const until = async (test) => { for (let i = 0; i < 40 && !test(); i++) await w(100); return test(); };
+
   button.click();
-  let state = null;
-  for (let i = 0; i < 40 && state !== 'playing'; i++) {
-    await new Promise((r) => setTimeout(r, 100));
-    state = panel.dataset.audioState ?? null;
-  }
-  if (state !== 'playing') {
+  if (!(await until(() => panel.dataset.audioState === 'playing'))) {
     button.click();
     return { reached: false };
   }
-  await new Promise((r) => setTimeout(r, 700));
-  const progress = Number(getComputedStyle(panel).getPropertyValue('--progress'));
-  const ring = getComputedStyle(panel.querySelector('.beatmapset-panel__play-progress')).opacity;
+  out.reached = true;
+  await w(900);
+  out.progress = progressOf(panel);
+  out.ring = getComputedStyle(panel.querySelector('.beatmapset-panel__play-progress')).opacity;
+  const r = bar.getBoundingClientRect();
+  out.placed = Math.round(r.bottom) === window.innerHeight && Math.round(r.right) === document.documentElement.clientWidth
+    && r.height === 40 && r.width <= 520 && getComputedStyle(bar).opacity === '1';
+  out.time = document.getElementById('audioCurrent').textContent + ' / ' + document.getElementById('audioTotal').textContent;
+  out.prevOnFirst = bar.dataset.audioHasPrev;
+
   button.click();
-  await new Promise((r) => setTimeout(r, 100));
-  return { reached: true, progress, ring, stopped: !panel.hasAttribute('data-audio-state') };
+  await until(() => panel.dataset.audioState === 'paused');
+  out.paused = panel.dataset.audioState + ' ' + bar.dataset.audioState;
+  const pausedAt = progressOf(bar);
+  await w(400);
+  out.kept = pausedAt > 0 && progressOf(bar) === pausedAt;
+
+  button.click();
+  await until(() => panel.dataset.audioState === 'playing');
+  await w(200);
+  out.resumed = panel.dataset.audioState === 'playing' && progressOf(bar) >= pausedAt;
+
+  document.getElementById('audioToggle').click();
+  await until(() => bar.dataset.audioState === 'paused');
+  out.barPauses = bar.dataset.audioState;
+
+  // The volume bar, pressed a quarter of the way along.
+  const vol = document.getElementById('audioVolume');
+  const vr = vol.getBoundingClientRect();
+  const at = { clientX: vr.left + vr.width / 4, clientY: vr.top + 1, button: 0, pointerId: 1, bubbles: true };
+  vol.dispatchEvent(new PointerEvent('pointerdown', at));
+  vol.dispatchEvent(new PointerEvent('pointerup', at));
+  out.volume = Math.abs(Number(getComputedStyle(bar).getPropertyValue('--volume')) - 0.25) < 0.02
+    && bar.dataset.audioVolume === 'quiet'
+    && JSON.parse(localStorage.getItem('osu-local-profiles:audio')).volume < 0.3;
+  document.getElementById('audioMute').click();
+  out.muted = bar.dataset.audioVolume;
+  document.getElementById('audioMute').click();
+
+  // Next goes to the next playable card and leaves the first as a plain card.
+  if (buttons.length > 1) {
+    bar.querySelector('[data-audio-nav=next]').click();
+    const second = buttons[1].closest('.beatmapset-panel');
+    await until(() => second.dataset.audioState === 'playing');
+    out.next = second.dataset.audioState === 'playing' && !panel.hasAttribute('data-audio-state');
+    buttons[1].click();
+    await until(() => second.dataset.audioState === 'paused');
+  }
+  await w(4300);
+  out.hidesAfter = bar.dataset.audioVisible + ' ' + getComputedStyle(bar).opacity;
+  return out;
 })()`);
+const AUDIO_CHECKS = ['the player bar is hidden until something plays', 'pressing play plays the preview',
+  'the ring moves', 'it stays visible while playing', "the bar comes up in the bottom right, osu!'s 520x40",
+  "it shows the clip's time", 'previous is dimmed on the first card', 'pressing the card again pauses it',
+  'and keeps its place', 'pressing it once more carries on from there', "the bar's own button pauses too",
+  'the volume slider sets and keeps the volume', 'mute shows the muted speaker',
+  'next plays the next card', 'the bar goes four seconds after pausing'];
 if (audio === null || audio.reached === false) {
-  for (const name of ['pressing play plays the preview', 'the ring moves', 'it stays visible while playing',
-    'pressing again stops it']) check(name, SKIP);
+  for (const name of AUDIO_CHECKS) check(name, SKIP);
 } else {
-  check('pressing play plays the preview', audio.reached, true);
-  check('the ring moves', audio.progress > 0, true);
-  check('it stays visible while playing', audio.ring, '1');
-  check('pressing again stops it', audio.stopped, true);
+  check(AUDIO_CHECKS[0], audio.hiddenBefore, true);
+  check(AUDIO_CHECKS[1], audio.reached, true);
+  check(AUDIO_CHECKS[2], audio.progress > 0, true);
+  check(AUDIO_CHECKS[3], audio.ring, '1');
+  check(AUDIO_CHECKS[4], audio.placed, true);
+  check(AUDIO_CHECKS[5], /^\d:\d\d \/ \d:\d\d$/.test(audio.time), true);
+  check(AUDIO_CHECKS[6], audio.prevOnFirst, '0');
+  check(AUDIO_CHECKS[7], audio.paused, 'paused paused');
+  check(AUDIO_CHECKS[8], audio.kept, true);
+  check(AUDIO_CHECKS[9], audio.resumed, true);
+  check(AUDIO_CHECKS[10], audio.barPauses, 'paused');
+  check(AUDIO_CHECKS[11], audio.volume, true);
+  check(AUDIO_CHECKS[12], audio.muted, 'muted');
+  check(AUDIO_CHECKS[13], audio.next ?? SKIP, true);
+  check(AUDIO_CHECKS[14], audio.hidesAfter, '0 0');
 }
 check(
   'an Explicit card has no play button',

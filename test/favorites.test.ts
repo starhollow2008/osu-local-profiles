@@ -15,6 +15,7 @@ import {
 } from '../src/favorites.ts';
 import { extractBeatmapset, type BeatmapsetDetails } from '../src/clients/osu-web.ts';
 import { deleteProfile } from '../src/profiles.ts';
+import { audioTime } from '../web/js/format.js';
 import {
   beatmapsetCard,
   getDiffColour,
@@ -328,4 +329,20 @@ test('video and storyboard icons appear only for the sets that have them', () =>
   assert.ok(cardWith({ storyboard: true }).includes('This beatmap contains storyboard'));
   // Unknown is not the same as yes.
   assert.ok(!cardWith({ video: null, storyboard: null }).includes('beatmapset-panel__play-icon'));
+});
+
+/*
+ * The floating player's timestamps, as osu-web writes them: the format follows the clip's
+ * length, so a ten-second preview reads 0:07 / 0:10 and the two columns never disagree.
+ */
+test("audio timestamps take osu-web's format from the clip's length", () => {
+  assert.equal(audioTime(0, 10.4), "0:00");
+  assert.equal(audioTime(7.9, 10.4), "0:07");
+  assert.equal(audioTime(10.4, 10.4), "0:10");
+  assert.equal(audioTime(75, 599), "1:15");
+  assert.equal(audioTime(75, 600), "01:15");
+  assert.equal(audioTime(3725, 3725), "1:02:05");
+  assert.equal(audioTime(3725, 36000), "01:02:05");
+  // Before the clip has loaded its duration is NaN; nothing is invented.
+  assert.equal(audioTime(Number.NaN, 10), "0:00");
 });

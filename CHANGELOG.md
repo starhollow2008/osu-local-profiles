@@ -12,6 +12,14 @@
 - **Download Replay**, in the same menu and on the card: saves the score's replay to your
   Downloads folder, byte for byte the file osu! wrote, named as osu!lazer names an exported
   replay. Offered whenever osu! recorded a replay for the score.
+- **osu!'s audio player bar.** Playing a Favorite Beatmaps preview brings up osu!'s bar in the
+  bottom-right corner: previous and next (through your favourites), play / pause, the clip's
+  progress and time -- drag it to seek -- a volume slider with mute, and osu!'s "play next
+  track automatically" button. It slides away a few seconds after the music stops. Your
+  volume, mute and autoplay choices are remembered by the browser.
+- **Pausing a preview now pauses it.** Pressing a playing card's button pauses the clip, and
+  pressing it again carries on from where it stopped, as on osu! -- it used to stop and start
+  over.
 
 ## 1.7.0
 

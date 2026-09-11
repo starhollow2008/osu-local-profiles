@@ -116,3 +116,21 @@ export function dayLabel(ms) {
 }
 
 export const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+/**
+ * A position in an audio clip, as osu-web's player writes it (`osu-audio/time-format.ts`).
+ * The format is picked by the clip's *length*, so the two timestamps always match: `0:07`
+ * under ten minutes, `07:32` under an hour, then `1:07:32`, then `01:07:32`.
+ */
+export function audioTime(seconds, duration) {
+  const total = Math.floor(Math.max(0, seconds || 0));
+  const s = total % 60;
+  const minutes = Math.floor(total / 60);
+  if (duration < 600) return `${minutes}:${pad2(s)}`;
+  if (duration < 3600) return `${pad2(minutes)}:${pad2(s)}`;
+  const hours = Math.floor(minutes / 60);
+  const rest = `${pad2(minutes % 60)}:${pad2(s)}`;
+  return duration < 36000 ? `${hours}:${rest}` : `${pad2(hours)}:${rest}`;
+}

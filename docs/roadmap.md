@@ -34,6 +34,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.19 | Open in browser on start, and a menu toggle   | done   |
 | 5.20 | Beatmaps section: Favorite Beatmaps           | done   |
 | 5.21 | View Details (score card) and Download Replay | done   |
+| 5.22 | Floating audio player; pause resumes          | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1340,3 +1341,59 @@ order after Pin: **View Details**, osu!'s score page (`osu.ppy.sh/scores/<id>`),
   **SHA-256 identical to the file in lazer's store**.
 - Screenshots of a lazer score, a simulated stable SS, all eight stable letters, and the card
   at phone width, compared with the real score page.
+
+---
+
+## 5.22 — The floating audio player, and pause that resumes
+
+**Status:** done -- not yet released.
+
+**Goal.** osu-web's bar in the bottom-right corner while a Favorite Beatmaps preview plays:
+previous / play-pause / next, the clip's progress, the time, the volume slider (and mute),
+and autoplay. And pausing as osu! pauses: pressing a playing card pauses it, and pressing it
+again carries on from there instead of starting over.
+
+### Established before building
+
+- **`core/osu-audio/main.ts`** is the whole behaviour: one `Audio`; `onClickPlay` toggles when
+  the pressed card is the current one and loads otherwise; `load` rewinds and plays;
+  `togglePlay` pauses or resumes in place; `ended` stops (rewinds) and, with `audio_autoplay`,
+  loads the next; `setState` shows the bar while loading or playing and hides it **4000ms**
+  after anything else. Seeking lands on release, and a seek to 100% goes to `duration - 0.01`.
+  The volume follows the pointer. `volumeIcon`: muted, silent (0), quiet (< 0.4), normal.
+- **Previous / next** walk the players inside the nearest `.js-audio--group`. On the profile
+  that is `page-extra__beatmapsets` -- the favourites list -- so they go card to card in page
+  order, and a card with no play button (Explicit) is not a stop.
+- **`audio-player.less`**: 40px, max 520px, b2, `margin-left: auto` in a fixed full-width
+  strip; 40px below the window at opacity 0 until visible, 120ms. Buttons c1 -> l1 on hover,
+  14px (play 16px); prev/next at 0.5 and inert with nowhere to go. Bars 2px on b6, 6px with a
+  14px h1 head while hovered or dragged, a 10px/5px invisible hit area; volume 50px. Times
+  12px tabular, total in c2, `--:--` until the duration is known. Autoplay at 0.5 unless on.
+- **`time-format.ts`**: the format follows the clip's length -- `0:07` under ten minutes.
+- **A paused card is a plain card**: `play-button` and the dark play area key on `loading`
+  and `playing` only, so paused shows play again; its ring keeps its place under hover.
+- **Guests' audio preferences live in localStorage** on osu-web; there is no account here.
+
+### Decisions
+
+- **Volume, mute and autoplay are kept in the browser's localStorage**, not profile settings:
+  they are about the speakers in front of you, as osu-web treats them for a visitor, and the
+  page must work with them missing (defaults 45%, unmuted, autoplay off).
+- **The clip keeps playing if its card disappears** (unfavourited, or paged away), as osu!'s
+  does -- the bar still controls it; previous / next are dimmed until it is back in the list.
+- **Pointer events** replace osu-web's mouse/touch pair, one path for both.
+- **The toast moves up** above the bar while it is showing: both live in the bottom-right.
+- The icons are drawn for this page, like every other icon here (Font Awesome is not shipped),
+  and sized to Font Awesome's fixed 1.25em width so the bar spaces out as osu!'s does.
+
+### What was checked
+
+- `npm run ui` **226/226**, 15 audio checks replacing the old 4: hidden until played; plays;
+  ring moves; bar in the bottom-right at 520x40; `m:ss / m:ss`; previous dimmed on the first
+  card; pressing the card pauses **and keeps its place**; pressing again carries on from it;
+  the bar's button pauses; the volume slider sets, shows "quiet" and persists; mute; next
+  plays the next card and clears the first; the bar gone four seconds after pausing.
+- In a real browser, separately: a seek to 90% landed at 0:09, the clip ended, and autoplay
+  started the next card; Previous went back.
+- `audioTime` against osu-web's four formats in `test/favorites.test.ts`.
+- A zoomed screenshot of the bar compared with the user's own screenshot of osu!'s.

@@ -413,7 +413,14 @@ with its cover, status, a coloured dot per difficulty, and the Explicit / Featur
 Spotlight badges, and a video or storyboard icon when the set has one. Hover the dots for
 every difficulty's name and star rating, and the card for the heart (unfavourite) and the
 download link. The play button on the cover plays osu!'s own short preview of the song --
-streamed from osu.ppy.sh only when pressed, about 100KB, and never stored.
+streamed from osu.ppy.sh only when pressed, about 100KB, and never stored. Press it again to
+pause, and again to carry on from where it stopped.
+
+While a preview plays, osu!'s audio bar comes up in the bottom-right corner: previous / next
+through your favourites, play / pause, the position (drag to seek), a volume slider with mute,
+and a button to play the next favourite automatically when one ends. It goes away a few
+seconds after the music stops. The volume, mute and autoplay choices are remembered by your
+browser.
 
 Favourites belong to the profile, as osu!'s belong to an account, and are never sent to
 osu!. Favouriting makes **one request** to `osu.ppy.sh` for that beatmap's details, which

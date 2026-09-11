@@ -68,6 +68,7 @@ allows redistribution.
 | most played | `.beatmap-playcount` | `profile-page/beatmap-playcount.tsx`, `bem/beatmap-playcount.less` |
 | play history chart | `#playHistory` | `profile-page/chart.tsx`, `profile-page/historical.tsx` |
 | medals | `.medals` | `profile-page/medals.tsx`, `bem/profile-badges.less` |
+| floating audio player | `#audioPlayer`, `.audio-player` | `core/osu-audio/main.ts`, `bem/audio-player.less`, `bem/audio-player-floating.less` |
 | score row menu | `#playMenu` | `components/play-detail-menu.tsx` |
 | View Details card | `#scoreModal`, `web/js/score-card.js` | `scores-show/*.tsx`, `bem/score-{beatmap,info,tower,dial,player,buttons,stats}.less`, `bem/user-card.less`, `bem/legacy-rank.less`, `utils/score-helper.ts` |
 
