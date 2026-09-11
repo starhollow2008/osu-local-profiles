@@ -55,6 +55,9 @@ accuracy dial, grade tower and every judgement, and every score gets its own pag
 screenshot**. **Download Replay** saves a score's replay file. Favourite previews get osu!'s
 audio player bar and pause where they left off, and a big profile's page is far faster.
 
+**v1.8.1** makes the Windows launcher always start the app's own Node runtime, even on a
+machine where Windows is set not to look in the app's folder for it.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

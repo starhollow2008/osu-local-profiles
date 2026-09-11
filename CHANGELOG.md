@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.1
 
 - **The Windows launcher always starts the app's own Node runtime.** It named `node.exe`
   without a path, which Windows only looks for in the app's folder while a security setting

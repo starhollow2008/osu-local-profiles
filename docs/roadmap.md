@@ -1532,4 +1532,5 @@ with no path, and the shell it was started from had NoDefaultCurrentDirectoryInE
 which stops `cmd` looking in the current folder. Reproduced directly -- the old launcher ran
 the system Node, `.\node.exe` ran the bundled one -- and fixed in `scripts/package-files.mjs`,
 with the test that claimed "not one from PATH" now actually checking it on Windows. Not in
-1.8.0; it ships with the next release.
+1.8.0; released on its own as **1.8.1** the same day, because the updater replaces the
+launcher on every update and so reaches everyone who presses the button.
