@@ -42,7 +42,10 @@ test('the launchers run the Node beside them, not one from PATH', () => {
   // `./` matters: a machine with its own node on PATH must still use the bundled runtime,
   // which is the version this app is actually tested against.
   assert.match(launcherFor('linux', 'node').content, /exec \.\/node src\/main\.ts/);
-  assert.match(launcherFor('win', 'node.exe').content, /node\.exe src\\main\.ts/);
+  // The same on Windows, and it was not: a bare `node.exe` only finds the bundled one while
+  // NoDefaultCurrentDirectoryInExePath is unset. Found when an update relaunched on the
+  // system Node from a shell that had it set.
+  assert.match(launcherFor('win', 'node.exe').content, /^\.\\node\.exe src\\main\.ts\r$/m);
 });
 
 test('the unix launchers start with a shebang and use forward slashes', () => {

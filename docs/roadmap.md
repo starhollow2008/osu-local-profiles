@@ -1512,3 +1512,24 @@ that), medals 87ms and the header's medal total another 76ms.
 `npm run check` 249/249 (a new test that the cache follows writes from this connection and
 another); `npm run ui` 228/228 against the real database; the replay download and the
 copy/save screenshot flows re-run end to end in a real browser.
+
+### Released as 1.8.0, and the update verified (2026-09-11)
+
+5.21-5.24 shipped together as **1.8.0**, published after CI was green on all three platforms
+for the release commit. The package is 201MB unpacked / 83MB zipped; its `node_modules` is
+227KB (2.8MB in 1.7.0).
+
+**A genuine 1.7.0 release updated itself to 1.8.0 with its own button.** The 1.7.0 zip was
+downloaded from GitHub, given port 7336, the profile name `Update Canary` and a canary file
+-- all only in its `data/` -- started, found 1.8.0, and was told to apply it. It came back as
+**1.8.0 on 7336 under `Update Canary`**, the canary intact, no `.rollback-` folder, no
+`data/update/`, `data/update.log` recording the swap, removal of the rollback and the
+relaunch, and the new `/scores/<id>` page served.
+
+**It also found a launcher bug present in every release.** The relaunched app was running
+on `C:\Program Files\nodejs\node.exe`, not the bundled runtime: the `.bat` said `node.exe`
+with no path, and the shell it was started from had NoDefaultCurrentDirectoryInExePath set,
+which stops `cmd` looking in the current folder. Reproduced directly -- the old launcher ran
+the system Node, `.\node.exe` ran the bundled one -- and fixed in `scripts/package-files.mjs`,
+with the test that claimed "not one from PATH" now actually checking it on Windows. Not in
+1.8.0; it ships with the next release.

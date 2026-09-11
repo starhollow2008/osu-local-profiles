@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **The Windows launcher always starts the app's own Node runtime.** It named `node.exe`
+  without a path, which Windows only looks for in the app's folder while a security setting
+  (NoDefaultCurrentDirectoryInExePath) is off. With it on, the app started on whatever Node
+  was installed on the computer -- possibly one too old to run it -- or failed to start.
+
 ## 1.8.0
 
 - **The profile page is much faster on a big profile.** On a profile of 20,000 scores a page

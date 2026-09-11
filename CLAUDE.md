@@ -359,6 +359,12 @@ Two rules follow from that, and both were learned by getting them wrong:
   included -- which is not ours to redistribute. It now matches by base name across
   `.dll`/`.dylib`/`.so` and warns when it prunes nothing.
 
+**The Windows launcher runs `.\node.exe`, never a bare `node.exe`.** `cmd` looks in the
+current folder for a bare name only while NoDefaultCurrentDirectoryInExePath is unset; with it
+set -- a real hardening switch, and set in Claude Code's own shell -- it searches PATH, so the
+app ran on the system Node. Found by an update's relaunch in 1.8.0; `test/package-files.test.ts`
+pins the `.\`. When testing a `.bat` from such a shell, invoke it as `.\x.bat` too.
+
 **Anything spawned through `cmd` needs `windowsVerbatimArguments`.** Node quotes spawn
 arguments by the C runtime's rules and `cmd` does not unescape them: the `""` title
 `start` needs arrived as `"\"\""`, so opening the browser silently did nothing on Windows

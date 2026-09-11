@@ -31,7 +31,13 @@ export function launcherFor(hostOs, nodeBinary) {
         '@echo off',
         'cd /d "%~dp0"',
         'title osu! local profiles',
-        `${nodeBinary} src\\main.ts`,
+        /*
+         * `.\` and never the bare name, as `./` on the other two. A bare `node.exe` is found
+         * in the current folder only while Windows' NoDefaultCurrentDirectoryInExePath is
+         * unset; with it set -- a documented hardening switch -- cmd searches PATH instead,
+         * and the app starts on whatever Node happens to be installed, or on none.
+         */
+        `.\\${nodeBinary} src\\main.ts`,
         'if errorlevel 1 (',
         '  echo.',
         '  echo The app stopped with an error. The message above says why.',
