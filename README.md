@@ -49,6 +49,12 @@ favourited from the menu on any score, with the difficulty popup, audio preview,
 Explicit / Featured Artist / Spotlight badges. The rank graph band is osu!'s darker hue, and
 Medals moves to the bottom of the page by default.
 
+**v1.8.0** adds osu!'s score page: **View Details** on any score opens it as a card, with the
+accuracy dial, grade tower and every judgement, and every score gets its own page at
+`localhost:7272/scores/<number>` with **Copy link**, **Save screenshot** and **Copy
+screenshot**. **Download Replay** saves a score's replay file. Favourite previews get osu!'s
+audio player bar and pause where they left off, and a big profile's page is far faster.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

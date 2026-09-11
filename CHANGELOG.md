@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.8.0
 
 - **The profile page is much faster on a big profile.** On a profile of 20,000 scores a page
   load took about a second, and so did every "show more" -- the page recalculated every

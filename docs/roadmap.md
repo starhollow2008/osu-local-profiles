@@ -1262,7 +1262,7 @@ a difficulty popup on hovering the dots, and a heart + download strip on hoverin
 
 ## 5.21 — View Details (score card) and Download Replay
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.8.0 (2026-09-11).
 
 **Goal.** Two entries from osu-web's score menu (`components/play-detail-menu.tsx`), in its
 order after Pin: **View Details**, osu!'s score page (`osu.ppy.sh/scores/<id>`), and
@@ -1348,7 +1348,7 @@ order after Pin: **View Details**, osu!'s score page (`osu.ppy.sh/scores/<id>`),
 
 ## 5.22 — The floating audio player, and pause that resumes
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.8.0 (2026-09-11).
 
 **Goal.** osu-web's bar in the bottom-right corner while a Favorite Beatmaps preview plays:
 previous / play-pause / next, the clip's progress, the time, the volume slider (and mute),
@@ -1404,7 +1404,7 @@ again carries on from there instead of starting over.
 
 ## 5.23 — Score links, score pages and score screenshots
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.8.0 (2026-09-11).
 
 **Goal.** From a score's View Details card, **Copy link** to a local address -- the
 equivalent of `osu.ppy.sh/scores/<id>` -- that opens the score on a page of its own; and on
@@ -1455,7 +1455,7 @@ both the pop-up and that page, **Save screenshot** and **Copy screenshot** of th
 
 ## 5.24 — Performance and cleanup pass
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.8.0 (2026-09-11).
 
 **Goal.** Review the whole codebase for redundancy, dead weight and speed, without touching
 anything that exists for macOS, Linux or osu!stable.
