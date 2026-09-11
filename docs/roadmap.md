@@ -1169,7 +1169,9 @@ branches correctly"; it branched correctly and then failed on the one platform v
 
 ## 5.20 — Beatmaps section: Favorite Beatmaps
 
-**Status: done** (unreleased).
+**Status: done** -- released as 1.7.0 (2026-09-11). A genuine 1.6.0 install updated itself
+to the published 1.7.0 with the button, **15/15**, including its existing database serving
+the new Favorite Beatmaps tables.
 
 **Goal.** osu!'s **Beatmaps** section with its **Favorite Beatmaps** subsection: osu-web's
 beatmapset card (cover strip, faded cover behind the info, title, artist, mapper, status
