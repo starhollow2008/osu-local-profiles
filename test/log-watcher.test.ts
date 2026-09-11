@@ -75,6 +75,15 @@ test('a play appended to the live log is picked up', async () => {
     );
 
     f.watcher.start();
+    /*
+     * Let the watch come up before writing, as every other test here does. This is the first
+     * `fs.watch` in the process, and on macOS that is when libuv starts its FSEvents thread:
+     * a write landing while that is still starting can go unreported. CI's macOS runner lost
+     * exactly that race. The app is not exposed to it -- reads go by byte offset, so the next
+     * append collects anything a missed event covered, and lazer's log is written constantly.
+     * Only a test that appends once, instantly, can see the difference.
+     */
+    await sleep(SETTLED_MS);
     fs.appendFileSync(runtime, quitLines(TOKEN, 'Artist - Title (Creator) [Insane]'));
     await f.waitFor(1);
 
