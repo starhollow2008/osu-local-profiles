@@ -1593,3 +1593,13 @@ minutes cold on an SSD and plausibly hours on a hard drive.
   copy showed no notice at all.
 - `npm run check` 253/253; `npm run ui` 229/229, including that the notice is hidden once the
   index exists.
+
+### Released as 1.9.0, and the update verified (2026-09-11)
+
+A genuine 1.8.1 release, given port 7339, the profile name `Update Canary` and a canary file
+in its own `data/`, updated itself to the published 1.9.0 with its own button: back on 7339
+under `Update Canary`, canary intact, no `.rollback-` folder, no `data/update/`, running on
+its own bundled `node.exe`, with the index notice in its page.
+
+The run also measured the problem this release removes: 1.8.1, started from an empty
+`data/`, took **about 99 seconds** before its page answered. 1.9.0 answered in 129ms.
