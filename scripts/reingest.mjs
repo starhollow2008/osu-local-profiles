@@ -11,7 +11,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { openDb, getOrCreateProfile } from '../src/db/index.ts';
+import { openDb } from '../src/db/index.ts';
+import { activeProfileId, findProfileByName, getProfile, seedFirstProfile } from '../src/profiles.ts';
 import { detectInstalls } from '../src/clients/detect.ts';
 import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { looksLikeReplay } from '../src/osr.ts';
@@ -20,7 +21,6 @@ import { loadConfig, dataDir } from '../src/config.ts';
 import { OfficialCalculator } from '../src/calc/official.ts';
 
 const config = loadConfig();
-const profileName = process.argv[2] ?? config.profileName;
 
 const installs = detectInstalls();
 if (installs.length === 0) {
@@ -29,7 +29,18 @@ if (installs.length === 0) {
 }
 
 const db = openDb(path.join(dataDir(), 'profiles.db'));
-const profileId = getOrCreateProfile(db, profileName);
+seedFirstProfile(db, config.profileName);
+
+// A named profile must already exist -- a typo must not create an empty one and fill it.
+// With no name, the profile the page has active, which is the one being played.
+const requested = process.argv[2];
+const target = requested === undefined ? getProfile(db, activeProfileId(db)) : findProfileByName(db, requested);
+if (!target) {
+  console.error(`no profile called "${requested}"`);
+  process.exit(1);
+}
+const profileId = target.id;
+const profileName = target.name;
 const { tracking_since: since } = db
   .prepare('SELECT tracking_since FROM profiles WHERE id = ?')
   .get(profileId);

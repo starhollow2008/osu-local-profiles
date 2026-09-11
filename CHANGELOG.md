@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Renaming your first profile no longer brings an empty copy back.** The app re-created a
+  profile under the name in `data/config.json` on every start, so after renaming the first
+  one, the next launch quietly added an empty profile under its old name. It now only uses
+  that name when there are no profiles at all. An empty extra profile left behind by this can
+  be deleted from **Options -> Profiles**.
+- `scripts/reingest.mjs` with no argument now works on the profile that is active, and a
+  profile named on the command line must already exist.
+
 ## 1.6.0
 
 - **Starting the app opens the page in your default browser.** It was always meant to, and

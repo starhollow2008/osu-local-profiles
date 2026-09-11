@@ -8,8 +8,10 @@ import {
   activeProfileId,
   createProfile,
   deleteProfile,
+  findProfileByName,
   listProfiles,
   renameProfile,
+  seedFirstProfile,
   setActiveProfile,
 } from '../src/profiles.ts';
 import { computeStats } from '../src/calc/stats.ts';
@@ -36,6 +38,39 @@ function insertScore(db: Db, profileId: number, key: string): void {
      VALUES (?,?,0,?,'lazer','[]','None',100,0,0,0,0,0,1.0,100,500000,1,'X',120.5,1,?)`,
   ).run(profileId, key, `md5-${key}`, Date.now());
 }
+
+/*
+ * config.json's profileName names the first profile and nothing more. It used to be a
+ * get-or-create on every start, so renaming the first profile made the next launch add an
+ * empty one back under the old name -- found as a ghost profile in a real install.
+ */
+test('the config name seeds only an empty database, and a rename does not bring it back', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-profiles-seed-'));
+  const db = openDb(path.join(tmp, 'test.db'));
+  try {
+    seedFirstProfile(db, 'Local Profile');
+    assert.deepEqual(listProfiles(db).map((p) => p.name), ['Local Profile']);
+
+    const [first] = listProfiles(db);
+    renameProfile(db, first!.id, 'Tangy');
+    seedFirstProfile(db, 'Local Profile'); // the next start
+    assert.deepEqual(listProfiles(db).map((p) => p.name), ['Tangy']);
+  } finally {
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('looking a profile up by name never creates one', () => {
+  const h = harness();
+  try {
+    assert.equal(findProfileByName(h.db, 'First')?.name, 'First');
+    assert.equal(findProfileByName(h.db, 'Nobody'), null);
+    assert.equal(listProfiles(h.db).length, 1);
+  } finally {
+    h.cleanup();
+  }
+});
 
 test('profiles keep their scores entirely separate', () => {
   const h = harness();

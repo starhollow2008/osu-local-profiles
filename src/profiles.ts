@@ -1,4 +1,4 @@
-import type { Db } from './db/index.ts';
+import { getOrCreateProfile, type Db } from './db/index.ts';
 
 /**
  * Several tracked playstyles in one install: "left hand", "mouse only", "tablet again".
@@ -51,6 +51,24 @@ export function listProfiles(db: Db): Profile[] {
     scoreCount: r.score_count,
     active: r.id === active,
   }));
+}
+
+/**
+ * Create the first profile, named from config.json -- only when there are no profiles yet.
+ *
+ * This used to be a get-or-create on every start, which quietly re-created a profile
+ * whenever the first one had been renamed: rename "Local Profile" to "Tangy" and the next
+ * launch added an empty "Local Profile" back to the list. After the first run, the set of
+ * profiles belongs to the database and the page, never to the config file.
+ */
+export function seedFirstProfile(db: Db, name: string): void {
+  const { n } = db.prepare('SELECT COUNT(*) AS n FROM profiles').get() as { n: number };
+  if (n === 0) getOrCreateProfile(db, name);
+}
+
+/** An existing profile by its exact name, or null. Never creates one. */
+export function findProfileByName(db: Db, name: string): Profile | null {
+  return listProfiles(db).find((p) => p.name === name) ?? null;
 }
 
 export function getProfile(db: Db, id: number): Profile | null {

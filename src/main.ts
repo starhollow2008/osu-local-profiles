@@ -3,8 +3,8 @@ import { loadConfig, saveConfig, dataDir } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { detectInstalls } from './clients/detect.ts';
 import { BeatmapResolver, indexBeatmapFiles } from './clients/beatmaps.ts';
-import { getOrCreateProfile, openDb } from './db/index.ts';
-import { activeProfileId, getProfile } from './profiles.ts';
+import { openDb } from './db/index.ts';
+import { activeProfileId, getProfile, seedFirstProfile } from './profiles.ts';
 import { Tracker } from './tracker/index.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
@@ -80,7 +80,7 @@ async function main(): Promise<void> {
   // config.profileName only seeds the very first profile. After that the set of profiles
   // lives in the database and which one is live is chosen from the page, so that renaming
   // or switching never has to round-trip through a config file.
-  getOrCreateProfile(db, config.profileName);
+  seedFirstProfile(db, config.profileName);
   const active = getProfile(db, activeProfileId(db))!;
   const profileId = active.id;
   const profileName = active.name;
