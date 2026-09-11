@@ -2,7 +2,7 @@
 
 ## Current work
 
-**v1.9.0 shipped.** The app is **osu! local profiles**, at
+**v1.10.0 shipped.** The app is **osu! local profiles**, at
 `github.com/jonathant09/osu-local-profiles`, and the user wants that to be the only name
 anywhere -- the previous one was scrubbed from the code, docs and every GitHub release. Do
 not reintroduce it, including as a compatibility alias (roadmap 5.18). Ongoing work is
@@ -114,6 +114,13 @@ there does not fail loudly -- it answers the *old* protocol and quietly returns 
 calculated the old way. After changing `Program.cs`, run `npm run build:pp:local`, not just
 `npm run build:pp`. `scripts/build-pp-helper.mjs` is shared with `npm run package` so the
 shipped helper and the development one cannot diverge.
+
+**Every pp value carries the osu! release that produced it.** The helper reports the
+`ppy.osu.Game` package version on its ready line and in each response, alongside `breakdown`
+(`GetAttributesForDisplay()` minus the total). Both land in `scores.pp_version` and
+`pp_parts`/`pp_nomod_parts`. A score's breakdown must belong to the pp shown beside it, so a
+score with no parts is recalculated *whole* when its card is opened -- never given parts
+from a newer calculator next to pp from an older one.
 
 **Do not add a fallback calculator.** `rosu-pp` was removed on purpose. Every reimplementation
 lags osu!'s reworks: rosu-pp 4.0.1 (its latest release, and the latest of the underlying Rust
@@ -268,9 +275,16 @@ are not:
 - taiko, catch and mania have **hit-count** medals in their place.
 - Star pass/FC medals run **1..10** for osu!standard and **1..8** elsewhere.
 
-**The page shows no text for a medal.** osu-web's listing is icons only, in one
-`Skill & Dedication` group with a row per `ordering` (combo 0, plays 1, rank 2, hits 3,
-pass 4, fc 5); everything else is in the hover card (`#medalTooltip`, one shared element
+**Mod Introduction is the only other group, on purpose.** The user chose it after asking
+what every medal would cost: the rest are beatmap packs, specific maps or hidden conditions a
+local profile cannot judge. Its rules are osu-queue-score-statistics' (the mod alone at its
+defaults, System mods and CL ignored; SO in osu!standard only; NC/DC are not DT/HT; passes
+only; Conversion/Fun are lazer-only mod *types*, from osu-web's `mods.json`). Do not add
+other groups without asking.
+
+**The page shows no text for a medal.** osu-web's listing is icons only, in its groups
+(Mod Introduction, then `Skill & Dedication` with a row per `ordering`: combo 0, plays 1,
+rank 2, hits 3, pass 4, fc 5); everything else is in the hover card (`#medalTooltip`, one shared element
 positioned in window coordinates like `#playMenu`). The header's Medals figure is
 account-wide (`earnedMedalCount`), as osu!'s is. An earned medal is a Recent-feed event
 (`medalEvents`) -- except rank medals, which carry no real date (`dated: false`) because
@@ -352,7 +366,9 @@ leaves a button that reveals nothing.
 macOS and Linux are written, covered by CI on `ubuntu-latest` and `macos-latest`, and
 **have never been run against a real osu! install**. Treat anything platform-specific as
 unproven rather than working, and see `docs/roadmap.md` 5.10 for the list of what still
-needs a real machine.
+needs a real machine. Since 1.10.0 each release carries `osx-arm64` and `linux-x64` zips,
+built by `.github/workflows/release.yml` on those runners (a package can only be built on
+its own OS); the user intends to test them, and osu!stable, on real machines later.
 
 Two rules follow from that, and both were learned by getting them wrong:
 
@@ -498,6 +514,9 @@ src/scores.ts          pin, order pins, remove a score (a hide); View Details da
 web/js/score-card.js   View Details: osu!'s score page as a card (dial, tower, stats)
 web/score.html         a score's own page, /scores/<id>; web/js/score-page.js drives it
 web/js/score-share.js  copy link, save/copy the card as a PNG, download the replay
+web/js/medals.js       the Medals section and the hover card over any medal
+web/js/audio-player.js the beatmap preview player (card button and corner bar)
+.github/workflows/release.yml  a v* tag builds win/osx/linux zips onto the release
 src/calc/medals.ts     medals, derived from scores; definitions from osu!'s own list
 src/http/screenshot.ts full-page PNG via an already-installed Chrome/Edge over CDP
 src/identity.ts        per-profile avatar and banner files in data/

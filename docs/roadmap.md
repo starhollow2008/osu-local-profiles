@@ -38,6 +38,14 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.23 | Score links, pages and screenshots            | done   |
 | 5.24 | Performance and cleanup pass                  | done   |
 | 5.25 | Beatmap index in the background, with progress | done   |
+| 5.26 | pp breakdown and calculator version           | done   |
+| 5.27 | Mod Introduction medals                       | done   |
+| 5.28 | Recent Plays as a section; Recent -> Milestones | done |
+| 5.29 | Release builds for macOS and Linux            | done   |
+| 5.30 | Split `web/js/main.js`                        | done   |
+| 5.31 | Sessions                                      | todo   |
+| 5.32 | Goals and challenges                          | todo   |
+| 5.33 | A page for each beatmap                       | todo   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1603,3 +1611,102 @@ its own bundled `node.exe`, with the index notice in its page.
 
 The run also measured the problem this release removes: 1.8.1, started from an empty
 `data/`, took **about 99 seconds** before its page answered. 1.9.0 answered in 129ms.
+
+## 5.26 — pp breakdown and calculator version
+
+**Status:** done -- released as 1.10.0.
+
+**Goal.** View Details shows how a score's pp splits into aim, speed, accuracy and
+flashlight, and the app says which osu! release's calculator priced each score.
+
+### Decisions
+
+- **The parts are osu!'s own.** The helper returns `PerformanceAttributes.GetAttributesForDisplay()`
+  minus the total: osu!standard gives Aim, Speed, Accuracy, Flashlight Bonus and Reading;
+  taiko Difficulty and Accuracy; mania Difficulty; catch nothing, so its card shows none.
+  Nothing is labelled or combined here.
+- **Card only**, at the user's request; not on the profile's score rows.
+- **Stored per score** (`pp_parts`, `pp_nomod_parts`, `pp_version`), since both pp values are
+  stored and the breakdown has to belong to the one shown. A score without parts is
+  recalculated -- the whole row, from its replay -- the first time its card is opened, so the
+  parts always add up to the pp beside them rather than to a newer calculator's figure.
+  Not while the beatmap index is running; the card then simply has no breakdown yet.
+- **The version is the `ppy.osu.Game` package's**, read from its assembly and reported on the
+  helper's ready line. Footer, Settings and card all show it; Settings counts scores priced
+  by another version and offers **Recalculate them** (`POST /api/recompute` with `all`).
+
+## 5.27 — Mod Introduction medals
+
+**Status:** done -- released as 1.10.0.
+
+The user asked what tracking *every* medal would cost. Most of osu!'s medals are beatmap
+packs, specific beatmaps, or hidden conditions a local profile cannot judge; Mod
+Introduction is the group that is fully decidable from the scores. Only that group was
+added, at the user's request.
+
+### Decisions
+
+- **osu!'s rules, from the code that awards them** (ppy/osu-queue-score-statistics): the
+  mod alone and at its defaults, System mods and Classic ignored; Spun Out in osu!standard
+  only; Nightcore and Daycore are not DT/HT; passes only; Conversion and Fun are lazer-only
+  mod types, taken per ruleset from osu-web's `mods.json` by `build-medal-table.mjs`.
+- **Shown in every mode**, as osu! shows modeless medals, and earned from a pass in any.
+- Groups follow osu-web's order: Mod Introduction, then Skill & Dedication.
+
+## 5.28 — Recent Plays as a section; Recent -> Milestones
+
+**Status:** done -- released as 1.10.0.
+
+Recent Plays moved out of Historical into a section of its own under me!; osu!'s "Recent"
+feed was renamed **Milestones** and placed under Historical. Both at the user's request.
+Section ids `recent` (now Milestones) and `top_ranks` are kept, since saved orders name
+them. A saved order that is exactly an earlier release's default is treated as never
+arranged and gets the new default (`RETIRED_DEFAULT_ORDERS` in `main.js`); any other saved
+order is the user's and keeps its arrangement, with Recent Plays slotted in after me!.
+
+## 5.29 — Release builds for macOS and Linux
+
+**Status:** done -- released as 1.10.0.
+
+`.github/workflows/release.yml` packages on `windows-latest` (win-x64), `macos-latest`
+(osx-arm64) and `ubuntu-latest` (linux-x64) on a `v*` tag, and creates the release with
+all three -- or attaches them to one that already exists, keeping its notes. A manual run
+without a tag is a dry run. `scripts/release-notes.mjs` builds the body from CHANGELOG.md;
+`test/release-notes.test.ts` pins its asset names to the updater's `assetNameFor`.
+
+Found while doing it: `src/update/zip.ts` dropped Unix permission bits, so a macOS or Linux
+update would have unpacked a runtime that could not be executed. It now restores the mode
+when a Unix `zip` wrote the archive.
+
+Intel Macs have no build: GitHub's Intel macOS runners are being retired. The macOS and
+Linux builds still need a real osu! install to be verified (5.10).
+
+## 5.30 — Split `web/js/main.js`
+
+**Status:** done -- released as 1.10.0.
+
+The parts that were already self-contained became modules -- `medals.js` (the section and
+its hover card), `beatmaps-popup.js` and `audio-player.js` -- taking `main.js` from 2,873
+lines to 2,295. The rest shares the page's state (mode, profile, settings, paging) closely
+enough that splitting it would mean passing that state around rather than simplifying
+anything, so it stays.
+
+## 5.31 — Sessions
+
+**Status:** todo -- not started. The user is still deciding how it should work.
+
+A play session as its own thing: plays grouped by when they were set, with what changed over
+the session (pp, accuracy, plays). How a session is bounded and shown is open.
+
+## 5.32 — Goals and challenges
+
+**Status:** todo -- for later, at the user's request.
+
+Fun, built-in goals or challenges a player can take on and track locally.
+
+## 5.33 — A page for each beatmap
+
+**Status:** todo -- for later, at the user's request.
+
+A page per beatmap gathering every play this profile has on it, as the score page does for a
+score.

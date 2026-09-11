@@ -1,6 +1,6 @@
 {
   "name": "osu-local-profiles",
-  "version": "1.9.0",
+  "version": "1.10.0",
   "private": true,
   "description": "Track an alternative osu! playstyle as its own profile, kept locally on your machine.",
   "type": "module",

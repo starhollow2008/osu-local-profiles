@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.10.0
+
+- **Recent Plays is a section of its own**, near the top of the page under me!, instead of
+  a part of Historical. The Recent feed -- medals, new bests and levels -- is now called
+  **Milestones** and sits under Historical. A page you have rearranged yourself keeps its
+  arrangement; one you never touched gets the new order.
+- **View Details shows the pp breakdown**: how much of a score's pp came from aim, speed,
+  accuracy and flashlight (taiko: difficulty and accuracy; mania: difficulty), exactly as
+  osu!'s own calculator splits it. Older scores get theirs the first time they are opened.
+- **You can see which osu! release priced your pp**: in the footer, in Settings, and on
+  each score's card. When osu! reworks pp and a newer calculator ships, Settings says how
+  many scores were priced by an older one and recalculates them with one button.
+- **Mod Introduction medals**: the thirteen medals osu! gives for your first pass with a mod
+  -- Easy, No Fail, Half Time, Hard Rock, Sudden Death, Perfect, Double Time, Nightcore,
+  Hidden, Flashlight and Spun Out, plus the lazer-only Conversion and Fun medals -- judged by
+  osu!'s own rules, from passes in any mode.
+- **macOS and Linux downloads.** Every release now has a build for Windows, macOS (Apple
+  silicon) and Linux, made on each system by GitHub Actions.
+- **Updates on macOS and Linux keep their files executable.** The updater unpacked the app
+  without the permission bits, so an update there would have relaunched nothing. (Windows has
+  no such bits and was never affected.)
+
 ## 1.9.0
 
 - **The page opens straight away on a first launch.** The app used to read your whole osu!

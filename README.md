@@ -62,6 +62,11 @@ machine where Windows is set not to look in the app's folder for it.
 folder now happens in the background, with a progress bar on the page, and anything you play
 meanwhile is added, with pp, as soon as it finishes.
 
+**v1.10.0** makes **Recent Plays** a section of its own under me!, and renames the Recent
+feed **Milestones**. View Details shows a score's **pp breakdown** -- aim, speed, accuracy,
+flashlight -- and which osu! release priced it; **Mod Introduction** medals arrive; and every
+release now has **macOS and Linux** downloads alongside Windows.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
@@ -85,8 +90,8 @@ ago` by day, and Play History reads `Plays 430` / `March 2020` by month.
 | Platform | State |
 | -------- | ----- |
 | **Windows** | Verified. Developed and used on it daily. |
-| **Linux** | Green on CI (`ubuntu-latest`): typecheck, the full test suite, and a real start-up. Nobody has yet run it against an actual osu! install. |
-| **macOS** | The same, on `macos-latest`. |
+| **Linux** | Green on CI (`ubuntu-latest`): typecheck, the full test suite, and a real start-up. Each release has a `linux-x64` build, packaged and started on Linux. Nobody has yet run it against an actual osu! install. |
+| **macOS** | The same, on `macos-latest`, with an `osx-arm64` (Apple silicon) build. |
 
 The honest summary is that Linux and macOS are *supported but unproven*. What can be
 checked without one of those machines has been: every path the app looks for osu! in is
@@ -378,8 +383,8 @@ A Medals section laid out as osu!'s is, restricted to the medals a local profile
 actually decide for itself. The names, descriptions, icons and thresholds are osu!'s own,
 taken from its published achievement list by `node scripts/build-medal-table.mjs`.
 
-All of them belong to osu!'s **Skill & Dedication** group, so that is the one group shown:
-a row of icons per family, with nothing written beside them. Hover (or tab to) a medal for
+They are shown in osu!'s own groups -- **Mod Introduction**, then **Skill & Dedication** --
+with a row of icons per family and nothing written beside them. Hover (or tab to) a medal for
 osu!'s card -- the group, the medal's name and description, and the date it was achieved,
 or *Locked*. A newly earned medal also appears in **Milestones**, and the page announces it
 when it happens.
@@ -395,6 +400,13 @@ here:
 | Beatmap pass | 1★ to 10★ | 1★ to 8★ |
 | Beatmap full combo | 1★ to 10★ | 1★ to 8★ |
 | Rank | top 50,000 / 10,000 / 5,000 / 1,000 | the same four |
+
+**Mod Introduction** is one set shared by every mode, as on osu!: your first pass with a mod
+on its own at its default settings -- Easy, No Fail, Half Time, Hard Rock, Sudden Death,
+Perfect, Double Time, Nightcore, Hidden, Flashlight, and Spun Out (osu!standard only). Two more
+go to lazer's **Conversion** and **Fun** mods, which osu!stable does not have. These are
+osu!'s rules, taken from the code that awards them: Classic does not count as a second mod,
+Nightcore is not Double Time, and a failed play earns nothing.
 
 Medals are **derived from the scores, never stored**: removing a score that earned one takes
 the medal with it. Two families are only as good as their inputs, and say so:
@@ -455,7 +467,13 @@ beatmap and its difficulty, the cover, the grade tower, osu!'s accuracy dial (or
 score set on osu!stable, the big grade letter osu! shows instead), the mods and total score,
 who played it and when and on which client, and accuracy, max combo, pp and every judgement
 -- great / ok / meh / miss, plus slider ticks, slider ends and spinners against what the map
-had. Close it with the X, Escape, or a click beside it; the page underneath is exactly as you
+had.
+
+Under those is the **pp breakdown**: how much came from aim, speed, accuracy and flashlight
+(taiko: difficulty and accuracy; mania: difficulty; catch has none), as osu!'s own calculator
+splits it, with the osu! release that priced the score. It is on the card only, not the
+profile page. A score tracked before this existed gets its breakdown the first time it is
+opened, recalculated from its replay so the parts always add up to the pp shown. Close it with the X, Escape, or a click beside it; the page underneath is exactly as you
 left it. Its own **⋯** has Pin and the rest, as the one on osu!'s score page does.
 
 Two things from osu!'s page are not there, because they are facts about osu!'s leaderboards
@@ -561,7 +579,7 @@ None by default. Six states, each its own choice, because they are not one propo
 pp still comes from osu!'s own calculator, which will price any beatmap it is handed. The
 two settings are independent: a Loved map played with Relax needs both before it counts.
 
-### Unfinished plays in Recent
+### Unfinished plays in Recent Plays
 
 Plays that were started and never finished -- quit, retried, or failed. They **always**
 count toward your play count, monthly play counts and Most Played, because osu! counts them
@@ -582,6 +600,13 @@ so a finished play in the middle still breaks it up the way it happened.
 These rows carry no accuracy, mods or pp, and are shown dimmed with a "Didn't finish" note
 rather than with zeroes standing in for numbers nobody recorded. See
 [Plays that were never finished](#plays-that-were-never-finished) for why.
+
+### pp calculator
+
+Says which osu! release's calculator prices your scores -- the footer says so too. After osu!
+reworks pp, a new version of this app ships the new calculator; when some of this profile's
+scores were priced by an older one, this says how many and **Recalculate them** brings them
+up to date from their replays, so every score is ranked against the others by one algorithm.
 
 ### Recalculating older scores
 
@@ -674,6 +699,11 @@ that to a different architecture, not a different OS: `dotnet publish` would hap
 cross-compile the pp helper, but the bundled Node runtime is a copy of the one running the
 script, and there is no cross-platform equivalent of that. Building for another OS is
 refused rather than producing an archive that starts on nothing.
+
+So releases are built by **GitHub Actions** (`.github/workflows/release.yml`): pushing a
+`v<version>` tag packages the app on a Windows, a macOS and a Linux runner and attaches the
+three zips to that version's release, with notes from this CHANGELOG. Running the workflow by
+hand with no tag is a dry run that builds all three and publishes nothing.
 
 Most of that script is *removal*. osu!'s NuGet packages carry the entire game -- fonts,
 textures, audio samples, ffmpeg, SDL, a shader compiler -- and a self-contained publish is
