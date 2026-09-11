@@ -21,6 +21,7 @@ import {
   beatmapPlaycountList,
   countingNoteText,
   playList,
+  reconcileSectionOrder,
   showMore,
 } from './sections.js';
 
@@ -31,9 +32,10 @@ const SECTIONS = [
   ['recent', 'Recent'],
   // The id is kept from when osu! called this Top Ranks: saved section orders refer to it.
   ['top_ranks', 'Scores'],
-  ['medals', 'Medals'],
   ['historical', 'Historical'],
   ['beatmaps', 'Beatmaps'],
+  // Last by default, at the user's request.
+  ['medals', 'Medals'],
 ];
 
 /* The five grades osu! counts on a profile. XH/X and SH/S are the silver variants. */
@@ -1102,17 +1104,7 @@ $('shareScreenshot').onclick = async () => {
 
 const DEFAULT_ORDER = SECTIONS.map(([id]) => id);
 
-function reconcileOrder(saved) {
-  const seen = new Set();
-  const out = [];
-  for (const id of saved ?? []) {
-    if (!DEFAULT_ORDER.includes(id) || seen.has(id)) continue;
-    seen.add(id);
-    out.push(id);
-  }
-  for (const id of DEFAULT_ORDER) if (!seen.has(id)) out.push(id);
-  return out;
-}
+const reconcileOrder = (saved) => reconcileSectionOrder(saved, DEFAULT_ORDER);
 
 function currentOrder() {
   return reconcileOrder(settings.sectionOrder);

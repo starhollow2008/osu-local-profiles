@@ -313,7 +313,9 @@ as literal text.
 the way osu! lets you rearrange your own profile.
 
 **Decisions.** The order lives in settings as an array of section ids. Unknown ids are
-dropped and missing ids appended on load, so adding a section later (5.8) never leaves a
+dropped and missing ids inserted on load -- *revised in 5.20:* after the section they follow in
+the default order rather than appended, since appending put Beatmaps below a Medals the user
+had moved to the bottom (`reconcileSectionOrder` in `web/js/sections.js`), so adding a section later (5.8) never leaves a
 saved order stale. The section tab bar follows the same order.
 
 **Plan.** Reuse whatever drag helper 5.4 produced. Drag handles appear on the section

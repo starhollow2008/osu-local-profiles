@@ -43,6 +43,29 @@ export function countingNoteText(counting) {
 }
 
 /**
+ * A saved section order, brought up to date with the sections that exist now.
+ *
+ * Unknown ids are dropped and duplicates ignored. A section the saved order has never seen
+ * -- one added in a later version -- goes in right after the section it follows in the
+ * default order, not at the very end: appending put Beatmaps below Medals on a profile that
+ * had moved Medals to the bottom, which is the one place it should not be. With nothing it
+ * follows present, it goes first.
+ */
+export function reconcileSectionOrder(saved, defaultOrder) {
+  const out = [];
+  for (const id of saved ?? []) {
+    if (defaultOrder.includes(id) && !out.includes(id)) out.push(id);
+  }
+  defaultOrder.forEach((id, index) => {
+    if (out.includes(id)) return;
+    // The nearest section before it in the default order that the saved order does have.
+    const before = defaultOrder.slice(0, index).reverse().find((prev) => out.includes(prev));
+    out.splice(before === undefined ? 0 : out.indexOf(before) + 1, 0, id);
+  });
+  return out;
+}
+
+/**
  * The profile's own description, as markup.
  *
  * Plain text in, escaped HTML out. osu! itself accepts BBCode here, but a local profile

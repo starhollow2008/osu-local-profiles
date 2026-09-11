@@ -11,6 +11,9 @@
   - Favourites are each profile's own, and never sent to osu!. Favouriting asks
     osu.ppy.sh for that beatmap's details once; with no connection it is still saved, and
     the card shows what is on your machine until it can be filled in.
+- **Sections are ordered me!, Recent, Scores, Historical, Beatmaps, Medals by default.**
+  A section added in a new version now joins a rearranged page after the section it follows
+  by default, instead of at the very bottom.
 
 - **The rank graph and stats band is darker, as on osu!.** It shared the header's and the
   level bar's hue, so the top of the page read as one block. It is now osu!'s darker page
