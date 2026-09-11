@@ -649,7 +649,9 @@ passed play is still counted exactly once.
 
 ## 5.12 — Incomplete plays on osu!stable
 
-**Status:** todo — blocked on having an osu!stable install to inspect
+**Status:** answered on a real osu!stable install (2026-09-11) — stable keeps no usable
+record of a play it did not save, so the app says so rather than guessing. See **What a real
+stable install turned out to hold** below; the leads above are kept for the reasoning.
 
 **Goal.** What 5.11 does for lazer, for osu!stable: count the plays that were started and
 never finished. Today a stable install contributes its passes exactly as it always has, and
@@ -729,6 +731,51 @@ The ingest is already client-agnostic and does not need changing:
   play — see how `dedupe_key` is used in `src/tracker/incomplete.ts`.
 - `logDirOf` in `src/clients/lazer-log.ts` already returns null for a stable install, so
   stable installs are silently skipped today rather than half-supported.
+
+### What a real stable install turned out to hold (2026-09-11)
+
+Measured on osu!stable `b20260711.1`, with the user playing a session and then a controlled
+test while the files were watched.
+
+**Lead 1 is dead: stable's logs say nothing about plays.** `Logs/` exists but holds only
+`runtime.log` (OpenGL initialisation, written at launch), `update_success.log` (the updater)
+and `osu!auth.log` (100KB of encrypted bytes). None was written during gameplay -- the newest
+was two minutes older than the first play of the session.
+
+**A pass writes a replay when the results screen is left.** `scores.db` recorded the three
+passes at 3:39:25, 3:41:04 and 3:42:12; `Data/r/*.osr` appeared at 3:39:48, 3:41:21 and
+3:42:20 -- 8 to 23 seconds later, as the player left each results screen. This is why a stable
+score reaches the page a little after it was set, and it is stable's behaviour, not something
+the watcher can improve on. It is worth saying on the page (see the note in `main.js`).
+
+**An unfinished play leaves exactly one thing: a per-beatmap "last played" time in
+`osu!.db`.** In the controlled test, a quit, a fail and a retry on *one* newly downloaded
+difficulty produced: no replay, no `scores.db` change, and **one** new timestamp, in that
+difficulty's record (offset 69411, 3:54:49) beside the set's import time (3:53:52). The other
+eight difficulties of the set carried the import time only. The same shape explains the
+earlier session: five play times in `osu!.db` against three scores, the two extras being the
+plays that were quit or failed.
+
+That is not enough to count plays, for four independent reasons:
+
+- **It cannot count.** Three attempts on one map wrote one timestamp. Retries -- the case that
+  matters most -- collapse to nothing.
+- **It cannot say what happened.** A pass updates the same field; only the replay beside it
+  tells the two apart.
+- **It is late.** `osu!.db` is flushed minutes after the fact (3:44:57 and 3:54:58 here), so a
+  play would appear long after it happened, and two plays in one window count once.
+- **It is fragile.** Reading it means parsing a binary format that has already moved: a parser
+  written to osu!'s documented layout broke on this build (version 20260711).
+
+**Decision: do not count them, and say so.** A play count that silently undercounts retries
+would be wrong in a way nobody could see, which is worse than a gap that is stated plainly --
+the same reasoning as "no fallback pp calculator". The page now carries a dismissible note in
+Recent Plays and Scores wherever a stable install is found, saying both facts: when a score
+arrives, and that quit or failed plays are not counted. lazer has neither limitation.
+
+**If this is ever revisited**, the only local source is that `osu!.db` timestamp, and any
+build on it must be labelled in the UI as the approximation it is. The osu! API's
+`include_fails=1` remains refused: it needs OAuth credentials and breaks "no login anywhere".
 
 **Done when.** A quit and a retry on osu!stable raise the play count the same way they do on
 lazer — or this section records, with evidence, that stable keeps no local trace of them and

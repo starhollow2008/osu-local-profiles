@@ -200,6 +200,8 @@ let staleScores = 0;
 /** Which osu! release prices scores, and how many of this profile's another one priced. */
 let ppCalculator = { version: null, outdated: 0 };
 let hiddenScoreCount = 0;
+/** Which clients were found, so the page can say how the one being watched behaves. */
+let installKinds = [];
 let sharing = { canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
@@ -427,6 +429,50 @@ $('favoritesNote').onclick = async (e) => {
   }
 };
 
+/**
+ * How osu!stable reaches this page, said once where it matters.
+ *
+ * Both facts were measured on a real stable install (roadmap 5.12), and neither is something
+ * this app can do anything about: stable writes the replay only when the results screen is
+ * left, so a score appears seconds after the play rather than at the moment it ends; and it
+ * keeps no usable record of a play that was quit, failed or retried, so those are not counted
+ * at all. lazer has neither limitation, so the note is shown only where stable was found.
+ */
+function renderStableNote() {
+  const show = installKinds.includes('stable') && settings.showStableNote !== false;
+  for (const note of document.querySelectorAll('[data-stable-note]')) {
+    note.hidden = !show;
+    if (!show) {
+      note.innerHTML = '';
+      continue;
+    }
+    note.innerHTML = `<div class="counting-note__text">
+        <b>Playing on osu!stable?</b> A score reaches this page when you leave the results
+        screen and go back to song select -- that is when stable writes the replay. Plays you
+        quit, failed or retried are not counted at all: stable keeps no record of them.
+        osu!lazer has neither limitation.
+      </div>
+      <div class="counting-note__actions">
+        <button type="button" class="counting-note__dismiss" data-dismiss-stable>Don't show again</button>
+        <button type="button" class="counting-note__close" data-dismiss-stable
+                aria-label="Don't show this again">&times;</button>
+      </div>`;
+  }
+}
+
+document.addEventListener('click', async (e) => {
+  if (!e.target.closest('[data-dismiss-stable]')) return;
+
+  settings = { ...settings, showStableNote: false };
+  renderStableNote();
+  try {
+    const d = await postJson('/api/settings', { showStableNote: false }, 'saving that failed');
+    settings = d.settings;
+  } catch (err) {
+    toast(err.message);
+  }
+});
+
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
@@ -537,7 +583,9 @@ async function loadState() {
   if (isStatic) $('footerVersion').textContent += ` - a copy, as of ${shortDate(Date.parse(snapshot.exportedAt))}`;
   renderUpdate();
 
-  const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
+  installKinds = s.installs.map((i) => i.kind);
+  renderStableNote();
+  const kinds = installKinds.join(' + ') || 'no client found';
   $('optInfo').textContent = `${s.profile.name} - watching ${kinds} - ${s.scoresThisSession} score${
     s.scoresThisSession === 1 ? '' : 's'
   } this session`;

@@ -212,3 +212,16 @@ test('markup typed into the description is stored as the text it is', () => {
     h.cleanup();
   }
 });
+
+test('the osu!stable note is offered until a profile turns it off', () => {
+  const h = harness();
+  try {
+    // Shown by default, like the counting note: it explains something surprising about how
+    // stable reaches the page (roadmap 5.12), and only where stable was found.
+    assert.equal(getSettings(h.db, h.profileId).showStableNote, true);
+    assert.equal(updateSettings(h.db, h.profileId, { showStableNote: false }).showStableNote, false);
+    assert.equal(getSettings(h.db, h.profileId).showStableNote, false);
+  } finally {
+    h.cleanup();
+  }
+});

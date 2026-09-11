@@ -106,6 +106,12 @@ export interface Settings {
    * or import an osu! account's -- with a Don't show again, like the counting note.
    */
   showFavoritesHint: boolean;
+  /**
+   * Whether the page explains, once, how osu!stable reaches it: a score arrives only when the
+   * results screen is left, and a play that was quit or failed never arrives at all. Shown
+   * only where a stable install was found, and dismissed per profile.
+   */
+  showStableNote: boolean;
 }
 
 /**
@@ -189,6 +195,10 @@ const DEFS: Defs = {
     coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
   },
   showFavoritesHint: {
+    default: true,
+    coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
+  },
+  showStableNote: {
     default: true,
     coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
   },

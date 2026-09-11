@@ -929,6 +929,33 @@ check('the name opens it too', await shown('identityModal'), 'grid');
 await evaluate("document.getElementById('identityClose').click()");
 check('Close closes it', await shown('identityModal'), 'none');
 
+/*
+ * The osu!stable note. Both halves of it were measured (roadmap 5.12): stable writes a score
+ * when the results screen is left, and never records a play that was quit or failed.
+ */
+console.log('\nosu!stable note');
+const stableNote = JSON.parse(await evaluate(`(() => {
+  const notes = [...document.querySelectorAll('[data-stable-note]')];
+  const state = notes.map((n) => n.hidden);
+  return JSON.stringify({
+    places: notes.length,
+    inRecentPlays: !!document.querySelector('#section-recent_plays [data-stable-note]'),
+    inScores: !!document.querySelector('#section-top_ranks [data-stable-note]'),
+    hidden: state,
+    text: notes[0]?.textContent.replace(/\\s+/g, ' ').trim() ?? '',
+    dismissible: notes[0] ? notes[0].querySelectorAll('[data-dismiss-stable]').length : 0,
+  });
+})()`));
+check('it can appear in Recent Plays', stableNote.inRecentPlays, true);
+check('and in Scores', stableNote.inScores, true);
+if (stableNote.hidden.every((h) => h)) {
+  console.log('  SKIP  the note itself  (no osu!stable on this machine, or it was dismissed)');
+} else {
+  check('it says when a stable score arrives', stableNote.text.includes('leave the results'), true);
+  check('and that quit or failed plays are not counted', stableNote.text.includes('not counted'), true);
+  check('it can be dismissed two ways, as the counting note is', stableNote.dismissible, 2);
+}
+
 console.log('\nimport from osu!');
 check('the import dialog is hidden on load', await shown('importModal'), 'none');
 check('Options offers it', await evaluate("!!document.getElementById('optImport')"), true);

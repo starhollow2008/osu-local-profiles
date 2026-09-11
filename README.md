@@ -205,8 +205,29 @@ This needs osu! to be signed in, which is also exactly when osu! counts the play
 two agree, and both go quiet together when you play offline. There is no accuracy, combo,
 mod list or pp for these: lazer never writes any of it down for a play it discards. They
 count toward your play count, monthly play counts and Most Played, and appear in Recent
-Plays as dimmed rows according to the **Unfinished plays in Recent** setting. It is a lazer
-feature only; osu!stable keeps no comparable log.
+Plays as dimmed rows according to the **Unfinished plays in Recent Plays** setting.
+
+### osu!stable is different, in two ways worth knowing
+
+Both were measured on a real stable install (`b20260711.1`), and neither is something this
+app can work around:
+
+- **A score arrives when you leave the results screen**, not when the play ends. That is the
+  moment stable writes the replay file: on one session the scores were set at 3:39:25,
+  3:41:04 and 3:42:12, and the replays appeared 8 to 23 seconds later, as each results screen
+  was closed. Until then there is nothing on disk to notice.
+- **Plays you quit, failed or retried are not counted at all.** stable writes no replay for
+  them and no log of them. The only trace is a single "last played" time per beatmap in
+  `osu!.db`: a quit, a fail and a retry on one difficulty left *one* timestamp between them,
+  flushed minutes later, and a pass updates the same field. That cannot count retries, cannot
+  tell a fail from a pass, and comes too late -- so this app does not guess. A play count that
+  silently undercounts is worse than one that states its gap, the same reasoning as having no
+  fallback pp calculator.
+
+The page says both, once, wherever a stable install is found -- in Recent Plays and in Scores,
+with a **Don't show again**. On osu!lazer neither limitation applies: a play is counted the
+moment osu! accepts it, quits and retries included. The full evidence is in
+[docs/roadmap.md](docs/roadmap.md) under 5.12.
 
 ### pp comes from osu!'s own calculator
 
