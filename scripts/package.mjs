@@ -41,7 +41,7 @@ if (target.split('-')[0] !== hostOs) {
   process.exit(1);
 }
 
-const name = `osu-fresh-profile-${pkg.version}-${target}`;
+const name = `osu-local-profiles-${pkg.version}-${target}`;
 const distRoot = path.join(root, 'dist');
 const out = path.join(distRoot, name);
 
@@ -208,6 +208,18 @@ const zipped =
 
 if (zipped.status === 0 && fs.existsSync(zip)) {
   console.log(`\n  ${path.relative(root, zip)}  (${mb(fs.statSync(zip).size)} to download)`);
+
+  /*
+   * The same archive under the app's name before 1.5.0. A 1.3.0 or 1.4.x install asks
+   * GitHub for *only* `osu-fresh-profile-<version>-<target>.zip` (github.ts, as it shipped),
+   * so a release without this copy offers those installs nothing -- they would have to be
+   * updated by hand. Attach both files to the release. The contents are byte-identical:
+   * the old updater strips the archive's top folder whatever it is called, and the swap
+   * itself is run by the new build's own updater.
+   */
+  const legacy = path.join(distRoot, `osu-fresh-profile-${pkg.version}-${target}.zip`);
+  fs.copyFileSync(zip, legacy);
+  console.log(`  ${path.relative(root, legacy)}  (the same file, for installs older than 1.5.0)`);
 } else {
   console.log('\n  could not create the zip -- ship the folder itself, it is complete');
 }

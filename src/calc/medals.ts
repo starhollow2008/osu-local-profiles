@@ -6,7 +6,7 @@ import { bonusPp, weightedTotal } from './pp.ts';
 import definitions from './medal-definitions.json' with { type: 'json' };
 
 /**
- * The medals a fresh profile has earned, derived from its scores.
+ * The medals a profile has earned, derived from its scores.
  *
  * **Derived, never stored.** The same reasoning as `history.ts`: a reingest, a removed
  * score, or a settings change must not leave a medal behind that the profile can no longer
@@ -39,13 +39,17 @@ export interface Medal {
   /** When it was first earned, or null while it is still locked. */
   achievedAt: number | null;
   /**
-   * Progress toward it, 0..1, for the ones that are a running total. Null where "progress"
-   * would be meaningless -- a 7-star pass is not 70% of a 10-star pass.
+   * Whether `achievedAt` is the real moment it was earned. False for rank medals, which are
+   * decided once from the current total rather than replayed score by score -- so they have
+   * no date worth announcing in the Recent feed.
    */
-  progress: number | null;
+  dated: boolean;
   /** Filled in for an earned medal: the play that earned it, where there is one. */
   earnedOn: string | null;
 }
+
+/** osu!'s group for every medal this app can award, and what its medal card is headed. */
+export const MEDAL_GROUPING = 'Skill & Dedication';
 
 export interface MedalSummary {
   medals: Medal[];
@@ -218,7 +222,6 @@ export function computeMedals(
     definitions: Definition[] | undefined,
     familyName: MedalFamily,
     earnedOn: Map<number, MedalRow>,
-    current: number,
   ) => {
     for (const definition of definitions ?? []) {
       const row = earnedOn.get(definition.threshold);
@@ -230,41 +233,60 @@ export function computeMedals(
         family: familyName,
         threshold: definition.threshold,
         achievedAt: row?.played_at ?? null,
+        dated: true,
         earnedOn: row ? title(row) : null,
-        // A star level is not a running total, so it gets no progress bar.
-        progress:
-          familyName === 'pass' || familyName === 'fc' || familyName === 'rank'
-            ? null
-            : Math.min(1, current / definition.threshold),
       });
     }
   };
 
-  add(family.combo, 'combo', comboAt, bestCombo);
-  add(family.plays, 'plays', playsAt, playcount);
-  add(family.hits, 'hits', hitsAt, totalHits);
-  add(family.pass, 'pass', passAt, 0);
-  add(family.fc, 'fc', fcAt, 0);
+  const addRank = () => {
+    for (const definition of TABLE.rank) {
+      // Lower is better: the medal is earned once the estimated rank is inside the threshold.
+      const earned = currentRank !== null && currentRank <= definition.threshold;
+      medals.push({
+        slug: definition.slug,
+        name: definition.name,
+        description: definition.description,
+        icon: definition.icon,
+        family: 'rank',
+        threshold: definition.threshold,
+        achievedAt: earned ? (rows[rows.length - 1]?.played_at ?? null) : null,
+        dated: false,
+        earnedOn: null,
+      });
+    }
+  };
 
-  for (const definition of TABLE.rank) {
-    // Lower is better: the medal is earned once the estimated rank is inside the threshold.
-    const earned = currentRank !== null && currentRank <= definition.threshold;
-    medals.push({
-      slug: definition.slug,
-      name: definition.name,
-      description: definition.description,
-      icon: definition.icon,
-      family: 'rank',
-      threshold: definition.threshold,
-      achievedAt: earned ? (rows[rows.length - 1]?.played_at ?? null) : null,
-      earnedOn: null,
-      progress: null,
-    });
-  }
+  // osu!'s own `ordering` within Skill & Dedication: combo 0, plays 1, rank 2, hits 3,
+  // pass 4, fc 5. Each ordering is one row of medals on osu!'s profile page.
+  add(family.combo, 'combo', comboAt);
+  add(family.plays, 'plays', playsAt);
+  addRank();
+  add(family.hits, 'hits', hitsAt);
+  add(family.pass, 'pass', passAt);
+  add(family.fc, 'fc', fcAt);
+
   return {
     medals,
     earned: medals.filter((m) => m.achievedAt !== null).length,
     total: medals.length,
     fcUnknown,
   };
+}
+
+/**
+ * How many medals the profile holds across every mode -- osu!'s header figure, which is the
+ * length of the account's whole achievement list and does not change with the mode tab.
+ *
+ * Counted by slug, so a rank medal reached in two modes is still one medal, exactly as osu!
+ * awards it once.
+ */
+export function earnedMedalCount(db: Db, profileId: number, e: Eligibility = VANILLA): number {
+  const earned = new Set<string>();
+  for (const mode of [0, 1, 2, 3] as Ruleset[]) {
+    for (const medal of computeMedals(db, profileId, mode, e).medals) {
+      if (medal.achievedAt !== null) earned.add(medal.slug);
+    }
+  }
+  return earned.size;
 }

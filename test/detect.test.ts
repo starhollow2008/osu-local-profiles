@@ -120,7 +120,7 @@ test('osu-winello\u2019s prefix is looked inside', () => {
  * nothing to guess -- only something to read. Most Linux players run stable this way.
  */
 test('osu-winello\u2019s recorded install path is read, not guessed', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-detect-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
   try {
     const data = path.join(tmp, 'data');
     fs.mkdirSync(path.join(data, 'osuconfig'), { recursive: true });
@@ -134,7 +134,7 @@ test('osu-winello\u2019s recorded install path is read, not guessed', () => {
 });
 
 test('a missing wine prefix is the normal case, not an error', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-detect-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
   try {
     const e: DetectEnvironment = { ...LINUX, home: tmp, env: { XDG_DATA_HOME: path.join(tmp, 'x') } };
     assert.deepEqual(wineStableRoots(e), []);
@@ -146,7 +146,7 @@ test('a missing wine prefix is the normal case, not an error', () => {
 });
 
 test('wine\u2019s per-user profile is listed rather than assumed', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-detect-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
   try {
     const users = path.join(tmp, 'prefix', 'drive_c', 'users');
     fs.mkdirSync(path.join(users, 'someone'), { recursive: true });
@@ -163,7 +163,7 @@ test('wine\u2019s per-user profile is listed rather than assumed', () => {
 /* ------------------------------------------------------- classifying a root */
 
 test('an install is recognised by its marker, not by its path', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-detect-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
   try {
     const lazer = path.join(tmp, 'anywhere-at-all');
     fs.mkdirSync(path.join(lazer, 'files'), { recursive: true });
@@ -203,7 +203,7 @@ test('an install is recognised by its marker, not by its path', () => {
  * and printed in that error message while nothing actually read it.
  */
 test('a configured install root is used, and classified by what is in it', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-detect-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
   try {
     const stable = path.join(tmp, 'somewhere', 'weird', 'osu!');
     fs.mkdirSync(stable, { recursive: true });
@@ -222,7 +222,7 @@ test('a configured install root is used, and classified by what is in it', () =>
 });
 
 test('a configured root that holds nothing is ignored, not fatal', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-detect-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
   try {
     const e: DetectEnvironment = { ...LINUX, home: tmp, env: {} };
     assert.deepEqual(detectInstalls([path.join(tmp, 'nope')], e), []);

@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.5.0 (not yet released)
+
+### A new name: osu! local profiles
+
+The app, the repository and every download are now **osu! local profiles**. The launcher is
+`Start osu! local profiles.bat` (`.command` on macOS). Nothing about your data changes: it
+stays in `data/`, and an update never touches that folder.
+
+**Updating from 1.3.0 or 1.4.0 still works with the button.** Those versions look for a
+download with the old name, so every release now carries the same archive under both
+names. Your install keeps its folder name -- rename the folder yourself if you like, with
+the app closed -- and a shortcut to the old launcher needs pointing at the new one.
+
+### The page matches osu!'s more closely
+
+- **Medals, pp and Total Play Time** under the rank graph, as on osu!, in place of pp,
+  Ranked Beatmaps and Bonus pp. The medal count is the whole profile's, across modes. Play
+  time is counted with osu!'s own rule -- each play adds the map's length at the speed it
+  was played, or the time actually spent in it if you quit, whichever is less.
+- **Top Ranks is now Scores**, and **Pinned is now Pinned Scores**. With nothing pinned,
+  that space is simply empty.
+- **The Medals section is laid out as osu!'s**: one *Skill & Dedication* group of icons, a
+  row per family, with no names, dates, counts or progress bars on the page. Hovering a
+  medal opens osu!'s card -- the group, the medal, its description, and when you achieved
+  it.
+- **New medals appear in Recent**, and the page says so the moment one is unlocked.
+- **Grade, mod and level lettering is larger and a little darker**, so it sits in its badge
+  the way osu!'s does.
+- **A new tab icon**: a house on osu!'s pink.
+
+### Removed
+
+- **Sharing the live page on your network.** The page can reset and delete profiles
+  without asking who is calling, so it now only ever answers the machine it runs on.
+  `shareOnNetwork` in an existing `config.json` is ignored. Saving the profile as a web page
+  or an image is unchanged.
+
 ## 1.4.0
 
 ### Fixed

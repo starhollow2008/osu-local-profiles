@@ -15,7 +15,7 @@ import {
 import { computeStats } from '../src/calc/stats.ts';
 
 function harness(): { db: Db; cleanup: () => void } {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-profiles-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-profiles-'));
   const db = openDb(path.join(tmp, 'test.db'));
   getOrCreateProfile(db, 'First');
   return {
@@ -67,7 +67,7 @@ test('a new profile starts from now, not from earlier plays', () => {
     const created = createProfile(h.db, 'Mouse only');
     assert.ok(
       created.trackingSince >= before,
-      'a fresh profile must not accept anything played before it existed',
+      'a new profile must not accept anything played before it existed',
     );
     assert.equal(created.scoreCount, 0);
   } finally {

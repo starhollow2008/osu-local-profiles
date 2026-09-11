@@ -72,6 +72,26 @@ export function monthTitle(ms) {
   });
 }
 
+/**
+ * Total Play Time as osu-web's `playTimeStrings` writes it: `2d 5h 13m` on the page, with
+ * `53 hours` -- or `97 minutes`, below two hours -- as the hover title. Days only appear
+ * once there is at least one.
+ */
+export function playTimeStrings(seconds) {
+  const totalMinutes = Math.floor((seconds ?? 0) / 60);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  const roundedHours = Math.round((seconds ?? 0) / 3600);
+  const title =
+    roundedHours < 2
+      ? `${fmt(totalMinutes)} minute${totalMinutes === 1 ? '' : 's'}`
+      : `${fmt(roundedHours)} hours`;
+
+  return { title, value: `${days > 0 ? `${fmt(days)}d ` : ''}${hours}h ${minutes}m` };
+}
+
 const DAY_MS = 86_400_000;
 
 /**

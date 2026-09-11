@@ -8,6 +8,7 @@ import {
   assetFor,
   assetNameFor,
   compareVersions,
+  LEGACY_ASSET_PREFIX,
   parseRepo,
   type Release,
 } from '../src/update/github.ts';
@@ -20,7 +21,7 @@ import { blockedReason, pruneUpdateLeftovers } from '../src/update/index.ts';
  * left untested is the swap itself, which needs two real installs and a process exit.
  */
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-update-'));
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'olp-update-'));
 
 /* ------------------------------------------------------------------ github */
 
@@ -51,20 +52,46 @@ test('a pre-release is older than the release it leads to', () => {
 });
 
 test('each platform looks for the archive the packager would have named', () => {
-  assert.equal(assetNameFor('1.3.0', 'win32', 'x64'), 'osu-fresh-profile-1.3.0-win-x64.zip');
-  assert.equal(assetNameFor('1.3.0', 'darwin', 'arm64'), 'osu-fresh-profile-1.3.0-osx-arm64.zip');
-  assert.equal(assetNameFor('1.3.0', 'linux', 'x64'), 'osu-fresh-profile-1.3.0-linux-x64.zip');
+  assert.equal(assetNameFor('1.5.0', 'win32', 'x64'), 'osu-local-profiles-1.5.0-win-x64.zip');
+  assert.equal(assetNameFor('1.5.0', 'darwin', 'arm64'), 'osu-local-profiles-1.5.0-osx-arm64.zip');
+  assert.equal(assetNameFor('1.5.0', 'linux', 'x64'), 'osu-local-profiles-1.5.0-linux-x64.zip');
 });
 
 test('a release with no build for this platform offers nothing', () => {
   const release: Release = {
-    version: '1.3.0',
+    version: '1.5.0',
     releaseUrl: 'https://example.invalid',
-    assets: [{ name: 'osu-fresh-profile-1.3.0-win-x64.zip', url: 'https://example.invalid', size: 1 }],
+    assets: [{ name: 'osu-local-profiles-1.5.0-win-x64.zip', url: 'https://example.invalid', size: 1 }],
   };
-  assert.equal(assetFor(release, 'win32', 'x64')?.name, 'osu-fresh-profile-1.3.0-win-x64.zip');
+  assert.equal(assetFor(release, 'win32', 'x64')?.name, 'osu-local-profiles-1.5.0-win-x64.zip');
   // A macOS user must not be handed a Windows build because it was the only asset there.
   assert.equal(assetFor(release, 'darwin', 'arm64'), null);
+});
+
+/*
+ * The rename to osu! local profiles. A release carries each archive under both names, so
+ * that 1.3.0 and 1.4.x -- which look for the old name only -- can still update themselves.
+ */
+test('the archive is found under its old name too, and the new name wins', () => {
+  const legacyOnly: Release = {
+    version: '1.5.0',
+    releaseUrl: 'https://example.invalid',
+    assets: [{ name: 'osu-fresh-profile-1.5.0-win-x64.zip', url: 'https://example.invalid/old', size: 1 }],
+  };
+  assert.equal(assetFor(legacyOnly, 'win32', 'x64')?.url, 'https://example.invalid/old');
+
+  const both: Release = {
+    ...legacyOnly,
+    assets: [
+      ...legacyOnly.assets,
+      { name: 'osu-local-profiles-1.5.0-win-x64.zip', url: 'https://example.invalid/new', size: 1 },
+    ],
+  };
+  assert.equal(assetFor(both, 'win32', 'x64')?.url, 'https://example.invalid/new');
+  assert.equal(
+    assetNameFor('1.5.0', 'win32', 'x64', LEGACY_ASSET_PREFIX),
+    'osu-fresh-profile-1.5.0-win-x64.zip',
+  );
 });
 
 /* --------------------------------------------------------------------- zip */
@@ -135,7 +162,7 @@ test('a zip round-trips through the reader', () => {
 
 test('backslash separators are read as separators', () => {
   // Not hypothetical: this project's own packager writes them, so a release archive says
-  // `osu-fresh-profile-1.2.0-win-x64\node.exe`. Read literally that is one long filename.
+  // `osu-local-profiles-1.5.0-win-x64\node.exe`. Read literally that is one long filename.
   const dir = tmp();
   const file = path.join(dir, 'a.zip');
   fs.writeFileSync(file, makeZip([{ name: 'root\\web\\index.html', data: Buffer.from('hi') }]));

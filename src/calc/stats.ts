@@ -2,6 +2,7 @@ import type { Db } from '../db/index.ts';
 import type { LazerMod, Ruleset } from '../osr.ts';
 import { bonusPp, weightedAccuracy, weightedTotal } from './pp.ts';
 import { levelFromScore, type Level } from './level.ts';
+import { playTimeSeconds } from './play-time.ts';
 import type { Grade } from './grade.ts';
 import {
   countsSql,
@@ -79,6 +80,8 @@ export interface ProfileStats {
   totalHits: number;
   hitsPerPlay: number;
   maxCombo: number;
+  /** Seconds, by osu!'s own per-play rule -- see src/calc/play-time.ts. */
+  playTime: number;
   level: Level;
   grades: Record<Grade, number>;
   distinctRankedBeatmaps: number;
@@ -242,6 +245,7 @@ export function computeStats(
      */
     hitsPerPlay: totals.playcount > 0 ? Math.floor(totals.total_hits / totals.playcount) : 0,
     maxCombo: totals.max_combo,
+    playTime: playTimeSeconds(db, profileId, mode),
     level: levelFromScore(totals.total_score),
     grades,
     distinctRankedBeatmaps: best.length,

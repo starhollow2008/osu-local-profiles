@@ -2,7 +2,11 @@
 
 ## Current work
 
-**v1.4.0 shipped.** Ongoing work is **Phase 5**, planned in [docs/roadmap.md](docs/roadmap.md) —
+**v1.4.0 shipped; 1.5.0 is ready but not released.** The app is now **osu! local profiles**
+(it was osu! fresh profile until 1.5.0). **5.18 in the roadmap is unfinished**: the GitHub
+repository rename and a 1.5.0 release carrying *both* zip names -- read it before releasing,
+or 1.3.0/1.4.x installs cannot update. Ongoing work is **Phase 5**, planned in
+[docs/roadmap.md](docs/roadmap.md) —
 read it before starting anything new. It holds one entry per feature with its design
 decisions, the files it touches, and a status column that is the resume point if a session
 is interrupted mid-feature. Update the status as you go.
@@ -172,6 +176,17 @@ client-agnostic -- it wants a token, a timestamp, a beatmap and a pass flag, fro
 The leads worth chasing, the ones already ruled out, and the measurement to run first are
 written up in `docs/roadmap.md` under **5.12**.
 
+## Total Play Time follows osu!'s server rule
+
+osu-queue-score-statistics' `PlayValidityHelper.GetPlayLength` adds, per play,
+`min(beatmap total_length / product of rate-adjust speed changes, ended_at - started_at)`,
+and runs on failed scores too. `src/calc/play-time.ts` applies exactly that: a finished
+score has no start time, so it counts its length/rate (the smaller side for a completed
+map); an incomplete play uses lazer's token time (`incomplete_plays.started_at`) to its
+submission, capped at the map length. Rows from before `started_at` existed count nothing
+-- do not "estimate" them. Beatmap lengths are read lazily from the `.osu` into
+`beatmaps.length_ms`, with 0 meaning unreadable, so no file is ever parsed twice.
+
 ## The osu! account link needs no API and no credentials
 
 `osu.ppy.sh/users/<name>` redirects to the numeric id and embeds the whole public user
@@ -188,9 +203,12 @@ Nothing is on a timer -- see `docs/reference-links.md` for why that matters.
 ## The server is localhost-only, and that is enforced per request
 
 The page can reset a profile, delete one and remove scores; none of those endpoints asks
-who is calling. So `startServer` refuses any request whose remote address is not loopback
-unless `config.shareOnNetwork` is set. It listened on every interface by default until
-Phase 5, which meant the whole LAN could reset a profile.
+who is calling. So `startServer` refuses any request whose remote address is not loopback,
+**with no switch to turn that off**. It listened on every interface by default until
+Phase 5, which meant the whole LAN could reset a profile; the opt-in `shareOnNetwork` that
+replaced that was then removed outright in 1.5.0 at the user's request. `loadConfig` drops
+the key from an old `config.json` (`RETIRED_KEYS`). Do not bring it back: sharing a profile
+is the HTML export and the PNG, both of which are read-only.
 
 **Do not "fix" this by binding to `127.0.0.1`.** A host-bound listen drops IPv6 loopback,
 and `localhost` resolves to `::1` before `127.0.0.1` on Windows, so the app becomes
@@ -229,6 +247,14 @@ are not:
 - taiko, catch and mania have **hit-count** medals in their place.
 - Star pass/FC medals run **1..10** for osu!standard and **1..8** elsewhere.
 
+**The page shows no text for a medal.** osu-web's listing is icons only, in one
+`Skill & Dedication` group with a row per `ordering` (combo 0, plays 1, rank 2, hits 3,
+pass 4, fc 5); everything else is in the hover card (`#medalTooltip`, one shared element
+positioned in window coordinates like `#playMenu`). The header's Medals figure is
+account-wide (`earnedMedalCount`), as osu!'s is. An earned medal is a Recent-feed event
+(`medalEvents`) -- except rank medals, which carry no real date (`dated: false`) because
+they are decided once from the current total.
+
 Medals are derived from the scores on every request, never stored -- the same reasoning as
 `history.ts`. A full combo needs `beatmap_max_combo`, because a lazer score can drop slider
 ends without breaking combo, so "no misses" alone would award FC medals to a run that
@@ -236,7 +262,7 @@ dropped a hundred of them. Rows without it are reported as unknown, never guesse
 
 ## Global rank is estimated from a sampled curve, and says so
 
-osu!'s rankings API only exposes the top 10,000, which never covers a fresh profile. The
+osu!'s rankings API only exposes the top 10,000, which never covers a new profile. The
 rank shown instead comes from `src/calc/rank-tables/<mode>.json`, a pp->rank curve built by
 `scripts/build-rank-table.mjs` from data.ppy.sh's `performance_<mode>_random_10000` dump --
 a random sample across the whole ladder in which every user carries their own actual rank,
@@ -244,7 +270,7 @@ so the curve needs no modelling.
 
 The script streams the ~1GB archive through `bzip2` and `tar` and keeps only the user-stats
 table, so nothing large is ever written to disk. Interpolation is linear in *log* rank:
-rank spans six orders of magnitude across the ladder while pp spans three, and a fresh
+rank spans six orders of magnitude across the ladder while pp spans three, and a new
 profile sits in the long tail where a linear axis would flatten everything.
 
 This is an estimate and is labelled as one in the UI. It is allowed to exist where a second
@@ -349,7 +375,7 @@ swapper.
 **Relaunch goes through `cmd`'s `start`, and the quoting is load-bearing.** Spawning the
 runtime directly is simpler and wrong: `detached` maps to DETACHED_PROCESS on Windows, so
 the app comes back running, tracking and with no console at all. The launcher is called
-`Start osu! fresh profile.bat`, so an unquoted path runs a program called `Start` — which
+`Start osu! local profiles.bat`, so an unquoted path runs a program called `Start` — which
 is what the first attempt did, caught only because the swap was tested end to end.
 
 The zip reader is ours (`src/update/zip.ts`) because no dependency was available and
@@ -357,7 +383,7 @@ shelling out to Windows' `tar.exe` would put the riskiest path in the app behind
 that exists on one OS. It refuses zip64 rather than half-reading it, refuses any entry whose
 path escapes the target — this runs on a file fetched over the network — and handles the
 **backslash separators this project's own packager writes**: a release archive says
-`osu-fresh-profile-1.3.0-win-x64
+`osu-local-profiles-1.5.0-win-x64
 ode.exe`.
 
 **This path has been run end to end against the real public repository** -- see
@@ -392,7 +418,7 @@ button would go.
   enrichment only, and the app must keep working with no credentials and no network.
 - **Never scan-and-import on startup.** Only live watch events count. An automatic
   backfill would retroactively import plays set with the user's normal playstyle while the
-  app was closed, which defeats the purpose of a fresh profile.
+  app was closed, which defeats the purpose of a separate local profile.
   Importing past plays *does* exist (`src/tracker/backfill.ts`), but only as an explicit
   action: the user picks a cutoff, sees a preview of exactly what it would bring in, and
   confirms. Keep all three of those. The mtime pre-filter is only a filter -- the

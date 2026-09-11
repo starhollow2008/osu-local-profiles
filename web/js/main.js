@@ -5,13 +5,13 @@
  * refetch followed by a re-render of the affected block, which is plenty for a page that
  * changes once every few minutes when a play lands.
  */
-import { MODE_NAMES, escapeHtml, fmt, fullDate, pct, shortDate } from './format.js';
+import { MODE_NAMES, escapeHtml, fmt, pct, playTimeStrings, shortDate } from './format.js';
 import {
   coverUrl,
   generatedAvatar,
   gradeBadge,
   levelBadge,
-  medalPlaceholder,
+  medalBadge,
 } from './badges.js';
 import { bindCharts, playHistoryChart, ppChart, rankChart } from './charts.js';
 import {
@@ -28,7 +28,8 @@ const $ = (id) => document.getElementById(id);
 const SECTIONS = [
   ['me', 'me!'],
   ['recent', 'Recent'],
-  ['top_ranks', 'Top Ranks'],
+  // The id is kept from when osu! called this Top Ranks: saved section orders refer to it.
+  ['top_ranks', 'Scores'],
   ['medals', 'Medals'],
   ['historical', 'Historical'],
 ];
@@ -73,7 +74,7 @@ const SETTINGS_FIELDS = [
     type: 'toggle',
     label: 'Warn when scoring is not comparable',
     hint:
-      'Shows a line in Top Ranks when a setting has made this profile’s pp incomparable ' +
+      'Shows a line in Scores when a setting has made this profile’s pp incomparable ' +
       'with a real osu! account. Turning it off hides that sentence only - the affected ' +
       'scores keep their *. This is also what the note’s "Don’t show again" sets.',
   },
@@ -156,7 +157,7 @@ let settings = {};
 let counting = null;
 let staleScores = 0;
 let hiddenScoreCount = 0;
-let sharing = { onNetwork: false, addresses: [], canScreenshot: false };
+let sharing = { canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
 
@@ -209,7 +210,7 @@ function renderIdentity() {
 }
 
 /**
- * osu! shows a user-chosen cover here. A fresh profile has none, so it falls back to the
+ * osu! shows a user-chosen cover here. A new profile has none, so it falls back to the
  * beatmap art of its best play -- and to the flat panel colour when offline.
  */
 function renderCover(top) {
@@ -245,11 +246,21 @@ $('modes').addEventListener('click', (e) => {
 
 /* ----------------------------------------------------------- detail block */
 
-function renderStats(next) {
+/**
+ * osu-web's three figures under the chart: Medals, pp, and Total Play Time. The medal count
+ * is the whole profile's, as osu!'s is, so it does not move when the mode tab does.
+ */
+function renderStats(next, medalTotal) {
   stats = next;
+  $('medalTotal').textContent = fmt(medalTotal ?? 0);
   $('totalPp').textContent = fmt(stats.totalPp, 0);
-  $('rankedMaps').textContent = fmt(stats.distinctRankedBeatmaps);
-  $('bonusPp').textContent = fmt(stats.bonusPp, 0);
+  $('totalPp').title =
+    `${fmt(stats.weightedPp, 0)}pp from the top plays, plus ${fmt(stats.bonusPp, 0)} bonus pp ` +
+    `for ${fmt(stats.distinctRankedBeatmaps)} beatmap${stats.distinctRankedBeatmaps === 1 ? '' : 's'}`;
+
+  const playTime = playTimeStrings(stats.playTime);
+  $('playTime').textContent = playTime.value;
+  $('playTime').title = playTime.title;
 
   $('gradeCounts').innerHTML = GRADE_ORDER.map(
     (g) => `<div class="profile-rank-count__item">
@@ -361,85 +372,62 @@ $('countingNote').onclick = async (e) => {
 };
 
 /**
- * The Medals section, grouped the way osu! groups it.
+ * The Medals section, laid out as osu-web's `medals-group`: one group, "Skill & Dedication",
+ * holding one row of icons per family in osu!'s own `ordering`. There is no text on the
+ * page at all -- a medal's name, description and date are in the card that appears on
+ * hover, exactly as on osu!.
  *
  * osu!'s own icon is used where it loads, over a generated placeholder that stays visible
  * if it does not -- the same arrangement as beatmap covers, and for the same reason: the
  * page has to be complete with no network.
  */
 
-/** Labels for each family, and the order they appear in. */
-const MEDAL_GROUPS = [
-  ['combo', 'Combo'],
-  ['hits', 'Hits'],
-  ['plays', 'Plays'],
-  ['rank', 'Rank'],
-  ['pass', 'Beatmap Pass'],
-  ['fc', 'Beatmap Full Combo'],
-];
+/** osu!'s group name, which heads both the section and every medal card. */
+const MEDAL_GROUPING = 'Skill & Dedication';
 
-/** What a locked medal still needs, said in the family's own terms. */
-function medalRequirement(medal) {
-  switch (medal.family) {
-    case 'combo':
-      return `Reach a combo of ${fmt(medal.threshold)}`;
-    case 'plays':
-      return `Play ${fmt(medal.threshold)} times`;
-    case 'hits':
-      return `Land ${fmt(medal.threshold)} hits`;
-    case 'rank':
-      return `Reach the top ${fmt(medal.threshold)}`;
-    case 'pass':
-      return `Pass a ${medal.threshold}-star beatmap`;
-    case 'fc':
-      return `Full combo a ${medal.threshold}-star beatmap`;
-    default:
-      return '';
+/** Families in osu!'s `ordering` within Skill & Dedication; each is one row of icons. */
+const MEDAL_ROWS = ['combo', 'plays', 'rank', 'hits', 'pass', 'fc'];
+
+/** Every medal currently on the page, by slug, for the hover card to read from. */
+let medalsBySlug = new Map();
+
+/** What this page last saw earned, so a newly unlocked medal can be announced once. */
+let lastEarned = { mode: null, slugs: new Set() };
+
+/**
+ * The card's content, osu-web's `tooltip-achievement`: the group, then the icon, name and
+ * description on a darker panel, then when it was achieved -- or "Locked".
+ *
+ * A rank medal is decided from the current estimated rank rather than replayed play by play,
+ * so it has no real date to give; it says what it is instead of borrowing the last play's.
+ */
+function medalCard(medal) {
+  let achieved;
+  if (medal.achievedAt === null) {
+    achieved = 'Locked';
+  } else if (!medal.dated) {
+    achieved = 'Achieved &middot; from the estimated rank';
+  } else {
+    achieved = `Achieved on <time datetime="${new Date(medal.achievedAt).toISOString()}"
+      title="${escapeHtml(new Date(medal.achievedAt).toLocaleString())}">${escapeHtml(shortDate(medal.achievedAt))}</time>`;
   }
-}
 
-function medalTile(medal) {
-  const earned = medal.achievedAt !== null;
-
-  /*
-   * Earned medals show the date and nothing else. The beatmap that earned it is worth
-   * knowing but not worth five wrapped lines in a 104px tile, so it goes in the tooltip.
-   */
-  const detail = earned ? shortDate(medal.achievedAt) : medalRequirement(medal);
-
-  // A percentage only means something for the families that are a running total.
-  const bar =
-    !earned && medal.progress !== null && medal.progress > 0
-      ? `<div class="medal__progress" title="${Math.round(medal.progress * 100)}% of the way there">
-           <div class="medal__progress-fill" style="width: ${Math.round(medal.progress * 100)}%"></div>
-         </div>`
-      : '';
-
-  const tooltip = [
-    medal.name,
-    medal.description,
-    earned
-      ? `Earned ${fullDate(medal.achievedAt)}${medal.earnedOn ? ` on ${medal.earnedOn}` : ''}`
-      : medalRequirement(medal),
-  ].join(' - ');
-
-  return `<div class="medal${earned ? '' : ' medal--locked'}" title="${escapeHtml(tooltip)}">
-    <div class="medal__icon">
-      ${medalPlaceholder(medal)}
-      <!-- Not lazy: a full-page screenshot renders below the fold without ever
-           scrolling there, and lazy icons never loaded. 32 small PNGs is nothing. -->
-      <img src="${escapeHtml(medal.icon)}" alt="">
+  return `<div class="medal-tooltip__grouping">${escapeHtml(MEDAL_GROUPING)}</div>
+    <div class="medal-tooltip__middle">
+      <div class="medal-tooltip__badge">${medalBadge(medal, 'tooltip')}</div>
+      <div class="medal-tooltip__name">${escapeHtml(medal.name)}</div>
+      <div class="medal-tooltip__description">${escapeHtml(medal.description)}</div>
     </div>
-    <div class="medal__name u-ellipsis">${escapeHtml(medal.name)}</div>
-    <div class="medal__detail">${escapeHtml(detail)}</div>
-    ${bar}
-  </div>`;
+    <div class="medal-tooltip__achieved">
+      <div class="medal-tooltip__date">${achieved}</div>
+    </div>`;
 }
 
 function renderMedals(summary) {
   if (!summary) return;
 
-  $('medalCount').textContent = `${fmt(summary.earned)} / ${fmt(summary.total)}`;
+  medalsBySlug = new Map(summary.medals.map((m) => [m.slug, m]));
+  announceNewMedals(summary);
 
   /*
    * An FC cannot be told from a near-miss without the beatmap's own maximum combo, which
@@ -458,19 +446,157 @@ function renderMedals(summary) {
     note.hidden = true;
   }
 
-  const groups = MEDAL_GROUPS.map(([family, label]) => {
+  const rows = MEDAL_ROWS.map((family) => {
     const medals = summary.medals.filter((m) => m.family === family);
     if (medals.length === 0) return '';
-    const earned = medals.filter((m) => m.achievedAt !== null).length;
-    return `<h3 class="title title--sub">${escapeHtml(label)}
-        <span class="title__count">${fmt(earned)} / ${fmt(medals.length)}</span>
-      </h3>
-      <div class="medal-grid">${medals.map(medalTile).join('')}</div>`;
+    return `<div class="medals-group__medals">${medals.map((m) => medalBadge(m)).join('')}</div>`;
   }).join('');
 
-  $('medalGroups').innerHTML =
-    groups || '<div class="u-empty">No medals apply to this mode yet.</div>';
+  $('medalGroups').innerHTML = rows
+    ? `<div class="medals-group">
+        <div class="medals-group__group">
+          <h3 class="medals-group__title">${escapeHtml(MEDAL_GROUPING)}</h3>
+          ${rows}
+        </div>
+      </div>`
+    : '<div class="u-empty">No medals apply to this mode yet.</div>';
 }
+
+/**
+ * Say so when a medal is unlocked while the page is open.
+ *
+ * Only against what this page already saw *in the same mode*: the first render of a mode
+ * sets the baseline, so opening the page or switching tabs never announces medals that were
+ * earned long ago. The Recent feed is the permanent record; this is the moment itself.
+ */
+function announceNewMedals(summary) {
+  const earned = summary.medals.filter((m) => m.achievedAt !== null);
+  const slugs = new Set(earned.map((m) => m.slug));
+
+  if (lastEarned.mode === mode) {
+    const fresh = earned.filter((m) => !lastEarned.slugs.has(m.slug));
+    if (fresh.length === 1) toast(`Medal unlocked: ${fresh[0].name}`);
+    else if (fresh.length > 1) toast(`${fresh.length} medals unlocked: ${fresh.map((m) => m.name).join(', ')}`);
+  }
+  lastEarned = { mode, slugs };
+}
+
+/* ------------------------------------------------------------ medal card */
+
+/*
+ * The card that opens over a medal, as osu-web's qtip does: above the icon and centred on
+ * it, after a short delay, and kept open while the pointer moves onto the card itself --
+ * `hide: { delay: 200, fixed: true }` there. One card serves every medal on the page, in
+ * the section and in the Recent feed alike.
+ */
+const MEDAL_CARD_DELAY = 200;
+let medalCardFor = null;
+let medalShowTimer = null;
+let medalHideTimer = null;
+
+function positionMedalCard(anchor) {
+  const card = $('medalTooltip');
+  const box = anchor.getBoundingClientRect();
+  const width = card.offsetWidth;
+  const height = card.offsetHeight;
+  const tip = 20;
+
+  // Centred over the icon, but never past either edge of the window; the tip follows the
+  // icon even when the card itself has been pushed sideways.
+  const centre = box.left + box.width / 2;
+  const left = Math.max(8, Math.min(centre - width / 2, window.innerWidth - width - 8));
+  const below = box.top - height - tip < 8;
+  const top = below ? box.bottom + tip : box.top - height - tip;
+
+  card.style.left = `${left}px`;
+  card.style.top = `${top}px`;
+  card.style.setProperty('--tip-x', `${centre - left}px`);
+  card.classList.toggle('medal-tooltip--below', below);
+}
+
+function showMedalCard(anchor) {
+  medalShowTimer = null;
+  const medal = medalsBySlug.get(anchor.dataset.medal);
+  if (!medal) return;
+  cancelMedalHide();
+  const card = $('medalTooltip');
+  if (medalCardFor === anchor && !card.hidden) return;
+
+  medalCardFor = anchor;
+  card.innerHTML = medalCard(medal);
+  card.hidden = false;
+  positionMedalCard(anchor);
+}
+
+function hideMedalCard() {
+  clearTimeout(medalShowTimer);
+  medalShowTimer = null;
+  medalHideTimer = null;
+  $('medalTooltip').hidden = true;
+  medalCardFor = null;
+}
+
+const scheduleMedalHide = () => {
+  clearTimeout(medalShowTimer);
+  medalShowTimer = null;
+  clearTimeout(medalHideTimer);
+  medalHideTimer = setTimeout(hideMedalCard, MEDAL_CARD_DELAY);
+};
+
+const cancelMedalHide = () => {
+  clearTimeout(medalHideTimer);
+  medalHideTimer = null;
+};
+
+document.addEventListener('mouseover', (e) => {
+  const badge = e.target.closest?.('[data-medal]');
+  if (badge) {
+    cancelMedalHide();
+    if (medalCardFor === badge) return;
+    clearTimeout(medalShowTimer);
+    // Moving from one medal straight to the next swaps at once, as osu!'s does.
+    if (!$('medalTooltip').hidden) showMedalCard(badge);
+    else medalShowTimer = setTimeout(() => showMedalCard(badge), MEDAL_CARD_DELAY);
+    return;
+  }
+  if (e.target.closest?.('#medalTooltip')) {
+    cancelMedalHide();
+    return;
+  }
+  // Anywhere else: let an open card go, or cancel one about to open. Otherwise nothing.
+  if ((medalCardFor !== null && medalHideTimer === null) || medalShowTimer !== null) {
+    scheduleMedalHide();
+  }
+});
+
+document.addEventListener('focusin', (e) => {
+  const badge = e.target.closest?.('[data-medal]');
+  if (badge) showMedalCard(badge);
+});
+document.addEventListener('focusout', (e) => {
+  if (e.target.closest?.('[data-medal]')) scheduleMedalHide();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') hideMedalCard();
+});
+// The card is positioned in window coordinates, so it would drift off its medal.
+window.addEventListener('scroll', hideMedalCard, { passive: true });
+window.addEventListener('resize', hideMedalCard);
+
+/*
+ * The drawn placeholder is only there until osu!'s icon arrives. osu!'s icons are not round,
+ * so once one has loaded the circle behind it has to go or it shows round the edges. `load`
+ * does not bubble, hence the capture.
+ */
+document.addEventListener(
+  'load',
+  (e) => {
+    if (e.target instanceof HTMLImageElement && e.target.matches('.badge-achievement__image')) {
+      e.target.closest('.badge-achievement')?.classList.add('badge-achievement--loaded');
+    }
+  },
+  true,
+);
 
 /* ------------------------------------------------------------------ data */
 
@@ -484,7 +610,7 @@ async function loadProfile() {
   const totals = data.totals ?? {};
   const totalFor = (section, list) => totals[section] ?? list.length;
 
-  renderStats(data.stats);
+  renderStats(data.stats, data.medalTotal);
   renderCover(data.top);
 
   renderRank(data);
@@ -506,10 +632,11 @@ async function loadProfile() {
   // terms of positions in this list.
   pinnedIds = (data.pinned ?? []).map((p) => p.id);
   $('pinnedCount').textContent = fmt(pinnedIds.length);
+  // Nothing pinned leaves the space empty, as osu! does, rather than explaining itself.
   $('pinnedPlays').innerHTML = playList(data.pinned, {
     actions: true,
     reorderable: true,
-    empty: 'Nothing pinned. Use the menu on any score to pin it here.',
+    empty: '',
   });
 
   const topTotal = totalFor('top', data.top);
@@ -560,8 +687,8 @@ async function loadState() {
 
   app = s.app ?? app;
   $('footerVersion').textContent = app.version
-    ? `osu! fresh profile v${app.version}`
-    : 'osu! fresh profile';
+    ? `osu! local profiles v${app.version}`
+    : 'osu! local profiles';
   renderUpdate();
 
   const kinds = s.installs.map((i) => i.kind).join(' + ') || 'no client found';
@@ -699,21 +826,23 @@ $('updateConfirm').onclick = async () => {
 /* ------------------------------------------------------------------ share */
 
 /*
- * Three ways to hand this profile to someone else, in order of how well they survive.
+ * Two ways to hand this profile to someone else.
  *
  * 1. A standalone .html file. One file, opens anywhere, needs neither this app nor a
  *    network. It is built from the *live page* rather than re-rendered on the server, so
  *    it captures exactly what is on screen -- the section order, the medals, everything --
  *    and cannot drift from it.
  * 2. A PNG, rendered by a browser that is already installed.
- * 3. The page itself, over the local network, which is off by default.
+ *
+ * The live page is never served to anyone else: it can reset and delete profiles, and none
+ * of that asks who is calling.
  */
 
 /** Elements that only make sense while you are using the page, not while reading it. */
 const EXPORT_STRIP = [
   '#optionsBtn', '.menu-wrap', '#toggle', '.backdrop', '#playMenu', '#toast',
   '#identityFile', '.section-order', '.play-detail__menu', '.play-detail__grip',
-  '#aboutEdit', 'script',
+  '#aboutEdit', '#medalTooltip', 'script',
 ];
 
 /**
@@ -787,7 +916,26 @@ async function buildStandaloneHtml() {
   ].join('\n');
   clone.querySelector('head').append(style);
 
+  /*
+   * The file has no script, so there is no medal card in it. A native title carries what the
+   * card would have said, which is the next best thing for a document.
+   */
+  for (const badge of clone.querySelectorAll('[data-medal]')) {
+    const medal = medalsBySlug.get(badge.dataset.medal);
+    if (!medal) continue;
+    const when = medal.achievedAt === null ? 'Locked' : medal.dated ? `Achieved on ${shortDate(medal.achievedAt)}` : 'Achieved';
+    badge.title = `${medal.name}\n${medal.description}\n${when}`;
+    badge.removeAttribute('tabindex');
+  }
+
   // Anything served by this app has to be carried, or the file breaks the moment it moves.
+  for (const link of clone.querySelectorAll('link[rel="icon"]')) {
+    try {
+      link.href = await fetchDataUri(link.getAttribute('href'));
+    } catch {
+      link.remove();
+    }
+  }
   for (const img of clone.querySelectorAll('img[src^="/"], img[src^="./"]')) {
     try {
       img.src = await fetchDataUri(img.getAttribute('src'));
@@ -806,7 +954,7 @@ async function buildStandaloneHtml() {
 
   const when = new Date().toLocaleString();
   return `<!doctype html>
-<!-- osu! fresh profile - "${profile?.name ?? 'profile'}" as of ${when}. Not an osu! page. -->
+<!-- osu! local profiles - "${profile?.name ?? 'profile'}" as of ${when}. Not an osu! page. -->
 ${clone.outerHTML}`;
 }
 
@@ -835,25 +983,6 @@ function shareHint(message, isError = false) {
 function openShare() {
   setMenuOpen(false);
   shareHint(' ');
-
-  const addresses = sharing.addresses ?? [];
-  $('shareNetwork').innerHTML = sharing.onNetwork
-    ? `<p>Anyone on your network can open this profile at:</p>
-       ${addresses.map((a) => `<code class="share-url">${escapeHtml(a)}</code>`).join('') ||
-         '<p class="setting__hint">No network address was found for this machine.</p>'}
-       <p class="setting__hint">
-         Sharing is on. Remember that anyone who can open the page can also use it &mdash;
-         including resetting this profile. Turn it off in <code>data/config.json</code>.
-       </p>`
-    : `<p class="setting__hint">
-         This profile is private to this machine. To let someone on the same network open
-         it live, set <code>"shareOnNetwork": true</code> in <code>data/config.json</code>
-         and restart.
-       </p>
-       <p class="setting__hint">
-         It is off by default because the page can reset this profile, delete a profile and
-         remove scores, and none of that asks who is calling.
-       </p>`;
 
   $('shareScreenshot').disabled = !sharing.canScreenshot;
   $('shareScreenshotNote').textContent = sharing.canScreenshot

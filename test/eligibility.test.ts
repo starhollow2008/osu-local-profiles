@@ -92,7 +92,7 @@ interface ScoreFixture {
 }
 
 function harness(): { db: Db; profileId: number; add: (s: ScoreFixture) => void; cleanup: () => void } {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-eligibility-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-eligibility-'));
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'First');
   let n = 0;

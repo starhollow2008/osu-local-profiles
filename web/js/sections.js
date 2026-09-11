@@ -1,6 +1,6 @@
 /** Markup builders for the repeated rows on the profile page. */
 import { escapeHtml, fmt, pct, timeAgo, fullDate } from './format.js';
-import { coverUrl, gradeBadge, incompleteBadge, modList } from './badges.js';
+import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './badges.js';
 
 function titleOf(item) {
   const name = [item.artist, item.title].filter(Boolean).join(' - ');
@@ -280,6 +280,8 @@ export function showMore(section, returned, requested, total) {
 
 export function playList(plays, options = {}) {
   if (!plays || plays.length === 0) {
+    // An empty string asks for nothing at all, not an empty placeholder box.
+    if (options.empty === '') return '';
     return `<div class="u-empty">${escapeHtml(options.empty ?? 'Nothing here yet.')}</div>`;
   }
   return `<div class="play-detail-list">${plays
@@ -319,11 +321,19 @@ export function beatmapPlaycountList(items) {
 
 /**
  * The Recent section. osu! fills this with account events (medals, rank milestones); a
- * fresh profile has its own equivalents, derived in src/calc/history.ts.
+ * local profile has its own equivalents, derived in src/calc/history.ts.
  */
 export function activityRow(event) {
   let text;
+  // osu-web gives every entry a 28px icon column; only a medal has something to put in it,
+  // but the column is kept on every row so the text lines up down the feed.
+  let icon = '';
   switch (event.type) {
+    case 'medal':
+      // osu!'s own wording (`events.achievement`), with the profile standing in for the user.
+      text = `Unlocked the "<strong>${escapeHtml(event.name)}</strong>" medal!`;
+      icon = medalBadge({ ...event, achievedAt: event.at }, 'recent-activity');
+      break;
     case 'best':
       text = `New best performance: <span class="activity__highlight">${fmt(event.pp, 0)}pp</span> on
               <span class="activity__map">${escapeHtml(event.title)}${
@@ -341,6 +351,7 @@ export function activityRow(event) {
   }
 
   return `<div class="activity">
+  <div class="activity__icon">${icon}</div>
   <div class="activity__text">${text}</div>
   <div class="activity__time" title="${escapeHtml(fullDate(event.at))}">${escapeHtml(timeAgo(event.at))}</div>
 </div>`;

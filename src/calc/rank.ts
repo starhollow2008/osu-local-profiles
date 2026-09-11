@@ -6,7 +6,7 @@ import type { Ruleset } from '../osr.ts';
 /**
  * Estimating what global rank this profile's pp would put it at.
  *
- * osu!'s rankings API only exposes the top 10,000, which never covers a fresh profile, so
+ * osu!'s rankings API only exposes the top 10,000, which never covers a new profile, so
  * the answer comes from a curve built offline from a data.ppy.sh random sample of the
  * whole ladder -- see `scripts/build-rank-table.mjs`. That keeps rank working with no
  * credentials and no network, like everything else here.
@@ -64,7 +64,7 @@ export interface RankEstimate {
  *
  * Interpolation is linear in log(rank), because rank spans six orders of magnitude across
  * the ladder while pp spans three -- interpolating rank directly would badly distort the
- * long tail where a fresh profile actually sits.
+ * long tail where a new profile actually sits.
  */
 export function estimateRank(pp: number, mode: Ruleset): RankEstimate | null {
   const table = rankTable(mode);

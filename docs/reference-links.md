@@ -26,7 +26,7 @@ constraints in `CLAUDE.md` only make sense next to the thing they were derived f
 
 The pp-to-rank curves in `src/calc/rank-tables/` are built from the public
 `performance_<mode>_random_10000` sample by `scripts/build-rank-table.mjs`. osu!'s own
-rankings API only exposes the top 10,000, which never covers a fresh profile.
+rankings API only exposes the top 10,000, which never covers a new profile.
 
 ## Why there is no polling loop
 

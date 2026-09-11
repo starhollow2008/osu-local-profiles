@@ -40,7 +40,7 @@ interface Fixture {
 }
 
 function fixture(): Fixture {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-logs-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-logs-'));
   const seen: ResolvedLoggedPlay[] = [];
   const watcher = new LogWatcher({
     dirs: [dir],
@@ -160,7 +160,7 @@ test('a session started after tracking began is followed from its first line', a
 
 test('a directory that does not exist is not an error', () => {
   const watcher = new LogWatcher({
-    dirs: [path.join(os.tmpdir(), 'ofp-logs-definitely-not-here')],
+    dirs: [path.join(os.tmpdir(), 'olp-logs-definitely-not-here')],
     onPlays: () => assert.fail('nothing should be reported'),
   });
   watcher.start();
@@ -216,8 +216,8 @@ test('an older session touched later does not take over', async () => {
  * into place.
  */
 test('a watched path is resolved to its canonical form before being watched', () => {
-  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-real-'));
-  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-link-')), 'logs');
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-real-'));
+  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'olp-link-')), 'logs');
 
   try {
     try {
@@ -236,14 +236,14 @@ test('a watched path is resolved to its canonical form before being watched', ()
 
 /** A path that cannot be resolved is handed through, for fs.watch itself to reject. */
 test('an unresolvable path is passed through rather than thrown on', () => {
-  const missing = path.join(os.tmpdir(), 'ofp-definitely-not-here');
+  const missing = path.join(os.tmpdir(), 'olp-definitely-not-here');
   assert.equal(watchablePath(missing), missing);
 });
 
 /* And the whole watcher still works when reached that way. */
 test('a directory reached through a junction is still watched', async () => {
-  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-logs-real-'));
-  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-logs-link-')), 'logs');
+  const real = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-logs-real-'));
+  const link = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'olp-logs-link-')), 'logs');
 
   try {
     fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');

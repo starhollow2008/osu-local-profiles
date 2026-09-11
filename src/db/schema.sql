@@ -1,7 +1,7 @@
 PRAGMA journal_mode = WAL;
 PRAGMA foreign_keys = ON;
 
--- A "fresh profile" = one alternative playstyle being tracked (left hand, mouse only, ...).
+-- A profile = one alternative playstyle being tracked (left hand, mouse only, ...).
 CREATE TABLE IF NOT EXISTS profiles (
   id             INTEGER PRIMARY KEY,
   name           TEXT    NOT NULL UNIQUE,
@@ -93,7 +93,10 @@ CREATE TABLE IF NOT EXISTS beatmaps (
   stars         REAL,
   max_combo     INTEGER,
   osu_path      TEXT,
-  cached_at     INTEGER NOT NULL
+  cached_at     INTEGER NOT NULL,
+  -- First hit object to last, in ms, read from the .osu file on first need. 0 means the file
+  -- could not be read, so it is not tried again. See src/calc/play-time.ts.
+  length_ms     INTEGER
 );
 
 -- MD5 -> path index of local .osu files. lazer stores files by SHA-256, so this is the
@@ -135,6 +138,9 @@ CREATE TABLE IF NOT EXISTS incomplete_plays (
   -- installed and nothing else can name it.
   beatmap_name TEXT,
   played_at   INTEGER NOT NULL,
+  -- When osu! issued the play's token. With played_at (the submission) this is how long the
+  -- play lasted, which is what Total Play Time needs. Null when the log was joined mid-play.
+  started_at  INTEGER,
   online_score_id TEXT,
   -- Removed from the profile by the user, exactly as on `scores`, so visibleSql() applies
   -- to this table verbatim.

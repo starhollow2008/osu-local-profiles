@@ -1,4 +1,4 @@
-# osu! fresh profile
+# osu! local profiles
 
 Track an alternative osu! playstyle as if it were a brand new account.
 
@@ -44,7 +44,11 @@ built against.
 
 Country rank still shows `-`, on purpose; see Known gaps.
 
-The long sections -- Recent, Top Ranks, Most Played Beatmaps and Recent Plays -- start at
+Under the rank graph sit osu!'s own three figures: **Medals** (every medal the profile
+holds, across all modes), **pp**, and **Total Play Time** -- see below for how that is
+counted.
+
+The long sections -- Recent, Scores, Most Played Beatmaps and Recent Plays -- start at
 five rows with a **show more** button, expanding to 25 and then 25 at a time, as on osu!.
 Both charts are hoverable: the rank graph reads out `Global Ranking #120,000` / `40 days
 ago` by day, and Play History reads `Plays 430` / `March 2020` by month.
@@ -81,8 +85,8 @@ at. Anything else needs `installRoots`.
 
 | Platform | Start it with |
 | -------- | ------------- |
-| Windows | double-click `Start osu! fresh profile.bat` |
-| macOS | double-click `Start osu! fresh profile.command` |
+| Windows | double-click `Start osu! local profiles.bat` |
+| macOS | double-click `Start osu! local profiles.command` |
 | Linux | run `./start.sh` |
 
 On macOS the first launch is refused, because the build is not signed by a paid Apple
@@ -217,7 +221,7 @@ of the button, never on a timer, and what it finds is copied into `data/` so it 
 fetched twice.
 
 Rank estimation was the one feature that looked like it would need the API, and it does not:
-the rankings endpoint only exposes the top 10,000 anyway, which never covers a fresh
+the rankings endpoint only exposes the top 10,000 anyway, which never covers a new
 profile, so the curve comes from the public dumps instead.
 
 ## Configuration
@@ -226,10 +230,9 @@ profile, so the curve comes from the public dumps instead.
 
 | key | default | meaning |
 |---|---|---|
-| `profileName` | `Fresh Profile` | name of the *first* profile only; after that, manage profiles from the page |
+| `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
 | `openBrowser` | `true` | open the page on start |
-| `shareOnNetwork` | `false` | let other machines on your network open the page (see Sharing) |
 | `checkForUpdates` | `true` | ask GitHub once at startup whether a newer release exists |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
@@ -308,7 +311,7 @@ leaving the destructive button as the only one that worked. No unit test would c
   banner in.
 
 If osu! is signed in, its username is offered as a suggestion, read from the client's own
-config file with no network at all. It only ever prefills: a fresh profile is a different
+config file with no network at all. It only ever prefills: a local profile is a different
 identity by definition, so it is never adopted without being asked for.
 
 Nothing here is required. With no picture the page draws an avatar from the profile's name,
@@ -325,16 +328,14 @@ and the banner falls back to the cover art of the profile's best play.
 - **Save as an image** -- a full-page PNG, rendered by the Chrome or Edge already on your
   machine. Nothing is bundled: a headless browser would be several times the size of this
   whole app. Without one installed the button says so and points at the HTML export.
-- **On your network** -- off by default.
 
-### Why network sharing is off by default
+### The live page is never shared
 
 The page can reset a profile, delete one and remove scores, and none of those endpoints
-asks who is calling. So the server refuses anything that is not coming from this machine
-unless you opt in with `"shareOnNetwork": true` in `data/config.json`.
-
-*(This changed in Phase 5. Before it, the server listened on every interface, which meant
-anyone on the same network could not only read the profile but reset it.)*
+asks who is calling. So the server refuses anything that is not coming from this machine,
+and there is no setting that changes that. *(Earlier versions had an opt-in
+`shareOnNetwork` setting; it was removed in 1.5.0, and an old `config.json` that still has
+it is simply ignored.)*
 
 The check is on the request rather than the listening socket, because binding to
 `127.0.0.1` also cuts off IPv6 loopback -- and `localhost` resolves to `::1` first on
@@ -342,9 +343,15 @@ Windows, so binding "safely" would leave the app unreachable from its own browse
 
 ## Medals
 
-A Medals section mirroring osu!'s, restricted to the medals a local profile can actually
-decide for itself. The names, descriptions, icons and thresholds are osu!'s own, taken from
-its published achievement list by `node scripts/build-medal-table.mjs`.
+A Medals section laid out as osu!'s is, restricted to the medals a local profile can
+actually decide for itself. The names, descriptions, icons and thresholds are osu!'s own,
+taken from its published achievement list by `node scripts/build-medal-table.mjs`.
+
+All of them belong to osu!'s **Skill & Dedication** group, so that is the one group shown:
+a row of icons per family, with nothing written beside them. Hover (or tab to) a medal for
+osu!'s card -- the group, the medal's name and description, and the date it was achieved,
+or *Locked*. A newly earned medal also appears in **Recent**, and the page announces it
+when it happens.
 
 What exists is **not the same in every mode**, and that is osu!'s doing rather than a gap
 here:
@@ -366,6 +373,23 @@ the medal with it. Two families are only as good as their inputs, and say so:
   without breaking combo, so "no misses" alone is not enough. Scores tracked before that
   was recorded are reported as unknown rather than guessed either way; the section says how
   many, and Settings can recalculate them.
+
+## Total Play Time
+
+Counted the way osu! counts it. osu!'s score processor adds, for every play,
+**the beatmap's length divided by the play's rate, or the time from starting the play to
+submitting it, whichever is less** -- so DT counts two-thirds of the map, and quitting after
+thirty seconds counts thirty seconds rather than the whole map.
+
+- A **finished score** counts its beatmap's length at the speed it was played. The replay
+  does not record when the play began, but for a map played to the end the length is the
+  smaller of the two anyway.
+- An **unfinished play** (quit, retry, fail) counts the time between osu! starting it and
+  osu! accepting its submission, both read from lazer's log, capped at the map's length.
+  Unfinished plays tracked before 1.5.0 have no start time recorded and count nothing
+  rather than a guess.
+- A beatmap's length runs from its first object to the end of its last, read once from the
+  `.osu` file. A slider's tail at the very end of a map is not included.
 
 ## Rearranging the page
 
@@ -390,7 +414,7 @@ exactly right -- and everything to lose by getting it wrong.
 
 Every score row has a **⋯** menu.
 
-- **Pin to profile** puts it in a **Pinned** section above Best Performance, as on osu!.
+- **Pin to profile** puts it under **Pinned Scores**, above Best Performance, as on osu!.
   Pins are per game mode, and a pinned score does not have to be in your top 100 -- pinning
   is how you show a play you are proud of that pp does not reward.
 - Drag pinned scores to reorder them, or use **Move up** / **Move down** in the same menu.
@@ -509,11 +533,11 @@ would be imported, then confirm.
 
 It never runs by itself, and the warning in the dialog is the important part -- reach back
 further than the session you actually played with this playstyle and you will pull in plays
-set with your normal one, which is the one thing a fresh profile must not contain.
+set with your normal one, which is the one thing a separate profile must not contain.
 
 ## Rank estimation
 
-osu!'s rankings API only exposes the top 10,000, which never covers a fresh profile. Rank
+osu!'s rankings API only exposes the top 10,000, which never covers a new profile. Rank
 is instead interpolated from a small curve built from data.ppy.sh's random sample of the
 whole ladder, in which every sampled user carries their own real rank:
 
@@ -552,7 +576,7 @@ the download, not the decompression.
 npm run package
 ```
 
-Produces `dist/osu-fresh-profile-<version>-<rid>/` and a zip beside it: **203MB on disk,
+Produces `dist/osu-local-profiles-<version>-<rid>/` and a zip beside it: **203MB on disk,
 83MB to download** for `win-x64`, containing Node, osu!'s pp calculator and the app. The
 user extracts it and runs the launcher; there is nothing to install and no admin rights
 needed, and because `data/` lives beside the app the whole folder can be moved or carried

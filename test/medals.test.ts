@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
-import { computeMedals, type Medal } from '../src/calc/medals.ts';
+import { computeMedals, earnedMedalCount, type Medal } from '../src/calc/medals.ts';
+import { medalEvents } from '../src/calc/history.ts';
 import { VANILLA } from '../src/calc/eligibility.ts';
 import { applyScoreAction } from '../src/scores.ts';
 import { Status } from '../src/clients/beatmaps.ts';
@@ -24,7 +25,7 @@ interface Fixture {
 }
 
 function harness() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-medals-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-medals-'));
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'First');
   let n = 0;
@@ -145,16 +146,62 @@ test('a combo medal is dated to the play that first reached it', () => {
   }
 });
 
-test('a locked running-total medal reports how far along it is', () => {
+test("families come in osu!'s own ordering, rank between plays and the star medals", () => {
   const h = harness();
   try {
     h.add({ combo: 250 });
-    const medal = find(h.medals().medals, 'osu-combo-500');
-    assert.equal(medal.progress, 0.5);
-    assert.equal(medal.achievedAt, null);
+    const families = [...new Set(h.medals().medals.map((m) => m.family))];
+    // Skill & Dedication's `ordering`: combo 0, plays 1, rank 2, hits 3, pass 4, fc 5.
+    assert.deepEqual(families, ['combo', 'plays', 'rank', 'pass', 'fc']);
   } finally {
     h.cleanup();
   }
+});
+
+test('an earned medal becomes one Recent entry, at the moment it was earned', () => {
+  const h = harness();
+  try {
+    h.add({ combo: 100, at: 1000 });
+    h.add({ combo: 600, at: 2000 });
+    const events = medalEvents(h.medals().medals);
+    const combo = events.find((e) => e.type === 'medal' && e.slug === 'osu-combo-500');
+    assert.ok(combo, 'the 500 combo medal is announced');
+    assert.equal(combo.at, 2000);
+    // Locked medals never appear.
+    assert.equal(events.some((e) => e.type === 'medal' && e.slug === 'osu-combo-750'), false);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("the header's medal count is the whole profile's, not one mode's", () => {
+  const h = harness();
+  try {
+    h.add({ combo: 600, mode: 0 }); // 500 combo, plus star pass 1..5
+    h.add({ hits: 40_000, mode: 1 }); // taiko's first hit-count medal, plus its star passes
+    const perMode = [0, 1].map(
+      (mode) => h.medals(mode).medals.filter((m) => m.achievedAt !== null).length,
+    );
+    assert.ok(perMode[0]! > 0 && perMode[1]! > 0, 'both modes earned something');
+    assert.equal(earnedMedalCount(h.db, h.profileId, VANILLA), perMode[0]! + perMode[1]!);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a rank medal carries no date, so it never slides to the top of Recent', () => {
+  const rank: Medal = {
+    slug: 'all-skill-highranker-1',
+    name: 'I Can See The Top',
+    description: '',
+    icon: '',
+    family: 'rank',
+    threshold: 50_000,
+    achievedAt: 5000,
+    dated: false,
+    earnedOn: null,
+  };
+  assert.deepEqual(medalEvents([rank]), []);
 });
 
 /* ---------------------------------------------------------------- plays */

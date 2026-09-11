@@ -75,7 +75,7 @@ Played Beatmaps, Recent Plays.
 | gap | on screen |
 |---|---|
 | Global and country rank (Phase 3 — osu!'s rankings API only exposes the top 10k) | `-`, with a tooltip |
-| No rank history to plot | the chart shows total pp instead, which a fresh profile does have |
+| No rank history to plot | the chart shows total pp instead, which a new profile does have |
 | Play time is not tracked | omitted from the stats box, which osu-web's v1 layout also does |
 | Replays watched by others | omitted; not applicable to a local profile |
 | Mod settings, e.g. DT at 1.3x | parsed and stored, shown only as the mod acronym |

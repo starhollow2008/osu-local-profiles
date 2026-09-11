@@ -25,12 +25,12 @@
 export function launcherFor(hostOs, nodeBinary) {
   if (hostOs === 'win') {
     return {
-      name: 'Start osu! fresh profile.bat',
+      name: 'Start osu! local profiles.bat',
       // CRLF: a .bat with bare newlines is not reliably parsed by cmd.
       content: [
         '@echo off',
         'cd /d "%~dp0"',
-        'title osu! fresh profile',
+        'title osu! local profiles',
         `${nodeBinary} src\\main.ts`,
         'if errorlevel 1 (',
         '  echo.',
@@ -45,7 +45,7 @@ export function launcherFor(hostOs, nodeBinary) {
   }
 
   return {
-    name: hostOs === 'osx' ? 'Start osu! fresh profile.command' : 'start.sh',
+    name: hostOs === 'osx' ? 'Start osu! local profiles.command' : 'start.sh',
     content: [
       '#!/bin/sh',
       '# Run from this folder however it was launched, so data/ is always found beside it.',
@@ -69,11 +69,11 @@ export function launcherFor(hostOs, nodeBinary) {
  * assume the build is broken.
  */
 function howToStart(hostOs) {
-  if (hostOs === 'win') return ['Double-click "Start osu! fresh profile.bat".'];
+  if (hostOs === 'win') return ['Double-click "Start osu! local profiles.bat".'];
 
   if (hostOs === 'osx') {
     return [
-      'Double-click "Start osu! fresh profile.command".',
+      'Double-click "Start osu! local profiles.command".',
       '',
       'The first time, macOS will refuse to open it. This app is not signed by an Apple',
       'developer account, and macOS quarantines downloaded programs that are not. To allow',
@@ -97,8 +97,8 @@ function howToStart(hostOs) {
 
 export function readmeFor(hostOs) {
   return [
-    'osu! fresh profile',
-    '==================',
+    'osu! local profiles',
+    '===================',
     '',
     ...howToStart(hostOs),
     '',

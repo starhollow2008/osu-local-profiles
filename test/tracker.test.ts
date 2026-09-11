@@ -75,7 +75,7 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
   if (installs.length === 0) return t.skip('no osu! installation on this machine');
   if (!fs.existsSync(REAL_DB)) return t.skip('run the app once to build the beatmap index');
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-test-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-test-'));
   const watchDir = path.join(tmp, 'watch');
   fs.mkdirSync(watchDir);
 
@@ -149,7 +149,7 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
  * log watcher, the ingest and the profile totals.
  */
 test('the tracker counts a play that finished without a score', { timeout: 30_000 }, async () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-incomplete-e2e-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-incomplete-e2e-'));
   const logs = path.join(tmp, 'logs');
   const watchDir = path.join(tmp, 'files');
   fs.mkdirSync(logs);

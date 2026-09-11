@@ -202,7 +202,7 @@ export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
     fs.mkdirSync(work, { recursive: true });
 
     const download = await fetch(asset.url, {
-      headers: { 'user-agent': 'osu-fresh-profile' },
+      headers: { 'user-agent': 'osu-local-profiles' },
       signal: AbortSignal.timeout(30 * 60_000),
     });
     if (!download.ok) throw new Error(`downloading the release failed (${download.status})`);

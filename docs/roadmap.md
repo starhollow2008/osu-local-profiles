@@ -29,6 +29,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.14 | The osu-web fidelity kit                      | done   |
 | 5.15 | Scrollable dialogs, footer, dismissible warning | done |
 | 5.16 | One-click update from GitHub releases         | done   |
+| 5.17 | osu! parity: header, Scores, medals, badges   | done   |
+| 5.18 | Rename to **osu! local profiles**             | in progress |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -385,6 +387,9 @@ renders offline, and `test/medals.test.ts` covers each family including the boun
 
 **Done when.** The exported HTML opens with the app closed and looks like the page, the PNG
 matches, and the LAN option is off by default.
+
+*Superseded in 5.17:* the LAN option was removed outright at the user's request. The live
+page is never served off the machine; the HTML export and the PNG are the ways to share.
 
 ---
 
@@ -806,7 +811,8 @@ same failure. This makes the source readable and writes down what may be taken f
   the part that is readable in place.
 - **Values, never files, and the licence is the reason.** osu-web is AGPL-3.0-or-later.
   Copying its stylesheets or images would relicense this project away from MIT and, because
-  the app serves a page over HTTP, engage AGPL §13 as soon as `shareOnNetwork` is set.
+  the app serves a page over HTTP, engage AGPL §13 the moment it is served to anyone else
+  (then via `shareOnNetwork`, since removed -- the reasoning still holds for the HTML export).
   Colours, ratios and wording are facts and carry no such condition.
 - **`ppy/osu-resources` is off limits, and it is the trap.** lazer's own flag and mod
   textures look like the obvious source. They are **CC-BY-NC 4.0** — incompatible with MIT
@@ -987,3 +993,111 @@ it at 628MB. The log shows the rollback created and removed within one second.
 **One thing that remains true:** a **1.2.0** install cannot use the button, because it has
 no `scripts/apply-update.mjs` inside it to run. v1.3.0 is the first build that can be
 updated *from*, so 1.2.0 users must download 1.3.0 by hand once.
+
+---
+
+## 5.17 — osu! parity: header, Scores, medals, badges
+
+**Status: done.** Eight requests arrived together; seven are this entry, the rename is 5.18.
+
+### Decisions
+
+- **The tab icon is drawn here, and says "home".** The old one was a pink ring written
+  inline in `index.html` in the commit that rebuilt the page (43109ca) -- one `<circle>`, not
+  taken from anywhere, but a pink ring is also the core of osu!'s own logo, which is why it
+  looked familiar. The new one is `web/favicon.svg`, a white house on osu!'s `#ff66ab`: local
+  without reading as "offline" or broken. It is a file rather than a data URI so it can be
+  swapped by dropping in another; the HTML export inlines it. **An XML comment may not
+  contain `--`** -- the first draft did, rendered as nothing, and the UI check only asked
+  whether the file was *served*. It now decodes it.
+- **Header figures are osu-web's `detail-stats.tsx`**: Medals, pp, Total Play Time, in a
+  four-column grid with play time spanning two (`value-display--plain-wide`). Ranked
+  Beatmaps and bonus pp moved into the pp figure's hover title rather than disappearing.
+- **The medal count is account-wide** (`user_achievements.length` on osu!), so it does not
+  change with the mode tab, unlike the section below it. Counted by slug, so a rank medal
+  reached in two modes is one medal.
+- **Total Play Time is osu!'s rule, not a formula of our own.** Read from
+  osu-queue-score-statistics: `PlayTimeProcessor` (runs on failed scores too) adds
+  `PlayValidityHelper.GetPlayLength` = `min(total_length / rate, ended_at - started_at)`.
+  Scores have no start time, so they count `length / rate` -- which *is* the minimum for a
+  completed map. Incomplete plays have both ends in lazer's log; `started_at` was parsed
+  already and simply never stored, so it now is. Older incomplete rows count nothing rather
+  than a guess. Lengths are read lazily from the `.osu` into `beatmaps.length_ms`.
+- **"Scores" and "Pinned Scores"** are osu-web's `extra.top_ranks.title` and `.pinned.title`.
+  The section id stays `top_ranks`, because saved section orders refer to it.
+- **Medals: icons only, osu-web's layout.** One `medals-group` titled *Skill & Dedication*
+  (the only group this app can award from), a `medals-group__medals` row per `ordering`
+  (combo 0, plays 1, rank 2, hits 3, pass 4, fc 5 -- rank moved to its real place), badges
+  70px wide at osu!'s 110:118, 10px/20px gaps, locked at 25% opacity and desaturated. The
+  progress bars and every line of text are gone.
+- **The hover card is `qtip--achievement` + `tooltip-achievement`**: 200px, 32px radius on
+  b6, grouping, then icon (72px), name (24px) and description on b5, then `Achieved on
+  <date>` (moment's `ll`) or `Locked` at half opacity; a 56x20 tip; 200ms show and hide
+  delays, and it stays open while hovered (`hide.fixed`). One shared `#medalTooltip` in
+  window coordinates, like `#playMenu`, flipping below when there is no room above. osu!'s
+  achieved-count and rarity lines are left out -- there is no population to count.
+- **Rank medals have no date to announce.** They are computed once from the current total,
+  so `achievedAt` is just the latest play; `dated: false` keeps them out of Recent, and the
+  card says "from the estimated rank" rather than a borrowed date.
+- **Recent uses osu!'s wording** (`events.achievement`: unlocked the "…" medal!) and its
+  28x22 icon column, kept on every row so text lines up. A toast announces a medal unlocked
+  while the page is open -- only against what the page already saw in that mode, so opening
+  the page never announces old medals.
+- **Network sharing is removed, not just hidden.** `shareOnNetwork`, `localAddresses`, the
+  dialog block and its CSS are gone; `loadConfig` drops the key via `RETIRED_KEYS`. The
+  per-request loopback check stays and now has no off switch.
+- **Badge lettering is sized for the fallback face.** osu! uses Venera, which is not
+  shipped; the fallback is narrower and lighter, so osu!'s own sizes read small. Grades go
+  11 -> 12.5 (weight 900), letters about a fifth darker, and the gold/silver letters get a
+  faint dark edge; mod acronyms 28 -> 34 units (0.4em -> ~0.49em, three-letter ones stay at
+  28) and a touch darker; the level number is osu-web's `@font-size--large`, 20px.
+
+### What was checked
+
+`npm run check` (212 tests, new `test/play-time.test.ts` and medal-ordering/Recent/count
+tests), and `npm run ui` at **177/177** including a real hover that reads the card, its
+width, its placement and that it closes. Screenshots of each region were looked at, which
+is what caught the favicon.
+
+---
+
+## 5.18 — Rename to osu! local profiles
+
+**Status: in progress** -- the code, docs and package are renamed and verified locally.
+Left: renaming the GitHub repository, pointing the git remote at it, and cutting 1.5.0
+with **both** zips attached. The local folder `Desktop\osu! fresh profile` is the user's
+to rename (with the app and any editor session closed).
+
+### Decisions
+
+- **Existing installs must keep updating, and they can.** Renaming a GitHub repository
+  redirects its old URLs, the API included, and `fetch` follows the redirect -- so a 1.3.0
+  or 1.4.x install still finds the newest release. What it would *not* find is the file:
+  those versions ask for exactly `osu-fresh-profile-<v>-<target>.zip`. So
+  `scripts/package.mjs` writes the archive twice, byte-identical, and **a release must
+  attach both**. That is safe because 1.4.0's `extractZip` strips the top folder whatever
+  it is called (checked against the v1.4.0 tag), `verifyStaged` checks contents not names,
+  and the swap is run by the *new* build's `apply-update.mjs`, which installs and relaunches
+  `Start osu! local profiles.bat`.
+- **Do not create a new repository at the old name.** That would break the redirect and
+  strand every older install. Delete-and-recreate instead of rename would do the same.
+- **What cannot be renamed for the user**: an existing install's own folder (it is the
+  running app, and `data/` is inside it), and any shortcut they made to the old launcher,
+  which the swap replaces.
+- **Compatibility names that stay on purpose**: `LEGACY_ASSET_PREFIX` in
+  `src/update/github.ts` (new builds also accept the old asset name), the old launcher names
+  at the end of `apply-update.mjs`'s relaunch list, and the legacy zip copy. Past CHANGELOG
+  entries and roadmap records keep the names things actually had.
+- **"Fresh profile" in prose** became "local profile" where it named what the app makes,
+  and "new profile" where it meant a brand-new player (the rank-curve notes). "Erase and
+  start fresh" is a verb and stays. The first profile's default name is `Local Profile`;
+  existing profiles keep theirs.
+
+### How to finish
+
+1. `gh repo rename osu-local-profiles` (or Settings -> Repository name), then
+   `git remote set-url origin https://github.com/jonathant09/osu-local-profiles.git`.
+2. Bump to 1.5.0, `npm run package`, and attach **both** `dist/*.zip` files to the release.
+3. Verify the bridge the way 5.16 did: an untouched 1.4.0 package, started, must offer the
+   update, install 1.5.0, and come back as `Start osu! local profiles.bat` with `data/`
+   intact.

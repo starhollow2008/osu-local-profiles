@@ -35,6 +35,11 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'scores', column: 'hidden_at', definition: 'INTEGER' },
   { table: 'scores', column: 'pinned_at', definition: 'INTEGER' },
   { table: 'scores', column: 'pin_order', definition: 'INTEGER' },
+  // Added with Total Play Time. Both stay NULL on older rows: a beatmap's length is filled
+  // in lazily from its .osu file, and an incomplete play from before this column simply has
+  // no start time to measure from -- see src/calc/play-time.ts.
+  { table: 'beatmaps', column: 'length_ms', definition: 'INTEGER' },
+  { table: 'incomplete_plays', column: 'started_at', definition: 'INTEGER' },
 ];
 
 function migrate(db: Db): void {

@@ -1,7 +1,6 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import type { Db } from '../db/index.ts';
 import type { Tracker } from '../tracker/index.ts';
@@ -18,7 +17,7 @@ import {
   recentPlays,
   topPlays,
 } from '../calc/stats.ts';
-import { buildHistory } from '../calc/history.ts';
+import { buildHistory, medalEvents } from '../calc/history.ts';
 
 /**
  * osu! only ever weights the top 100 plays, so Best Performance cannot be longer than that
@@ -34,7 +33,7 @@ const TOP_PLAYS = 100;
  * a stray URL ask the database to assemble every score ever tracked.
  */
 const MAX_PAGE = 2000;
-import { computeMedals } from '../calc/medals.ts';
+import { computeMedals, earnedMedalCount } from '../calc/medals.ts';
 import { estimateRank, rankTable } from '../calc/rank.ts';
 import {
   activeProfileId,
@@ -68,23 +67,6 @@ import {
   reorderPins,
   type ScoreAction,
 } from '../scores.ts';
-
-/**
- * The addresses this machine can be reached at from the local network.
- *
- * Only IPv4, and only non-internal: an IPv6 link-local address is not something anyone is
- * going to type into a phone.
- */
-function localAddresses(port: number): string[] {
-  const out: string[] = [];
-  for (const entries of Object.values(os.networkInterfaces())) {
-    for (const entry of entries ?? []) {
-      if (entry.family !== 'IPv4' || entry.internal) continue;
-      out.push(`http://${entry.address}:${port}`);
-    }
-  }
-  return out;
-}
 
 /**
  * Is this request coming from the machine the app is running on?
@@ -124,8 +106,6 @@ export interface ServerOptions {
   tagline: string;
   dataDir: string;
   port: number;
-  /** Listen on every interface rather than only this machine. Off by default. */
-  shareOnNetwork: boolean;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -200,22 +180,17 @@ export function startServer(opts: ServerOptions): http.Server {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
     /*
-     * Refuse anyone who is not on this machine, unless sharing was asked for.
-     *
-     * This used to be open by default, and that was wrong: the page can reset a profile,
-     * delete one and remove scores, and none of those endpoints asks who is calling.
+     * Refuse anyone who is not on this machine. There is no switch for this: the page can
+     * reset a profile, delete one and remove scores, and none of those endpoints asks who
+     * is calling. Sharing a profile means saving it as a page or an image.
      *
      * Enforced here rather than by binding to 127.0.0.1, because a host-bound listen also
      * cuts off IPv6 loopback -- and `localhost` resolves to ::1 first on Windows -- so
      * binding "safely" would leave the app unreachable from its own browser.
      */
-    if (!opts.shareOnNetwork && !isLocal(req.socket.remoteAddress)) {
+    if (!isLocal(req.socket.remoteAddress)) {
       res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' });
-      res.end(
-        'This osu! fresh profile is private to the machine it runs on.\n' +
-          'To share it on your network, set "shareOnNetwork": true in data/config.json ' +
-          'and restart.\n',
-      );
+      res.end('osu! local profiles only answers the machine it runs on.\n');
       return;
     }
 
@@ -245,13 +220,8 @@ export function startServer(opts: ServerOptions): http.Server {
         staleScores: opts.tracker.staleScores,
         // Scores removed from the profile. They are never deleted, so they can be put back.
         hiddenScores: hiddenCount(opts.db, current()),
-        // How this profile can be shared. `addresses` is empty unless sharing is on, which
-        // is what stops the page offering a URL nothing outside this machine can reach.
-        sharing: {
-          onNetwork: opts.shareOnNetwork,
-          addresses: opts.shareOnNetwork ? localAddresses(opts.port) : [],
-          canScreenshot: findBrowser() !== null,
-        },
+        // Whether the Share dialog can offer an image as well as a web page.
+        sharing: { canScreenshot: findBrowser() !== null },
         defaultMode: mostRecentMode(opts.db, current()),
         modesWithPlays: modesWithPlays(opts.db, current()),
         installs: opts.installs.map((i) => ({
@@ -279,7 +249,15 @@ export function startServer(opts: ServerOptions): http.Server {
         return Math.min(Math.max(Math.floor(asked), 1), MAX_PAGE);
       };
 
-      const history = buildHistory(opts.db, current(), mode, page('events', 15), e);
+      const medals = computeMedals(opts.db, current(), mode, e);
+      const history = buildHistory(
+        opts.db,
+        current(),
+        mode,
+        page('events', 15),
+        e,
+        medalEvents(medals.medals),
+      );
       const stats = computeStats(opts.db, current(), mode, e);
       const table = rankTable(mode);
       return json(res, {
@@ -293,7 +271,9 @@ export function startServer(opts: ServerOptions): http.Server {
         // ~200 countries is far too thin to interpolate per country.
         rank: estimateRank(stats.totalPp, mode),
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
-        medals: computeMedals(opts.db, current(), mode, e),
+        medals,
+        // osu!'s header figure: every medal the profile holds, whichever mode is showing.
+        medalTotal: earnedMedalCount(opts.db, current(), e),
         pinned: pinnedPlays(opts.db, current(), mode, e),
         top: topPlays(opts.db, current(), mode, page('top', 100), e),
         recent: recentPlays(
@@ -803,7 +783,7 @@ export function startServer(opts: ServerOptions): http.Server {
       const modes = [0, 1, 2, 3] as Ruleset[];
       const payload = {
         exportedAt: new Date().toISOString(),
-        app: 'osu! fresh profile',
+        app: 'osu! local profiles',
         profile: {
           name: profile.name,
           createdAt: profile.createdAt,
@@ -861,7 +841,7 @@ export function startServer(opts: ServerOptions): http.Server {
         if (err) return json(res, { error: err.message }, 500);
         res.writeHead(200, {
           'content-type': 'application/octet-stream',
-          'content-disposition': `attachment; filename="osu-fresh-profile-${stamp}.db"`,
+          'content-disposition': `attachment; filename="osu-local-profiles-${stamp}.db"`,
           'cache-control': 'no-store',
         });
         res.end(buf);

@@ -33,7 +33,7 @@ interface Fixture {
 }
 
 function harness() {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-scores-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-scores-'));
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'First');
   let n = 0;

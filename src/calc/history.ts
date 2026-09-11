@@ -3,6 +3,7 @@ import type { Ruleset } from '../osr.ts';
 import { bonusPp, weightedTotal } from './pp.ts';
 import { levelFromScore } from './level.ts';
 import { countsSql, ppColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
+import type { Medal, MedalFamily } from './medals.ts';
 
 /**
  * The time-series and activity feed behind the profile page's chart, the Historical
@@ -30,7 +31,39 @@ export interface MonthlyPlaycount {
 export type ActivityEvent =
   | { type: 'best'; at: number; pp: number; title: string; version: string | null }
   | { type: 'level'; at: number; level: number }
-  | { type: 'first'; at: number };
+  | { type: 'first'; at: number }
+  | {
+      type: 'medal';
+      at: number;
+      slug: string;
+      name: string;
+      description: string;
+      icon: string;
+      family: MedalFamily;
+      threshold: number;
+    };
+
+/**
+ * The Recent-feed entries for a mode's medals: one per medal, at the moment it was earned.
+ *
+ * Only medals with a real date. A rank medal is decided from the current total rather than
+ * replayed score by score (see `computeMedals`), so its "date" is merely the latest play and
+ * would keep sliding to the top of the feed.
+ */
+export function medalEvents(medals: readonly Medal[]): ActivityEvent[] {
+  return medals
+    .filter((m) => m.achievedAt !== null && m.dated)
+    .map((m) => ({
+      type: 'medal' as const,
+      at: m.achievedAt!,
+      slug: m.slug,
+      name: m.name,
+      description: m.description,
+      icon: m.icon,
+      family: m.family,
+      threshold: m.threshold,
+    }));
+}
 
 export interface History {
   pp: PpPoint[];
@@ -75,6 +108,8 @@ export function buildHistory(
   mode: Ruleset,
   maxEvents = 15,
   e: Eligibility = VANILLA,
+  /** Events derived elsewhere -- medals -- merged into the feed by time. */
+  extraEvents: readonly ActivityEvent[] = [],
 ): History {
   const rows = db
     .prepare(
@@ -177,6 +212,11 @@ export function buildHistory(
   }
 
   if (pendingDay !== null) pp.push({ at: pendingDay, pp: totalPp([...bestByMap.values()]) });
+
+  // A stable sort, so a medal earned by the same play as a new best lands after it, the way
+  // osu! would announce the score before the medal it unlocked.
+  events.push(...extraEvents);
+  events.sort((a, b) => a.at - b.at);
 
   const months = [...monthly.keys()].sort((a, b) => a - b);
   const monthlyPlaycounts = monthsBetween(months[0]!, months[months.length - 1]!).map((at) => ({

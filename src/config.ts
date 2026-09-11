@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export interface Config {
-  /** Name of the fresh profile being tracked (one per alternative playstyle). */
+  /** Name of the first profile to track (one per alternative playstyle). */
   profileName: string;
   port: number;
   /** Open the page in the default browser on start. */
@@ -12,7 +12,7 @@ export interface Config {
   installRoots: string[];
   /**
    * Shown beside the profile name, the way osu! shows a country. Two-letter ISO code;
-   * empty means the profile has no country, which is how a fresh profile starts.
+   * empty means the profile has no country, which is how a new profile starts.
    */
   country: string;
   /** What to call the playstyle under the profile name, e.g. "left hand, mouse only". */
@@ -26,28 +26,24 @@ export interface Config {
    * the page.
    */
   checkForUpdates: boolean;
-  /**
-   * Listen on every network interface instead of only this machine.
-   *
-   * Off by default, and that default matters: the page can reset a profile, delete one and
-   * remove scores, and none of those endpoints asks who is calling. Bound to localhost they
-   * are reachable only from this machine. Turned on, anyone on the same network can open
-   * the profile -- which is the point -- but also do anything else the page can do. So it
-   * is opt-in, and the app says so on startup.
-   */
-  shareOnNetwork: boolean;
 }
 
 const DEFAULTS: Config = {
-  profileName: 'Fresh Profile',
+  profileName: 'Local Profile',
   port: 7272,
   openBrowser: true,
   installRoots: [],
   country: '',
   tagline: '',
-  shareOnNetwork: false,
   checkForUpdates: true,
 };
+
+/**
+ * Keys older versions wrote that mean nothing now. Dropped on load so the next save does not
+ * carry them forward: `shareOnNetwork` opened the page to the local network, and was removed
+ * because the page can reset and delete profiles without asking who is calling.
+ */
+const RETIRED_KEYS = ['shareOnNetwork'];
 
 /**
  * Where the profile database, config and any user-supplied images live.
@@ -91,7 +87,9 @@ export function loadConfig(): Config {
   } catch {
     /* first run, or unreadable: fall back to defaults */
   }
-  return { ...DEFAULTS, ...stored };
+  const merged: Record<string, unknown> = { ...DEFAULTS, ...stored };
+  for (const key of RETIRED_KEYS) delete merged[key];
+  return merged as unknown as Config;
 }
 
 export function saveConfig(config: Config): void {

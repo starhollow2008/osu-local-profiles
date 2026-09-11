@@ -8,7 +8,7 @@ import { createProfile, deleteProfile } from '../src/profiles.ts';
 import { defaultSettings, getSettings, updateSettings } from '../src/settings.ts';
 
 function harness(): { db: Db; profileId: number; cleanup: () => void } {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-settings-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-settings-'));
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'First');
   return {

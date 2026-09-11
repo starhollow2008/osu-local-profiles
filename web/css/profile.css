@@ -384,11 +384,16 @@
   gap: 20px;
 }
 
+/* osu-web: four equal columns, with Total Play Time spanning the last two. */
 .profile-detail-stats__values--grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, max-content));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   flex: 1;
+}
+
+.value-display--plain-wide {
+  grid-column-end: span 2;
 }
 
 @media (min-width: 900px) {
@@ -610,11 +615,13 @@
   height: 100%;
 }
 
+/* osu-web's `.user-level` is @font-size--large, which the number inherits. */
 .user-level__level {
   position: relative;
   color: hsl(var(--hsl-b6));
   font-weight: 700;
-  font-size: var(--fs-title-small-3);
+  font-size: var(--fs-large);
+  line-height: 1;
 }
 
 /* ======================================================================== */
@@ -1111,6 +1118,17 @@
   border-bottom: 0;
 }
 
+/* osu-web's `profile-extra-entries__icon`: 28px across, one 22px row tall, top-aligned. */
+.activity__icon {
+  flex: none;
+  align-self: flex-start;
+  display: flex;
+  justify-content: center;
+  width: 28px;
+  height: 22px;
+  margin-right: -5px;
+}
+
 .activity__text {
   flex: 1;
   min-width: 0;
@@ -1374,21 +1392,6 @@
   cursor: default;
 }
 
-.share-network p {
-  margin: 0 0 6px;
-}
-
-.share-url {
-  display: block;
-  margin-bottom: 6px;
-  padding: 7px 10px;
-  border-radius: var(--radius-base);
-  background-color: hsl(var(--hsl-b6));
-  color: hsl(var(--hsl-c1));
-  font-size: var(--fs-normal-2);
-  user-select: all;
-}
-
 /*
  * `?export=1`: the same page with everything you would only use while *using* it removed.
  * The screenshot renderer loads this, and so does anyone who wants to read without the
@@ -1423,32 +1426,93 @@
 /* Medals                                                                   */
 /* ======================================================================== */
 
-.medal-grid {
+/*
+ * osu-web's `medals-group`: groups 40px apart (20px on narrow screens), and within a group
+ * the heading and one row of icons per `ordering`, 10px apart. Icons sit 20px apart across
+ * and 10px down, with no text beside them -- everything else is in the hover card.
+ */
+.medals-group {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 14px 10px;
-  margin-bottom: 22px;
+  gap: 20px;
+  margin-bottom: 10px;
 }
 
-.medal {
-  text-align: center;
-  min-width: 0;
+.medals-group__group {
+  display: grid;
+  gap: 10px;
+}
+
+.medals-group__medals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+/* A 2px rule in the highlight colour across the full width, with the name beneath it. */
+.medals-group__title {
+  position: relative;
+  margin: 0;
+  padding: 10px 0 0;
+  color: #fff;
+  font-size: var(--fs-title-small);
+  font-weight: 700;
+}
+
+.medals-group__title::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-h1));
+}
+
+@media (min-width: 900px) {
+  .medals-group {
+    gap: 40px;
+  }
 }
 
 /*
- * osu!'s own icon sits on top of a drawn placeholder, exactly as beatmap covers do: a
- * request that fails -- or a page opened offline -- still shows a complete medal instead of
- * a broken image.
+ * One medal icon, `badge-achievement`. osu!'s icons are 110x118, so a 70px-wide listing
+ * badge is 75px tall. osu!'s icon sits over a drawn placeholder, as beatmap covers do, so a
+ * request that fails -- or a page opened offline -- still shows a medal. The placeholder is
+ * dropped once the icon arrives, because osu!'s icons are not round and it would show round
+ * their edges.
  */
-.medal__icon {
+.badge-achievement {
+  --medal-w: 70px;
   position: relative;
-  width: 68px;
-  height: 68px;
-  margin: 0 auto 6px;
+  flex: none;
+  width: var(--medal-w);
+  height: calc(var(--medal-w) * 118 / 110);
+  border-radius: 6px;
 }
 
-.medal__icon img,
-.medal__placeholder {
+.badge-achievement--listing,
+.badge-achievement--recent-activity {
+  cursor: default;
+}
+
+.badge-achievement:focus-visible {
+  outline: 2px solid hsl(var(--hsl-h1));
+  outline-offset: 3px;
+}
+
+/* osu-web's recent-activity badge is the full height of a 22px feed row. */
+.badge-achievement--recent-activity {
+  --medal-w: calc(22px * 110 / 118);
+}
+
+/* osu-web: 72px tall in the card (`font-size: 72px` on a 1em-high dynamic-height badge). */
+.badge-achievement--tooltip {
+  --medal-w: calc(72px * 110 / 118);
+}
+
+.badge-achievement__image,
+.badge-achievement__placeholder {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -1456,57 +1520,105 @@
   display: block;
 }
 
-.medal__icon img {
+.badge-achievement__image {
   object-fit: contain;
 }
 
+/* Inset so the round stand-in sits inside where osu!'s taller icon would be. */
+.badge-achievement__placeholder {
+  inset: 3px 0;
+  height: auto;
+}
+
+.badge-achievement--loaded .badge-achievement__placeholder {
+  display: none;
+}
+
+/* A locked medal is osu!'s own icon at a quarter opacity with the colour taken out. */
+.badge-achievement--locked .badge-achievement__image,
+.badge-achievement--locked .badge-achievement__placeholder {
+  opacity: 0.25;
+  filter: saturate(0);
+}
+
 /*
- * osu! ships one icon per medal, so a locked one is dimmed here rather than fetched. The
- * whole tile fades, not only the picture: several of osu!'s skill medals are silver to
- * begin with, and greyscale alone barely separates them from an earned one.
+ * The medal card, osu-web's `qtip--achievement` and `tooltip-achievement`: 200px wide,
+ * 32px corners on --hsl-b6, the group in small type, then the icon, name and description on
+ * a --hsl-b5 panel, then when it was achieved at half opacity. A 56x20 tip points at the
+ * medal. Positioned in window coordinates by main.js, so it escapes every panel.
  */
-.medal--locked {
-  opacity: 0.5;
-}
-
-.medal--locked .medal__icon img,
-.medal--locked .medal__placeholder {
-  filter: grayscale(1) brightness(0.6);
-}
-
-/* And an earned one is lifted, so the two are told apart at a glance. */
-.medal:not(.medal--locked) .medal__icon {
-  filter: drop-shadow(0 0 6px hsla(var(--hsl-h1), 0.35));
-}
-
-.medal__name {
-  font-size: var(--fs-normal-2);
-  font-weight: 600;
-  color: hsl(var(--hsl-c1));
-}
-
-.medal__detail {
-  font-size: var(--fs-normal);
-  color: hsl(var(--hsl-f1));
-  line-height: 1.35;
-}
-
-.medal--locked .medal__name {
-  color: hsl(var(--hsl-l1));
-}
-
-.medal__progress {
-  height: 3px;
-  margin: 5px auto 0;
-  width: 68px;
-  border-radius: 2px;
+.medal-tooltip {
+  --border-radius: 32px;
+  --padding-x: 16px;
+  position: fixed;
+  z-index: 60;
+  width: 200px;
+  border-radius: var(--border-radius);
   background-color: hsl(var(--hsl-b6));
-  overflow: hidden;
+  box-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  text-align: center;
+  line-height: 1;
+  font-size: var(--fs-normal);
 }
 
-.medal__progress-fill {
-  height: 100%;
-  background-color: hsl(var(--hsl-h1));
+.medal-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--tip-x, 50%);
+  width: 56px;
+  height: 20px;
+  margin-left: -28px;
+  background-color: hsl(var(--hsl-b6));
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.medal-tooltip--below::after {
+  top: auto;
+  bottom: 100%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+.medal-tooltip__grouping {
+  padding: 8px var(--padding-x);
+  color: hsl(var(--hsl-c2));
+}
+
+.medal-tooltip__middle {
+  display: grid;
+  gap: 16px;
+  padding: 16px var(--padding-x);
+  border-radius: var(--border-radius);
+  background-color: hsl(var(--hsl-b5));
+  line-height: normal;
+  overflow-wrap: anywhere;
+}
+
+.medal-tooltip__badge {
+  display: flex;
+  justify-content: center;
+}
+
+.medal-tooltip__name {
+  font-size: var(--fs-title);
+  font-weight: 400;
+}
+
+.medal-tooltip__description {
+  font-size: var(--fs-title-small);
+  color: hsl(var(--hsl-c2));
+}
+
+.medal-tooltip__achieved {
+  display: grid;
+  gap: 8px;
+  padding: 16px var(--padding-x);
+}
+
+.medal-tooltip__date {
+  color: hsl(var(--hsl-c2));
+  opacity: 0.5;
 }
 
 .medals-note {

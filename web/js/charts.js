@@ -103,7 +103,7 @@ function dateCaption(from, to) {
  *
  * Two things differ from an ordinary series: the axis is inverted, because a *smaller* rank
  * is better and belongs at the top; and it is log-scaled, because rank spans six orders of
- * magnitude and a fresh profile lives in the long tail where a linear axis would flatten
+ * magnitude and a new profile lives in the long tail where a linear axis would flatten
  * every gain to nothing.
  */
 export function rankChart(input) {
@@ -132,7 +132,7 @@ export function rankChart(input) {
 /**
  * pp over time, shown in the same slot when no rank curve exists for the mode.
  *
- * The baseline is anchored at zero rather than at the lowest value: a fresh profile starts
+ * The baseline is anchored at zero rather than at the lowest value: a new profile starts
  * there, and letting the floor float would make a 2pp wobble look like a career.
  */
 export function ppChart(input, emptyMessage = 'no ranked plays yet') {

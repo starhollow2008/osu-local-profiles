@@ -45,7 +45,7 @@ const RANK_MEDALS = [
 ];
 
 const response = await fetch(`https://osu.ppy.sh/users/${encodeURIComponent(who)}`, {
-  headers: { accept: 'text/html', 'user-agent': 'osu-fresh-profile medal table builder' },
+  headers: { accept: 'text/html', 'user-agent': 'osu-local-profiles medal table builder' },
 });
 if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
 

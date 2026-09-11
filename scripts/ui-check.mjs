@@ -224,15 +224,12 @@ check(
   })()`),
   true,
 );
-// Sharing on the network is off by default, and the dialog must say why rather than
-// offering a URL that nothing outside this machine can reach.
+// The live page is never offered to the network any more: the option was removed outright.
 check(
-  'the network section explains its default',
+  'the dialog offers no network sharing',
   await evaluate(`(() => {
-    const text = document.getElementById('shareNetwork').textContent;
-    return text.includes('private to this machine')
-      ? !text.includes('http://')
-      : text.includes('http://');
+    const text = document.getElementById('shareModal').textContent;
+    return !document.getElementById('shareNetwork') && !/network|shareOnNetwork/i.test(text);
   })()`),
   true,
 );
@@ -265,22 +262,67 @@ check(
   true,
 );
 
-console.log('\nmedals');
+console.log('\nheader figures');
+// osu-web's three figures under the chart, in its order.
 check(
-  'the medal grid is rendered',
-  await evaluate("document.querySelectorAll('#medalGroups .medal').length > 0"),
+  'the figures are Medals, pp and Total Play Time',
+  await evaluate(
+    "[...document.querySelectorAll('.profile-detail-stats__values--grid .value-display__label')].map((l) => l.textContent.trim()).join(' | ')",
+  ),
+  'Medals | pp | Total Play Time',
+);
+check(
+  "play time reads as osu!'s does",
+  await evaluate("/^(\\d[\\d,]*d )?\\d+h \\d+m$/.test(document.getElementById('playTime').textContent)"),
   true,
 );
 check(
-  'the section header counts earned against total',
-  await evaluate(`(() => {
-    const parts = document.getElementById('medalCount').textContent.split(' / ');
-    if (parts.length !== 2) return 'not a fraction';
-    const [earned, total] = parts.map((p) => Number(p.replace(/,/g, '')));
-    // Both real numbers, and you cannot have earned more than exist.
-    return Number.isFinite(earned) && total > 0 && earned <= total;
-  })()`),
+  'play time spans two columns',
+  await evaluate("getComputedStyle(document.getElementById('playTime').parentElement).gridColumnEnd"),
+  'span 2',
+);
+check(
+  'the medal figure is a whole number',
+  await evaluate("/^\\d[\\d,]*$/.test(document.getElementById('medalTotal').textContent)"),
   true,
+);
+check(
+  "the level number is set at osu!'s size",
+  await evaluate("getComputedStyle(document.querySelector('.user-level__level')).fontSize"),
+  '20px',
+);
+
+console.log('\nmedals');
+check(
+  'medals are one Skill & Dedication group',
+  await evaluate(
+    "[...document.querySelectorAll('#medalGroups .medals-group__title')].map((t) => t.textContent).join('|')",
+  ),
+  'Skill & Dedication',
+);
+check(
+  'the section heading carries no count',
+  await evaluate("document.querySelector('#section-medals h2.title').textContent.trim()"),
+  'Medals',
+);
+// No names, dates or progress on the page: all of that is in the hover card. Rendered text
+// rather than textContent, because the offline placeholder behind each icon stamps a star
+// level on its face and is hidden once osu!'s own icon has loaded.
+// Waits for the icons to settle first: until one arrives its placeholder is what shows.
+check(
+  'the medals themselves carry no text',
+  await evaluate(`(async () => {
+    const images = [...document.querySelectorAll('#medalGroups img')];
+    await Promise.all(images.map((i) => i.complete ? null : new Promise((r) => { i.onload = i.onerror = r; })));
+    await new Promise((r) => setTimeout(r, 50));
+    return document.getElementById('medalGroups').innerText.replace(/\\s+/g, ' ').trim();
+  })()`),
+  'Skill & Dedication',
+);
+check(
+  'there are no progress bars',
+  await evaluate("document.querySelectorAll('#medalGroups [class*=progress]').length"),
+  0,
 );
 /*
  * Every medal carries osu!'s own icon over a drawn placeholder, so a failed request -- or a
@@ -289,39 +331,61 @@ check(
 check(
   'each medal has both an icon and a drawn fallback',
   await evaluate(`(() => {
-    const medals = [...document.querySelectorAll('.medal')];
-    return medals.every(
-      (m) => m.querySelector('.medal__icon img') && m.querySelector('svg.medal__placeholder'),
+    const medals = [...document.querySelectorAll('#medalGroups .badge-achievement')];
+    return medals.length > 0 && medals.every(
+      (m) => m.querySelector('img.badge-achievement__image') && m.querySelector('svg.badge-achievement__placeholder'),
     );
   })()`),
   true,
 );
 check(
-  'the fallback is behind the icon, not beside it',
-  await evaluate(`(() => {
-    const icon = document.querySelector('.medal__icon');
-    const img = icon.querySelector('img').getBoundingClientRect();
-    const svg = icon.querySelector('svg').getBoundingClientRect();
-    return Math.abs(img.top - svg.top) < 1 && Math.abs(img.left - svg.left) < 1;
-  })()`),
-  true,
+  "a listing medal is osu!'s 70px wide",
+  await evaluate("document.querySelector('#medalGroups .badge-achievement').getBoundingClientRect().width"),
+  70,
 );
 check(
-  'a locked medal says what it needs',
-  await evaluate(`(() => {
-    const locked = document.querySelector('.medal--locked');
-    if (!locked) return 'every medal is earned';
-    return locked.querySelector('.medal__detail').textContent.trim().length > 0;
-  })()`),
-  true,
+  'the medal card is hidden on load',
+  await shown('medalTooltip'),
+  'none',
 );
-// The star families are not running totals, so a progress bar there would be nonsense.
+
+// Hover a medal in view, as a pointer would, and read the card that comes up.
+const card = await evaluate(`(async () => {
+  const badge = document.querySelector('#medalGroups [data-medal]');
+  badge.scrollIntoView({ block: 'center' });
+  await new Promise((r) => setTimeout(r, 50));
+  badge.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 350));
+  const el = document.getElementById('medalTooltip');
+  const b = badge.getBoundingClientRect();
+  const c = el.getBoundingClientRect();
+  return {
+    display: getComputedStyle(el).display,
+    grouping: el.querySelector('.medal-tooltip__grouping')?.textContent,
+    name: el.querySelector('.medal-tooltip__name')?.textContent === badge.getAttribute('aria-label'),
+    description: (el.querySelector('.medal-tooltip__description')?.textContent ?? '').length > 0,
+    date: /^(Achieved|Locked)/.test(el.querySelector('.medal-tooltip__date')?.textContent.trim() ?? ''),
+    width: c.width,
+    placed: c.bottom <= b.top || c.top >= b.bottom,
+    onScreen: c.left >= 0 && c.right <= innerWidth && c.top >= 0 && c.bottom <= innerHeight,
+  };
+})()`);
+check('hovering a medal opens its card', card.display, 'block');
+check('the card is headed by the group', card.grouping, 'Skill & Dedication');
+check("the card names the medal", card.name, true);
+check('the card describes it', card.description, true);
+check('the card says when it was achieved, or that it is locked', card.date, true);
+check("the card is osu!'s 200px", card.width, 200);
+check('the card sits clear of the medal, not over it', card.placed, true);
+check('the card is fully on screen', card.onScreen, true);
 check(
-  'star medals show no progress bar',
-  await evaluate(
-    "[...document.querySelectorAll('.medal')].filter((m) => /star beatmap/.test(m.title)).every((m) => !m.querySelector('.medal__progress'))",
-  ),
-  true,
+  'moving away closes it',
+  await evaluate(`(async () => {
+    document.body.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 350));
+    return getComputedStyle(document.getElementById('medalTooltip')).display;
+  })()`),
+  'none',
 );
 
 console.log('\nsection order');
@@ -703,7 +767,7 @@ await evaluate('document.body.click()');
 check('clicking elsewhere closes it', await shown('playMenu'), 'none');
 
 check(
-  'the Pinned section is there, above Best Performance',
+  'Pinned Scores is there, above Best Performance',
   await evaluate(`(() => {
     const pinned = document.getElementById('pinnedPlays');
     const top = document.getElementById('topRanks');
@@ -711,12 +775,15 @@ check(
   })()`),
   true,
 );
+// As on osu!: nothing pinned leaves the space blank rather than explaining itself.
 check(
-  'an empty Pinned section says how to fill it',
-  await evaluate(
-    "document.querySelector('#pinnedPlays .u-empty')?.textContent.includes('pin it here') ?? 'not empty'",
-  ),
-  true,
+  'an empty Pinned Scores list is blank',
+  await evaluate(`(() => {
+    const pinned = document.getElementById('pinnedPlays');
+    if (pinned.querySelector('.play-detail')) return ${JSON.stringify('skipped')};
+    return pinned.innerHTML.trim();
+  })()`),
+  '',
 );
 
 console.log('\nthe update button');
@@ -747,14 +814,14 @@ console.log('\nthe page says what it is');
 check(
   'the footer links to the source',
   await evaluate("document.querySelector('.site-footer a')?.href ?? 'missing'"),
-  'https://github.com/jonathant09/osu-fresh-profile',
+  'https://github.com/jonathant09/osu-local-profiles',
 );
 // Compared against what the server reports rather than pattern-matched, so a footer that
 // silently prints someone else's version fails instead of passing on its shape.
 check(
   'and names the running version',
   await evaluate(`fetch('/api/state').then((r) => r.json()).then(
-    (s) => document.getElementById('footerVersion').textContent === 'osu! fresh profile v' + s.app.version,
+    (s) => document.getElementById('footerVersion').textContent === 'osu! local profiles v' + s.app.version,
   )`),
   true,
 );
@@ -1122,8 +1189,35 @@ check(
   ),
   'section-historical,section-me,section-medals,section-recent,section-top_ranks',
 );
+// osu-web's own names: `extra.top_ranks.title` is "Scores", its pinned list "Pinned Scores".
+check(
+  "the scores section uses osu!'s names",
+  await evaluate(`(() => {
+    const s = document.getElementById('section-top_ranks');
+    const main = s.querySelector('h2.title').textContent.trim();
+    const pinned = s.querySelector('h3.title').firstChild.textContent.trim();
+    const tab = document.querySelector('#sectionTabs a[href="#section-top_ranks"]').textContent;
+    return [main, pinned, tab].join(' | ');
+  })()`),
+  'Scores | Pinned Scores | Scores',
+);
+check(
+  'the tab icon is served, and actually draws',
+  // Loaded as an image rather than just fetched: an SVG that is served fine but is not
+  // well-formed XML -- a `--` inside a comment is enough -- renders as nothing at all.
+  await evaluate(`(async () => {
+    const href = document.querySelector('link[rel="icon"]').getAttribute('href');
+    const r = await fetch(href);
+    if (!r.ok || !(r.headers.get('content-type') ?? '').startsWith('image/svg+xml')) return 'not served';
+    const img = new Image();
+    img.src = href;
+    try { await img.decode(); } catch { return 'does not decode'; }
+    return img.naturalWidth > 0;
+  })()`),
+  true,
+);
 // Consecutive headings must stack: they were inline-block once, which overlapped
-// "Top Ranks" with "Best Performance".
+// "Scores" with "Pinned Scores".
 check(
   'section headings stack',
   await evaluate(`(() => {

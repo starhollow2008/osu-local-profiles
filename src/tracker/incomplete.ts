@@ -93,8 +93,8 @@ export function ingestIncompletePlay(
     .prepare(
       `INSERT INTO incomplete_plays
         (profile_id, dedupe_key, mode, beatmap_md5, beatmap_id, beatmap_name,
-         played_at, online_score_id)
-       VALUES (?,?,?,?,?,?,?,?)`,
+         played_at, started_at, online_score_id)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       ctx.profileId,
@@ -104,6 +104,7 @@ export function ingestIncompletePlay(
       beatmap.beatmapId,
       play.beatmapName,
       play.countedAt,
+      play.startedAt,
       play.onlineScoreId,
     );
 

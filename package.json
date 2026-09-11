@@ -1,8 +1,8 @@
 {
-  "name": "osu-fresh-profile",
+  "name": "osu-local-profiles",
   "version": "1.4.0",
   "private": true,
-  "description": "Track an alternative osu! playstyle as a fresh profile, locally.",
+  "description": "Track an alternative osu! playstyle as its own profile, kept locally on your machine.",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -31,6 +31,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jonathant09/osu-fresh-profile.git"
+    "url": "https://github.com/jonathant09/osu-local-profiles.git"
   }
 }

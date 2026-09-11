@@ -9,7 +9,7 @@ import { dedupeKey } from './ingest.ts';
  *
  * This is deliberately a manual action with an explicit cutoff, never something that runs
  * on startup. A profile that scanned and imported by itself would quietly absorb every
- * play made with the user's *normal* playstyle, which is the one thing a fresh profile
+ * play made with the user's *normal* playstyle, which is the one thing a separate profile
  * must not contain. Asking for a cutoff makes the user state which session they mean.
  */
 

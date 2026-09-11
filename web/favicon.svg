@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- osu! local profiles: a house on a pink disc, for a profile that lives on your own machine. -->
+  <circle cx="32" cy="32" r="32" fill="#ff66ab"/>
+  <path fill="#fff" d="M32 14.5 13.5 30.2a2 2 0 0 0 2.6 3l2.4-2V47a3 3 0 0 0 3 3h7.5V39.5a1.5 1.5 0 0 1 1.5-1.5h3a1.5 1.5 0 0 1 1.5 1.5V50h7.5a3 3 0 0 0 3-3V31.2l2.4 2a2 2 0 0 0 2.6-3z"/>
+</svg>

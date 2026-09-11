@@ -58,8 +58,8 @@ function openBrowser(url: string): void {
 }
 
 async function main(): Promise<void> {
-  console.log('\n  osu! fresh profile');
-  console.log('  ------------------');
+  console.log('\n  osu! local profiles');
+  console.log('  -------------------');
 
   const config = loadConfig();
   saveConfig(config);
@@ -207,7 +207,6 @@ async function main(): Promise<void> {
     tagline: config.tagline,
     dataDir: dataDir(),
     port: config.port,
-    shareOnNetwork: config.shareOnNetwork,
   });
 
   const url = `http://localhost:${config.port}`;

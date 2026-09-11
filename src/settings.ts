@@ -51,7 +51,7 @@ export interface Settings {
   includeUnrankedMaps: UnrankedMapStatus[];
   /**
    * An osu! account this profile borrows its name, avatar and banner from. 0 for none,
-   * which is the default and stays the default -- a fresh profile is a different identity
+   * which is the default and stays the default -- a local profile is a different identity
    * by definition, so it is never linked without being asked for.
    */
   linkedUserId: number;
@@ -89,7 +89,7 @@ export interface Settings {
    */
   sectionOrder: string[];
   /**
-   * Whether Top Ranks warns that this profile's pp is not comparable with a real osu!
+   * Whether the Scores section warns that this profile's pp is not comparable with a real osu!
    * account.
    *
    * On by default, and only *shown* at all when a setting has actually made the profile

@@ -39,7 +39,7 @@ interface Harness {
 }
 
 function harness(trackingSince = 0): Harness {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-incomplete-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-incomplete-'));
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'First');
   const resolver = new BeatmapResolver(db, []);
@@ -369,7 +369,7 @@ test('a collapsed run counts as one row against the limit, not as its attempts',
 /* ------------------------------------------------------------------ mode */
 
 test('the mode of an abandoned play comes from the beatmap, since the log never says', () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-mode-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-mode-'));
   try {
     const file = path.join(tmp, 'map.osu');
     fs.writeFileSync(

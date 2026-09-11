@@ -1,7 +1,7 @@
 /**
  * Build the pp -> global rank curve that `src/calc/rank.ts` interpolates.
  *
- * osu!'s rankings API only exposes the top 10,000, which is useless for a fresh profile
+ * osu!'s rankings API only exposes the top 10,000, which is useless for a new profile
  * sitting near the bottom of the ladder. data.ppy.sh instead publishes
  * `performance_<mode>_random_10000`: a random sample of users from across the whole
  * distribution, each carrying both their pp and their actual global rank. Those pairs are

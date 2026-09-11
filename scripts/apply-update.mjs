@@ -103,7 +103,7 @@ function move(from, to) {
  * Start the app again, in a window the user can see.
  *
  * On Windows this goes through `cmd`'s `start`, and the quoting is the whole difficulty:
- * the launcher is called `Start osu! fresh profile.bat`, so the path has spaces in it, and
+ * the launcher is called `Start osu! local profiles.bat`, so the path has spaces in it, and
  * handing that to a shell unquoted runs a program called `Start`. `start` also treats its
  * first quoted argument as a window title, which is what the empty `""` is for.
  *
@@ -112,7 +112,15 @@ function move(from, to) {
  * tracking, and invisible.
  */
 function relaunch() {
-  const launcher = ['Start osu! fresh profile.bat', 'Start osu! fresh profile.command', 'start.sh']
+  // The names before 1.5.0 come last: a swap always installs the new launcher, so they only
+  // matter if that copy somehow failed and the old one is all there is.
+  const launcher = [
+    'Start osu! local profiles.bat',
+    'Start osu! local profiles.command',
+    'start.sh',
+    'Start osu! fresh profile.bat',
+    'Start osu! fresh profile.command',
+  ]
     .map((name) => path.join(installDir, name))
     .find((file) => fs.existsSync(file));
 

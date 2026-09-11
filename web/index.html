@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>osu! fresh profile</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='none' stroke='%23ff66ab' stroke-width='5'/%3E%3C/svg%3E">
+<title>osu! local profiles</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/profile.css">
@@ -44,7 +44,7 @@
               title="Change this profile's picture"></button>
       <div class="profile-info__info">
         <h1 class="profile-info__name u-ellipsis u-text-shadow" id="pname"
-            role="button" tabindex="0" title="Rename this profile">Fresh Profile</h1>
+            role="button" tabindex="0" title="Rename this profile">Local Profile</h1>
         <div class="profile-info__flags u-text-shadow" id="pflags"></div>
       </div>
       <nav class="game-mode" id="modes" aria-label="Game mode"></nav>
@@ -74,16 +74,16 @@
       <div class="profile-detail-stats__chart-numbers">
         <div class="profile-detail-stats__values profile-detail-stats__values--grid">
           <div class="value-display value-display--plain">
+            <div class="value-display__label">Medals</div>
+            <div class="value-display__value" id="medalTotal">0</div>
+          </div>
+          <div class="value-display value-display--plain">
             <div class="value-display__label">pp</div>
             <div class="value-display__value" id="totalPp">0</div>
           </div>
-          <div class="value-display value-display--plain">
-            <div class="value-display__label">Ranked Beatmaps</div>
-            <div class="value-display__value" id="rankedMaps">0</div>
-          </div>
-          <div class="value-display value-display--plain">
-            <div class="value-display__label">Bonus pp</div>
-            <div class="value-display__value" id="bonusPp">0</div>
+          <div class="value-display value-display--plain value-display--plain-wide">
+            <div class="value-display__label">Total Play Time</div>
+            <div class="value-display__value" id="playTime">0h 0m</div>
           </div>
         </div>
         <div class="profile-detail-stats__values">
@@ -139,8 +139,8 @@
   </section>
 
   <section class="page-extra" id="section-top_ranks">
-    <h2 class="title">Top Ranks</h2>
-    <h3 class="title title--sub title--sub-first">Pinned<span class="title__count" id="pinnedCount">0</span></h3>
+    <h2 class="title">Scores</h2>
+    <h3 class="title title--sub title--sub-first">Pinned Scores<span class="title__count" id="pinnedCount">0</span></h3>
     <div id="pinnedPlays"></div>
     <h3 class="title title--sub">Best Performance<span class="title__count" id="topCount">0</span></h3>
     <div class="counting-note" id="countingNote" hidden></div>
@@ -148,7 +148,7 @@
   </section>
 
   <section class="page-extra" id="section-medals">
-    <h2 class="title">Medals<span class="title__count" id="medalCount">0</span></h2>
+    <h2 class="title">Medals</h2>
     <div class="medals-note" id="medalsNote" hidden></div>
     <div id="medalGroups"></div>
   </section>
@@ -177,6 +177,12 @@
   <button type="button" class="danger" data-act="hide" role="menuitem">Remove from profile</button>
 </div>
 
+<!--
+  The medal card, osu-web's `qtip--achievement`. One card shared by every medal, for the
+  same reason as the menu above: it has to escape the section that would clip it.
+-->
+<div class="medal-tooltip" id="medalTooltip" role="tooltip" hidden></div>
+
 <!-- Outside every dialog: the picker is opened from script, and is never seen. -->
 <input type="file" id="identityFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
 
@@ -185,7 +191,7 @@
     <h3 id="identityTitle">Edit profile</h3>
     <p>
       The name, picture and banner for <b id="identityProfileName">this profile</b>. None of
-      this is required &mdash; a fresh profile starts with a drawn avatar and the cover art
+      this is required &mdash; a new profile starts with a drawn avatar and the cover art
       of its best play.
     </p>
 
@@ -260,9 +266,6 @@
       <button type="button" id="shareScreenshot">Save&hellip;</button>
     </div>
 
-    <h4 class="identity-heading">On your network</h4>
-    <div class="share-network" id="shareNetwork"></div>
-
     <div class="profile-hint" id="shareHint">&nbsp;</div>
 
     <div class="actions">
@@ -335,7 +338,7 @@
     </p>
     <div class="warn">
       Go back only as far as the session you played with this playstyle. Anything earlier
-      pulls in plays set with your normal one &mdash; which is exactly what a fresh profile
+      pulls in plays set with your normal one &mdash; which is exactly what a separate profile
       exists to keep out.
     </div>
 
@@ -404,9 +407,9 @@
 </div>
 
 <footer class="site-footer">
-  <span id="footerVersion">osu! fresh profile</span>
+  <span id="footerVersion">osu! local profiles</span>
   <span class="site-footer__sep">&middot;</span>
-  <a href="https://github.com/jonathant09/osu-fresh-profile" target="_blank" rel="noreferrer noopener">
+  <a href="https://github.com/jonathant09/osu-local-profiles" target="_blank" rel="noreferrer noopener">
     Source code (GitHub)
   </a>
   <span class="site-footer__sep">&middot;</span>

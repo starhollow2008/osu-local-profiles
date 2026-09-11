@@ -69,7 +69,7 @@ test('backfill imports only replays newer than the chosen cutoff', async (t) => 
   const replay = await findReplay();
   if (!replay) return t.skip('no parseable replay available');
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-backfill-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-backfill-'));
   const watchDir = path.join(tmp, 'replays');
   fs.mkdirSync(watchDir);
   const dropped = path.join(watchDir, 'past-replay');
@@ -116,7 +116,7 @@ test('the same replay in two places counts once', async (t) => {
   const replay = await findReplay();
   if (!replay) return t.skip('no parseable replay available');
 
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-backfill-dupe-'));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-backfill-dupe-'));
   const watchDir = path.join(tmp, 'replays');
   fs.mkdirSync(path.join(watchDir, 'nested'), { recursive: true });
   // lazer keeps its own copy of anything imported, so one play really can exist twice.

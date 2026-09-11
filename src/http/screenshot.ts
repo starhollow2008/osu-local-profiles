@@ -153,7 +153,7 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
 
   const port = options.port ?? 9455;
   const width = options.width ?? 1280;
-  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ofp-shot-'));
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-shot-'));
 
   let browser: ChildProcess | null = null;
   let devtools: Devtools | null = null;

@@ -22,7 +22,7 @@ const TIMEOUT_MS = 10_000;
 /** Avatars and covers are small; anything larger is a sign of a wrong URL. */
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-const USER_AGENT = 'osu-fresh-profile (local profile tracker; one request per user action)';
+const USER_AGENT = 'osu-local-profiles (local profile tracker; one request per user action)';
 
 export interface OsuWebUser {
   id: number;

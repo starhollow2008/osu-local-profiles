@@ -7,7 +7,7 @@ import type { OsuInstall } from './detect.ts';
  *
  * This is the offline half of identity: it needs no network and no account link, and it is
  * almost always the name the user actually wants. It is only ever used to *prefill* -- a
- * fresh profile is a different identity by definition, so adopting the real one silently
+ * local profile is a different identity by definition, so adopting the real one silently
  * would be wrong.
  *
  * Read-only and best effort. A missing file, an unreadable one, or an osu! that has never

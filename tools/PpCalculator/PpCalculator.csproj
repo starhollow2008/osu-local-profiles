@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>osu-pp</AssemblyName>
-    <RootNamespace>OsuFreshProfile.PpCalculator</RootNamespace>
+    <RootNamespace>OsuLocalProfiles.PpCalculator</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
   <ItemGroup>

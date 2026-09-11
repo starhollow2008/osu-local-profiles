@@ -51,7 +51,7 @@ function findEndOfCentralDirectory(buf: Buffer): number {
  * tidiness one: an entry named `..\..\Windows\System32\...` would otherwise be written
  * exactly where it asked to be. Backslashes are normalised because *this project's own
  * packager writes them* -- the ZIP spec says forward slashes, and the entries in a release
- * built on Windows say `osu-fresh-profile-1.2.0-win-x64\node.exe`.
+ * built on Windows say `osu-local-profiles-1.5.0-win-x64\node.exe`.
  */
 function safeName(raw: string): string | null {
   const name = raw.replace(/\\/g, '/').replace(/^\/+/, '');
@@ -139,7 +139,7 @@ function entryData(buf: Buffer, entry: ZipEntry): Buffer {
 /**
  * Extract `file` into `dest`, dropping `stripComponents` leading path segments.
  *
- * A release archive wraps everything in one `osu-fresh-profile-<version>-<target>/` folder,
+ * A release archive wraps everything in one `osu-local-profiles-<version>-<target>/` folder,
  * so extracting it usefully means stripping that. Returns how many files were written, so
  * the caller can refuse a suspiciously empty result rather than swapping in nothing.
  */

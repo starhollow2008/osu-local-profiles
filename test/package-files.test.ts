@@ -14,9 +14,9 @@ import { launcherFor, readmeFor } from '../scripts/package-files.mjs';
  */
 
 test('each platform gets the launcher its file manager will run', () => {
-  assert.equal(launcherFor('win', 'node.exe').name, 'Start osu! fresh profile.bat');
+  assert.equal(launcherFor('win', 'node.exe').name, 'Start osu! local profiles.bat');
   // .command, not .sh: Finder opens a .sh in a text editor rather than running it.
-  assert.equal(launcherFor('osx', 'node').name, 'Start osu! fresh profile.command');
+  assert.equal(launcherFor('osx', 'node').name, 'Start osu! local profiles.command');
   assert.equal(launcherFor('linux', 'node').name, 'start.sh');
 });
 
@@ -80,8 +80,8 @@ test('the Linux README says how to restore a lost executable bit', () => {
 });
 
 test('each README names the launcher that platform actually has', () => {
-  assert.match(readmeFor('win'), /Start osu! fresh profile\.bat/);
-  assert.match(readmeFor('osx'), /Start osu! fresh profile\.command/);
+  assert.match(readmeFor('win'), /Start osu! local profiles\.bat/);
+  assert.match(readmeFor('osx'), /Start osu! local profiles\.command/);
   assert.match(readmeFor('linux'), /\.\/start\.sh/);
 
   // ...and not one of the others, which would send the user looking for a missing file.

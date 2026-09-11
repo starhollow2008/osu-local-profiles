@@ -26,14 +26,20 @@ const GRADE_GRADIENT = {
   gold: ['#FFE7A8', '#FFB800'],
   silver: ['#FFFFFF', '#AADFF0'],
 };
+/*
+ * `letter` is osu!'s letterform colour taken about a fifth darker. osu! draws the letter in
+ * Venera, a wide heavy display face this project cannot ship; in the fallback face the same
+ * colour reads lighter and thinner against the pill, so the extra depth restores roughly
+ * the contrast osu!'s own badge has.
+ */
 const GRADE_PALETTE = {
-  X: { pill: '#CE1C9D', light: '#DE31AE', darkA: '#C30B90', darkB: '#BE0089', letter: '#5E244E' },
-  S: { pill: '#00A8B5', light: '#02B5C3', darkA: '#009DAA', darkB: '#0096A2', letter: '#095056' },
-  A: { pill: '#7CCE14', light: '#88DA20', darkA: '#72C904', darkB: '#69BB00', letter: '#275227' },
-  B: { pill: '#E3B130', light: '#EBBD48', darkA: '#DCA519', darkB: '#D99D03', letter: '#553A2B' },
-  C: { pill: '#F18252', light: '#FF8E5D', darkA: '#EA7948', darkB: '#E67342', letter: '#473625' },
-  D: { pill: '#E95353', light: '#FF5A5A', darkA: '#DE4949', darkB: '#D63D3D', letter: '#512525' },
-  F: { pill: '#373737', light: '#3F3F3F', darkA: '#2E2E2E', darkB: '#2E2E2E', letter: '#2B2B2B' },
+  X: { pill: '#CE1C9D', light: '#DE31AE', darkA: '#C30B90', darkB: '#BE0089', letter: '#4B1D3E' },
+  S: { pill: '#00A8B5', light: '#02B5C3', darkA: '#009DAA', darkB: '#0096A2', letter: '#074045' },
+  A: { pill: '#7CCE14', light: '#88DA20', darkA: '#72C904', darkB: '#69BB00', letter: '#1F421F' },
+  B: { pill: '#E3B130', light: '#EBBD48', darkA: '#DCA519', darkB: '#D99D03', letter: '#442E22' },
+  C: { pill: '#F18252', light: '#FF8E5D', darkA: '#EA7948', darkB: '#E67342', letter: '#392B1E' },
+  D: { pill: '#E95353', light: '#FF5A5A', darkA: '#DE4949', darkB: '#D63D3D', letter: '#411E1E' },
+  F: { pill: '#373737', light: '#3F3F3F', darkA: '#2E2E2E', darkB: '#2E2E2E', letter: '#1F1F1F' },
 };
 
 /** XH/SH are the silver variants of X/S; everything else maps to itself. */
@@ -70,9 +76,13 @@ export function gradeBadge(grade, { title } = {}) {
     <path d="M7 -3 L12 5 L2 5 Z" fill="${p.darkB}"/>
     <path d="M9 12 L14 20 L4 20 Z" fill="${p.darkB}"/>
   </g>
-  <text x="16" y="12.2" text-anchor="middle" fill="${fill}"
-        font-size="${text.length > 1 ? 10.5 : 11}" font-weight="800"
-        letter-spacing="${text.length > 1 ? -0.6 : 0}"
+  <!-- Sized for the fallback face, which is narrower than osu!'s Venera: at osu!'s own size
+       the letter sat small in the pill. The gold and silver letters get a faint dark edge,
+       because a light gradient on a saturated pill otherwise loses its outline. -->
+  <text x="16" y="12.6" text-anchor="middle" fill="${fill}"
+        font-size="${text.length > 1 ? 12 : 12.5}" font-weight="900"
+        letter-spacing="${text.length > 1 ? -0.5 : 0}"
+        ${stops === null ? '' : 'stroke="rgba(0,0,0,0.28)" stroke-width="0.7" paint-order="stroke"'}
         style="font-family: var(--font-grade)">${text}</text>
 </svg>`;
 }
@@ -282,7 +292,9 @@ export function modPill(mod) {
     ? MOD_UNKNOWN_COLOUR
     : MOD_TYPE_COLOUR[definition.type] ?? MOD_UNKNOWN_COLOUR;
 
-  const glyphColour = darken(colour, 0.1, { linear: true });
+  // osu!'s 10% (linear), taken a little further: the fallback face is lighter than Venera,
+  // so the same colour reads weaker on the badge than it does on osu!.
+  const glyphColour = darken(colour, 0.075, { linear: true });
   const extenderColour = darken(colour, 0.263, { linear: false });
 
   const extended = extendedContent(m);
@@ -301,9 +313,10 @@ export function modPill(mod) {
   }
 
   parts.push(hexagon(0, MOD_ICON_W, colour));
-  // 0.4em of the badge's 1em height, as `mod.less` sets it.
-  parts.push(`<text x="${MOD_ICON_W / 2}" y="${MOD_UNIT / 2}" text-anchor="middle"
-    dominant-baseline="central" font-size="28" font-weight="900"
+  // `mod.less` sets 0.4em (28 of 70) in Venera. The fallback face is narrower and lighter,
+  // so it is drawn at ~0.49em to fill the badge the way osu!'s acronym does.
+  parts.push(`<text x="${MOD_ICON_W / 2}" y="${MOD_UNIT / 2 + 1}" text-anchor="middle"
+    dominant-baseline="central" font-size="${m.acronym.length > 2 ? 28 : 34}" font-weight="900" letter-spacing="-0.5"
     style="fill: ${glyphColour}; font-family: var(--font-grade)">${escapeHtml(m.acronym)}</text>`);
 
   /*
@@ -365,9 +378,9 @@ function hashHue(text) {
   return h;
 }
 
-/** A drawn stand-in for a profile picture, since a fresh profile has no account. */
+/** A drawn stand-in for a profile picture, since a local profile has no account. */
 export function generatedAvatar(name) {
-  const hue = hashHue(name || 'fresh');
+  const hue = hashHue(name || 'local');
   const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
   const grad = nextId('agrad');
   return `<svg viewBox="0 0 100 100" role="img" aria-label="${escapeHtml(name)}">
@@ -399,17 +412,18 @@ const MEDAL_HUE = { combo: 42, plays: 28, hits: 28, rank: 275, pass: 200, fc: 33
  */
 export function medalPlaceholder(medal) {
   const hue = MEDAL_HUE[medal.family] ?? 210;
-  const locked = medal.achievedAt === null;
+  // Drawn in colour even when locked: `.badge-achievement--locked` greys the whole badge the
+  // way osu! greys its own icon, so the placeholder and the real icon fade identically.
   const grad = nextId('mgrad');
 
   // A star level is worth showing on the face; a five-digit combo is not.
   const stamp = medal.family === 'pass' || medal.family === 'fc' ? String(medal.threshold) : '';
 
-  return `<svg class="medal__placeholder" viewBox="0 0 100 100" aria-hidden="true">
+  return `<svg class="badge-achievement__placeholder" viewBox="0 0 100 100" aria-hidden="true">
   <defs>
     <radialGradient id="${grad}" cx="0.4" cy="0.32" r="0.85">
-      <stop offset="0" stop-color="hsl(${hue}, ${locked ? 8 : 62}%, ${locked ? 34 : 62}%)"/>
-      <stop offset="1" stop-color="hsl(${hue}, ${locked ? 6 : 55}%, ${locked ? 18 : 28}%)"/>
+      <stop offset="0" stop-color="hsl(${hue}, 62%, 62%)"/>
+      <stop offset="1" stop-color="hsl(${hue}, 55%, 28%)"/>
     </radialGradient>
   </defs>
   <circle cx="50" cy="50" r="44" fill="url(#${grad})"/>
@@ -423,4 +437,25 @@ export function medalPlaceholder(medal) {
       : ''
   }
 </svg>`;
+}
+
+/**
+ * One medal icon, osu-web's `badge-achievement`, with no text beside it -- the name,
+ * description and date live in the hover card (see `medalCard` in main.js).
+ *
+ * `size` picks the modifier: `listing` in the Medals section, `recent-activity` in the
+ * Recent feed, `tooltip` inside the card itself. The first two carry `data-medal` so the
+ * card can find what to show, and are focusable so it opens from the keyboard or a tap.
+ */
+export function medalBadge(medal, size = 'listing') {
+  const locked = medal.achievedAt === null;
+  const interactive = size !== 'tooltip';
+  return `<div class="badge-achievement badge-achievement--${size}${locked ? ' badge-achievement--locked' : ''}"
+    ${interactive ? `tabindex="0" data-medal="${escapeHtml(medal.slug)}"` : ''}
+    role="img" aria-label="${escapeHtml(medal.name)}">
+  ${medalPlaceholder(medal)}
+  <!-- Not lazy: a full-page screenshot renders below the fold without ever scrolling there,
+       and lazy icons never loaded. -->
+  <img class="badge-achievement__image" src="${escapeHtml(medal.icon)}" alt="">
+</div>`;
 }

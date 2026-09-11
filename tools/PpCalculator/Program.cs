@@ -26,7 +26,7 @@ using osu.Game.Rulesets.Taiko;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
 
-namespace OsuFreshProfile.PpCalculator;
+namespace OsuLocalProfiles.PpCalculator;
 
 public sealed class Request
 {
