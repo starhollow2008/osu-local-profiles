@@ -295,6 +295,13 @@ an 8.3 short name like `C:\Users\RUNNER~1\...`. That last one is what a GitHub r
 `TEMP` is, which is how this shipped -- it passed on every local run and then killed two
 unrelated test files on CI, because the process died rather than a test failing.
 
+**A watcher test must let the watch come up before its first write.** On macOS the first
+`fs.watch` in a process starts libuv's FSEvents thread, and a write landing during that is
+not reported. Two tests appended the instant `start()` returned; both passed for months and
+then failed CI on macOS once the suite's timing shifted, one of them on a docs-only commit.
+The app is not exposed (reads go by byte offset), so this is a test rule: `await
+sleep(SETTLED_MS)` after `start()`.
+
 `watchablePath` in `src/tracker/watcher.ts` resolves the directory, and both watchers go
 through it. Paths are still *reported* against the directory as configured, so nothing
 downstream ever sees two spellings of one file.
