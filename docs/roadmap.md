@@ -978,6 +978,12 @@ reads as user data.
 This also means **upgrading from 1.3.0 tidies up after 1.3.0**, which is what makes the
 fix reach installs that already have the leftovers.
 
+**Verified by the first real update between two releases (2026-09-11).** A genuine,
+untouched 1.3.0 package updated itself to the published 1.4.0 -- no version faked this time
+-- and passed **19/19**: no `.rollback-` folder afterwards, `data/update/` swept by the
+relaunched app, `data/` intact, and the install **238MB** where 1.3.0's own update had left
+it at 628MB. The log shows the rollback created and removed within one second.
+
 **One thing that remains true:** a **1.2.0** install cannot use the button, because it has
 no `scripts/apply-update.mjs` inside it to run. v1.3.0 is the first build that can be
 updated *from*, so 1.2.0 users must download 1.3.0 by hand once.
