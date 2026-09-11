@@ -67,6 +67,11 @@ feed **Milestones**. View Details shows a score's **pp breakdown** -- aim, speed
 flashlight -- and which osu! release priced it; **Mod Introduction** medals arrive; and every
 release now has **macOS and Linux** downloads alongside Windows.
 
+**v1.11.0** gives me! osu!'s BBCode editor, with images pasted straight in; adds **Import
+from osu!** for the avatar, banner, flag, me! and favorites; shares Favorite Beatmaps across
+profiles; lets removed scores be deleted for good; and makes the saved web page work like the
+page itself -- show more, mode tabs, View Details -- so it can be put online as a sample.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

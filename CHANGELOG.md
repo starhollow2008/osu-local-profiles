@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.11.0
 
 - **me! is written the way osu!'s is**: BBCode, with osu!'s own toolbar (Bold, Italic,
   Strike Out, Header, Link, Spoiler Box, lists, Image, Image Map, Font Size), a Preview, and
