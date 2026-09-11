@@ -384,6 +384,47 @@ $('countingNote').onclick = async (e) => {
   }
 };
 
+/**
+ * An empty Favorite Beatmaps says how to fill it, until the profile says not to: the counting
+ * note's shape, with an Import button beside Don't show again. Once there is a favorite the
+ * reminder has done its job and steps aside on its own.
+ */
+function renderFavoritesNote(total) {
+  const note = $('favoritesNote');
+  note.hidden = total > 0 || settings.showFavoritesHint === false;
+  if (note.hidden) {
+    note.innerHTML = '';
+    return;
+  }
+  note.innerHTML = `<div class="counting-note__text">
+      Favorite a beatmap from the <b>&middot;&middot;&middot;</b> menu on any play in Recent Plays or
+      Scores and it appears here. Already have favorites on osu!? Import them from your account.
+    </div>
+    <div class="counting-note__actions">
+      <button type="button" class="counting-note__import" data-import-favorites>Import&hellip;</button>
+      <button type="button" class="counting-note__dismiss" data-dismiss-note>Don't show again</button>
+      <button type="button" class="counting-note__close" data-dismiss-note
+              aria-label="Don't show this again">&times;</button>
+    </div>`;
+}
+
+$('favoritesNote').onclick = async (e) => {
+  if (e.target.closest('[data-import-favorites]')) {
+    void openImport({ favoritesOnly: true });
+    return;
+  }
+  if (!e.target.closest('[data-dismiss-note]')) return;
+
+  $('favoritesNote').hidden = true;
+  settings = { ...settings, showFavoritesHint: false };
+  try {
+    const d = await postJson('/api/settings', { showFavoritesHint: false }, 'saving that failed');
+    settings = d.settings;
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
 /* ------------------------------------------------------------------ data */
 
 async function loadProfile() {
@@ -463,6 +504,7 @@ async function loadProfile() {
   $('favoriteBeatmaps').innerHTML =
     favoriteList(data.favorites) +
     showMore('favorites', (data.favorites ?? []).length, shown.favorites, favoritesTotal);
+  renderFavoritesNote(favoritesTotal);
   // The redraw replaced the playing card with one showing play; give it back its state. If
   // the card is gone the clip plays on, as osu!'s does, with the bar still in charge of it.
   syncPlayers();
@@ -606,6 +648,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('settingsModal').hidden) closeSettings();
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('identityModal').hidden) closeIdentity();
+  if (!$('importModal').hidden) closeImport();
   if (!$('shareModal').hidden) closeShare();
   if (!$('updateModal').hidden) closeUpdate();
 });
@@ -1172,17 +1215,9 @@ function renderIdentityPreviews() {
   }
 }
 
-/** What can be offered without touching the network: the osu! session, and any link. */
+/** The osu! account this profile is linked to, if any. Importing has a dialog of its own. */
 function renderIdentitySuggestions() {
   const bits = [];
-  for (const session of identitySuggestions.sessions ?? []) {
-    bits.push(
-      `<button type="button" class="identity-suggestion" data-query="${escapeHtml(session.username)}">
-         Use <b>${escapeHtml(session.username)}</b>
-         <span>signed in to osu!${escapeHtml(session.client)}</span>
-       </button>`,
-    );
-  }
   if (identitySuggestions.linked) {
     bits.push(
       `<div class="identity-linked">
@@ -1199,7 +1234,6 @@ async function openIdentity() {
   setMenuOpen(false);
   $('identityProfileName').textContent = profile?.name ?? 'this profile';
   $('identityName').value = profile?.name ?? '';
-  $('identityQuery').value = '';
   identityHint(' ');
   renderIdentityPreviews();
   $('identityFound').innerHTML = '';
@@ -1285,13 +1319,6 @@ $('identityModal').addEventListener('click', async (e) => {
     return;
   }
 
-  const suggestion = e.target.closest('[data-query]');
-  if (suggestion) {
-    $('identityQuery').value = suggestion.dataset.query;
-    $('identityLookup').click();
-    return;
-  }
-
   if (e.target.id === 'identityUnlink') {
     try {
       await identityAction({ action: 'unlink' });
@@ -1328,59 +1355,168 @@ $('identityFile').onchange = async () => {
   }
 };
 
-/* --- borrowing from an osu! account ------------------------------------- */
+/* --- importing from an osu! account ------------------------------------ */
 
-$('identityLookup').onclick = async () => {
-  const query = $('identityQuery').value.trim();
+$('identityImport').onclick = () => {
+  closeIdentity();
+  void openImport();
+};
+
+/*
+ * Options -> Import from osu!: look an account up, then copy what was chosen from it. Never a
+ * prompt at start-up, at the user's request -- nothing happens until a button is pressed.
+ * Avatar, banner, flag and me! are ticked by default; favorites are not, because they add
+ * to a list rather than replacing one thing.
+ */
+const IMPORT_DEFAULTS = { avatar: true, cover: true, country: true, aboutMe: true, favorites: false };
+const IMPORT_FAVORITES_ONLY = { avatar: false, cover: false, country: false, aboutMe: false, favorites: true };
+
+const importHint = (message, isError) => hint('importHint', message, isError);
+/** The account the last Look up found, so Import copies from exactly that one. */
+let importUser = null;
+
+function importChoices() {
+  const out = {};
+  for (const box of $('importModal').querySelectorAll('[data-import]')) out[box.dataset.import] = box.checked;
+  return out;
+}
+
+/** What pressing Import would do that is worth knowing first. */
+function renderImportNote() {
+  const choices = importChoices();
+  const notes = [];
+  if (choices.aboutMe && (settings.aboutMe ?? '').trim()) {
+    notes.push("me! replaces what this profile's me! says now.");
+  }
+  if (choices.favorites) {
+    notes.push(
+      app.config?.sharedFavorites === false
+        ? "Favorites are added to this profile's list."
+        : 'Favorites are added to the list every profile shares.',
+    );
+  }
+  $('importNote').textContent = notes.join(' ');
+  $('importGo').disabled = !Object.values(choices).some(Boolean);
+}
+
+const joinList = (items) =>
+  items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
+async function openImport({ favoritesOnly = false } = {}) {
+  setMenuOpen(false);
+  const choices = favoritesOnly ? IMPORT_FAVORITES_ONLY : IMPORT_DEFAULTS;
+  for (const box of $('importModal').querySelectorAll('[data-import]')) box.checked = choices[box.dataset.import];
+  $('importProfileName').textContent = profile?.name ?? 'this profile';
+  importUser = null;
+  $('importFound').innerHTML = '';
+  importHint(' ');
+  renderImportNote();
+  $('importModal').hidden = false;
+  $('importQuery').focus();
+
+  // The linked account, or the one osu! is signed in as: neither costs a request.
+  try {
+    const found = await identityAction({ action: 'suggestions' });
+    if ($('importModal').hidden) return;
+    if (found.linked && !$('importQuery').value) $('importQuery').value = found.linked.username;
+    $('importFound').innerHTML = (found.sessions ?? [])
+      .filter((session) => session.username !== found.linked?.username)
+      .map(
+        (session) => `<button type="button" class="identity-suggestion" data-query="${escapeHtml(session.username)}">
+           Use <b>${escapeHtml(session.username)}</b>
+           <span>signed in to osu!${escapeHtml(session.client)}</span>
+         </button>`,
+      )
+      .join('');
+  } catch {
+    /* a convenience; typing a name always works */
+  }
+}
+
+const closeImport = () => {
+  $('importModal').hidden = true;
+};
+
+$('optImport').onclick = () => void openImport();
+$('importClose').onclick = closeImport;
+$('importModal').onclick = (e) => {
+  if (e.target === $('importModal')) closeImport();
+};
+$('importModal').addEventListener('change', (e) => {
+  if (e.target.closest('[data-import]')) renderImportNote();
+});
+$('importFound').addEventListener('click', (e) => {
+  const suggestion = e.target.closest('[data-query]');
+  if (!suggestion) return;
+  $('importQuery').value = suggestion.dataset.query;
+  $('importLookup').click();
+});
+$('importQuery').onkeydown = (e) => {
+  if (e.key === 'Enter') $('importLookup').click();
+};
+$('importQuery').oninput = () => {
+  importUser = null;
+};
+
+$('importLookup').onclick = async () => {
+  const query = $('importQuery').value.trim();
   if (!query) {
-    identityHint('Type a username, a user id, or a link to a profile.', true);
+    importHint('Type a username, a user id, or a link to a profile.', true);
     return;
   }
 
-  $('identityLookup').disabled = true;
-  identityHint(`Looking up "${query}" on osu.ppy.sh...`);
+  $('importLookup').disabled = true;
+  importHint(`Looking up "${query}" on osu.ppy.sh...`);
   try {
     const { user } = await identityAction({ action: 'lookup', query });
-    // Shown before anything is applied: one press to look, another to use what was found.
-    $('identityFound').innerHTML = `<div class="identity-candidate">
+    importUser = user;
+    // Shown before anything is copied: one press to look, another to import.
+    $('importFound').innerHTML = `<div class="identity-candidate">
       <img class="identity-candidate__avatar" src="${escapeHtml(user.avatarUrl ?? '')}" alt="">
       <div class="identity-candidate__detail">
         <b>${escapeHtml(user.username)}</b>
-        <span>#${fmt(user.id)}${user.countryCode ? ` &middot; ${escapeHtml(user.countryCode)}` : ''}</span>
+        <span>#${fmt(user.id)}${user.countryCode ? ` &middot; ${escapeHtml(countryName(user.countryCode))}` : ''}
+          &middot; ${user.pageRaw ? 'has a me! page' : 'no me! page'}</span>
       </div>
-      <button type="button" id="identityUse">Use this</button>
     </div>`;
-    identityHint('Found. "Use this" copies the picture and banner here.');
+    importHint('Found. Choose what to copy, then Import.');
   } catch (err) {
-    $('identityFound').innerHTML = '';
-    identityHint(err.message, true);
+    importUser = null;
+    $('importFound').innerHTML = '';
+    importHint(err.message, true);
   } finally {
-    $('identityLookup').disabled = false;
+    $('importLookup').disabled = false;
   }
 };
 
-$('identityFound').addEventListener('click', async (e) => {
-  if (!e.target.closest('#identityUse')) return;
-  const query = $('identityQuery').value.trim();
-
-  identityHint('Copying the picture and banner...');
-  try {
-    const d = await identityAction({ action: 'link', query });
-    identitySuggestions.linked = { id: d.user.id, username: d.user.username };
-    await loadState();
-    renderIdentityPreviews();
-    renderIdentitySuggestions();
-    await loadProfile();
-    identityHint(
-      d.failures?.length
-        ? `Linked to ${d.user.username}, but ${d.failures.join('; ')}`
-        : `Linked to ${d.user.username}.`,
-      Boolean(d.failures?.length),
-    );
-  } catch (err) {
-    identityHint(err.message, true);
+$('importGo').onclick = async () => {
+  const query = importUser ? String(importUser.id) : $('importQuery').value.trim();
+  if (!query) {
+    importHint('Type the account to import from first.', true);
+    return;
   }
-});
+  const choices = importChoices();
+
+  $('importGo').disabled = true;
+  importHint(choices.favorites ? 'Importing - favorites can take a few seconds...' : 'Importing...');
+  try {
+    const d = await identityAction({ action: 'import', query, ...choices });
+    settings = d.settings;
+    await Promise.all([loadState(), loadProfile()]);
+    renderAbout();
+    const what = d.done.length ? `Imported ${joinList(d.done)} from ${d.user.username}` : `Linked to ${d.user.username}`;
+    if (d.failures.length) {
+      importHint(`${what}, but ${d.failures.join('; ')}`, true);
+    } else {
+      closeImport();
+      toast(`${what}.`);
+    }
+  } catch (err) {
+    importHint(err.message, true);
+  } finally {
+    renderImportNote();
+  }
+};
 
 /* ---------------------------------------------------------------- settings */
 
@@ -1561,6 +1697,7 @@ function openSettings() {
   void renderRemovedScores();
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
+  $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
   settingsHint(' ');
   $('settingsModal').hidden = false;
   $('settingsCancel').focus();
@@ -1593,6 +1730,13 @@ $('settingsSave').onclick = async () => {
         String(d.settings[f.key] ?? '') === '',
     );
     settings = d.settings;
+
+    // Belongs to the install rather than the profile, so it goes to config.json.
+    const shareFavorites = $('sharedFavorites').checked;
+    if (shareFavorites !== (app.config?.sharedFavorites !== false)) {
+      const c = await postJson('/api/app-config', { sharedFavorites: shareFavorites }, 'saving that failed');
+      app = { ...app, config: c.config };
+    }
     closeSettings();
     // The eligibility settings change every number on the page, not just the header.
     await Promise.all([loadState(), loadProfile()]);

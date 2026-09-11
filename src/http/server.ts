@@ -50,12 +50,13 @@ import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
-import { downloadImage, fetchBeatmapset, lookupUser } from '../clients/osu-web.ts';
+import { downloadImage, fetchBeatmapset, fetchFavouriteBeatmapsets, lookupUser } from '../clients/osu-web.ts';
 import {
   addFavorite,
   detailsFor,
   favoriteCount,
   favoriteIds,
+  importFavorites,
   listFavorites,
   missingDetails,
   removeFavorite,
@@ -131,7 +132,7 @@ export interface ServerOptions {
    */
   appConfig: {
     get(): AppConfig;
-    set(patch: AppConfig): void;
+    set(patch: Partial<AppConfig>): void;
   };
 }
 
@@ -139,6 +140,8 @@ export interface ServerOptions {
 export interface AppConfig {
   /** Open the page in the default browser when the app starts. */
   openBrowser: boolean;
+  /** One Favorite Beatmaps list for every profile (the default), or one each. */
+  sharedFavorites?: boolean;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -150,6 +153,8 @@ export function startServer(opts: ServerOptions): http.Server {
    * would leave the API answering about a profile the user has already left.
    */
   const current = () => activeProfileId(opts.db);
+  /** The Favorite Beatmaps list requests are about: shared by every profile, or the current one's. */
+  const favorites = () => ({ profileId: current(), shared: opts.appConfig.get().sharedFavorites === true });
 
   /*
    * config.json's country and tagline are the *fallback* for a profile that has never
@@ -386,8 +391,8 @@ export function startServer(opts: ServerOptions): http.Server {
           mostPlayed(opts.db, profileId, mode, page('mostPlayed', 15)),
         ),
         // Favourites are the profile's, not a mode's, exactly as osu!'s are the account's.
-        favorites: listFavorites(opts.db, profileId, page('favorites', 6), opts.tracker.beatmaps),
-        favoriteIds: favoriteIds(opts.db, profileId),
+        favorites: listFavorites(opts.db, favorites(), page('favorites', 6), opts.tracker.beatmaps),
+        favoriteIds: favoriteIds(opts.db, favorites()),
         /*
          * How many rows each of those sections has in full, so the headings can show a real
          * count and "show more" can know when to stop offering. Top Ranks is capped at 100
@@ -398,7 +403,7 @@ export function startServer(opts: ServerOptions): http.Server {
           recent: recentTotal,
           mostPlayed: mostPlayedCount,
           events: history.eventsTotal,
-          favorites: favoriteCount(opts.db, profileId),
+          favorites: favoriteCount(opts.db, favorites()),
         },
         ppHistory: history.pp,
         // osu-web charts global rank here, so do the same wherever a curve exists.
@@ -459,10 +464,16 @@ export function startServer(opts: ServerOptions): http.Server {
       if (req.method !== 'POST') return json(res, { config: opts.appConfig.get() });
 
       return readBody(req, res, (body) => {
-        if (typeof body['openBrowser'] !== 'boolean') {
+        const patch: Partial<AppConfig> = {};
+        for (const key of ['openBrowser', 'sharedFavorites'] as const) {
+          if (!(key in body)) continue;
+          if (typeof body[key] !== 'boolean') return json(res, { error: `${key} must be true or false` }, 400);
+          patch[key] = body[key];
+        }
+        if (Object.keys(patch).length === 0) {
           return json(res, { error: 'openBrowser must be true or false' }, 400);
         }
-        opts.appConfig.set({ openBrowser: body['openBrowser'] });
+        opts.appConfig.set(patch);
         const config = opts.appConfig.get();
         broadcast('app-config', config);
         return json(res, { ok: true, config });
@@ -616,6 +627,84 @@ export function startServer(opts: ServerOptions): http.Server {
                 ok: true,
                 user,
                 failures,
+                settings: settingsFor(id),
+                ...imageState(opts.dataDir, id),
+              });
+            }
+
+            /**
+             * Copy what was chosen from an osu! account, and link the profile to it. Everything
+             * happens because the Import button was pressed: one lookup, one download per image,
+             * one request per hundred favourites. Each part is best effort -- a banner that will
+             * not download does not undo the avatar -- and the answer says what worked.
+             */
+            case 'import': {
+              const user = await lookupUser(String(body['query'] ?? ''));
+              const want = (key: string, fallback: boolean) =>
+                typeof body[key] === 'boolean' ? (body[key] as boolean) : fallback;
+              const done: string[] = [];
+              const failures: string[] = [];
+
+              const patch: Record<string, unknown> = { linkedUserId: user.id, linkedUsername: user.username };
+              if (want('country', true)) {
+                if (user.countryCode) {
+                  patch['country'] = user.countryCode;
+                  done.push('flag');
+                } else {
+                  failures.push('flag: that account shows no country');
+                }
+              }
+              if (want('aboutMe', true)) {
+                // An empty me! on osu! leaves this one alone rather than wiping it.
+                if (user.pageRaw !== null) {
+                  patch['aboutMe'] = user.pageRaw;
+                  done.push('me!');
+                } else {
+                  failures.push("me!: that account's me! is empty");
+                }
+              }
+              updateSettings(opts.db, id, patch, configFallbacks);
+
+              for (const [kind, source, label] of [
+                ['avatar', user.avatarUrl, 'avatar'],
+                ['cover', user.coverUrl, 'banner'],
+              ] as const) {
+                if (!want(kind, true)) continue;
+                if (!source) {
+                  failures.push(`${label}: that account has none`);
+                  continue;
+                }
+                try {
+                  const downloaded = await downloadImage(source);
+                  saveImage(opts.dataDir, id, kind, downloaded.bytes, downloaded.extension);
+                  done.push(label);
+                } catch (e) {
+                  failures.push(`${label}: ${(e as Error).message}`);
+                }
+              }
+
+              let favouritesFound = 0;
+              let favouritesAdded = 0;
+              if (want('favorites', false)) {
+                try {
+                  const sets = await fetchFavouriteBeatmapsets(user.id);
+                  favouritesFound = sets.length;
+                  favouritesAdded = importFavorites(opts.db, favorites(), sets);
+                  done.push(`${favouritesFound} favourite beatmap${favouritesFound === 1 ? '' : 's'}`);
+                } catch (e) {
+                  failures.push(`favourite beatmaps: ${(e as Error).message}`);
+                }
+              }
+
+              broadcast('identity', { linked: user.id });
+              broadcast('settings', settingsFor(id));
+              if (favouritesAdded > 0) broadcast('favorites', { action: 'import' });
+              return json(res, {
+                ok: true,
+                user,
+                done,
+                failures,
+                favorites: { found: favouritesFound, added: favouritesAdded },
                 settings: settingsFor(id),
                 ...imageState(opts.dataDir, id),
               });
@@ -825,14 +914,14 @@ export function startServer(opts: ServerOptions): http.Server {
         }
 
         if (action === 'remove') {
-          removeFavorite(opts.db, current(), id);
+          removeFavorite(opts.db, favorites(), id);
         } else {
-          addFavorite(opts.db, current(), id);
+          addFavorite(opts.db, favorites(), id);
         }
 
         let detailsError: string | null = null;
         const wanted = action === 'add' && detailsFor(opts.db, id) === null ? [id] : [];
-        for (const missing of missingDetails(opts.db, current(), FAVORITE_RETRIES)) {
+        for (const missing of missingDetails(opts.db, favorites(), FAVORITE_RETRIES)) {
           if (!wanted.includes(missing)) wanted.push(missing);
         }
         for (const setId of wanted) {
@@ -848,7 +937,7 @@ export function startServer(opts: ServerOptions): http.Server {
         broadcast('favorites', { action, beatmapsetId: id });
         return json(res, {
           ok: true,
-          favorites: favoriteIds(opts.db, current()),
+          favorites: favoriteIds(opts.db, favorites()),
           detailsError,
         });
       });

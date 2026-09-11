@@ -102,6 +102,11 @@ export interface Settings {
    * and the Settings dialog still says what each option does.
    */
   showCountingNote: boolean;
+  /**
+   * Whether an empty Favorite Beatmaps says how to fill it -- favourite from a play's menu,
+   * or import an osu! account's -- with a Don't show again, like the counting note.
+   */
+  showFavoritesHint: boolean;
 }
 
 /**
@@ -172,7 +177,8 @@ const DEFS: Defs = {
   },
   aboutMe: {
     default: '',
-    coerce: (raw) => cleanMultiline(raw, 4000),
+    // osu!'s own me! pages run long, and an imported one should arrive whole.
+    coerce: (raw) => cleanMultiline(raw, 60000),
   },
   showIncompleteInRecent: {
     default: 'collapse',
@@ -181,6 +187,10 @@ const DEFS: Defs = {
   showCountingNote: {
     default: true,
     // Defaults to on, so anything but an explicit "off" leaves the warning showing.
+    coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
+  },
+  showFavoritesHint: {
+    default: true,
     coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
   },
   sectionOrder: {

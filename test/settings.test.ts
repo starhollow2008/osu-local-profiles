@@ -190,8 +190,9 @@ test('runs of blank lines collapse, so pasted text cannot stretch the page', () 
 test('the description is capped, and is not a place to store a novel', () => {
   const h = harness();
   try {
-    const saved = updateSettings(h.db, h.profileId, { aboutMe: 'x'.repeat(9000) }).aboutMe;
-    assert.equal(saved.length, 4000);
+    const saved = updateSettings(h.db, h.profileId, { aboutMe: 'x'.repeat(70000) }).aboutMe;
+    // Room for a whole osu! me! page, which is what an import brings in.
+    assert.equal(saved.length, 60000);
   } finally {
     h.cleanup();
   }

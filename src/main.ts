@@ -1,3 +1,4 @@
+import { syncFavoriteSharing } from './favorites.ts';
 import path from 'node:path';
 import { loadConfig, saveConfig, dataDir } from './config.ts';
 import { openBrowser } from './browser.ts';
@@ -220,15 +221,22 @@ async function main(): Promise<void> {
      * the app runs is not overwritten.
      */
     appConfig: {
-      get: () => ({ openBrowser: config.openBrowser }),
+      get: () => ({ openBrowser: config.openBrowser, sharedFavorites: config.sharedFavorites }),
       set: (patch) => {
         const current = loadConfig();
-        current.openBrowser = patch.openBrowser;
+        if (patch.openBrowser !== undefined) current.openBrowser = config.openBrowser = patch.openBrowser;
+        if (patch.sharedFavorites !== undefined) {
+          current.sharedFavorites = config.sharedFavorites = patch.sharedFavorites;
+          // Merge or copy the lists now, so the next request already reads the right one.
+          syncFavoriteSharing(db, patch.sharedFavorites);
+        }
         saveConfig(current);
-        config.openBrowser = patch.openBrowser;
       },
     },
   });
+
+  // Before any request is answered: the lists must agree with the setting as it stands.
+  syncFavoriteSharing(db, config.sharedFavorites !== false);
 
   const url = `http://localhost:${config.port}`;
   // The banner reports osu!standard; other modes are a click away on the page.

@@ -2562,6 +2562,24 @@
   cursor: pointer;
 }
 
+/* The Favorite Beatmaps reminder's own action, beside the counting note's two. */
+.counting-note__import {
+  padding: 3px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-small-2);
+  white-space: nowrap;
+}
+
+.counting-note__import:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.import-choices {
+  margin: 12px 0 4px;
+}
+
 .counting-note__dismiss:hover,
 .counting-note__close:hover {
   color: hsl(var(--hsl-c1));

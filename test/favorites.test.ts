@@ -15,6 +15,7 @@ import {
 } from '../src/favorites.ts';
 import { extractBeatmapset, type BeatmapsetDetails } from '../src/clients/osu-web.ts';
 import { deleteProfile } from '../src/profiles.ts';
+import { importFavorites, syncFavoriteSharing } from '../src/favorites.ts';
 import { audioTime } from '../web/js/format.js';
 import {
   beatmapsetCard,
@@ -345,4 +346,69 @@ test("audio timestamps take osu-web's format from the clip's length", () => {
   assert.equal(audioTime(3725, 36000), "01:02:05");
   // Before the clip has loaded its duration is NaN; nothing is invented.
   assert.equal(audioTime(Number.NaN, 10), "0:00");
+});
+
+/* ------------------------------------------------------------ shared lists */
+
+test('a shared list is the same whichever profile asks', () => {
+  const h = harness();
+  try {
+    const other = getOrCreateProfile(h.db, 'Second');
+    addFavorite(h.db, { profileId: h.profileId, shared: true }, 100);
+    assert.deepEqual(favoriteIds(h.db, { profileId: other, shared: true }), [100]);
+    assert.equal(favoriteCount(h.db, { profileId: other, shared: true }), 1);
+    // The per-profile lists are untouched by it.
+    assert.deepEqual(favoriteIds(h.db, h.profileId), []);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('switching sharing on merges every list; off copies it back; nothing is lost', () => {
+  const h = harness();
+  try {
+    const other = getOrCreateProfile(h.db, 'Second');
+    addFavorite(h.db, h.profileId, 100);
+    addFavorite(h.db, other, 200);
+
+    assert.equal(syncFavoriteSharing(h.db, true), 'merged');
+    assert.deepEqual(favoriteIds(h.db, { profileId: h.profileId, shared: true }).sort(), [100, 200]);
+    assert.equal(syncFavoriteSharing(h.db, true), null, 'once per switch, not every start');
+
+    addFavorite(h.db, { profileId: h.profileId, shared: true }, 300);
+    assert.equal(syncFavoriteSharing(h.db, false), 'copied');
+    assert.deepEqual(favoriteIds(h.db, h.profileId).sort(), [100, 200, 300]);
+    assert.deepEqual(favoriteIds(h.db, other).sort(), [100, 200, 300]);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('unfavoriting while shared takes it from every profile, so switching off cannot bring it back', () => {
+  const h = harness();
+  try {
+    const other = getOrCreateProfile(h.db, 'Second');
+    addFavorite(h.db, other, 100);
+    syncFavoriteSharing(h.db, true);
+    removeFavorite(h.db, { profileId: h.profileId, shared: true }, 100);
+    syncFavoriteSharing(h.db, false);
+    assert.deepEqual(favoriteIds(h.db, other), []);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("an import keeps osu!'s order, caches every card, and counts only what is new", () => {
+  const h = harness();
+  try {
+    addFavorite(h.db, h.profileId, 2, 1);
+    const added = importFavorites(h.db, h.profileId, [details(1), details(2), details(3)], 10_000);
+    assert.equal(added, 2);
+    assert.deepEqual(
+      listFavorites(h.db, h.profileId, 10, null).map((c) => [c.id, c.source]),
+      [[1, 'osu'], [3, 'osu'], [2, 'osu']],
+    );
+  } finally {
+    h.cleanup();
+  }
 });

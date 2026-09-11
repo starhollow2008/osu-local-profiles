@@ -8,7 +8,8 @@ import { visibleSql } from './calc/eligibility.ts';
 /**
  * Favorite Beatmaps: the profile's own list of beatmapsets, shown as osu-web's cards.
  *
- * Per profile, as osu! keeps favourites per account, and this app's own -- nothing is ever
+ * One list shared by every profile by default (`config.sharedFavorites`), or one per profile
+ * as osu! keeps them per account; see `FavoriteScope`. This app's own -- nothing is ever
  * written to osu!. A card is drawn from the details osu.ppy.sh gave when the set was
  * favourited (`beatmapset_details`); if that request could not be made, from what this
  * machine knows instead: lazer's `online.db` lists every difficulty and its mapper, the
@@ -60,40 +61,144 @@ export interface FavoriteCard {
 
 /* --------------------------------------------------------------- the list */
 
+/**
+ * Whose favourites: one profile's (a bare id), or the list every profile shares.
+ *
+ * Shared is the default, at the user's request: favourites are a player's taste, which does
+ * not change with the hand they play with. The profile id still matters when shared -- a
+ * card built from local data takes star ratings from that profile's own scores.
+ */
+export type FavoriteScope = number | { profileId: number; shared: boolean };
+
+interface ResolvedScope {
+  table: 'favorite_beatmapsets' | 'shared_favorite_beatmapsets';
+  where: string;
+  params: number[];
+  profileId: number;
+}
+
+function resolveScope(scope: FavoriteScope): ResolvedScope {
+  if (typeof scope === 'number' || !scope.shared) {
+    const profileId = typeof scope === 'number' ? scope : scope.profileId;
+    return { table: 'favorite_beatmapsets', where: 'profile_id = ?', params: [profileId], profileId };
+  }
+  return { table: 'shared_favorite_beatmapsets', where: '1 = 1', params: [], profileId: scope.profileId };
+}
+
 /** Add a set; true if it was not already a favourite. */
-export function addFavorite(db: Db, profileId: number, beatmapsetId: number, now = Date.now()): boolean {
-  const result = db
-    .prepare(
-      `INSERT OR IGNORE INTO favorite_beatmapsets (profile_id, beatmapset_id, favorited_at)
-       VALUES (?, ?, ?)`,
-    )
-    .run(profileId, beatmapsetId, now);
+export function addFavorite(db: Db, scope: FavoriteScope, beatmapsetId: number, now = Date.now()): boolean {
+  const s = resolveScope(scope);
+  const result =
+    s.table === 'shared_favorite_beatmapsets'
+      ? db
+          .prepare('INSERT OR IGNORE INTO shared_favorite_beatmapsets (beatmapset_id, favorited_at) VALUES (?, ?)')
+          .run(beatmapsetId, now)
+      : db
+          .prepare(
+            `INSERT OR IGNORE INTO favorite_beatmapsets (profile_id, beatmapset_id, favorited_at)
+             VALUES (?, ?, ?)`,
+          )
+          .run(s.profileId, beatmapsetId, now);
   return result.changes > 0;
 }
 
-/** Remove a set; true if it was a favourite. */
-export function removeFavorite(db: Db, profileId: number, beatmapsetId: number): boolean {
+/**
+ * Remove a set; true if it was a favourite.
+ *
+ * Removing from the shared list removes it from every profile's own list as well, so that
+ * switching sharing off later cannot bring back a favourite the user already took away.
+ */
+export function removeFavorite(db: Db, scope: FavoriteScope, beatmapsetId: number): boolean {
+  const s = resolveScope(scope);
+  if (s.table === 'shared_favorite_beatmapsets') {
+    const result = db.prepare('DELETE FROM shared_favorite_beatmapsets WHERE beatmapset_id = ?').run(beatmapsetId);
+    db.prepare('DELETE FROM favorite_beatmapsets WHERE beatmapset_id = ?').run(beatmapsetId);
+    return result.changes > 0;
+  }
   const result = db
     .prepare('DELETE FROM favorite_beatmapsets WHERE profile_id = ? AND beatmapset_id = ?')
-    .run(profileId, beatmapsetId);
+    .run(s.profileId, beatmapsetId);
   return result.changes > 0;
 }
 
 /** Every favourited set id, so the page can label each row's menu Favorite or Unfavorite. */
-export function favoriteIds(db: Db, profileId: number): number[] {
+export function favoriteIds(db: Db, scope: FavoriteScope): number[] {
+  const s = resolveScope(scope);
   return (
-    db
-      .prepare('SELECT beatmapset_id FROM favorite_beatmapsets WHERE profile_id = ?')
-      .all(profileId) as { beatmapset_id: number }[]
+    db.prepare(`SELECT beatmapset_id FROM ${s.table} WHERE ${s.where}`).all(...s.params) as {
+      beatmapset_id: number;
+    }[]
   ).map((r) => r.beatmapset_id);
 }
 
-export function favoriteCount(db: Db, profileId: number): number {
-  return (
-    db.prepare('SELECT COUNT(*) AS n FROM favorite_beatmapsets WHERE profile_id = ?').get(profileId) as {
-      n: number;
+export function favoriteCount(db: Db, scope: FavoriteScope): number {
+  const s = resolveScope(scope);
+  return (db.prepare(`SELECT COUNT(*) AS n FROM ${s.table} WHERE ${s.where}`).get(...s.params) as { n: number }).n;
+}
+
+/**
+ * Add an osu! account's favourites, keeping osu!'s order (newest first) and caching each
+ * set's details, which the favourites list already carries. Returns how many were new.
+ */
+export function importFavorites(db: Db, scope: FavoriteScope, sets: BeatmapsetDetails[], now = Date.now()): number {
+  let added = 0;
+  db.exec('BEGIN');
+  try {
+    sets.forEach((set, index) => {
+      saveDetails(db, set, now);
+      // A millisecond apart, so the first in osu!'s list stays the newest here too.
+      if (addFavorite(db, scope, set.id, now - index)) added++;
+    });
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return added;
+}
+
+/**
+ * Bring the two lists together when sharing is switched, so nothing is lost either way.
+ *
+ * On: every profile's own favourites join the shared list. Off: the shared list is copied
+ * into every profile's own. What was last applied is kept in `kv`, so this runs once per
+ * switch -- including a switch made by hand in config.json while the app was closed -- and
+ * an install from before sharing existed (per profile, in effect) merges on its first start.
+ */
+export function syncFavoriteSharing(db: Db, shared: boolean): 'merged' | 'copied' | null {
+  const row = db.prepare("SELECT value FROM kv WHERE key = 'favoritesShared'").get() as { value: string } | undefined;
+  const was = row?.value === '1';
+  const record = () =>
+    db
+      .prepare(
+        "INSERT INTO kv (key, value) VALUES ('favoritesShared', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run(shared ? '1' : '0');
+  if (was === shared) {
+    if (!row) record();
+    return null;
+  }
+
+  db.exec('BEGIN');
+  try {
+    if (shared) {
+      db.exec(
+        `INSERT OR IGNORE INTO shared_favorite_beatmapsets (beatmapset_id, favorited_at)
+         SELECT beatmapset_id, MAX(favorited_at) FROM favorite_beatmapsets GROUP BY beatmapset_id`,
+      );
+    } else {
+      db.exec(
+        `INSERT OR IGNORE INTO favorite_beatmapsets (profile_id, beatmapset_id, favorited_at)
+         SELECT p.id, s.beatmapset_id, s.favorited_at FROM profiles p CROSS JOIN shared_favorite_beatmapsets s`,
+      );
     }
-  ).n;
+    record();
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return shared ? 'merged' : 'copied';
 }
 
 /* ---------------------------------------------------------- the details */
@@ -123,17 +228,18 @@ export function detailsFor(db: Db, beatmapsetId: number): BeatmapsetDetails | nu
  * Includes details cached before the card kept the video and storyboard flags: they are
  * stale rather than missing, and are refreshed the same way, a few per favourite action.
  */
-export function missingDetails(db: Db, profileId: number, limit: number): number[] {
+export function missingDetails(db: Db, scope: FavoriteScope, limit: number): number[] {
+  const s = resolveScope(scope);
   return (
     db
       .prepare(
-        `SELECT f.beatmapset_id FROM favorite_beatmapsets f
+        `SELECT f.beatmapset_id FROM ${s.table} f
            LEFT JOIN beatmapset_details d ON d.beatmapset_id = f.beatmapset_id
-          WHERE f.profile_id = ?
+          WHERE ${s.where}
             AND (d.beatmapset_id IS NULL OR json_type(d.data, '$.video') IS NULL)
           ORDER BY f.favorited_at DESC LIMIT ?`,
       )
-      .all(profileId, limit) as { beatmapset_id: number }[]
+      .all(...s.params, limit) as { beatmapset_id: number }[]
   ).map((r) => r.beatmapset_id);
 }
 
@@ -144,22 +250,23 @@ export function missingDetails(db: Db, profileId: number, limit: number): number
  */
 export function listFavorites(
   db: Db,
-  profileId: number,
+  scope: FavoriteScope,
   limit: number,
   resolver: BeatmapResolver | null,
 ): FavoriteCard[] {
+  const s = resolveScope(scope);
   const rows = db
     .prepare(
-      `SELECT beatmapset_id, favorited_at FROM favorite_beatmapsets
-        WHERE profile_id = ? ORDER BY favorited_at DESC, beatmapset_id DESC LIMIT ?`,
+      `SELECT beatmapset_id, favorited_at FROM ${s.table}
+        WHERE ${s.where} ORDER BY favorited_at DESC, beatmapset_id DESC LIMIT ?`,
     )
-    .all(profileId, limit) as { beatmapset_id: number; favorited_at: number }[];
+    .all(...s.params, limit) as { beatmapset_id: number; favorited_at: number }[];
 
   return rows.map((r) => {
     const details = detailsFor(db, r.beatmapset_id);
     return details
       ? fromDetails(details, r.favorited_at)
-      : localCard(db, profileId, r.beatmapset_id, r.favorited_at, resolver);
+      : localCard(db, s.profileId, r.beatmapset_id, r.favorited_at, resolver);
   });
 }
 

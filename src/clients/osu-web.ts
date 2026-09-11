@@ -30,6 +30,8 @@ export interface OsuWebUser {
   avatarUrl: string | null;
   coverUrl: string | null;
   countryCode: string | null;
+  /** The account's me! page as BBCode, exactly as its owner wrote it; null when it is empty. */
+  pageRaw: string | null;
 }
 
 /**
@@ -97,6 +99,7 @@ function extractUser(html: string): OsuWebUser | null {
   if (!user || typeof user['id'] !== 'number') return null;
 
   const country = user['country'] as { code?: unknown } | undefined;
+  const page = user['page'] as { raw?: unknown } | undefined;
   return {
     id: user['id'],
     username: typeof user['username'] === 'string' ? user['username'] : String(user['id']),
@@ -108,6 +111,7 @@ function extractUser(html: string): OsuWebUser | null {
         : typeof country?.code === 'string'
           ? country.code
           : null,
+    pageRaw: typeof page?.raw === 'string' && page.raw.trim() !== '' ? page.raw : null,
   };
 }
 
@@ -249,7 +253,14 @@ export function extractBeatmapset(html: string): BeatmapsetDetails | null {
   } catch {
     return null;
   }
+  return beatmapsetFromJson(raw);
+}
 
+/**
+ * One beatmapset object as osu-web serialises it -- on its page, or in a profile's favourites
+ * list, which use the same shape -- reduced to `BeatmapsetDetails`. Null if it is not one.
+ */
+export function beatmapsetFromJson(raw: Record<string, unknown>): BeatmapsetDetails | null {
   const str = (v: unknown) => (typeof v === 'string' ? v : null);
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
@@ -292,6 +303,61 @@ export function extractBeatmapset(html: string): BeatmapsetDetails | null {
     date: date ?? str(raw['last_updated']),
     difficulties,
   };
+}
+
+/** Favourites are read a hundred at a time, and at most fifty pages of them. */
+const FAVOURITES_PAGE = 100;
+const MAX_FAVOURITE_PAGES = 50;
+
+/**
+ * Every beatmapset an osu! account has favourited, as osu! lists them (newest first), with
+ * the details each card draws.
+ *
+ * osu-web's profile page loads more favourites from `/users/<id>/beatmapsets/favourite`,
+ * which answers JSON to anyone -- no credentials -- with each set in the same shape as
+ * `json-beatmapset`. So an import is one request per hundred favourites and none per set.
+ * Pages are read until one comes back empty, not until one comes back short, so a smaller
+ * page size on osu!'s side cannot end the import early. Runs only because a button was
+ * pressed.
+ */
+export async function fetchFavouriteBeatmapsets(userId: number): Promise<BeatmapsetDetails[]> {
+  if (!Number.isInteger(userId) || userId <= 0) throw new Error('not a user id');
+  const shapeError = 'the favourites were not in the shape expected; osu! may have changed them';
+
+  const sets: BeatmapsetDetails[] = [];
+  const seen = new Set<number>();
+  let offset = 0;
+  for (let page = 0; page < MAX_FAVOURITE_PAGES; page++) {
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(
+        `https://osu.ppy.sh/users/${userId}/beatmapsets/favourite?limit=${FAVOURITES_PAGE}&offset=${offset}`,
+        'application/json',
+      );
+    } catch {
+      throw new Error('could not reach osu.ppy.sh');
+    }
+    if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+
+    let list: unknown;
+    try {
+      list = await response.json();
+    } catch {
+      throw new Error(shapeError);
+    }
+    if (!Array.isArray(list)) throw new Error(shapeError);
+    if (list.length === 0) break;
+
+    for (const raw of list) {
+      const set = raw !== null && typeof raw === 'object' ? beatmapsetFromJson(raw as Record<string, unknown>) : null;
+      if (set !== null && !seen.has(set.id)) {
+        seen.add(set.id);
+        sets.push(set);
+      }
+    }
+    offset += list.length;
+  }
+  return sets;
 }
 
 /**

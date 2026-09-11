@@ -807,11 +807,44 @@ check('the name opens it too', await shown('identityModal'), 'grid');
 await evaluate("document.getElementById('identityClose').click()");
 check('Close closes it', await shown('identityModal'), 'none');
 
+console.log('\nimport from osu!');
+check('the import dialog is hidden on load', await shown('importModal'), 'none');
+check('Options offers it', await evaluate("!!document.getElementById('optImport')"), true);
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optImport').click()");
+check('it opens', await shown('importModal'), 'grid');
+check(
+  'avatar, banner, flag and me! are ticked; favorites are not',
+  await evaluate(`JSON.stringify(Object.fromEntries(
+    [...document.querySelectorAll('#importModal [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
+  JSON.stringify({ avatar: true, cover: true, country: true, aboutMe: true, favorites: false }),
+);
+check(
+  'nothing is asked of osu! until a button is pressed',
+  await evaluate("document.getElementById('importFound').querySelector('.identity-candidate') === null"),
+  true,
+);
+await evaluate("document.getElementById('importClose').click()");
+check('Close closes it', await shown('importModal'), 'none');
+check(
+  'the favorites reminder only shows while the list is empty',
+  await evaluate(`(() => {
+    const count = Number(document.getElementById('favoriteCount').textContent.replace(/,/g, ''));
+    return count > 0 ? document.getElementById('favoritesNote').hidden : true;
+  })()`),
+  true,
+);
+
 console.log('\nsettings dialog');
 check('settings dialog is hidden on load', await shown('settingsModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optSettings').click()");
 check('settings dialog opens', await shown('settingsModal'), 'grid');
+check(
+  'favorites are shared by every profile unless switched off',
+  await evaluate("document.getElementById('sharedFavorites').checked"),
+  true,
+);
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
 
 /*

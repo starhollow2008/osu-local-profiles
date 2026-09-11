@@ -176,6 +176,14 @@ CREATE TABLE IF NOT EXISTS beatmapset_details (
   fetched_at    INTEGER NOT NULL
 );
 
+-- The Favorite Beatmaps list every profile shares, used while config.json's sharedFavorites
+-- is on (the default). syncFavoriteSharing in src/favorites.ts merges the per-profile lists
+-- into it when sharing is switched on, and copies it back out when it is switched off.
+CREATE TABLE IF NOT EXISTS shared_favorite_beatmapsets (
+  beatmapset_id INTEGER PRIMARY KEY,
+  favorited_at  INTEGER NOT NULL
+);
+
 -- Scores deleted for good from Settings' Removed scores. The row is gone; only its dedupe key
 -- is kept, because the replay is still in osu!'s file store and would otherwise be ingested
 -- again as a brand new score -- the reason a removal is a hide in the first place.

@@ -26,6 +26,12 @@ export interface Config {
    * the page.
    */
   checkForUpdates: boolean;
+  /**
+   * One Favorite Beatmaps list for every profile, rather than one each. On by default, at
+   * the user's request. Install-level because it is about how profiles relate, not any one
+   * of them; see syncFavoriteSharing in favorites.ts for what switching it does.
+   */
+  sharedFavorites: boolean;
 }
 
 const DEFAULTS: Config = {
@@ -36,6 +42,7 @@ const DEFAULTS: Config = {
   country: '',
   tagline: '',
   checkForUpdates: true,
+  sharedFavorites: true,
 };
 
 /**

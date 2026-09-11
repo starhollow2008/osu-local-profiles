@@ -22,6 +22,7 @@
         <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
         <div class="menu" id="optionsMenu" hidden>
           <button id="optIdentity" type="button">Edit profile&hellip;</button>
+          <button id="optImport" type="button">Import from osu!&hellip;</button>
           <button id="optSettings" type="button">Settings&hellip;</button>
           <button id="optProfiles" type="button">Profiles&hellip;</button>
           <button id="optBackfill" type="button">Import past plays&hellip;</button>
@@ -196,6 +197,7 @@
   <section class="page-extra" id="section-beatmaps">
     <h2 class="title">Beatmaps</h2>
     <h3 class="title title--sub title--sub-first">Favorite Beatmaps<span class="title__count" id="favoriteCount">0</span></h3>
+    <div class="counting-note" id="favoritesNote" hidden></div>
     <div id="favoriteBeatmaps"></div>
   </section>
 </main>
@@ -340,23 +342,64 @@
       </div>
     </div>
 
-    <h4 class="identity-heading">Borrow from an osu! account</h4>
+    <h4 class="identity-heading">osu! account</h4>
     <p class="setting__hint">
-      Optional, and never automatic. Looking one up makes a single request to
-      <code>osu.ppy.sh</code> when you press the button; the picture and banner are then
-      copied here, so the page still works with no network. No login and no API key.
+      Copy the avatar, banner, flag, me! and favorite beatmaps from an osu! account with
+      <b>Import from osu!</b>. Optional, and never automatic: it asks <code>osu.ppy.sh</code>
+      only when you press the button, and copies what it finds here, so the page still works
+      with no network. No login and no API key.
     </p>
-    <div class="identity-link">
-      <input type="text" id="identityQuery" placeholder="username, user id, or profile link">
-      <button type="button" id="identityLookup">Look up</button>
-    </div>
     <div class="identity-found" id="identityFound"></div>
+    <div class="identity-link">
+      <button type="button" id="identityImport">Import from osu!&hellip;</button>
+    </div>
 
     <div class="profile-hint" id="identityHint">&nbsp;</div>
 
     <div class="actions">
       <button id="identityClose" type="button">Close</button>
       <button id="identitySave" class="primary" type="button">Save name</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  Options -> Import from osu!. One dialog for everything an osu! account can lend a profile,
+  and never a prompt: nothing is asked of osu.ppy.sh until a button here is pressed.
+-->
+<div class="backdrop" id="importModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <h3 id="importTitle">Import from osu!</h3>
+    <p>
+      Copies what you choose from an osu! account's public profile into
+      <b id="importProfileName">this profile</b>, and links the two. Nothing is ever written
+      to osu!.
+    </p>
+
+    <div class="identity-link">
+      <input type="text" id="importQuery" placeholder="username, user id, or profile link">
+      <button type="button" id="importLookup">Look up</button>
+    </div>
+    <div class="identity-found" id="importFound"></div>
+
+    <div class="checkgroup import-choices" id="importChoices">
+      <label class="checkgroup__item"><input type="checkbox" data-import="avatar"> Avatar</label>
+      <label class="checkgroup__item"><input type="checkbox" data-import="cover"> Banner</label>
+      <label class="checkgroup__item"><input type="checkbox" data-import="country"> Flag</label>
+      <label class="checkgroup__item"><input type="checkbox" data-import="aboutMe"> me!</label>
+      <label class="checkgroup__item"><input type="checkbox" data-import="favorites"> Favorite beatmaps</label>
+    </div>
+    <p class="setting__hint" id="importNote"></p>
+    <p class="setting__hint">
+      One request to <code>osu.ppy.sh</code> to find the account, one per picture, and one per
+      hundred favorites -- all when you press Import. No login and no API key.
+    </p>
+
+    <div class="profile-hint" id="importHint">&nbsp;</div>
+
+    <div class="actions">
+      <button id="importClose" type="button">Close</button>
+      <button id="importGo" class="primary" type="button">Import</button>
     </div>
   </div>
 </div>
@@ -403,6 +446,21 @@
     </p>
 
     <div id="settingsFields"></div>
+
+    <div class="removed-scores" id="appWide">
+      <h4>Every profile</h4>
+      <div class="setting">
+        <label class="field">
+          <span>Keep Favorite Beatmaps the same on every profile</span>
+          <input type="checkbox" id="sharedFavorites">
+        </label>
+        <div class="setting__hint">
+          On by default: one list, shared by every profile. Turn it off and each profile keeps
+          its own copy of the list as it stands; turn it back on and the lists are merged.
+          Nothing is lost either way.
+        </div>
+      </div>
+    </div>
 
     <div class="removed-scores" id="removedScores" hidden>
       <h4>Removed scores<span class="title__count" id="removedCount">0</span></h4>
