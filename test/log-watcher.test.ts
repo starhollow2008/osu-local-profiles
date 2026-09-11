@@ -272,6 +272,9 @@ test('a directory reached through a junction is still watched', async () => {
     const runtime = path.join(link, '1000.runtime.log');
     fs.writeFileSync(runtime, '');
     watcher.start();
+    // The same macOS FSEvents start-up race as the first test in this file: let the watch
+    // come up before the one write it has to see. Losing it failed CI on a docs-only commit.
+    await sleep(SETTLED_MS);
 
     fs.appendFileSync(runtime, quitLines(TOKEN, 'Artist - Title (Creator) [Insane]'));
     for (let i = 0; i < 40 && seen.length < 1; i++) await sleep(100);
