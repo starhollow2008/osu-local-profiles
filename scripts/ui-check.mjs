@@ -201,6 +201,32 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+console.log('\nopen in browser on start');
+// Read, flip, read back from the server, flip back: the check must leave config.json as it
+// found it, since it runs against a real install.
+const toggle = await evaluate(`(async () => {
+  const state = async () => (await (await fetch('/api/state')).json()).app.config.openBrowser;
+  document.getElementById('optionsBtn').click();
+  const button = document.getElementById('optOpenBrowser');
+  const before = await state();
+  const shownBefore = button.getAttribute('aria-checked') === String(before);
+  button.click();
+  await new Promise((r) => setTimeout(r, 300));
+  const after = await state();
+  const menuOpen = getComputedStyle(document.getElementById('optionsMenu')).display !== 'none';
+  const shownAfter = button.getAttribute('aria-checked') === String(after);
+  button.click();
+  await new Promise((r) => setTimeout(r, 300));
+  const restored = (await state()) === before;
+  document.body.click();
+  return { shownBefore, flipped: after === !before, shownAfter, menuOpen, restored };
+})()`);
+check('the switch shows the saved setting', toggle.shownBefore, true);
+check('pressing it saves the opposite', toggle.flipped, true);
+check('and the switch follows', toggle.shownAfter, true);
+check('the menu stays open while it is pressed', toggle.menuOpen, true);
+check('pressing it again puts it back', toggle.restored, true);
+
 console.log('\nshare dialog');
 check('the share dialog is hidden on load', await shown('shareModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");

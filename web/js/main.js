@@ -686,6 +686,7 @@ async function loadState() {
   modesWithPlays = s.modesWithPlays ?? [];
 
   app = s.app ?? app;
+  renderOpenBrowser();
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
@@ -767,6 +768,43 @@ document.addEventListener('keydown', (e) => {
   if (!$('shareModal').hidden) closeShare();
   if (!$('updateModal').hidden) closeUpdate();
 });
+
+/* ------------------------------------------------------- open on start */
+
+/*
+ * "Open in browser on start": whether launching the app opens this page. It belongs to the
+ * install, not the profile -- it decides what happens before any profile is on screen -- so
+ * it is saved to data/config.json rather than with the profile's settings. On by default.
+ *
+ * The menu stays open when it is pressed, so the switch visibly flips under the pointer.
+ */
+function renderOpenBrowser() {
+  const on = app.config?.openBrowser !== false;
+  $('optOpenBrowser').setAttribute('aria-checked', String(on));
+}
+
+$('optOpenBrowser').onclick = async () => {
+  const next = app.config?.openBrowser === false;
+  app = { ...app, config: { ...app.config, openBrowser: next } };
+  renderOpenBrowser();
+  try {
+    const r = await fetch('/api/app-config', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ openBrowser: next }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'saving that failed');
+    app = { ...app, config: d.config };
+    renderOpenBrowser();
+    toast(next ? 'This page will open when the app starts' : 'The app will start without opening this page');
+  } catch (err) {
+    // Put back what the server actually has, rather than leaving the switch lying.
+    app = { ...app, config: { ...app.config, openBrowser: !next } };
+    renderOpenBrowser();
+    toast(err.message);
+  }
+};
 
 /* ----------------------------------------------------------------- update */
 
@@ -2311,6 +2349,11 @@ es.addEventListener('profiles', () => {
 // be left showing the old country.
 es.addEventListener('settings', () => loadState());
 es.addEventListener('identity', () => loadState());
+// A second tab should not be left showing the switch the wrong way round.
+es.addEventListener('app-config', (e) => {
+  app = { ...app, config: JSON.parse(e.data) };
+  renderOpenBrowser();
+});
 // Pin, unpin and remove all change what the page should be showing.
 es.addEventListener('scores', () => {
   loadProfile();

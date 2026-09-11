@@ -31,6 +31,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.16 | One-click update from GitHub releases         | done   |
 | 5.17 | osu! parity: header, Scores, medals, badges   | done   |
 | 5.18 | Rename to **osu! local profiles**             | done   |
+| 5.19 | Open in browser on start, and a menu toggle   | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1064,9 +1065,8 @@ is what caught the favicon.
 ## 5.18 — Rename to osu! local profiles
 
 **Status: done** -- released as 1.5.0 (2026-09-11) and verified end to end from a real
-1.4.0 install. The one thing left is the user's: the local checkout folder
-`Desktop\osu! fresh profile` still has the old name (rename it with the app and any editor
-session closed; the git remote already points at the new repository).
+1.4.0 install. The local checkout folder and its Claude memory directory were renamed to
+`Desktop\osu! local profiles` by the user afterwards.
 
 ### Decisions
 
@@ -1118,3 +1118,44 @@ session closed; the git remote already points at the new repository).
 
 **Keep attaching both zips to every release.** There is no way to know when the last 1.3.0
 or 1.4.x install is gone, and the second file costs nothing but upload time.
+
+---
+
+## 5.19 — Open in browser on start, and a menu toggle
+
+**Status: done** -- released as 1.6.0.
+
+Asked for as a new feature: launching the app should open the page in the default browser,
+with an option in the Options menu, on by default.
+
+### What it turned out to be
+
+**The feature already existed and had never worked on Windows.** `openBrowser` in
+`src/main.ts` spawned `cmd /c start "" <url>`, and `config.openBrowser` defaulted to true.
+But Node quotes spawn arguments by the C runtime's rules, so the empty title `""` reached
+`cmd` as `"\"\""`. `cmd` does not treat a backslash as an escape: `start` read a title of
+`\` and then tried to run a program called `\""`, and the URL never opened. Shown directly
+by having `cmd` echo what it received -- `start "\"\"" http://localhost:7272` before,
+`start "" http://localhost:7272` after. Roadmap 5.10 had recorded "`openBrowser` already
+branches correctly"; it branched correctly and then failed on the one platform verified.
+
+### Decisions
+
+- **`src/browser.ts` builds the command as a pure function of the platform**, the
+  `clients/detect.ts` pattern, so `test/browser.test.ts` pins the Windows line from any OS.
+  Windows passes `windowsVerbatimArguments` and escapes `&` and `^`, the two URL
+  characters `cmd` would act on.
+- **Verified against a real browser, not just the command line**: a throwaway local server,
+  the app's own `openBrowser`, and a URL containing `&`; the default browser requested it.
+- **The toggle is install-level, stored in `config.json`, not a profile setting.** It
+  decides what happens before any profile is on screen. This is the one place the page
+  writes `config.json`, which 5.1 deliberately avoided, so it goes through a narrow door:
+  `POST /api/app-config` accepts exactly `openBrowser` as a boolean and nothing else, and
+  the write re-reads the file first so a hand edit made while the app runs survives.
+  `startServer` takes an `appConfig` get/set pair so tests never touch a real config file.
+- **It sits in the Options menu itself as a switch**, not in Settings, whose dialog says
+  everything in it belongs to the current profile. The menu stays open when it is pressed,
+  so the switch visibly flips.
+- **1.6.0, not a replacement 1.5.0.** The updater only offers a *higher* version, so an
+  install already on 1.5.0 would never have received a changed 1.5.0 -- and replacing the
+  published archive would have swapped the build verified end to end for one that was not.

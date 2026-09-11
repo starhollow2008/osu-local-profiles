@@ -26,6 +26,7 @@ interface Harness {
   profileId: number;
   tracker: Tracker;
   base: string;
+  appConfig: { openBrowser: boolean };
   cleanup: () => void;
 }
 
@@ -33,6 +34,7 @@ function harness(): Harness {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-reset-'));
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'Reset Test');
+  const appConfig = { openBrowser: true };
   const tracker = new Tracker({
     db,
     resolver: new BeatmapResolver(db, []),
@@ -49,12 +51,18 @@ function harness(): Harness {
     tagline: '',
     dataDir: tmp,
     port: 0, // ephemeral
+    // In memory: a test must never write the real data/config.json.
+    appConfig: {
+      get: () => ({ ...appConfig }),
+      set: (patch) => Object.assign(appConfig, patch),
+    },
   });
   const { port } = server.address() as AddressInfo;
   return {
     db,
     profileId,
     tracker,
+    appConfig,
     base: `http://127.0.0.1:${port}`,
     cleanup: () => {
       server.close();
@@ -70,6 +78,38 @@ const post = (base: string, body: unknown) =>
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+/*
+ * "Open in browser on start", from the Options menu. It writes the file the app boots from,
+ * so the endpoint takes exactly one key of exactly one type and nothing else.
+ */
+test('the open-in-browser option round-trips, and rejects anything but a boolean', async () => {
+  const h = harness();
+  try {
+    const state = (await (await fetch(`${h.base}/api/state`)).json()) as {
+      app: { config: { openBrowser: boolean } };
+    };
+    assert.equal(state.app.config.openBrowser, true);
+
+    const send = (body: unknown) =>
+      fetch(`${h.base}/api/app-config`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    const off = await send({ openBrowser: false });
+    assert.equal(off.status, 200);
+    assert.equal(((await off.json()) as { config: { openBrowser: boolean } }).config.openBrowser, false);
+    assert.equal(h.appConfig.openBrowser, false);
+
+    assert.equal((await send({ openBrowser: 'no' })).status, 400);
+    assert.equal((await send({ port: 80 })).status, 400);
+    assert.equal(h.appConfig.openBrowser, false, 'a rejected request changes nothing');
+  } finally {
+    h.cleanup();
+  }
+});
 
 test('reset refuses without an explicit confirmation', async () => {
   const h = harness();

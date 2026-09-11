@@ -106,6 +106,20 @@ export interface ServerOptions {
   tagline: string;
   dataDir: string;
   port: number;
+  /**
+   * Install-level options the page can change, stored in `data/config.json` by the caller.
+   * Passed in rather than read here so the tests never touch a real config file.
+   */
+  appConfig: {
+    get(): AppConfig;
+    set(patch: AppConfig): void;
+  };
+}
+
+/** What of config.json the page is allowed to see and change. Deliberately small. */
+export interface AppConfig {
+  /** Open the page in the default browser when the app starts. */
+  openBrowser: boolean;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -202,7 +216,7 @@ export function startServer(opts: ServerOptions): http.Server {
         // What is running, so the page can print it and the update check has something to
         // compare against. Null when package.json could not be read, which the page shows
         // as an unknown version rather than inventing one.
-        app: { version: appVersion(), update: updateState() },
+        app: { version: appVersion(), update: updateState(), config: opts.appConfig.get() },
         profile: {
           id: profile.id,
           name: profile.name,
@@ -339,6 +353,25 @@ export function startServer(opts: ServerOptions): http.Server {
         const settings = updateSettings(opts.db, current(), body, configFallbacks);
         broadcast('settings', settings);
         return json(res, { ok: true, settings });
+      });
+    }
+
+    /*
+     * The install's own options, as opposed to a profile's. Only the keys in `AppConfig` can
+     * be changed, and only to a value of the right type: this writes the file the app needs
+     * to boot, so nothing the page sends is passed through unchecked.
+     */
+    if (url.pathname === '/api/app-config') {
+      if (req.method !== 'POST') return json(res, { config: opts.appConfig.get() });
+
+      return readBody(req, res, (body) => {
+        if (typeof body['openBrowser'] !== 'boolean') {
+          return json(res, { error: 'openBrowser must be true or false' }, 400);
+        }
+        opts.appConfig.set({ openBrowser: body['openBrowser'] });
+        const config = opts.appConfig.get();
+        broadcast('app-config', config);
+        return json(res, { ok: true, config });
       });
     }
 

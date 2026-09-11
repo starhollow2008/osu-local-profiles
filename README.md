@@ -40,6 +40,10 @@ the page closer to osu!'s own: Medals, pp and Total Play Time under the rank gra
 Scores section, and a Medals section laid out as osu!'s with its hover card. Installs of
 1.3.0 and 1.4.0 update to it with the button as usual.
 
+**v1.6.0** makes starting the app open the page in your browser, which it was meant to do
+all along and on Windows never did, and adds **Options -> Open in browser on start** to turn
+that off.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
@@ -237,7 +241,7 @@ profile, so the curve comes from the public dumps instead.
 |---|---|---|
 | `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
-| `openBrowser` | `true` | open the page on start |
+| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Open in browser on start** |
 | `checkForUpdates` | `true` | ask GitHub once at startup whether a newer release exists |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |

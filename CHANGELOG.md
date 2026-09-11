@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.6.0
+
+- **Starting the app opens the page in your default browser.** It was always meant to, and
+  on Windows it never did: the command that opens the browser reached Windows garbled, so
+  nothing happened and you had to type `localhost:7272` yourself. Fixed, and checked against
+  a real browser.
+- **Options -> Open in browser on start** turns that off (or back on). It is on by default,
+  and it applies to the whole app rather than one profile -- it is saved in
+  `data/config.json` as `openBrowser`.
+
 ## 1.5.0
 
 ### A new name: osu! local profiles

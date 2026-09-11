@@ -2,7 +2,7 @@
 
 ## Current work
 
-**v1.5.0 shipped.** The app is now **osu! local profiles** (it was osu! fresh profile until
+**v1.6.0 shipped.** The app is now **osu! local profiles** (it was osu! fresh profile until
 1.5.0), at `github.com/jonathant09/osu-local-profiles`. **Every release must attach both
 zips `npm run package` writes** -- the second, old-named one is what 1.3.0/1.4.x installs
 look for; see roadmap 5.18. Ongoing work is **Phase 5**, planned in
@@ -338,6 +338,12 @@ Two rules follow from that, and both were learned by getting them wrong:
   nothing at all, and *silently* shipped a 273MB helper instead of a 114MB one, BASS
   included -- which is not ours to redistribute. It now matches by base name across
   `.dll`/`.dylib`/`.so` and warns when it prunes nothing.
+
+**Anything spawned through `cmd` needs `windowsVerbatimArguments`.** Node quotes spawn
+arguments by the C runtime's rules and `cmd` does not unescape them: the `""` title
+`start` needs arrived as `"\"\""`, so opening the browser silently did nothing on Windows
+from the first release until 1.6.0. `src/browser.ts` builds the line as a pure function and
+`test/browser.test.ts` pins it. The updater's relaunch is the same trap, handled there.
 
 `config.installRoots` is the escape hatch for a layout nobody anticipated, and on macOS and
 Linux that is the normal case for osu!stable: there is no official build, only Wine

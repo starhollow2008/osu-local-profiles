@@ -1,6 +1,6 @@
 import path from 'node:path';
-import { spawn } from 'node:child_process';
 import { loadConfig, saveConfig, dataDir } from './config.ts';
+import { openBrowser } from './browser.ts';
 import { detectInstalls } from './clients/detect.ts';
 import { BeatmapResolver, indexBeatmapFiles } from './clients/beatmaps.ts';
 import { getOrCreateProfile, openDb } from './db/index.ts';
@@ -41,20 +41,6 @@ function lazerSearchHint(): string {
   if (process.platform === 'win32') return '%APPDATA%/osu';
   if (process.platform === 'darwin') return '~/Library/Application Support/osu';
   return '~/.local/share/osu';
-}
-
-function openBrowser(url: string): void {
-  try {
-    if (process.platform === 'win32') {
-      spawn('cmd', ['/c', 'start', '""', url], { detached: true, stdio: 'ignore' }).unref();
-    } else if (process.platform === 'darwin') {
-      spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    } else {
-      spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
-    }
-  } catch {
-    /* the URL is printed anyway */
-  }
 }
 
 async function main(): Promise<void> {
@@ -207,6 +193,21 @@ async function main(): Promise<void> {
     tagline: config.tagline,
     dataDir: dataDir(),
     port: config.port,
+    /*
+     * The page's "Open in browser on start" toggle. It is install-level, not per profile --
+     * it decides what happens before any profile is on screen -- so it lives in config.json
+     * beside the port, and is re-read from disk before each write so a hand edit made while
+     * the app runs is not overwritten.
+     */
+    appConfig: {
+      get: () => ({ openBrowser: config.openBrowser }),
+      set: (patch) => {
+        const current = loadConfig();
+        current.openBrowser = patch.openBrowser;
+        saveConfig(current);
+        config.openBrowser = patch.openBrowser;
+      },
+    },
   });
 
   const url = `http://localhost:${config.port}`;
