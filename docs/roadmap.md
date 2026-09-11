@@ -30,7 +30,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.15 | Scrollable dialogs, footer, dismissible warning | done |
 | 5.16 | One-click update from GitHub releases         | done   |
 | 5.17 | osu! parity: header, Scores, medals, badges   | done   |
-| 5.18 | Rename to **osu! local profiles**             | in progress |
+| 5.18 | Rename to **osu! local profiles**             | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1063,10 +1063,10 @@ is what caught the favicon.
 
 ## 5.18 — Rename to osu! local profiles
 
-**Status: in progress** -- the code, docs and package are renamed and verified locally.
-Left: renaming the GitHub repository, pointing the git remote at it, and cutting 1.5.0
-with **both** zips attached. The local folder `Desktop\osu! fresh profile` is the user's
-to rename (with the app and any editor session closed).
+**Status: done** -- released as 1.5.0 (2026-09-11) and verified end to end from a real
+1.4.0 install. The one thing left is the user's: the local checkout folder
+`Desktop\osu! fresh profile` still has the old name (rename it with the app and any editor
+session closed; the git remote already points at the new repository).
 
 ### Decisions
 
@@ -1093,11 +1093,28 @@ to rename (with the app and any editor session closed).
   start fresh" is a verb and stays. The first profile's default name is `Local Profile`;
   existing profiles keep theirs.
 
-### How to finish
+### How it was finished, and verified
 
-1. `gh repo rename osu-local-profiles` (or Settings -> Repository name), then
-   `git remote set-url origin https://github.com/jonathant09/osu-local-profiles.git`.
-2. Bump to 1.5.0, `npm run package`, and attach **both** `dist/*.zip` files to the release.
-3. Verify the bridge the way 5.16 did: an untouched 1.4.0 package, started, must offer the
-   update, install 1.5.0, and come back as `Start osu! local profiles.bat` with `data/`
-   intact.
+1. `gh repo rename osu-local-profiles`, then `git remote set-url origin
+   https://github.com/jonathant09/osu-local-profiles.git`. Straight after the rename, the
+   exact request a 1.4.0 install makes -- the old repo path, its own user agent -- answered
+   **200 via redirect** with the latest release.
+2. CI went red on macOS only, **twice in a row**, and not because of the rename:
+   `a play appended to the live log is picked up` appended the instant its watcher started,
+   and the first `fs.watch` in a process is when libuv starts macOS's FSEvents thread. The
+   previous commit, re-run on the same day's runners, was green -- so the suite's timing had
+   shifted enough to lose a race that test had always been running. Fixed in the test
+   (f18c350); the app reads by byte offset and is not exposed. **Green on all three after.**
+3. v1.5.0 published with both archives, byte-identical at 87,068,311 bytes.
+4. **The bridge, end to end, 14/14.** The genuine 1.4.0 release, downloaded through the
+   repository's *old* name and unzipped untouched, was given port 7334, the profile name
+   `Bridge Canary` and a canary file -- all only in its own `data/`. It found 1.5.0,
+   offered it, installed it, and came back as 1.5.0 on 7334 under `Bridge Canary` with the
+   canary intact, `Start osu! local profiles.bat` in place of the old launcher, no
+   `.rollback-` folder, and `data/update.log` recording the update and the relaunch via the
+   new launcher. The harness is `scratchpad/bridge-e2e.mjs`, not in the repository for the
+   same reason as 5.16's: it downloads 83MB and needs a published release. A first run
+   indexes ~63k beatmap files before it listens, so give it minutes, not seconds.
+
+**Keep attaching both zips to every release.** There is no way to know when the last 1.3.0
+or 1.4.x install is gone, and the second file costs nothing but upload time.
