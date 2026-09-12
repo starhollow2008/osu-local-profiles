@@ -64,6 +64,14 @@ The rest of what goes is dead weight: `osu.Game.Resources.dll` (125MB of fonts, 
 and audio samples), the localisation satellite assemblies, and the native ffmpeg, SDL,
 shader-compiler, image-loader and debug-symbol libraries.
 
+**Trimming the assemblies is not an option, and that was measured rather than assumed.**
+`PublishTrimmed` takes the helper to 36MB, and then breaks it: with the linker's removals in
+place it fails inside osu!'s own graph, unable to construct
+`Newtonsoft.Json.Converters.StringEnumConverter` while reading a lazer replay. .NET's own
+linker warns in advance that `osu.Game`, `osu.Framework`, `Realm`, `Newtonsoft.Json`,
+`AutoMapper` and `MongoDB.Bson` are not trim-safe. See `docs/roadmap.md` 5.44 for the full
+result and how to repeat it.
+
 **Less can be removed than you would expect.** osu.Framework's `Logger` static constructor
 pulls in nearly the whole managed assembly graph — NUnit, Sentry, OpenTabletDriver and
 others are all loaded before any of this project's code runs, however irrelevant they are

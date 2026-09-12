@@ -2,7 +2,7 @@
 
 ## Current work
 
-**v1.13.1 shipped.** The app is **osu! local profiles**, at
+**v1.13.2 shipped.** The app is **osu! local profiles**, at
 `github.com/jonathant09/osu-local-profiles`, and the user wants that to be the only name
 anywhere -- the previous one was scrubbed from the code, docs and every GitHub release. Do
 not reintroduce it, including as a compatibility alias (roadmap 5.18). Ongoing work is
@@ -134,6 +134,14 @@ crate) implements the 2025-10-29 algorithm, so after osu!'s 2026-07-03 rework it
 7.03 stars / 142pp for a play osu! scores at 6.93 / 151. Two calculators in one profile means
 scores ranked against each other under different algorithms. When the helper is unavailable,
 store no pp and say so loudly.
+
+**Do not trim the helper either.** `PublishTrimmed` would take it from 113MB to 36MB and was
+measured at 1.13.1: it breaks inside osu!'s own graph (`StringEnumConverter`, reading lazer's
+extended block), and .NET's linker warns that osu.Game, osu.Framework, Realm, Newtonsoft,
+AutoMapper and MongoDB.Bson are all trim-unsafe. Making it work would mean a trimmer root
+descriptor over osu!'s internals, re-verified on every package bump, guarding against a
+*wrong pp value* rather than a crash. `docs/roadmap.md` 5.44 has the four failures in order
+and the reproduction.
 
 **After an osu! pp rework:** bump the package versions in `PpCalculator.csproj`, then run
 `node scripts/reingest.mjs` to recompute every stored score from its replay.

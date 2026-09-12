@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.13.2
+
+- **The launcher says when the folder is incomplete**, instead of failing with a message that
+  looks like a missing prerequisite. Nothing in this app needs installing -- the runtime ships
+  inside the folder -- so a missing file means the download or the extraction did not finish,
+  or antivirus took something. The launcher now names what is missing, says that plainly, and
+  links to the downloads. On macOS and Linux it also spots a runtime that lost its executable
+  bit in transit, and gives the `chmod +x` that restores it.
+
 ## 1.13.1
 
 - **The accuracy is centred in its cell again** in Pinned Scores and Recent Plays. Only Best

@@ -48,6 +48,70 @@ test('the launchers run the Node beside them, not one from PATH', () => {
   assert.match(launcherFor('win', 'node.exe').content, /^\.\\node\.exe src\\main\.ts\r$/m);
 });
 
+/* ------------------------------------------------- the incomplete-folder guard */
+
+/*
+ * Nothing in this app needs installing, so a missing file is never a missing prerequisite:
+ * it is an incomplete download, a half-finished extraction, or antivirus having taken the
+ * runtime. Left to itself cmd says "'node.exe' is not recognized as an internal or external
+ * command", which reads exactly like a missing prerequisite and sends people off installing
+ * a Node this app would not use anyway.
+ *
+ * Verified by running all three launchers against folders in each state; what those runs
+ * cannot check is the executable-bit branch, because NTFS reports every file as executable.
+ * `sh -n` parses it, and only a real unix filesystem can exercise it -- the same standing
+ * caveat as the rest of the macOS and Linux packaging.
+ */
+test('a launcher whose folder is incomplete says so instead of failing obscurely', () => {
+  const win = launcherFor('win', 'node.exe').content;
+  assert.match(win, /if not exist "\.\\node\.exe" set "missing=node\.exe"/);
+  assert.match(win, /if not exist "src\\main\.ts" set "missing=src\\main\.ts"/);
+  assert.match(win, /is missing from this folder/);
+
+  for (const os of ['osx', 'linux'] as const) {
+    const content = launcherFor(os, 'node').content;
+    assert.match(content, /if \[ ! -f \.\/node \] \|\| \[ ! -f src\/main\.ts \]; then/);
+    assert.match(content, /this folder is incomplete/);
+  }
+});
+
+/*
+ * The sentence that stops the guard from causing the very thing it exists to prevent. A
+ * message naming a missing `node.exe` with no context is an invitation to go and install
+ * Node, which would not help: the launcher runs the runtime beside it and never one on PATH.
+ */
+test('the guard says nothing needs installing, and where to get the archive', () => {
+  for (const [os, binary] of [['win', 'node.exe'], ['osx', 'node'], ['linux', 'node']] as const) {
+    const { content } = launcherFor(os, binary);
+    assert.match(content, /Nothing needs installing/);
+    assert.match(content, /github\.com\/jonathant09\/osu-local-profiles\/releases/);
+  }
+});
+
+/*
+ * The failure this shape invites: a `.bat` runs straight on into whatever follows, so
+ * without the `exit /b` the success path falls through the label and every normal start
+ * ends by announcing that the folder is incomplete.
+ */
+test('the Windows launcher leaves before reaching its own error message', () => {
+  const lines = launcherFor('win', 'node.exe').content.split('\r\n');
+  const run = lines.findIndex((l) => l.startsWith('.\\node.exe'));
+  const exit = lines.indexOf('exit /b', run);
+  const label = lines.indexOf(':incomplete');
+  assert.ok(run > 0 && exit > run, 'the run path has to end in exit /b');
+  assert.ok(label > exit, 'the error message has to come after that exit, not before it');
+});
+
+/* A zip extracted by a tool that drops permissions leaves the runtime present and unrunnable;
+ * `sh` reports only "Permission denied", which says nothing about how to fix it. */
+test('the unix launchers tell the user how to restore a lost executable bit', () => {
+  for (const os of ['osx', 'linux'] as const) {
+    const { content } = launcherFor(os, 'node');
+    assert.match(content, /if \[ ! -x \.\/node \]; then/);
+    assert.match(content, /chmod \+x \.\/node tools\/pp\/osu-pp/);
+  }
+});
+
 test('the unix launchers start with a shebang and use forward slashes', () => {
   for (const os of ['osx', 'linux'] as const) {
     const { content } = launcherFor(os, 'node');

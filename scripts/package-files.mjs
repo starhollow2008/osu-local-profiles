@@ -11,6 +11,12 @@
 /** `win` | `osx` | `linux`, the first half of a .NET runtime identifier. */
 
 /**
+ * Where to get the archive again, which is the answer to every case the launcher's guard
+ * catches. Written once here rather than in each launcher and each README.
+ */
+const RELEASES_URL = 'https://github.com/jonathant09/osu-local-profiles/releases';
+
+/**
  * The launcher, named the way each platform's file manager will actually run it.
  *
  * All three do the same two things: move to the folder they are in, then run the app with
@@ -32,6 +38,20 @@ export function launcherFor(hostOs, nodeBinary) {
         'cd /d "%~dp0"',
         'title osu! local profiles',
         /*
+         * Nothing needs installing, so a missing file here is never a missing prerequisite --
+         * it is an incomplete download, a half-finished extraction, or antivirus having
+         * quarantined the runtime. Without this the user gets cmd's own "is not recognized as
+         * an internal or external command", which reads exactly like a missing prerequisite
+         * and sends them off installing Node they do not need.
+         *
+         * Checked in this order so that the runtime is the one named when both are gone: it
+         * is the file something else is most likely to have taken.
+         */
+        'set "missing="',
+        'if not exist "src\\main.ts" set "missing=src\\main.ts"',
+        `if not exist ".\\${nodeBinary}" set "missing=${nodeBinary}"`,
+        'if defined missing goto incomplete',
+        /*
          * `.\` and never the bare name, as `./` on the other two. A bare `node.exe` is found
          * in the current folder only while Windows' NoDefaultCurrentDirectoryInExePath is
          * unset; with it set -- a documented hardening switch -- cmd searches PATH instead,
@@ -43,6 +63,21 @@ export function launcherFor(hostOs, nodeBinary) {
         '  echo The app stopped with an error. The message above says why.',
         '  pause',
         ')',
+        'exit /b',
+        '',
+        ':incomplete',
+        'echo.',
+        'echo  osu! local profiles cannot start: %missing% is missing from this folder.',
+        'echo.',
+        'echo  Nothing needs installing - the runtime ships inside this folder - so this',
+        'echo  means the download or the extraction did not finish, or antivirus has',
+        `echo  removed part of it - ${nodeBinary} is the usual casualty.`,
+        'echo.',
+        'echo  Download the archive again and extract all of it:',
+        `echo  ${RELEASES_URL}`,
+        'echo.',
+        'pause',
+        'exit /b 1',
         '',
       ].join('\r\n'),
       // Windows has no executable bit; the extension is what makes it runnable.
@@ -56,6 +91,32 @@ export function launcherFor(hostOs, nodeBinary) {
       '#!/bin/sh',
       '# Run from this folder however it was launched, so data/ is always found beside it.',
       'cd "$(dirname "$0")" || exit 1',
+      '',
+      // The same reasoning as the Windows guard above, plus a case Windows does not have:
+      // a zip extracted by a tool that drops permissions leaves the runtime present and
+      // unrunnable, which `sh` reports only as "Permission denied".
+      `if [ ! -f ./${nodeBinary} ] || [ ! -f src/main.ts ]; then`,
+      '  echo ""',
+      '  echo "  osu! local profiles cannot start: this folder is incomplete."',
+      '  echo ""',
+      '  echo "  Nothing needs installing - the runtime ships inside this folder - so this"',
+      '  echo "  means the download or the extraction did not finish."',
+      '  echo ""',
+      '  echo "  Download the archive again and extract all of it:"',
+      `  echo "  ${RELEASES_URL}"`,
+      '  echo ""',
+      '  exit 1',
+      'fi',
+      '',
+      `if [ ! -x ./${nodeBinary} ]; then`,
+      '  echo ""',
+      '  echo "  The bundled runtime is not executable. Some unzip tools drop that."',
+      '  echo ""',
+      `  echo "  Restore it from this folder with:  chmod +x ./${nodeBinary} tools/pp/osu-pp"`,
+      '  echo ""',
+      '  exit 1',
+      'fi',
+      '',
       `exec ./${nodeBinary} src/main.ts`,
       '',
     ].join('\n'),

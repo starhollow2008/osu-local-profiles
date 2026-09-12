@@ -2041,3 +2041,75 @@ has a filter saved rather than overwriting it.
 `test/tracker.test.ts` drops a real replay through the real watcher with a filter that cannot
 match it and asserts the *absence*: no `scores` row, no play count, and then the same replay
 tracked normally once the filter is off.
+
+## 5.43 - The launcher says when the folder is incomplete
+
+**Status:** done -- released as 1.13.2 (2026-09-12).
+
+Nothing in this app needs installing, so a missing file is never a missing prerequisite: it
+is an incomplete download, a half-finished extraction, or antivirus having taken the runtime.
+Left to itself cmd answers that with *"'node.exe' is not recognized as an internal or external
+command"*, which reads exactly like a missing prerequisite and sends someone off installing a
+Node this app would not use anyway -- the launcher runs `.
+ode.exe`, never one from PATH.
+
+All three launchers now check for the runtime and for `src/main.ts` before starting anything,
+name whichever is missing, say **nothing needs installing**, and give the releases link. The
+two unix launchers carry a second check Windows cannot have: a zip extracted by a tool that
+drops permissions leaves the runtime present and unrunnable, which `sh` reports only as
+"Permission denied", so that case names `chmod +x` instead.
+
+Verified by running each launcher against a folder in each state. The exec-bit branch is the
+exception and is honest about it: NTFS reports every file as executable, so it is checked with
+`sh -n` and can only be exercised on a real unix filesystem -- the same standing caveat as the
+rest of the macOS and Linux packaging.
+
+`test/package-files.test.ts` pins the guard, including the `exit /b` before `:incomplete`:
+a `.bat` runs straight on into whatever follows, so without it every *successful* start would
+end by announcing that the folder is incomplete.
+
+## 5.44 - Trimming the pp helper: measured, and rejected
+
+**Status:** measured 2026-09-12. **Do not ship it.**
+
+`PublishTrimmed` is the obvious remaining lever on the helper's 113MB, and the prize is real:
+**36MB pruned, against 113MB today.** It is still the wrong trade, and this is what it cost to
+find out, so that nobody has to repeat it.
+
+Four distinct breakages, in the order they appear. The first three are *ours*:
+
+1. **Reflection-based `System.Text.Json` is off by default under trimming.** The helper throws
+   on its own ready line before reading a single request.
+2. With that re-enabled, **ILLink trims anonymous types' constructor parameter names**, so the
+   ready line throws again. `-p:_ExtraTrimmerArgs="--keep-metadata parametername"` had no
+   effect.
+3. With the framing hand-written, **`Request`'s constructor is removed** -- nothing in the
+   program ever constructs one, only the deserializer does, by reflection -- so every request
+   fails. A source-generated `JsonSerializerContext` is the real fix for all three.
+
+The fourth is not ours, and is the one that decides it:
+
+4. With `Request` rooted, the helper starts, reports the right osu! version, and then **fails
+   inside osu!'s own dependency graph**: `Error creating
+   'Newtonsoft.Json.Converters.StringEnumConverter'` on every lazer replay -- which is the
+   path that reads lazer's extended block, the thing this whole project is built on.
+
+The build warns about exactly this in advance: ILLink reports *"produced trim warnings"* for
+`osu.Game`, `osu.Framework`, `Realm`, `Newtonsoft.Json`, `AutoMapper`, `MongoDB.Bson` and
+`nunit.framework`.
+
+### Why 77MB is not enough
+
+Fixing 4 means a trimmer root descriptor enumerating osu!'s internals -- **and re-verifying it
+on every `ppy.osu.Game` bump**, which this project does after every pp rework. The failure it
+guards against is not a crash but a *wrong number*: a converter that fails to construct for
+some mods gives wrong mods and therefore wrong pp, silently, in the one part of this app that
+is not allowed to be approximately right. That is the same reasoning that keeps rosu-pp out
+(5.x, "do not add a fallback calculator"): a helper that is correct for most replays is worse
+than one that is correct for all of them and larger.
+
+Re-run it before assuming it still holds -- .NET's linker and osu!'s dependencies both move.
+The reproduction is `dotnet publish -p:PublishTrimmed=true
+-p:JsonSerializerIsReflectionEnabledByDefault=true`, pruned with `shouldPrune` from
+`scripts/build-pp-helper.mjs`, compared field by field against the shipped helper on real
+replays.
