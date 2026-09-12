@@ -6,7 +6,7 @@ import path from 'node:path';
 import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
 import { computeStats, recentPlays, topPlays } from '../src/calc/stats.ts';
 import { buildHistory } from '../src/calc/history.ts';
-import { eligibilityOf, VANILLA } from '../src/calc/eligibility.ts';
+import { eligibilityOf, scoreColumn, VANILLA } from '../src/calc/eligibility.ts';
 import { defaultSettings, type Settings } from '../src/settings.ts';
 import { Status, UNRESOLVED_STATUS } from '../src/clients/beatmaps.ts';
 import {
@@ -388,6 +388,53 @@ test('an unrecognised beatmap state in stored settings is dropped, not trusted',
     });
     assert.deepEqual(e.extraMapStatuses, [Status.LOVED]);
     assert.equal(topPlays(h.db, h.profileId, 0, 100, e).length, 2);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/* --------------------------------------------------------- osu!'s two scales */
+
+test('the scoring scale picks which score column every query reads', () => {
+  assert.equal(scoreColumn(VANILLA), 'COALESCE(s.score_standard, s.total_score)');
+  assert.equal(scoreColumn({ ...VANILLA, scoring: 'classic' }), 'COALESCE(s.score_classic, s.total_score)');
+  assert.equal(scoreColumn({ ...VANILLA, scoring: 'classic' }, 'x'), 'COALESCE(x.score_classic, x.total_score)');
+});
+
+test('lazer scoring is the default, exactly as it is on osu!', () => {
+  assert.equal(eligibilityOf(defaultSettings()).scoring, 'lazer');
+  assert.equal(eligibilityOf({ ...defaultSettings(), scoring: 'classic' } as Settings).scoring, 'classic');
+});
+
+test('switching scales moves every score-shaped number, with no recalculation', () => {
+  const h = harness();
+  try {
+    h.add({ md5: 'a', pp: 100 });
+    h.db.prepare('UPDATE scores SET score_standard = 700000, score_classic = 4000000').run();
+
+    const lazer = computeStats(h.db, h.profileId, 0, VANILLA);
+    const classic = computeStats(h.db, h.profileId, 0, { ...VANILLA, scoring: 'classic' });
+
+    assert.equal(lazer.totalScore, 700000);
+    assert.equal(classic.totalScore, 4000000);
+    assert.equal(lazer.rankedScore, 700000);
+    assert.equal(classic.rankedScore, 4000000);
+    // The level is a function of total score, so it moves with the scale.
+    assert.ok(classic.level.current > lazer.level.current, 'the uncapped scale reaches a higher level');
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a score tracked before both scales existed falls back to what its replay carried', () => {
+  const h = harness();
+  try {
+    h.add({ md5: 'old', pp: 100 });
+
+    for (const scoring of ['lazer', 'classic'] as const) {
+      const stats = computeStats(h.db, h.profileId, 0, { ...VANILLA, scoring });
+      assert.equal(stats.totalScore, 500000, `${scoring} falls back`);
+    }
   } finally {
     h.cleanup();
   }

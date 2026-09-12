@@ -1,6 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bonusPp, weightedTotal, weightedAccuracy, decodeLegacyMods, modsAwardPp } from '../src/calc/pp.ts';
+import {
+  bonusPp,
+  weightedTotal,
+  weightedAccuracy,
+  decodeLegacyMods,
+  modsAwardPp,
+  withClassicMod,
+} from '../src/calc/pp.ts';
 import { levelFromScore, requiredScore } from '../src/calc/level.ts';
 
 test('bonus pp tops out at the documented 413.894', () => {
@@ -77,4 +84,17 @@ test('unranked mods make a score award no pp', () => {
   assert.equal(modsAwardPp([{ acronym: 'AP' }]), false);
   assert.equal(modsAwardPp([{ acronym: 'RX' }]), false);
   assert.equal(modsAwardPp([{ acronym: 'DT' }, { acronym: 'AP' }]), false);
+});
+
+test('osu! scores a stable play with Classic, and the page says so', () => {
+  // Display only: what the player chose stays in mods_json, which medals and play time read.
+  assert.deepEqual(withClassicMod([{ acronym: 'HD' }, { acronym: 'DT' }], 'stable'), [
+    { acronym: 'HD' },
+    { acronym: 'DT' },
+    { acronym: 'CL' },
+  ]);
+  assert.deepEqual(withClassicMod([], 'stable'), [{ acronym: 'CL' }]);
+  // A lazer play is left exactly as it was, and CL is never added twice.
+  assert.deepEqual(withClassicMod([{ acronym: 'HD' }], 'lazer'), [{ acronym: 'HD' }]);
+  assert.deepEqual(withClassicMod([{ acronym: 'CL' }], 'stable'), [{ acronym: 'CL' }]);
 });

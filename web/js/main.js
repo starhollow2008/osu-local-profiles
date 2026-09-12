@@ -583,6 +583,7 @@ async function loadState() {
   if (isStatic) $('footerVersion').textContent += ` - a copy, as of ${shortDate(Date.parse(snapshot.exportedAt))}`;
   renderUpdate();
 
+  renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
   renderStableNote();
   const kinds = installKinds.join(' + ') || 'no client found';
@@ -703,6 +704,37 @@ document.addEventListener('keydown', (e) => {
   if (!$('shareModal').hidden) closeShare();
   if (!$('updateModal').hidden) closeUpdate();
 });
+
+/* ---------------------------------------------------------- lazer scoring */
+
+/*
+ * osu!'s own toggle, in the same place osu! puts it: the options menu, on by default.
+ *
+ * It picks which of osu!'s two scales every score is read on -- standardised, where a nomod
+ * SS is 1,000,000, or the uncapped classic scale. Both are stored per score, so this is a
+ * settings change and a redraw, never a recalculation. It moves every score-shaped number:
+ * the rows, the card, Total Score, Ranked Score, and the level, which is a function of score.
+ */
+function renderLazerScoring() {
+  $('optLazerScoring').setAttribute('aria-checked', String(settings.scoring !== 'classic'));
+}
+
+$('optLazerScoring').onclick = async () => {
+  const next = settings.scoring === 'classic' ? 'lazer' : 'classic';
+  settings = { ...settings, scoring: next };
+  renderLazerScoring();
+  try {
+    const d = await postJson('/api/settings', { scoring: next }, 'saving that failed');
+    settings = d.settings;
+    renderLazerScoring();
+    await loadProfile();
+    toast(next === 'classic' ? 'Classic scoring' : 'Lazer scoring');
+  } catch (err) {
+    settings = { ...settings, scoring: next === 'classic' ? 'lazer' : 'classic' };
+    renderLazerScoring();
+    toast(err.message);
+  }
+};
 
 /* ------------------------------------------------------- open on start */
 

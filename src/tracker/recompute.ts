@@ -67,6 +67,38 @@ export function countStale(db: Db, profileId: number): number {
   return row.n;
 }
 
+/**
+ * The columns a recompute rewrites, in the order the statement binds them.
+ *
+ * The SQL is generated from this list and the values are read back out by name, so a column
+ * added without its value -- or a value without its column -- cannot silently shift every
+ * parameter after it. That happened once: two columns joined the SET clause without their
+ * values, which left `WHERE id = ?` bound to NULL, and the recompute wrote nothing at all
+ * while reporting every row as updated.
+ */
+const UPDATE_COLUMNS = [
+  'mods_json',
+  'mods_label',
+  'stars',
+  'pp',
+  'pp_source',
+  'score_standard',
+  'score_classic',
+  'pp_nomod',
+  'stars_nomod',
+  'beatmap_max_combo',
+  'map_status',
+  'mods_ranked',
+  'mods_countable',
+  'ranked',
+  'beatmap_id',
+  'pp_parts',
+  'pp_nomod_parts',
+  'pp_version',
+] as const;
+
+type UpdateValues = Record<(typeof UPDATE_COLUMNS)[number], string | number | null>;
+
 export async function recomputeScores(opts: RecomputeOptions): Promise<RecomputeResult> {
   const rows = opts.db
     .prepare(
@@ -79,13 +111,7 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
     .all(opts.profileId, ...(opts.ids ?? [])) as { id: number; replay_path: string; pp: number | null }[];
 
   const update = opts.db.prepare(
-    `UPDATE scores
-        SET mods_json = ?, mods_label = ?,
-            stars = ?, pp = ?, pp_source = ?,
-            pp_nomod = ?, stars_nomod = ?, beatmap_max_combo = ?,
-            map_status = ?, mods_ranked = ?, mods_countable = ?, ranked = ?,
-            beatmap_id = ?, pp_parts = ?, pp_nomod_parts = ?, pp_version = ?
-      WHERE id = ?`,
+    `UPDATE scores SET ${UPDATE_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
   );
 
   const result: RecomputeResult = { considered: rows.length, updated: 0, skipped: 0, gainedPp: 0 };
@@ -122,20 +148,27 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
       result.skipped++;
     }
 
-    update.run(
-      JSON.stringify(mods), modsLabel(mods),
-      computed?.stars ?? null, computed?.pp ?? null, computed ? 'official' : null,
-      stripped?.pp ?? null, stripped?.stars ?? null,
-      computed?.maxCombo ?? null,
-      beatmap.status ?? UNRESOLVED_STATUS,
-      modsRanked ? 1 : 0, countable ? 1 : 0,
-      awardsPp(beatmap.status) && modsRanked ? 1 : 0,
-      beatmap.beatmapId,
-      computed ? JSON.stringify(computed.breakdown) : null,
-      stripped ? JSON.stringify(stripped.breakdown) : null,
-      computed?.version ?? null,
-      row.id,
-    );
+    const values: UpdateValues = {
+      mods_json: JSON.stringify(mods),
+      mods_label: modsLabel(mods),
+      stars: computed?.stars ?? null,
+      pp: computed?.pp ?? null,
+      pp_source: computed ? 'official' : null,
+      score_standard: computed?.standardisedScore ?? null,
+      score_classic: computed?.classicScore ?? null,
+      pp_nomod: stripped?.pp ?? null,
+      stars_nomod: stripped?.stars ?? null,
+      beatmap_max_combo: computed?.maxCombo ?? null,
+      map_status: beatmap.status ?? UNRESOLVED_STATUS,
+      mods_ranked: modsRanked ? 1 : 0,
+      mods_countable: countable ? 1 : 0,
+      ranked: awardsPp(beatmap.status) && modsRanked ? 1 : 0,
+      beatmap_id: beatmap.beatmapId,
+      pp_parts: computed ? JSON.stringify(computed.breakdown) : null,
+      pp_nomod_parts: stripped ? JSON.stringify(stripped.breakdown) : null,
+      pp_version: computed?.version ?? null,
+    };
+    update.run(...UPDATE_COLUMNS.map((column) => values[column]), row.id);
 
     if (beatmap.osuPath) result.updated++;
     if (row.pp === null && computed?.pp != null) result.gainedPp++;

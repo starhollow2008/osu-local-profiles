@@ -37,6 +37,14 @@ export interface OfficialRequest {
 
 export interface OfficialResult {
   stars: number;
+  /**
+   * The same play on osu!'s two scales, as osu! itself computes them: standardised (a nomod
+   * SS is 1,000,000) and classic (uncapped). `legacyTotalScore` is the number osu!stable
+   * recorded, present only for a stable replay. Null from a helper too old to send them.
+   */
+  standardisedScore: number | null;
+  classicScore: number | null;
+  legacyTotalScore: number | null;
   /** The beatmap's maximum achievable combo. */
   maxCombo: number;
   accuracy: number;
@@ -77,6 +85,9 @@ interface Response {
   pp?: number | null;
   stripped?: boolean;
   breakdown?: PpPart[];
+  standardisedScore?: number | null;
+  classicScore?: number | null;
+  legacyTotalScore?: number | null;
 }
 
 const STARTUP_TIMEOUT_MS = 30_000;
@@ -223,6 +234,9 @@ export class OfficialCalculator {
         isLegacy: response.isLegacy ?? false,
         mods: response.mods ?? [],
         pp: response.pp ?? null,
+        standardisedScore: response.standardisedScore ?? null,
+        classicScore: response.classicScore ?? null,
+        legacyTotalScore: response.legacyTotalScore ?? null,
         stripped: response.stripped ?? false,
         breakdown: response.breakdown ?? [],
       };

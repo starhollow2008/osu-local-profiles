@@ -24,6 +24,7 @@ using osu.Game.Rulesets;
 using osu.Game.Rulesets.Catch;
 using osu.Game.Rulesets.Mania;
 using osu.Game.Rulesets.Osu;
+using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Taiko;
 using osu.Game.Scoring;
 using osu.Game.Scoring.Legacy;
@@ -138,6 +139,11 @@ public static class Program
             accuracy = scoreInfo.Accuracy,
             combo = scoreInfo.MaxCombo,
             rank = scoreInfo.Rank.ToString(),
+            // The same play on osu!'s two scales, both as osu! itself computes them.
+            standardisedScore = scoreInfo.GetDisplayScore(ScoringMode.Standardised),
+            classicScore = scoreInfo.GetDisplayScore(ScoringMode.Classic),
+            // Set by the decoder for a stable replay: the number stable itself recorded.
+            legacyTotalScore = scoreInfo.LegacyTotalScore,
             isLegacy = scoreInfo.IsLegacyScore,
             mods = scoreInfo.Mods.Select(m => m.Acronym).ToArray(),
             pp = performance?.Total,

@@ -23,6 +23,13 @@ export interface Eligibility {
   preferStrippedPp: boolean;
   /** Beatmap `approved` values to count beyond ranked and approved. Empty by default. */
   extraMapStatuses: number[];
+  /**
+   * Which of osu!'s two score scales every score-shaped number is read on, exactly as osu!'s
+   * own profile page switches between them: `lazer` is standardised (a nomod SS is
+   * 1,000,000), `classic` the uncapped older scale. It moves the score on every row and card,
+   * Total Score, Ranked Score and the level, because all of them are the same number summed.
+   */
+  scoring: 'lazer' | 'classic';
 }
 
 /** osu!'s own rules: ranked and approved maps, default settings on ranked mods, nothing else. */
@@ -30,6 +37,7 @@ export const VANILLA: Eligibility = {
   includeUnrankedMods: false,
   preferStrippedPp: false,
   extraMapStatuses: [],
+  scoring: 'lazer',
 };
 
 export function eligibilityOf(settings: Settings): Eligibility {
@@ -39,6 +47,7 @@ export function eligibilityOf(settings: Settings): Eligibility {
     // Only meaningful while unranked mods are being counted at all.
     preferStrippedPp: includeUnrankedMods && settings.unrankedModPp === 'without-the-mod',
     extraMapStatuses: mapStatuses(settings.includeUnrankedMaps),
+    scoring: settings.scoring === 'classic' ? 'classic' : 'lazer',
   };
 }
 
@@ -85,6 +94,18 @@ const RANKED_STATUSES = [Status.RANKED, Status.APPROVED];
  */
 export function ppColumn(e: Eligibility, alias = 's'): string {
   return e.preferStrippedPp ? `COALESCE(${alias}.pp_nomod, ${alias}.pp)` : `${alias}.pp`;
+}
+
+/**
+ * The score column, on whichever of osu!'s scales the profile is reading.
+ *
+ * Rows tracked before both scales were stored have neither, and fall back to the number the
+ * replay itself carried -- stable's own score for a stable play, the standardised one for a
+ * lazer play, which is what this app showed before. Settings' recalculation fills them in.
+ */
+export function scoreColumn(e: Eligibility, alias = 's'): string {
+  const osuScale = e.scoring === 'classic' ? 'score_classic' : 'score_standard';
+  return `COALESCE(${alias}.${osuScale}, ${alias}.total_score)`;
 }
 
 /** The matching star rating, so a stripped-pp play does not show its as-played difficulty. */

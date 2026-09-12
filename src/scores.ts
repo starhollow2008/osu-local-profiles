@@ -127,7 +127,7 @@ export interface HiddenScore {
 export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenScore[] {
   const rows = db
     .prepare(
-      `SELECT s.id, s.mode, s.mods_label, s.accuracy, s.grade, s.pp, s.played_at, s.hidden_at,
+      `SELECT s.id, s.mode, s.mods_label, s.client, s.accuracy, s.grade, s.pp, s.played_at, s.hidden_at,
               b.artist, b.title, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
@@ -143,7 +143,8 @@ export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenScor
     title:
       [r['artist'], r['title']].filter(Boolean).join(' - ') || `beatmap ${String(r['id'])}`,
     version: (r['version'] as string | null) ?? null,
-    modsLabel: r['mods_label'] as string,
+    // Named as osu! names it: a stable play carries Classic (see withClassicMod).
+    modsLabel: classicLabel(r['mods_label'] as string, r['client'] === 'stable'),
     accuracy: r['accuracy'] as number,
     grade: r['grade'] as string,
     pp: (r['pp'] as number | null) ?? null,
@@ -195,6 +196,12 @@ export function deleteRemovedScores(db: Db, profileId: number, ids: number[] | '
 /** Whether a replay with this key was deleted from the profile, and must not come back. */
 export function wasDeleted(db: Db, profileId: number, dedupeKey: string): boolean {
   return db.prepare('SELECT 1 AS hit FROM deleted_scores WHERE profile_id = ? AND dedupe_key = ?').get(profileId, dedupeKey) !== undefined;
+}
+
+/** A stored mods label as osu! shows it for that client. */
+function classicLabel(label: string, stable: boolean): string {
+  if (!stable || /\bCL\b/.test(label)) return label;
+  return label === 'None' ? 'CL' : `${label}CL`;
 }
 
 export function hiddenCount(db: Db, profileId: number): number {

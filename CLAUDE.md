@@ -497,6 +497,33 @@ in both. Two consequences:
 - **An image the app serves must go through `assetUrl()`** so the copy can carry it. The copy
   must never contain install paths or other profiles; share-copy.js strips them.
 
+## osu! keeps two score scales, and so does this
+
+osu!'s own profile page has a **lazer scoring** switch (on by default); off is the uncapped
+classic scale. Both numbers come from osu!'s code, never from arithmetic here: the pp helper
+returns `GetDisplayScore(Standardised)`, `GetDisplayScore(Classic)` and `LegacyTotalScore`,
+and ingest stores them in `scores.score_standard` and `score_classic`. Which one classic
+shows is osu-web's rule (`resources/js/utils/score-helper.ts`): the score stable recorded if
+there is one, else osu!'s classic conversion -- so `score_classic` is
+`legacyTotalScore ?? classicScore`.
+
+`scoreColumn(e)` in `src/calc/eligibility.ts` is the *only* place a query names a score
+column, exactly as `ppColumn` is for pp. Do not write `s.total_score` in a new query: that
+column is the raw number the replay carried, and is only the fallback for rows tracked before
+both scales existed. Switching scales is a settings write and a redraw -- never a recompute --
+and it moves the rows, the cards, Total Score, Ranked Score and the level together.
+
+**osu!stable scores are listed with CL.** osu! adds Classic to every legacy score before
+scoring it, and osu-web shows it, so `withClassicMod` (`src/calc/pp.ts`) adds it when a row or
+a card is built. `mods_json` keeps what the player chose; medals, play time and eligibility
+read that.
+
+**A multi-column UPDATE is generated from one list.** `UPDATE_COLUMNS` in
+`src/tracker/recompute.ts` builds the SET clause, and the values are read back out by name.
+Two columns were once added to that statement without their values: node:sqlite bound what it
+had and left the rest NULL, so `WHERE id = ?` became `WHERE id = NULL` and a full recompute
+wrote nothing while reporting every row updated. Never hand-align a placeholder list there.
+
 ## Favorites are shared by default
 
 `config.sharedFavorites` (default true) puts every profile on `shared_favorite_beatmapsets`;

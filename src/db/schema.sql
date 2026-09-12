@@ -42,6 +42,12 @@ CREATE TABLE IF NOT EXISTS scores (
   accuracy        REAL    NOT NULL,
   max_combo       INTEGER NOT NULL,
   total_score     INTEGER NOT NULL,
+  -- The same play on osu!'s two scales, both from osu!'s own code (see src/calc/official.ts):
+  -- standardised, where a nomod SS is 1,000,000, and classic, the uncapped older scale.
+  -- Null on rows tracked before these existed; those fall back to total_score until a
+  -- recalculation fills them in.
+  score_standard  INTEGER,
+  score_classic   INTEGER,
   passed          INTEGER NOT NULL,
   grade           TEXT    NOT NULL,
   stars           REAL,

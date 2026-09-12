@@ -42,6 +42,8 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'incomplete_plays', column: 'started_at', definition: 'INTEGER' },
   // Added with the pp breakdown and the calculator version. NULL on older rows until the
   // score is recalculated -- opening its details does that for one score, Settings for all.
+  { table: 'scores', column: 'score_standard', definition: 'INTEGER' },
+  { table: 'scores', column: 'score_classic', definition: 'INTEGER' },
   { table: 'scores', column: 'pp_parts', definition: 'TEXT' },
   { table: 'scores', column: 'pp_nomod_parts', definition: 'TEXT' },
   { table: 'scores', column: 'pp_version', definition: 'TEXT' },

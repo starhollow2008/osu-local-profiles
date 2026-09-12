@@ -123,10 +123,10 @@ export async function ingestScore(
         (profile_id, dedupe_key, mode, beatmap_md5, beatmap_id, client, mods_json, mods_label,
          count300, count100, count50, count_geki, count_katu, count_miss,
          statistics_json, max_statistics_json,
-         accuracy, max_combo, total_score, passed, grade, stars, pp, pp_source,
+         accuracy, max_combo, total_score, score_standard, score_classic, passed, grade, stars, pp, pp_source,
          pp_nomod, stars_nomod, beatmap_max_combo, map_status, mods_ranked, mods_countable,
          ranked, played_at, online_score_id, replay_path, pp_parts, pp_nomod_parts, pp_version)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       ctx.profileId, key, mode, score.beatmapMD5, beatmap.beatmapId, score.client,
@@ -134,7 +134,10 @@ export async function ingestScore(
       score.count300, score.count100, score.count50, score.countGeki, score.countKatu, score.countMiss,
       score.extras?.statistics ? JSON.stringify(score.extras.statistics) : null,
       score.extras?.maximum_statistics ? JSON.stringify(score.extras.maximum_statistics) : null,
-      acc, score.maxCombo, score.totalScore, didPass ? 1 : 0, grade,
+      acc, score.maxCombo, score.totalScore,
+      // osu!'s own two scales, so the profile can be read on either without a recalculation.
+      computed?.standardisedScore ?? null, computed?.classicScore ?? null,
+      didPass ? 1 : 0, grade,
       computed?.stars ?? null, computed?.pp ?? null, computed ? 'official' : null,
       stripped?.pp ?? null, stripped?.stars ?? null,
       computed?.maxCombo ?? null,

@@ -51,6 +51,8 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.36 | Import from an osu! profile (Options menu)    | done   |
 | 5.37 | Delete removed scores permanently             | done   |
 | 5.38 | An interactive HTML export, fit to host       | done   |
+| 5.39 | osu!stable scores carry the Classic mod       | done   |
+| 5.40 | Lazer and classic scoring, as osu! switches them | done |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1851,3 +1853,43 @@ and a canary file in its own `data/`, updated itself to the published 1.11.0 wit
 button: back within seconds on 7340 under `Update Canary`, canary intact, no `.rollback-`
 folder, no `data/update/`, running on its own bundled `node.exe`, serving the new me! editor
 and the Import from osu! dialog, with favorites shared by default.
+
+## 5.39 - osu!stable scores carry the Classic mod
+
+**Status:** done -- not yet released.
+
+osu! adds CL to every legacy score before scoring it (`LegacyScoreDecoder`), which is what
+selects classic slider accuracy and legacy miss estimation, and osu-web lists a stable play as
+`DTCL`. The page now says the same: `withClassicMod` in `src/calc/pp.ts` adds it where a row
+or a card is built. `mods_json` still holds exactly what the player chose, and medals, play
+time and eligibility read that -- they must keep reading it.
+
+## 5.40 - Lazer and classic scoring, as osu! switches them
+
+**Status:** done -- not yet released.
+
+osu!'s profile page has a **lazer scoring** switch, on by default; off shows the uncapped
+classic scale. Before this the page mixed the two without saying so: a stable play showed the
+number stable recorded while a lazer play showed the standardised one.
+
+### Decisions
+
+- **Both numbers come from osu!**, never from arithmetic here. The helper returns
+  `GetDisplayScore(Standardised)`, `GetDisplayScore(Classic)` and `LegacyTotalScore` beside the
+  pp. Measured on real replays: a stable DT play is 107,088 as stable recorded it and 545,287
+  standardised; a lazer play is 617,536 standardised and 4,989,978 classic.
+- **Which number classic shows is osu-web's own rule**
+  (`resources/js/utils/score-helper.ts`): the score stable recorded if there is one, else the
+  classic conversion. So `score_classic` stores `legacyTotalScore ?? classicScore`.
+- **Stored per score, switched at query time** (`scoreColumn` in `src/calc/eligibility.ts`),
+  the same shape as the two pp values: switching is a settings write and a redraw, never a
+  recalculation. Rows from before both scales existed fall back to `total_score`.
+- **The level moves with it**, because the level is a function of total score.
+
+### What this cost an hour, and must not happen again
+
+Adding two columns to the recompute UPDATE without their values did not fail: node:sqlite
+bound what it was given and left the rest NULL, so `WHERE id = ?` became `WHERE id = NULL`.
+A full recompute reported 45 rows updated and wrote nothing at all. The statement is now
+generated from one `UPDATE_COLUMNS` list with the values read back by name, so the two cannot
+drift apart again.

@@ -112,7 +112,16 @@ export interface Settings {
    * only where a stable install was found, and dismissed per profile.
    */
   showStableNote: boolean;
+  /**
+   * Which of osu!'s two score scales the profile reads, as osu!'s own profile page offers:
+   * `lazer` (the default, a nomod SS is 1,000,000) or `classic` (uncapped, stable's scale).
+   * Both are stored per score, so switching is instant and never needs a recalculation.
+   */
+  scoring: ScoringScale;
 }
+
+/** osu!'s two score scales, named as osu! names them. */
+export type ScoringScale = 'lazer' | 'classic';
 
 /**
  * A setting is its default plus how to clean whatever arrives from the page. `coerce` is
@@ -201,6 +210,11 @@ const DEFS: Defs = {
   showStableNote: {
     default: true,
     coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
+  },
+  scoring: {
+    // osu!'s own default: lazer scoring is on unless it is turned off.
+    default: 'lazer',
+    coerce: (raw) => (raw === 'classic' ? 'classic' : 'lazer'),
   },
   sectionOrder: {
     default: [],

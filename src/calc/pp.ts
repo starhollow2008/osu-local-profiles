@@ -85,12 +85,33 @@ export function scoreMods(score: ReplayScore): LazerMod[] {
   return score.extras?.mods ?? decodeLegacyMods(score.legacyMods);
 }
 
+/**
+ * osu! scores every stable play with Classic on, and shows it that way.
+ *
+ * `LegacyScoreDecoder` adds CL to a legacy score's mods before the calculators ever see it
+ * -- it is what selects classic slider accuracy and legacy miss estimation -- so osu!'s own
+ * pages list a stable play as `HDDTCL`. This says the same thing on this page, for display
+ * only: `mods_json` keeps what the player actually chose, which is what medals, play time
+ * and eligibility read.
+ */
+export function withClassicMod(mods: LazerMod[], client: 'lazer' | 'stable'): LazerMod[] {
+  if (client !== 'stable' || mods.some((m) => m.acronym === 'CL')) return mods;
+  return [...mods, { acronym: 'CL' }];
+}
+
 export function modsLabel(mods: LazerMod[]): string {
   return mods.length === 0 ? 'None' : mods.map((m) => m.acronym).join('');
 }
 
 export interface PpResult {
   pp: number;
+  /** osu!'s standardised score for this play (a nomod SS is 1,000,000). */
+  standardisedScore: number | null;
+  /**
+   * The play on osu!'s classic scale: what osu!stable recorded when it set the play, and
+   * osu!'s own classic conversion for a play set on lazer.
+   */
+  classicScore: number | null;
   stars: number;
   /** The beatmap's maximum achievable combo. */
   maxCombo: number;
@@ -134,6 +155,9 @@ export async function calculateScorePp(
 
   return {
     pp: result.pp,
+    // osu!'s own two scales for the same play; see PpResult.
+    standardisedScore: result.standardisedScore,
+    classicScore: result.legacyTotalScore ?? result.classicScore,
     stars: result.stars,
     maxCombo: result.maxCombo,
     accuracy: result.accuracy,

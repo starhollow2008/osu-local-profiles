@@ -956,6 +956,54 @@ if (stableNote.hidden.every((h) => h)) {
   check('it can be dismissed two ways, as the counting note is', stableNote.dismissible, 2);
 }
 
+/*
+ * osu!'s own two scoring scales, and the Classic mod on a stable play. Both are parity with
+ * osu!'s own profile page: it lists a stable score as carrying CL, and its options menu has a
+ * "lazer scoring" switch that is on by default.
+ */
+console.log('\nosu! scoring parity');
+const scoring = JSON.parse(await evaluate(`(() => {
+  const rows = [...document.querySelectorAll('#recentPlays .play-detail, #topRanks .play-detail')];
+  // A badge's text is its title and then its acronym, so the acronym is the last text node.
+  const mods = rows.map((r) =>
+    [...r.querySelectorAll('.play-detail__mods .mod')].map((m) => [...m.querySelectorAll('text')].pop()?.textContent.trim() ?? ''));
+  return JSON.stringify({
+    toggle: !!document.getElementById('optLazerScoring'),
+    on: document.getElementById('optLazerScoring')?.getAttribute('aria-checked'),
+    withClassic: mods.filter((m) => m.includes('CL')).length,
+    rows: rows.length,
+  });
+})()`));
+check('the options menu carries a lazer scoring switch', scoring.toggle, true);
+check('and it is on by default, as on osu!', scoring.on, 'true');
+if (scoring.withClassic === 0) {
+  console.log('  SKIP  the Classic mod  (this profile has no osu!stable scores on screen)');
+} else {
+  check('a stable play is listed with Classic, as osu! lists it', scoring.withClassic > 0, true);
+}
+
+/*
+ * Switching scales moves the numbers with no recalculation -- both are stored per score. The
+ * switch is put back afterwards, because this runs against a real profile.
+ */
+const switched = JSON.parse(await evaluate(`(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const totals = () => [...document.querySelectorAll('.profile-stats__value')].map((v) => v.textContent).join('|');
+  const switchEl = document.getElementById('optLazerScoring');
+  const before = totals();
+  switchEl.click();
+  await wait(1500);
+  const after = totals();
+  const checked = switchEl.getAttribute('aria-checked');
+  switchEl.click();
+  await wait(1500);
+  return JSON.stringify({ changed: before !== after, checked, restored: totals() === before, back: switchEl.getAttribute('aria-checked') });
+})()`));
+check('switching to classic scoring changes the score totals', switched.changed, true);
+check('and the switch reads as off while it is', switched.checked, 'false');
+check('switching back restores the totals', switched.restored, true);
+check('and the switch with them', switched.back, 'true');
+
 console.log('\nimport from osu!');
 check('the import dialog is hidden on load', await shown('importModal'), 'none');
 check('Options offers it', await evaluate("!!document.getElementById('optImport')"), true);

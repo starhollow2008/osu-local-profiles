@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- **Two scoring scales, as osu! has them**: Options -> Lazer scoring, on by default. On, a
+  nomod SS is 1,000,000; off, scores read on the uncapped classic scale -- what stable
+  recorded for a stable play, and osu!'s own classic conversion for a lazer one. Both are
+  stored per score, so switching is instant, and it moves the rows, the cards, Total Score,
+  Ranked Score and the level together.
+- **osu!stable scores are listed with the Classic mod**, exactly as osu! lists them.
+- **A note wherever osu!stable is found**, in Recent Plays and Scores: a stable score reaches
+  the page when you leave the results screen, and plays you quit, failed or retried are not
+  counted at all, because stable keeps no record of them. Both were measured on a real stable
+  install; the evidence is in docs/roadmap.md 5.12.
+
 ## 1.11.0
 
 - **me! is written the way osu!'s is**: BBCode, with osu!'s own toolbar (Bold, Italic,

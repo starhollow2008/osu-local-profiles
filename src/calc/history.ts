@@ -2,7 +2,7 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { bonusPp, weightedTotal } from './pp.ts';
 import { levelFromScore } from './level.ts';
-import { countsSql, ppColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
+import { countsSql, ppColumn, scoreColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
 import type { Medal, MedalFamily } from './medals.ts';
 
 /**
@@ -141,7 +141,7 @@ export function buildHistory(
       // `counts` is the same predicate the totals use, selected rather than filtered on:
       // level and monthly play counts are about everything played, pp only about what
       // counts, and both come out of this one chronological pass.
-      `SELECT s.played_at, ${ppColumn(e)} AS pp, s.total_score, s.beatmap_md5,
+      `SELECT s.played_at, ${ppColumn(e)} AS pp, ${scoreColumn(e)} AS total_score, s.beatmap_md5,
               ${countsSql(e)} AS counts,
               b.title, b.artist, b.version
          FROM scores s

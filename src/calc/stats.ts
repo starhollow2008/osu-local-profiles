@@ -1,12 +1,13 @@
 import type { Db } from '../db/index.ts';
 import type { LazerMod, Ruleset } from '../osr.ts';
-import { bonusPp, weightedAccuracy, weightedTotal } from './pp.ts';
+import { bonusPp, weightedAccuracy, weightedTotal, withClassicMod } from './pp.ts';
 import { levelFromScore, type Level } from './level.ts';
 import { playTimeSeconds } from './play-time.ts';
 import type { Grade } from './grade.ts';
 import {
   countsSql,
   ppColumn,
+  scoreColumn,
   starsColumn,
   visibleSql,
   VANILLA,
@@ -104,8 +105,8 @@ const EMPTY_GRADES = (): Record<Grade, number> => ({
  * rather than filtered on so a row can say why it is or is not counting.
  */
 function playColumns(e: Eligibility): string {
-  return `s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.accuracy, s.max_combo,
-        s.total_score, s.grade, s.ranked, s.passed, s.played_at,
+  return `s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.client, s.accuracy, s.max_combo,
+        ${scoreColumn(e)} AS total_score, s.grade, s.ranked, s.passed, s.played_at,
         ${starsColumn(e)} AS stars,
         ${countsSql(e)} AS counts,
         s.pp_nomod IS NOT NULL AS has_nomod,
@@ -125,6 +126,8 @@ function toPlay(r: Row, e: Eligibility): Play {
   } catch {
     /* a malformed row should not take the whole page down */
   }
+  // As osu! lists a stable play: with Classic, which osu! itself scored it with.
+  mods = withClassicMod(mods, r['client'] === 'stable' ? 'stable' : 'lazer');
 
   return {
     kind: 'score',
@@ -191,7 +194,7 @@ export function computeStats(
   const totals = db
     .prepare(
       `SELECT COUNT(*)                                            AS playcount,
-              COALESCE(SUM(total_score), 0)                       AS total_score,
+              COALESCE(SUM(${scoreColumn(e)}), 0)                  AS total_score,
               COALESCE(SUM(count300 + count100 + count50
                            + count_geki + count_katu), 0)         AS total_hits,
               COALESCE(MAX(max_combo), 0)                         AS max_combo
@@ -221,7 +224,7 @@ export function computeStats(
   const ranked = db
     .prepare(
       `SELECT COALESCE(SUM(best), 0) AS ranked_score FROM (
-         SELECT MAX(s.total_score) AS best
+         SELECT MAX(${scoreColumn(e)}) AS best
            FROM scores s
           WHERE s.profile_id = ? AND s.mode = ? AND ${countsSql(e)}
           GROUP BY s.beatmap_md5)`,

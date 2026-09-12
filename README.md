@@ -391,6 +391,30 @@ the account, one per picture, and one per hundred favorites. No login and no API
 osu! is signed in on this machine, its username is offered, read from the client's own config
 file with no network at all.
 
+## Two scoring scales, as osu! has
+
+osu! keeps every play on two scales, and its own profile page switches between them. So does
+this: **Options -> Lazer scoring**, on by default, exactly as osu! defaults it.
+
+- **Lazer scoring** (on) is osu!'s standardised scale, where a nomod SS is 1,000,000.
+- **Classic scoring** (off) is the uncapped older scale. A play set on osu!stable shows the
+  number stable itself recorded; a play set on lazer shows osu!'s own classic conversion of
+  it, which runs into the millions.
+
+Both numbers come from osu!'s own code -- the pp helper returns them beside the pp -- and both
+are stored per score, so switching is instant and never needs a recalculation. It moves every
+score-shaped number together: the score on each row and card, Total Score, Ranked Score, and
+the level, which is a function of total score. A score tracked before this existed shows the
+single number its replay carried, until **Settings** recalculates it.
+
+Which number classic shows is osu!'s own rule: the score stable recorded if there is one,
+otherwise osu!'s classic conversion of a lazer play.
+
+osu!stable plays are also listed **with the Classic mod**, as osu! lists them. osu! adds CL to
+every stable score before scoring it -- it is what selects classic slider accuracy and legacy
+miss estimation -- so a stable play reads `DTCL` here just as it does on osu!. That is display
+only: medals, play time and pp eligibility all read the mods you actually chose.
+
 ## Sharing the profile
 
 **Options -> Share this profile.**
