@@ -1927,3 +1927,11 @@ beside stable and statuses resolve for stable's plays too, with no configuration
 The alternatives, both rejected for now: parsing stable's own `osu!.db` (the format already
 broke a parser written to its documentation -- see 5.12), and asking osu.ppy.sh per beatmap,
 which would be a network request per new score and breaks the offline-first rule.
+
+### 5.39 - 5.41 released as 1.12.0, and the update verified (2026-09-11)
+
+The tag built and attached all three archives (win-x64 87MB, osx-arm64 92MB, linux-x64 100MB).
+A genuine 1.11.0 release, given port 7341, the profile name Update Canary and a canary file in
+its own data/, updated itself to the published 1.12.0 with its own button: back within seconds
+on 7341 under Update Canary, canary intact, no rollback folder, no data/update/, and serving
+both new features (the Lazer scoring switch and the osu!stable note).
