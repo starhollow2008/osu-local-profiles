@@ -16,6 +16,8 @@ import { ingestReplayFile, type IngestedScore } from './ingest.ts';
 import { scanForReplays, type BackfillScan } from './backfill.ts';
 import { countStale, recomputeScores, type RecomputeResult } from './recompute.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
+import { getSettings } from '../settings.ts';
+import { filterNarrows, type FilterCriterion, type TrackingFilter } from '../tracking-filter.ts';
 
 export interface TrackerOptions {
   db: Db;
@@ -32,9 +34,25 @@ export interface TrackerEvents {
   /** A play osu! counted that finished without a score: a quit, a retry, or an HP fail. */
   incomplete: [IngestedIncomplete];
   skip: [{ reason: string }];
+  /**
+   * A play the profile's tracking filter turned away, which is deliberately not a `skip`: a
+   * skip means the play was already here or could not be read, while this one is the user's
+   * own rule doing what it was set up to do -- and it is the only trace of a play that was
+   * never written down, so it names the beatmap and the criterion.
+   */
+  filtered: [FilteredPlay];
   error: [Error];
   /** How far the beatmap index has got; sent while it runs and once when it finishes. */
   indexing: [IndexState];
+}
+
+/** A play that was not tracked because the filter said so. */
+export interface FilteredPlay {
+  title: string;
+  criterion: FilterCriterion;
+  /** Whether it was a finished score or a play that left no replay. */
+  kind: 'score' | 'incomplete';
+  at: number;
 }
 
 /** The beatmap index, as the page shows it. */
@@ -58,6 +76,12 @@ export interface BackfillResult {
   imported: number;
   /** Already tracked, or rejected by the parser. */
   skipped: number;
+  /**
+   * Declined by the play tracking filter. Counted apart from `skipped`, because the answer to
+   * "why did my import bring in three of forty plays" is the filter, and the dialog has to be
+   * able to say so -- the way to import everything is to switch the filter off first.
+   */
+  filtered: number;
   scanned: number;
   since: number;
 }
@@ -77,6 +101,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   /** Serialises ingestion so two replays landing together cannot interleave writes. */
   private queue: Promise<void> = Promise.resolve();
   private added = 0;
+  /** Plays the filter has turned away since the app started, so the dialog can say so. */
+  private filtered = 0;
   private index: IndexState = {
     active: false,
     visible: false,
@@ -105,6 +131,31 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   get scoresAdded(): number {
     return this.added;
+  }
+
+  /**
+   * How many plays the tracking filter has declined since the app started.
+   *
+   * A running count rather than a stored one: these plays leave no row anywhere by design, so
+   * there is nothing to count later. It is what stops a filter that is too tight from looking
+   * like tracking having stopped.
+   */
+  get playsFiltered(): number {
+    return this.filtered;
+  }
+
+  /**
+   * This profile's play tracking filter, read from its settings on every ingest rather than
+   * captured once -- the page can change it while the app runs, and the play landing a second
+   * later must be judged by what is saved now.
+   */
+  private currentFilter(): TrackingFilter {
+    return getSettings(this.opts.db, this.opts.profileId).trackingFilter;
+  }
+
+  /** Whether the filter can actually turn a play away, for the console's start-up line. */
+  get filterNarrowing(): boolean {
+    return filterNarrows(this.currentFilter());
   }
 
   get indexState(): IndexState {
@@ -167,6 +218,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   setTrackingSince(at: number): void {
     this.opts.trackingSince = at;
     this.added = 0;
+    this.filtered = 0;
   }
 
   /**
@@ -180,6 +232,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       this.opts.profileId = profileId;
       this.opts.trackingSince = trackingSince;
       this.added = 0;
+      this.filtered = 0;
     });
   }
 
@@ -236,7 +289,12 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   /** Preview what an import would bring in, without changing anything. */
   previewBackfill(since: number): Promise<BackfillScan> {
     return this.enqueue(() =>
-      scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since),
+      scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since, {
+        resolver: this.opts.resolver,
+        // So the preview counts what the import will actually decline, rather than promising
+        // plays the same filter is about to turn away.
+        filter: this.currentFilter(),
+      }),
     );
   }
 
@@ -258,6 +316,10 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
       let imported = 0;
       let skipped = 0;
+      let filtered = 0;
+      // The filter applies to an import too: this is the same tracking decision made later,
+      // so a profile cannot be filled with what live tracking would have declined.
+      const filter = this.currentFilter();
       for (const candidate of scan.candidates) {
         if (candidate.duplicate) {
           skipped++;
@@ -271,16 +333,20 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           // are plays from before tracking started that the user has asked for by hand.
           trackingSince: since,
           official: this.opts.official,
+          filter,
         });
         if (result.status === 'added') {
           imported++;
           this.added++;
+        } else if (result.status === 'filtered') {
+          filtered++;
+          this.filtered++;
         } else {
           skipped++;
         }
       }
 
-      return { imported, skipped, scanned: scan.scanned, since };
+      return { imported, skipped, filtered, scanned: scan.scanned, since };
     });
   }
 
@@ -371,8 +437,10 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             resolver: this.opts.resolver,
             profileId: this.opts.profileId,
             trackingSince: this.opts.trackingSince,
+            filter: this.currentFilter(),
           });
           if (result.status === 'added') this.emit('incomplete', result.play);
+          else if (result.status === 'filtered') this.reportFiltered(result, 'incomplete');
           // A passed play is not a skip worth reporting: its replay is the event.
           else if (result.reason !== 'passed') this.emit('skip', { reason: result.reason });
         }
@@ -380,6 +448,20 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       .catch((e: unknown) => {
         this.emit('error', e as Error);
       });
+  }
+
+  /** Count a declined play and say so, once, for either kind of play. */
+  private reportFiltered(
+    result: { criterion: FilterCriterion; title: string },
+    kind: 'score' | 'incomplete',
+  ): void {
+    this.filtered++;
+    this.emit('filtered', {
+      title: result.title,
+      criterion: result.criterion,
+      kind,
+      at: Date.now(),
+    });
   }
 
   private handleReplay(file: string): void {
@@ -392,10 +474,13 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           profileId: this.opts.profileId,
           trackingSince: this.opts.trackingSince,
           official: this.opts.official,
+          filter: this.currentFilter(),
         });
         if (result.status === 'added') {
           this.added++;
           this.emit('score', result.score);
+        } else if (result.status === 'filtered') {
+          this.reportFiltered(result, 'score');
         } else {
           this.emit('skip', { reason: result.reason });
         }

@@ -1,6 +1,11 @@
 import type { Db } from './db/index.ts';
 import { UNRANKED_MAP_STATUSES, type UnrankedMapStatus } from './clients/beatmaps.ts';
 import type { IncompleteDisplay } from './calc/stats.ts';
+import {
+  coerceTrackingFilter,
+  defaultTrackingFilter,
+  type TrackingFilter,
+} from './tracking-filter.ts';
 
 /**
  * Per-profile settings, edited from the page.
@@ -118,6 +123,13 @@ export interface Settings {
    * Both are stored per score, so switching is instant and never needs a recalculation.
    */
   scoring: ScoringScale;
+  /**
+   * Which plays are tracked at all -- beatmap criteria and mods, from Options.
+   *
+   * The one setting here that is not reversible, because it decides whether a play is
+   * *written*: see src/tracking-filter.ts. Off by default, and wide open when switched on.
+   */
+  trackingFilter: TrackingFilter;
 }
 
 /** osu!'s two score scales, named as osu! names them. */
@@ -215,6 +227,13 @@ const DEFS: Defs = {
     // osu!'s own default: lazer scoring is on unless it is turned off.
     default: 'lazer',
     coerce: (raw) => (raw === 'classic' ? 'classic' : 'lazer'),
+  },
+  trackingFilter: {
+    // A whole object rather than a scalar, which the one-row-per-key store already handles:
+    // the value is JSON either way. Its own module owns the shape and the cleaning, because
+    // the page and the tracker both have to agree on it exactly.
+    default: defaultTrackingFilter(),
+    coerce: coerceTrackingFilter,
   },
   sectionOrder: {
     default: [],

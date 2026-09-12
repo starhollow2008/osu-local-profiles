@@ -13,6 +13,14 @@ import {
 } from '../calc/pp.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { accuracy, gradeOf, passed } from '../calc/grade.ts';
+import {
+  beatmapFilterFacts,
+  defaultTrackingFilter,
+  filterRejects,
+  playFacts,
+  type FilterCriterion,
+  type TrackingFilter,
+} from '../tracking-filter.ts';
 
 export interface IngestContext {
   db: Db;
@@ -22,6 +30,13 @@ export interface IngestContext {
   trackingSince: number;
   /** osu!'s own pp calculator. When null, scores are stored with no pp rather than a guess. */
   official: OfficialCalculator | null;
+  /**
+   * Which plays this profile tracks at all (src/tracking-filter.ts). Omitted means no
+   * filtering, which is the safe default for a caller that is re-ingesting *stored* scores --
+   * `scripts/reingest.mjs` rebuilds every row it already has, and a filter applied there
+   * would delete scores rather than decline new ones.
+   */
+  filter?: TrackingFilter;
 }
 
 export interface IngestedScore {
@@ -46,7 +61,23 @@ export interface IngestedScore {
 
 export type IngestOutcome =
   | { status: 'added'; score: IngestedScore }
-  | { status: 'skipped'; reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed' };
+  | { status: 'skipped'; reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed' }
+  /**
+   * Turned away by the profile's play tracking filter, which is not the same event as a skip:
+   * the others are "this is already here" or "this is not readable", while this one is a
+   * decision the user made. It carries what the play was and which criterion rejected it, so
+   * the console and the page can say so rather than the play vanishing silently.
+   */
+  | { status: 'filtered'; criterion: FilterCriterion; title: string };
+
+/**
+ * What to call the play in a message. Hoisted out of the result because a play the filter
+ * turns away needs naming too, and there is nothing else to identify it by.
+ */
+function describe(beatmap: { artist: string | null; title: string | null; version: string | null }, md5: string): string {
+  const title = [beatmap.artist, beatmap.title].filter(Boolean).join(' - ') || md5.slice(0, 12);
+  return beatmap.version ? `${title} [${beatmap.version}]` : title;
+}
 
 /** A replay identifies itself; fall back to map+time for stable replays with no hash. */
 export function dedupeKey(score: ReplayScore): string {
@@ -93,6 +124,24 @@ export async function ingestScore(
   // What osu! itself would say. Kept as `ranked` so nothing downstream shifts meaning.
   const eligible = mapRanked && modsRanked;
 
+  const named = describe(beatmap, score.beatmapMD5);
+
+  /*
+   * The play tracking filter, in two halves, because the star rating is the one criterion
+   * that costs a round trip to osu!'s calculator: everything else is decided first, so a play
+   * rejected on its mods or its length is never priced at all.
+   *
+   * Nothing is looked up while the filter is off, which is the default -- `beatmapFilterFacts`
+   * reads the beatmap file the first time it sees each map.
+   */
+  const filter = ctx.filter ?? defaultTrackingFilter();
+  let facts = null;
+  if (filter.enabled) {
+    facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
+    const rejected = filterRejects(filter, playFacts(facts, mode, mods));
+    if (rejected) return { status: 'filtered', criterion: rejected, title: named };
+  }
+
   /*
    * pp is calculated for *every* score we can calculate one for, not only the ranked ones.
    *
@@ -104,6 +153,13 @@ export async function ingestScore(
   const computed = beatmap.osuPath
     ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official)
     : null;
+
+  // The filter's second half: the star rating as played, now that osu! has produced one. A
+  // play whose rating could not be calculated is not rejected on it -- see filterRejects.
+  if (facts !== null && computed !== null) {
+    const rejected = filterRejects(filter, { stars: computed.stars });
+    if (rejected) return { status: 'filtered', criterion: rejected, title: named };
+  }
 
   /*
    * A second pass with Relax/Autopilot removed, which is what "count it as if the mod were
@@ -154,14 +210,12 @@ export async function ingestScore(
 
   const id = (ctx.db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;
 
-  const title = [beatmap.artist, beatmap.title].filter(Boolean).join(' - ') || score.beatmapMD5.slice(0, 12);
-
   return {
     status: 'added',
     score: {
       id,
       mode,
-      title: beatmap.version ? `${title} [${beatmap.version}]` : title,
+      title: named,
       modsLabel: label,
       accuracy: acc,
       grade,

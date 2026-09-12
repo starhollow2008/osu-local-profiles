@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+- **Play tracking filter** (Options): choose which plays this profile records at all, by
+  keyword, mode, star rating, mods, category, length and the dates a beatmap was added,
+  submitted and ranked. Off by default, and switching it on changes nothing until you narrow
+  something -- every criterion starts wide open.
+  - **Mods have three states**, not a checkbox: a mod may be used, must be used, or must not
+    be used. Every mod in all four modes is there, and the dialog prints what the current
+    selection means in a sentence, so a grid of sixty-seven badges never has to be read as a
+    rule. There is a nomod badge too, for "only nomod plays" or "never a nomod play".
+  - **A play the filter turns away is not recorded at all** -- no score, no pp, no play
+    count -- and cannot be brought back, so the app says so every time: a line in the console,
+    a message on the page naming the criterion, a count in the Options menu, and a mark on the
+    menu entry while a filter is on.
+  - **Import past plays applies it too**, and says how many it would leave out. Switch the
+    filter off first to bring in everything.
+  - Plays you quit, failed or retried are matched on the seven criteria that can judge them:
+    osu!lazer records no mods and no star rating for a play it discards.
+  - With osu!stable and no osu!lazer, the category and the two submission dates have no source
+    on the machine, and those three sections say so.
+
 ## 1.12.0
 
 - **Two scoring scales, as osu! has them**: Options -> Lazer scoring, on by default. On, a

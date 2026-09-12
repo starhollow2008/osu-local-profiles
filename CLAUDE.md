@@ -208,6 +208,47 @@ asking: a count that silently undercounts retries is worse than a stated gap, wh
 same reasoning as having no fallback pp calculator. `ingestIncompletePlay` stays
 client-agnostic in case a future stable ever writes a real record.
 
+## The play tracking filter is the one setting with no second chance
+
+Every other setting decides how a stored play is *read*. `src/tracking-filter.ts` decides
+whether it is **written**, so a play it declines leaves no row anywhere and cannot be
+recovered. Three things follow, and none is optional:
+
+- **It is off by default, and switching it on narrows nothing.** Every criterion starts at
+  its widest, so it can only be made stricter deliberately. `filterNarrows` -- the one
+  definition of "this filter is doing something", which `/api/state` sends to the page for the
+  mark on the Options menu -- is therefore separate from `enabled`.
+- **A fact the filter does not have never rejects a play.** A quit, an HP fail or a retry has
+  no mod list and no star rating recorded anywhere, and those two criteria simply do not judge
+  it while the other seven do. Dropping what cannot be fully judged would make the play count
+  disagree with osu!'s the moment the filter came on.
+- **A declined play is announced** -- a console line, an SSE `filtered` event, a toast naming
+  the criterion, and a running count in `/api/state`. It is the only trace there is; silence
+  would be indistinguishable from tracking having stopped.
+
+The nine criteria are matched against the replay, the `.osu` and `online.db`, so the same
+filter answers the same way at live ingest and during Import past plays -- which applies it
+too, and reports how many it declined. `scripts/reingest.mjs` must **not** pass one:
+`IngestContext.filter` is optional precisely so that re-ingesting *stored* scores cannot
+delete them.
+
+**`online.db` has a second table, and it is what makes two of the dates possible.**
+`osu_beatmapsets(beatmapset_id, submit_date, approved_date, approved)` -- 60,492 rows against
+`osu_beatmaps`' 234,457, with `approved` values of 1, 2 and 4 only, so it holds the **ranked,
+approved and loved sets alone**. Every other set has no row and therefore no date, which is why
+both date criteria carry an *include beatmaps with no date on record* box that is on by
+default. Its earliest `submit_date` is `2007-10-06`, which is where the sliders' floor comes
+from.
+
+**Date added is the file's creation time, never its mtime.** Measured here: beatmaps lazer
+imported from stable's `Songs` keep mtimes from 2019-2021 and were *created* 2025-11-06, the
+day they were imported. mtime is the beatmap's own age, not when it arrived. Where a
+filesystem reports no creation time, mtime stands in.
+
+Star rating and length are judged **as played**, mods included, and the three beatmap dates
+and the length are filled in lazily on `beatmaps` with `length_ms`'s convention: NULL means
+never looked up, 0 means looked up and unknowable.
+
 ## Total Play Time follows osu!'s server rule
 
 osu-queue-score-statistics' `PlayValidityHelper.GetPlayLength` adds, per play,
@@ -611,6 +652,8 @@ src/calc/              pp (official helper only), level, grades, aggregation
 src/calc/official.ts   JSON-lines client for the .NET calculator
 src/calc/eligibility.ts  the single definition of "this score counts toward pp"
 src/settings.ts        per-profile settings, stored one row per key
+src/tracking-filter.ts   which plays are tracked at all; applied at ingest, never after
+web/js/tracking-filter.js  the Play tracking filter dialog (mod grid, ranges, readouts)
 src/tracker/recompute.ts  recalculate stored scores in place from their replays
 src/scores.ts          pin, order pins, remove a score (a hide); View Details data, replay download
 web/js/score-card.js   View Details: osu!'s score page as a card (dial, tower, stats)

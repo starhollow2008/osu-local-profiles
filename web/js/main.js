@@ -36,6 +36,13 @@ import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { renderMedals } from './medals.js';
 import { setPopupCards } from './beatmaps-popup.js';
+import {
+  closeTrackingFilter,
+  openTrackingFilter,
+  resetTrackingFilter,
+  saveTrackingFilter,
+  trackingFilterOpen,
+} from './tracking-filter.js';
 import { syncPlayers } from './audio-player.js';
 import {
   activityList,
@@ -200,6 +207,9 @@ let staleScores = 0;
 /** Which osu! release prices scores, and how many of this profile's another one priced. */
 let ppCalculator = { version: null, outdated: 0 };
 let hiddenScoreCount = 0;
+/** Whether the play tracking filter can turn a play away, and how many it has. */
+let filterNarrowing = false;
+let playsFiltered = 0;
 /** Which clients were found, so the page can say how the one being watched behaves. */
 let installKinds = [];
 let sharing = { canScreenshot: false };
@@ -587,9 +597,17 @@ async function loadState() {
   installKinds = s.installs.map((i) => i.kind);
   renderStableNote();
   const kinds = installKinds.join(' + ') || 'no client found';
-  $('optInfo').textContent = `${s.profile.name} - watching ${kinds} - ${s.scoresThisSession} score${
-    s.scoresThisSession === 1 ? '' : 's'
-  } this session`;
+  $('optInfo').textContent =
+    `${s.profile.name} - watching ${kinds} - ${s.scoresThisSession} score${
+      s.scoresThisSession === 1 ? '' : 's'
+    } this session` +
+    // Only when there are any: a filter that is declining plays is the explanation for a score
+    // that never appeared, and it should not have to be gone looking for.
+    (playsFiltered > 0 ? ` - ${playsFiltered} filtered out` : '');
+
+  filterNarrowing = Boolean(s.filterNarrowing);
+  playsFiltered = s.playsFiltered ?? 0;
+  renderFilterMenu();
 
   setTracking(s.tracking);
   renderIndexing(s.indexing);
@@ -696,6 +714,7 @@ document.addEventListener('keydown', (e) => {
   setMenuOpen(false);
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
+  if (trackingFilterOpen()) closeTrackingFilter();
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
   if (!$('playMenu').hidden) closePlayMenu();
@@ -2424,10 +2443,29 @@ $('backfillCheck').onclick = async () => {
   try {
     const d = await postJson('/api/backfill/preview', { since }, 'preview failed');
 
+    /*
+     * The tracking filter applies to an import too, so the preview has to account for it: the
+     * answer to "why would only three of forty come in" is the filter, and switching it off is
+     * the way to import everything.
+     */
+    const filtered =
+      d.filtered > 0
+        ? ` ${fmt(d.filtered)} would be left out by the play tracking filter.`
+        : '';
+    // The star rating is the one criterion the preview does not check -- it costs a call to
+    // osu!'s calculator per play -- so when it is set, the count is an upper bound and says so.
+    const unchecked = d.starsUnchecked
+      ? ' The filter’s star rating is checked as each play is imported, so a few more may be left out.'
+      : '';
+
     if (d.importable === 0) {
       resetBackfillPreview(
-        d.duplicates > 0
-          ? `Nothing new. All ${fmt(d.duplicates)} play${d.duplicates === 1 ? '' : 's'} found since then are already tracked.`
+        d.duplicates > 0 || d.filtered > 0
+          ? `Nothing to import.${escapeHtml(
+              d.duplicates > 0
+                ? ` ${fmt(d.duplicates)} play${d.duplicates === 1 ? '' : 's'} found since then are already tracked.`
+                : '',
+            )}${escapeHtml(filtered)}`
           : `No plays found since then (${fmt(d.scanned)} files checked).`,
       );
       return;
@@ -2439,7 +2477,7 @@ $('backfillCheck').onclick = async () => {
         : '';
     const dupes = d.duplicates > 0 ? ` ${fmt(d.duplicates)} already tracked and will be left alone.` : '';
     $('backfillSummary').innerHTML =
-      `<b>${fmt(d.importable)} play${d.importable === 1 ? '' : 's'}</b> would be imported.${escapeHtml(span)}${escapeHtml(dupes)}`;
+      `<b>${fmt(d.importable)} play${d.importable === 1 ? '' : 's'}</b> would be imported.${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(unchecked)}`;
     $('backfillConfirm').disabled = false;
     $('backfillConfirm').textContent = `Import ${fmt(d.importable)}`;
   } catch (err) {
@@ -2456,7 +2494,10 @@ $('backfillConfirm').onclick = async () => {
   $('backfillConfirm').textContent = 'Importing...';
   try {
     const d = await postJson('/api/backfill', { since, confirm: true }, 'import failed');
-    toast(`Imported ${fmt(d.imported)} past play${d.imported === 1 ? '' : 's'}`);
+    toast(
+      `Imported ${fmt(d.imported)} past play${d.imported === 1 ? '' : 's'}` +
+        (d.filtered > 0 ? ` - ${fmt(d.filtered)} left out by the filter` : ''),
+    );
     closeBackfill();
     await Promise.all([loadProfile(), loadState()]);
   } catch (err) {
@@ -2464,6 +2505,46 @@ $('backfillConfirm').onclick = async () => {
   } finally {
     $('backfillCheck').disabled = false;
   }
+};
+
+/* ---------------------------------------------------- play tracking filter */
+
+/*
+ * Options -> Play tracking filter. The dialog itself lives in web/js/tracking-filter.js; this
+ * is only the wiring, and the marker on the menu entry.
+ *
+ * The marker matters more than it looks: the filter is the one setting whose effect cannot be
+ * undone later, so a profile that has one on must be able to see that from the menu rather
+ * than by wondering where a play went. `filterNarrowing` comes from the server, which asks
+ * src/tracking-filter.ts -- the page does not decide that for itself.
+ */
+function renderFilterMenu() {
+  const button = $('optFilter');
+  button.classList.toggle('menu__marked', Boolean(filterNarrowing));
+  button.title = filterNarrowing
+    ? 'A filter is on: some plays are not being recorded'
+    : 'Choose which plays are recorded at all';
+}
+
+$('optFilter').onclick = () => {
+  setMenuOpen(false);
+  openTrackingFilter({
+    filter: settings.trackingFilter,
+    profileName: profile?.name ?? 'this profile',
+    hasLazer: installKinds.includes('lazer'),
+    playsFiltered,
+    onSaved: async (saved) => {
+      settings = saved;
+      await loadState();
+    },
+  });
+};
+
+$('filterCancel').onclick = closeTrackingFilter;
+$('filterReset').onclick = resetTrackingFilter;
+$('filterSave').onclick = () => void saveTrackingFilter();
+$('filterModal').onclick = (e) => {
+  if (e.target === $('filterModal')) closeTrackingFilter();
 };
 
 /* --------------------------------------------------------- reset profile */
@@ -2537,6 +2618,16 @@ es.addEventListener('incomplete', (e) => {
   const play = JSON.parse(e.data);
   toast(`Didn't finish - ${play.title}`);
   if (play.mode === mode) loadProfile();
+  loadState();
+});
+/*
+ * A play the tracking filter declined. Announced, because nothing else will ever mention it:
+ * no row is written, so a silent drop is indistinguishable from tracking having stopped. The
+ * criterion is named, so a filter set one notch too tight says which notch.
+ */
+es.addEventListener('filtered', (e) => {
+  const play = JSON.parse(e.data);
+  toast(`Not tracked (${play.criterion}) - ${play.title}`);
   loadState();
 });
 es.addEventListener('tracking', (e) => setTracking(JSON.parse(e.data).tracking));

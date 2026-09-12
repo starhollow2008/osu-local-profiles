@@ -404,6 +404,65 @@ the account, one per picture, and one per hundred favorites. No login and no API
 osu! is signed in on this machine, its username is offered, read from the client's own config
 file with no network at all.
 
+## Play tracking filter
+
+**Options -> Play tracking filter.** Which plays this profile records *at all*.
+
+It is **off by default**, and switching it on changes nothing on its own: every criterion
+starts wide open, so the filter only ever narrows on purpose. There are nine:
+
+| | |
+|---|---|
+| **Keywords** | Matched against the song title, the artist, the difficulty name and the mapper. Separate several with commas -- a play counts if any one appears. |
+| **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
+| **Difficulty** | The star rating **as played**, mods included, so a 5.50&#9733; beatmap under Double Time is judged at its Double Time rating. |
+| **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
+| **Categories** | Ranked, Qualified, Loved, Pending, Work in progress, Graveyarded, Never submitted. |
+| **Length** | How long the beatmap runs at the speed it was played. |
+| **Date added** | When the beatmap arrived on this machine. |
+| **Date submitted** | When it was first uploaded to osu!. |
+| **Date ranked** | When it was ranked, approved or loved. |
+
+**A play the filter turns away is not recorded at all** -- no score, no pp, no play count --
+and it cannot be brought back afterwards. So the app says so every time: a line in the
+console, a message on the page naming the criterion that declined it, a count in the Options
+menu, and a mark on the menu entry for as long as a filter is narrowing anything. **Import
+past plays applies the filter too**, and says how many it would leave out; switch it off first
+to bring in everything.
+
+### The mods section
+
+A mod is in one of three states, and a click moves it to the next:
+
+- **may be used** (the starting state) -- the mod has no say in whether the play is tracked.
+- **must be used** -- every play tracked has to have it on.
+- **must not be used** -- no play with it on is tracked.
+
+So Hidden left alone with everything else marked out tracks nomod and HD plays; Double Time
+set to *must* with Hidden left alone tracks DT and DTHD. The **nomod** badge says what the
+grid cannot: *must* means only plays with no mods at all, *must not* means never a nomod play.
+Under the grid is a sentence saying what the current selection means, because sixty-seven
+badges cannot be read as a rule.
+
+Only *which* mods were on is compared, never how they were configured, and an osu!stable play
+is matched on what you actually chose -- osu! adds Classic to stable scores afterwards, which
+is not a choice anyone made. Autoplay and Cinema are not listed at all: nothing in this app
+can ever count them.
+
+### What it cannot judge
+
+- **Plays you quit, failed or retried** are matched on the other seven criteria. osu!lazer
+  records no mods and no star rating for a play it discards, and those two simply do not judge
+  it -- the alternative, dropping what cannot be fully judged, would make this profile's play
+  count disagree with osu!'s the moment the filter came on.
+- **With osu!stable and no osu!lazer**, a beatmap's category and both of its submission dates
+  have no source on the machine. Those three sections say so and stay out of the way; the
+  other six work normally.
+- **Beatmaps osu! has never ranked, approved or loved have no submission or ranked date at
+  all** -- osu! only records them for those three. Both date criteria therefore carry an
+  *include beatmaps with no date on record* box, on by default, so narrowing a year does not
+  silently stop tracking every graveyarded map.
+
 ## Two scoring scales, as osu! has
 
 osu! keeps every play on two scales, and its own profile page switches between them. So does

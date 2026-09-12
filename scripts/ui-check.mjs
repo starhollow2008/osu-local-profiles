@@ -213,6 +213,146 @@ await evaluate(
 );
 check('Escape closes the import dialog', await shown('backfillModal'), 'none');
 
+/*
+ * The play tracking filter. Everything here is generated, three-state and long enough to
+ * scroll, so nothing about it is visible to a unit test: whether the controls are really inert
+ * while the switch is off, whether a chip's state shows, and whether the sentence under the
+ * grid says what the grid means.
+ */
+console.log('\nplay tracking filter');
+/*
+ * These assert the dialog's *starting* state, which only means anything on a profile that has
+ * not set a filter. Rather than overwrite a real one to make the check pass -- the filter is
+ * the one setting whose effect cannot be undone -- a profile that has one is skipped, the same
+ * way the favourites checks are.
+ */
+const filterInUse = await evaluate(
+  "(async () => (await (await fetch('/api/state')).json()).settings.trackingFilter.enabled)()",
+);
+const unlessSet = (value) => (filterInUse ? SKIP : value);
+
+check('the filter dialog is hidden on load', await shown('filterModal'), 'none');
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optFilter').click()");
+check('the filter dialog opens', await shown('filterModal'), 'grid');
+check('options menu closed behind it', await shown('optionsMenu'), 'none');
+check(
+  'it opens switched off',
+  unlessSet(await evaluate("document.getElementById('filterEnabled').checked")),
+  false,
+);
+check(
+  'every criterion is inert while it is off',
+  unlessSet(
+    await evaluate(
+      "[...document.querySelectorAll('#filterBody input, #filterBody button')].every((c) => c.disabled)",
+    ),
+  ),
+  true,
+);
+check(
+  'and the nine criteria are all there',
+  await evaluate("document.querySelectorAll('#filterBody .tfilter-section').length"),
+  9,
+);
+// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod.
+check(
+  'every mod in the game has a chip',
+  await evaluate("document.querySelectorAll('#tf-mods .mod-chip').length"),
+  67,
+);
+check(
+  'the readout starts by saying nothing is excluded',
+  unlessSet(await evaluate("document.getElementById('tf-mods-readout').textContent.trim()")),
+  'Every mod combination counts.',
+);
+
+console.log('\nafter switching the filter on');
+await evaluate(`(() => {
+  const box = document.getElementById('filterEnabled');
+  box.checked = true;
+  box.dispatchEvent(new Event('change', { bubbles: true }));
+})()`);
+check(
+  'the criteria become editable',
+  await evaluate(
+    "[...document.querySelectorAll('#filterBody input, #filterBody button')].some((c) => !c.disabled)",
+  ),
+  true,
+);
+const chips = await evaluate(`(() => {
+  // From a known state, so the sentence below is this click's doing and not the profile's.
+  document.getElementById('tf-mods-all').click();
+  const chip = document.querySelector('#tf-mods .mod-chip[data-mod="HD"]');
+  const out = {};
+  chip.click();
+  out.required = chip.classList.contains('mod-chip--required');
+  out.readoutRequired = document.getElementById('tf-mods-readout').textContent.trim();
+  chip.click();
+  out.excluded = chip.classList.contains('mod-chip--excluded');
+  chip.click();
+  out.backToPlain =
+    !chip.classList.contains('mod-chip--required') && !chip.classList.contains('mod-chip--excluded');
+  document.getElementById('tf-mods-none').click();
+  out.readoutNone = document.getElementById('tf-mods-readout').textContent.trim();
+  document.getElementById('tf-mods-all').click();
+  out.readoutAll = document.getElementById('tf-mods-readout').textContent.trim();
+  return out;
+})()`);
+check('one click on a mod requires it', chips.required, true);
+check('and the readout says so', chips.readoutRequired, 'Tracks plays that use HD.');
+check('a second click excludes it', chips.excluded, true);
+check('a third click lets it be either', chips.backToPlain, true);
+check('"Allow none" means no mods at all', chips.readoutNone, 'Tracks plays with no mods at all.');
+check('"Allow every mod" clears the section', chips.readoutAll, 'Every mod combination counts.');
+
+const range = await evaluate(`(() => {
+  const root = document.getElementById('tf-stars');
+  const max = root.querySelector('[data-bound="max"]');
+  max.value = '69';
+  max.dispatchEvent(new Event('input', { bubbles: true }));
+  const fields = root.nextElementSibling;
+  const fill = root.querySelector('[data-fill]');
+  return {
+    typed: fields.querySelector('[data-field="max"]').value,
+    // The filled span has to stop where the handle is, or the control lies about its range.
+    fill: getComputedStyle(fill).right !== '0px',
+  };
+})()`);
+check('dragging the star ceiling in sets the text field', range.typed, '6.90');
+check('and the filled track follows it', range.fill, true);
+check(
+  'a filter that can match nothing says so',
+  await evaluate(`(() => {
+    for (const box of document.querySelectorAll('#filterBody [data-mode]')) {
+      box.checked = false;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    const warning = document.getElementById('filterImpossible');
+    return getComputedStyle(warning).display !== 'none' && warning.textContent.includes('No mode');
+  })()`),
+  true,
+);
+
+console.log('\nleaving the filter dialog');
+await evaluate("document.getElementById('filterCancel').click()");
+check('Cancel closes it', await shown('filterModal'), 'none');
+check(
+  'and nothing it changed was saved',
+  unlessSet(
+    await evaluate(
+      "(async () => (await (await fetch('/api/state')).json()).settings.trackingFilter.enabled)()",
+    ),
+  ),
+  false,
+);
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optFilter').click()");
+await evaluate(
+  "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
+);
+check('Escape closes it', await shown('filterModal'), 'none');
+
 console.log('\nfavorite beatmaps');
 check(
   'the Beatmaps section has its Favorite Beatmaps heading',

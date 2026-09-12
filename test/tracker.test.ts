@@ -11,6 +11,7 @@ import { parseReplay, looksLikeReplay } from '../src/osr.ts';
 import { modsAwardPp, scoreMods } from '../src/calc/pp.ts';
 import { computeStats } from '../src/calc/stats.ts';
 import { OfficialCalculator } from '../src/calc/official.ts';
+import { updateSettings } from '../src/settings.ts';
 
 const REAL_DB = path.join(process.cwd(), 'data', 'profiles.db');
 
@@ -140,6 +141,92 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
   official?.dispose();
   db.close();
   fs.rmSync(tmp, { recursive: true, force: true });
+});
+
+/*
+ * The play tracking filter, end to end, on a real replay through the real watcher.
+ *
+ * The thing worth proving here is the *absence*: a declined play must leave nothing at all
+ * behind -- no score row, no pp, no play count -- because that is the whole promise of the
+ * feature and the one thing a unit test on the matching rule cannot show. The filter is read
+ * from the profile's settings on every ingest, so it is written there rather than handed to
+ * the tracker, which is also how the page changes it while the app runs.
+ */
+test('a play the filter declines is not recorded at all', { timeout: 120_000 }, async (t) => {
+  const installs = detectInstalls();
+  if (installs.length === 0) return t.skip('no osu! installation on this machine');
+  if (!fs.existsSync(REAL_DB)) return t.skip('run the app once to build the beatmap index');
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-filter-e2e-'));
+  const watchDir = path.join(tmp, 'watch');
+  fs.mkdirSync(watchDir);
+
+  const db = openDb(path.join(tmp, 'test.db'));
+  if (seedIndex(db) === 0) return t.skip('beatmap index is empty');
+  const profileId = getOrCreateProfile(db, 'Test Profile');
+  const resolver = new BeatmapResolver(db, installs);
+  const source = await findScorableReplay(db, resolver);
+  if (!source) return t.skip('no replay available to drop through the watcher');
+
+  // A keyword no beatmap on this machine can contain, so the rejection is unambiguous.
+  updateSettings(db, profileId, {
+    trackingFilter: { enabled: true, keywords: 'zzz-not-a-real-beatmap-zzz' },
+  });
+
+  const tracker = new Tracker({
+    db,
+    resolver,
+    installs: [{ ...installs[0]!, replayDir: watchDir }],
+    profileId,
+    trackingSince: 0,
+    official: null,
+  });
+
+  const declined = new Promise<{ title: string; criterion: string; kind: string }>(
+    (resolve, reject) => {
+      tracker.on('filtered', resolve);
+      tracker.on('score', () => reject(new Error('the filter let a play through')));
+      tracker.on('error', reject);
+      setTimeout(() => reject(new Error('nothing reported within 30s')), 30_000).unref();
+    },
+  );
+
+  try {
+    tracker.start();
+    // The watch has to be up before the file lands; see the fs.watch notes in CLAUDE.md.
+    await new Promise((r) => setTimeout(r, 300));
+    fs.copyFileSync(source, path.join(watchDir, 'incoming-replay'));
+
+    const play = await declined;
+    assert.equal(play.criterion, 'keywords');
+    assert.equal(play.kind, 'score');
+    assert.ok(play.title.length > 0, 'a declined play still has to say which map it was');
+
+    assert.equal(
+      (db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n,
+      0,
+      'a filtered play must leave no score row',
+    );
+    assert.equal(computeStats(db, profileId, 0).playcount, 0);
+    assert.equal(tracker.playsFiltered, 1);
+
+    /*
+     * And the same replay with the filter switched off is tracked, which is what makes the
+     * first half a statement about the filter rather than about this particular replay.
+     */
+    updateSettings(db, profileId, { trackingFilter: { enabled: false } });
+    const tracked = new Promise<{ title: string }>((resolve, reject) => {
+      tracker.on('score', resolve);
+      setTimeout(() => reject(new Error('no score reported within 30s')), 30_000).unref();
+    });
+    fs.copyFileSync(source, path.join(watchDir, 'incoming-replay-again'));
+    assert.ok((await tracked).title.length > 0);
+    assert.equal(computeStats(db, profileId, 0).playcount, 1);
+  } finally {
+    tracker.stop();
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 /*

@@ -48,6 +48,7 @@ import {
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { appVersion } from '../config.ts';
 import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
+import { filterNarrows } from '../tracking-filter.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
@@ -180,6 +181,12 @@ export function startServer(opts: ServerOptions): http.Server {
   // A play with no score still moves the play count and the charts, so the page has to be
   // told about it -- it just has nothing to put in a toast beyond which map it was.
   opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
+  /*
+   * A play the tracking filter declined. Broadcast because it is the only trace of it: nothing
+   * is written, so a page that said nothing would leave "why was that play not counted?"
+   * unanswerable -- and that question is exactly what a too-tight filter produces.
+   */
+  opts.tracker.on('filtered', (play) => broadcast('filtered', play));
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
@@ -311,6 +318,12 @@ export function startServer(opts: ServerOptions): http.Server {
         profiles: listProfiles(opts.db),
         tracking: opts.tracker.isTracking,
         scoresThisSession: opts.tracker.scoresAdded,
+        // Plays the tracking filter has declined since the app started. They leave no row
+        // anywhere, so this running count is the only record there is.
+        playsFiltered: opts.tracker.playsFiltered,
+        // Whether that filter can actually turn a play away, decided by src/tracking-filter.ts
+        // rather than by the page -- there is one definition of "this filter narrows something".
+        filterNarrowing: filterNarrows(settings.trackingFilter),
         // A page opened mid-index shows where it has got to, not only what arrives next.
         indexing: opts.tracker.indexState,
         /*
@@ -1107,6 +1120,8 @@ export function startServer(opts: ServerOptions): http.Server {
                 scanned: scan.scanned,
                 importable: scan.importable,
                 duplicates: scan.duplicates,
+                filtered: scan.filtered,
+                starsUnchecked: scan.starsUnchecked,
                 earliest: scan.earliest,
                 latest: scan.latest,
               });
@@ -1116,7 +1131,8 @@ export function startServer(opts: ServerOptions): http.Server {
             broadcast('backfill', result);
             console.log(
               `\n  imported ${result.imported} past play(s) from ` +
-                `${new Date(since).toLocaleString()}\n`,
+                `${new Date(since).toLocaleString()}` +
+                `${result.filtered > 0 ? ` (${result.filtered} declined by the tracking filter)` : ''}\n`,
             );
             return json(res, result);
           } catch (e) {

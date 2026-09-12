@@ -1375,6 +1375,24 @@
   background-color: #fff;
 }
 
+/*
+ * A menu item whose setting is currently doing something. Only the play tracking filter uses
+ * it, and it earns the mark: it is the one setting whose effect cannot be undone afterwards,
+ * so "a filter is on" has to be visible without opening the dialog to check.
+ */
+.menu button.menu__marked::after {
+  content: "on";
+  float: right;
+  margin-left: 12px;
+  padding: 0 6px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  line-height: 16px;
+}
+
 .menu .sep {
   height: 1px;
   background-color: hsl(var(--hsl-b3));
@@ -4651,4 +4669,304 @@ s.bbcode-editor__glyph {
 
 .static-copy .profile-info__name:hover {
   text-decoration: none;
+}
+
+/* ======================================================================== */
+/* Play tracking filter                                                     */
+/* ======================================================================== */
+
+/*
+ * This dialog is wider than the rest because of the mod grid: sixty-nine badges wrap into a
+ * readable block at this width and into a narrow column at 460px. It still collapses to one
+ * column on a phone, where `.modal`'s own max-width takes over.
+ */
+.modal--wide {
+  max-width: 760px;
+}
+
+/* The one button in an `.actions` row that belongs at the other end from the confirm pair. */
+.actions__aside {
+  margin-right: auto;
+}
+
+.tfilter {
+  margin-top: 6px;
+}
+
+.tfilter--inactive {
+  opacity: 0.45;
+}
+
+/*
+ * One criterion. Separated by a rule rather than by space alone: the dialog is long enough to
+ * scroll, and a heading arriving at the top of the viewport needs to read as the start of
+ * something.
+ */
+.tfilter-section {
+  padding: 14px 0;
+  border-top: 1px solid hsla(var(--hsl-b3), 0.7);
+}
+
+.tfilter-section h4 {
+  margin: 0 0 8px;
+  font-size: var(--fs-title-small);
+  font-weight: 600;
+  color: hsl(var(--hsl-c2));
+}
+
+/* A criterion nothing on this machine can answer -- see `applyEnabled` in tracking-filter.js. */
+.tfilter-section--unavailable {
+  opacity: 0.5;
+}
+
+.tfilter__text {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 7px 9px;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.tfilter__unknown {
+  margin-top: 10px;
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-l1));
+}
+
+/* What the current selection means, in words. The mod grid cannot be read without it. */
+.tfilter__readout {
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-left: 3px solid hsl(var(--hsl-h2));
+  border-radius: 5px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c2));
+  font-size: var(--fs-normal-2);
+}
+
+/* ---------------------------------------------------------------- range slider */
+
+/*
+ * Two native sliders on one track.
+ *
+ * The inputs are stripped bare and stacked over a drawn track, so the only thing either one
+ * paints is its thumb. Both keep their native keyboard behaviour, which is the whole reason
+ * for not drawing the control outright. Pointer events reach the thumbs only -- the track
+ * itself is not clickable, because a click landing between two overlapping handles has no
+ * unambiguous meaning.
+ */
+.range {
+  position: relative;
+  height: 22px;
+  margin: 4px 0 2px;
+}
+
+.range__track {
+  position: absolute;
+  top: 9px;
+  left: 0;
+  right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background-color: hsl(var(--hsl-b6));
+}
+
+.range__fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  background-color: hsl(var(--hsl-h2));
+}
+
+.range__input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  pointer-events: none;
+}
+
+/* Whichever handle the pointer came down nearest to, so neither can be buried by the other. */
+.range__input--front {
+  z-index: 2;
+}
+
+.range__input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--hsl-b6));
+  background-color: hsl(var(--hsl-c1));
+  cursor: pointer;
+}
+
+.range__input::-moz-range-thumb {
+  pointer-events: auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--hsl-b6));
+  background-color: hsl(var(--hsl-c1));
+  cursor: pointer;
+}
+
+.range__input:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid hsl(var(--hsl-h1));
+  outline-offset: 1px;
+}
+
+.range__fields {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-l1));
+}
+
+.range__value {
+  width: 108px;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 5px 7px;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.range__value[type="text"] {
+  width: 76px;
+}
+
+.range__dash {
+  color: hsl(var(--hsl-f1));
+}
+
+.range__unit {
+  color: hsl(var(--hsl-f1));
+}
+
+/* -------------------------------------------------------------------- mod grid */
+
+.mod-grid__legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-bottom: 10px;
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+}
+
+/*
+ * The legend keys wear the same marks the chips do, so the grid is readable without having
+ * read the paragraph underneath it.
+ */
+.mod-grid__key {
+  padding: 2px 7px;
+  border-radius: var(--radius-base);
+}
+
+.mod-grid__key--allowed {
+  border: 1px dashed hsla(var(--hsl-b1), 0.9);
+}
+
+.mod-grid__key--required {
+  border: 1px solid hsl(var(--hsl-h1));
+  color: hsl(var(--hsl-c2));
+}
+
+.mod-grid__key--excluded {
+  border: 1px solid transparent;
+  opacity: 0.4;
+}
+
+.mod-grid__actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.mod-grid__actions button {
+  background-color: hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 4px 9px;
+  font-size: var(--fs-normal);
+}
+
+.mod-grid__actions button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.mod-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.mod-grid__label {
+  font-size: var(--fs-small-2);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--hsl-f1));
+  margin-bottom: 4px;
+}
+
+.mod-grid__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/*
+ * One mod, in its three states. The dashed border is the resting state rather than a marked
+ * one: everything starts at "may be used", and the border is what makes "must not be used"
+ * -- the same badge with no border and half the opacity -- read as a change from it.
+ */
+.mod-chip {
+  display: block;
+  padding: 3px;
+  border: 1px dashed hsla(var(--hsl-b1), 0.9);
+  border-radius: 6px;
+  background: none;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.mod-chip .mod {
+  height: 20px;
+  width: auto;
+  display: block;
+}
+
+.mod-chip:hover {
+  background-color: hsla(var(--hsl-b2), 0.6);
+}
+
+.mod-chip--required {
+  border: 1px solid hsl(var(--hsl-h1));
+  background-color: hsla(var(--hsl-h2), 0.35);
+}
+
+.mod-chip--excluded {
+  border: 1px solid transparent;
+  opacity: 0.35;
+}
+
+.mod-chip:disabled {
+  cursor: default;
 }

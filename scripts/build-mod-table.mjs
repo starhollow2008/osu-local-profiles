@@ -22,12 +22,27 @@ const SOURCE = 'https://raw.githubusercontent.com/ppy/osu-web/master/database/mo
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outFile = path.join(root, 'web', 'js', 'mod-definitions.js');
 
-const response = await fetch(SOURCE);
-if (!response.ok) {
-  console.error(`could not download ${SOURCE}: HTTP ${response.status}`);
-  process.exit(1);
+/*
+ * `--source <file>` reads the same table out of the sparse `reference/osu-web` checkout
+ * instead of fetching it. It is the same file either way -- docs/osu-web-fidelity.md already
+ * sparse-checks `database` -- so a machine that has the reference does not need the network,
+ * and a machine that does not still works with no argument.
+ */
+const argument = process.argv.indexOf('--source');
+const localSource = argument > 0 ? process.argv[argument + 1] : null;
+
+let rulesets;
+if (localSource) {
+  rulesets = JSON.parse(fs.readFileSync(localSource, 'utf8'));
+  console.log(`read ${localSource}`);
+} else {
+  const response = await fetch(SOURCE);
+  if (!response.ok) {
+    console.error(`could not download ${SOURCE}: HTTP ${response.status}`);
+    process.exit(1);
+  }
+  rulesets = await response.json();
 }
-const rulesets = await response.json();
 
 /*
  * osu!standard is read first so that, if a mod's type ever differs between rulesets, the
@@ -37,8 +52,17 @@ const rulesets = await response.json();
 const order = ['osu', 'taiko', 'fruits', 'mania'];
 const sorted = [...rulesets].sort((a, b) => order.indexOf(a.Name) - order.indexOf(b.Name));
 
+/* osu!'s own ruleset names, as the app numbers its modes. */
+const MODE_OF = { osu: 0, taiko: 1, fruits: 2, mania: 3 };
+
 const mods = {};
 for (const ruleset of sorted) {
+  const mode = MODE_OF[ruleset.Name];
+  if (mode === undefined) {
+    console.error(`unrecognised ruleset "${ruleset.Name}"; this table is keyed by mode number.`);
+    process.exit(1);
+  }
+
   for (const mod of ruleset.Mods) {
     const settings = {};
     for (const setting of mod.Settings ?? []) {
@@ -56,10 +80,23 @@ for (const ruleset of sorted) {
       }
       // A later ruleset can still contribute setting labels the first one did not have.
       Object.assign(existing.settings, { ...settings, ...existing.settings });
+      existing.modes.push(mode);
       continue;
     }
 
-    mods[mod.Acronym] = { name: mod.Name, type: mod.Type, settings };
+    /*
+     * `modes` is which rulesets offer the mod, and `playable` whether a player can choose it
+     * at all -- Autoplay, Cinema and ScoreV2 cannot. The play tracking filter needs both:
+     * it draws every mod in the game, and a mod it drew that nobody can select would be a
+     * choice that does nothing.
+     */
+    mods[mod.Acronym] = {
+      name: mod.Name,
+      type: mod.Type,
+      modes: [mode],
+      playable: mod.UserPlayable !== false,
+      settings,
+    };
   }
 }
 
@@ -88,6 +125,19 @@ if (unknownTypes.length > 0) {
   console.error('badges.js has no colour for these; add them there before regenerating.');
   process.exit(1);
 }
+/*
+ * Every mod has to belong to at least one mode and every mode has to have mods, or the play
+ * tracking filter's grid comes out short without saying so -- the same reasoning as the count
+ * check above. Checked per mode rather than in total, because a source that dropped one
+ * ruleset would still pass a total.
+ */
+for (const mode of Object.values(MODE_OF)) {
+  const inMode = Object.values(mods).filter((m) => m.modes.includes(mode)).length;
+  if (inMode < 20) {
+    console.error(`only ${inMode} mods for mode ${mode}; expected 26 or more per ruleset.`);
+    process.exit(1);
+  }
+}
 
 const entries = Object.keys(mods)
   .sort()
@@ -100,7 +150,9 @@ const body = `/**
  * Rebuild with \`node scripts/build-mod-table.mjs\`. Source: ${SOURCE}
  *
  * \`type\` is what gives a mod its colour (ppy/osu's OsuColour.ForModType), so this file
- * is the reason a badge is the right one rather than a guess.
+ * is the reason a badge is the right one rather than a guess. \`modes\` is which rulesets
+ * offer the mod, numbered as this app numbers them, and \`playable\` is false for the three
+ * a player cannot choose (Autoplay, Cinema, ScoreV2).
  */
 export const MOD_DEFINITIONS = {
 ${entries}

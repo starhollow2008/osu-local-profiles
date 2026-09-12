@@ -1935,3 +1935,97 @@ A genuine 1.11.0 release, given port 7341, the profile name Update Canary and a 
 its own data/, updated itself to the published 1.12.0 with its own button: back within seconds
 on 7341 under Update Canary, canary intact, no rollback folder, no data/update/, and serving
 both new features (the Lazer scoring switch and the osu!stable note).
+
+## 5.42 - Play tracking filter
+
+**Status:** done -- unreleased.
+
+Options -> **Play tracking filter**: one scrollable dialog that decides which plays are
+tracked at all. Off by default, and when it is switched on every criterion starts wide open,
+so turning it on changes nothing until something is narrowed. A play the filter rejects is
+never written -- no `scores` row, no `incomplete_plays` row, no pp -- and Import past plays
+applies it too, so the way to bring in everything is to switch the filter off first.
+
+### Where each criterion's facts come from, all offline
+
+| criterion | source | needs |
+|---|---|---|
+| keywords (artist, title, difficulty, mapper) | the `.osu`'s `[Metadata]` | nothing |
+| mode | the replay; for a play with no replay, the `.osu`'s `[General]` | nothing |
+| star rating, as played | osu!'s own difficulty calculator at ingest | the pp helper |
+| mods | the replay's mod list (what the player chose, so no `CL` on a stable play) | nothing |
+| category | `online.db`'s `osu_beatmaps.approved` | osu!lazer |
+| length, as played | the `.osu`'s `[HitObjects]`, divided by the rate-adjust product | nothing |
+| date added | the local `.osu` file's **creation** time | nothing |
+| date submitted | `online.db`'s `osu_beatmapsets.submit_date` | osu!lazer |
+| date ranked | `online.db`'s `osu_beatmapsets.approved_date` | osu!lazer |
+
+### Decisions
+
+- **`osu_beatmapsets` is what makes the two submission dates possible**, and it was not
+  known to be there: `online.db` turns out to ship a second table --
+  `beatmapset_id, submit_date, approved_date, approved` -- with 60,492 rows against
+  `osu_beatmaps`' 234,457. Its `approved` values are only 1, 2 and 4, so it holds the
+  **ranked, approved and loved sets only**. A qualified, pending, WIP, graveyarded or
+  unsubmitted set has no row, which is exactly why both date criteria carry an *include
+  beatmaps with no date on record* box, on by default. The earliest `submit_date` in it is
+  `2007-10-06 17:46:31+00:00`, which is where the sliders' floor comes from -- measured,
+  not chosen.
+- **Date added is the local file's creation time, not its mtime.** Measured here: files
+  osu!lazer imported from osu!stable's `Songs` keep mtimes from 2019-2021 and were *created*
+  2025-11-06, the day they were imported; a beatmap downloaded inside lazer has both the
+  same. mtime is the beatmap's own age, which is not what "added to the client" means.
+  Where a filesystem reports no creation time (some Linux ones), mtime stands in.
+- **Star rating and length are judged as played**, mods included -- a 5.5* map with DT is
+  judged at its DT rating and its DT length. That is what the score card shows and what the
+  play actually was. The mods section is how a DT play is excluded on its mods instead.
+- **Mods have three states, not two**: *may be used* (the default, a dotted ring), *must be
+  used* (a solid ring), *must not be used* (dimmed). A play matches when every required mod
+  is present and no excluded mod is. The user's own reading: a dotted Hidden with everything
+  else cleared tracks nomod and HD plays; DT required with HD dotted tracks DT and DTHD. A
+  separate nomod chip states "no mods at all" (required) or "never a nomod play" (excluded),
+  neither of which the grid can say on its own. The dialog prints what the current selection
+  means in a sentence, because a grid of 65 chips cannot be read as a rule.
+- **Autoplay and Cinema are not in the grid.** They can never be tracked under any settings
+  (`NEVER_COUNTABLE`), so offering them as a choice would be a lie. Said once, in a caption.
+- **An unknowable criterion never rejects a play.** A play with no replay -- a quit, an HP
+  fail, a retry, over half of what osu! counts -- has no mods and no star rating recorded
+  anywhere, so those two criteria cannot judge it while the other seven still do. The
+  alternative, dropping what cannot be fully judged, would make the play count disagree with
+  osu!'s the moment the filter came on. The dialog says which criteria those are.
+- **The three beatmap dates and the length are filled in lazily** and cached on `beatmaps`,
+  each read once, the same arrangement `length_ms` already had: NULL means never looked up,
+  0 means looked up and unknowable. So a beatmap cached before this existed is covered with
+  no migration pass over the store.
+- **With osu!stable and no osu!lazer, three criteria have no source** -- there is no
+  `online.db`, so a beatmap's category and both submission dates are unknowable. Those
+  sections are dimmed and say why, exactly as the unranked-beatmap boxes already are
+  (5.41). The other six work normally.
+
+### What it is made of
+
+- `src/tracking-filter.ts` -- the shape, the cleaning and the matching, all pure. Nothing else
+  decides what a filter means.
+- `src/tracker/ingest.ts` and `src/tracker/incomplete.ts` apply it, both returning a new
+  `filtered` outcome that names the criterion and the beatmap. `IngestContext.filter` is
+  *optional* so `scripts/reingest.mjs`, which rebuilds stored rows, can never delete them.
+- `Tracker` reads the filter from the profile's settings on **every** ingest, so the page can
+  change it while the app runs and the next play is judged by what is saved now.
+- `web/js/tracking-filter.js` -- the dialog. Nine sections, a sixty-seven-chip mod grid drawn
+  with the page's own `modPill`, two-handled ranges built from paired native sliders, and a
+  sentence under the mod grid saying what the selection means.
+- `scripts/build-mod-table.mjs` now records `modes` and `playable` per mod, and takes
+  `--source <file>` so it can be regenerated from the sparse `reference/osu-web` checkout with
+  no network at all.
+
+### Checked
+
+`npm run ui` gained 19 checks, which is where this feature could not be tested otherwise:
+that the criteria are genuinely inert while the switch is off, that a chip cycles through its
+three states, that the readout says what the grid means, that the range's fill follows its
+handle, and that a filter which can match nothing says so. They skip on a profile that already
+has a filter saved rather than overwriting it.
+
+`test/tracker.test.ts` drops a real replay through the real watcher with a filter that cannot
+match it and asserts the *absence*: no `scores` row, no play count, and then the same replay
+tracked normally once the filter is off.

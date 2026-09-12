@@ -108,7 +108,18 @@ CREATE TABLE IF NOT EXISTS beatmaps (
   cached_at     INTEGER NOT NULL,
   -- First hit object to last, in ms, read from the .osu file on first need. 0 means the file
   -- could not be read, so it is not tried again. See src/calc/play-time.ts.
-  length_ms     INTEGER
+  length_ms     INTEGER,
+  -- The three dates the play tracking filter reads, each looked up once on first need, with
+  -- the same convention as length_ms: NULL means never looked up, 0 means looked up and not
+  -- knowable. See src/tracking-filter.ts.
+  --   added_at     when the local .osu file was created, i.e. when osu! imported the beatmap.
+  --   submitted_at online.db's osu_beatmapsets.submit_date.
+  --   ranked_at    online.db's osu_beatmapsets.approved_date -- ranked, approved or loved.
+  -- The last two exist only for sets online.db records, which is the ranked, approved and
+  -- loved ones; every other set is legitimately 0 here.
+  added_at      INTEGER,
+  submitted_at  INTEGER,
+  ranked_at     INTEGER
 );
 
 -- MD5 -> path index of local .osu files. lazer stores files by SHA-256, so this is the

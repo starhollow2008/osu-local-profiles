@@ -49,6 +49,19 @@ export const UNRANKED_MAP_STATUSES = {
 
 export type UnrankedMapStatus = keyof typeof UNRANKED_MAP_STATUSES;
 
+/**
+ * When a beatmapset was submitted, and when it was ranked, approved or loved.
+ *
+ * Both come from `online.db`'s second table, `osu_beatmapsets`, which holds only the sets
+ * osu! has accepted -- 60,492 rows against `osu_beatmaps`' 234,457 here, with `approved`
+ * values of 1, 2 and 4 only. A qualified, pending, WIP, graveyarded or unsubmitted set has
+ * no row at all, so "not known" is the normal answer and never an error.
+ */
+export interface BeatmapsetDates {
+  submittedAt: number | null;
+  rankedAt: number | null;
+}
+
 /** One difficulty of a beatmapset, as lazer's `online.db` records it. */
 export interface OnlineSetBeatmap {
   beatmapId: number;
@@ -308,6 +321,13 @@ function parseOsuMetadata(file: string): OsuMetadata {
   return out;
 }
 
+/** `online.db`'s timestamp format -> epoch milliseconds, or null for anything unreadable. */
+function parseOnlineDate(value: string | null | undefined): number | null {
+  if (typeof value !== 'string' || value === '') return null;
+  const at = Date.parse(value.replace(' ', 'T'));
+  return Number.isFinite(at) ? at : null;
+}
+
 /**
  * The ruleset a beatmap was written for, from its `[General]` section.
  *
@@ -389,6 +409,30 @@ export class BeatmapResolver {
         .prepare('SELECT checksum FROM osu_beatmaps WHERE beatmap_id = ?')
         .get(beatmapId) as { checksum: string | null } | undefined;
       if (row?.checksum) return row.checksum;
+    }
+    return null;
+  }
+
+  /**
+   * A beatmapset's submission and ranked dates, from `online.db`, or null when it has no row
+   * there -- which is every set osu! has not ranked, approved or loved.
+   *
+   * The timestamps are written `2007-10-06 17:46:31+00:00`: ISO but for the space, which
+   * `Date` is not required to accept, so the space becomes a `T` before parsing rather than
+   * relying on a browser-ism holding in Node.
+   */
+  beatmapsetDates(beatmapsetId: number): BeatmapsetDates | null {
+    for (const online of this.onlineDbs) {
+      let row: { submit_date: string | null; approved_date: string | null } | undefined;
+      try {
+        row = online
+          .prepare('SELECT submit_date, approved_date FROM osu_beatmapsets WHERE beatmapset_id = ?')
+          .get(beatmapsetId) as typeof row;
+      } catch {
+        continue; // an older online.db with no such table
+      }
+      if (!row) continue;
+      return { submittedAt: parseOnlineDate(row.submit_date), rankedAt: parseOnlineDate(row.approved_date) };
     }
     return null;
   }

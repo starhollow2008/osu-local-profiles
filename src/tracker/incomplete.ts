@@ -2,6 +2,14 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { beatmapMode, type BeatmapResolver } from '../clients/beatmaps.ts';
 import type { ResolvedLoggedPlay } from '../clients/lazer-log.ts';
+import {
+  beatmapFilterFacts,
+  defaultTrackingFilter,
+  filterRejects,
+  playFacts,
+  type FilterCriterion,
+  type TrackingFilter,
+} from '../tracking-filter.ts';
 
 /**
  * Turning a play read out of lazer's log into a tracked one.
@@ -19,6 +27,12 @@ export interface IncompleteContext {
   profileId: number;
   /** Plays from before this instant are ignored, exactly as for replays. */
   trackingSince: number;
+  /**
+   * Which plays this profile tracks at all. Two of its nine criteria cannot judge a play
+   * like this -- there is no mod list and no star rating to judge -- and the other seven
+   * still do; see src/tracking-filter.ts for why that is the right way round.
+   */
+  filter?: TrackingFilter;
 }
 
 export interface IngestedIncomplete {
@@ -30,7 +44,9 @@ export interface IngestedIncomplete {
 
 export type IncompleteOutcome =
   | { status: 'added'; play: IngestedIncomplete }
-  | { status: 'skipped'; reason: 'passed' | 'too-old' | 'duplicate' | 'unresolved' };
+  | { status: 'skipped'; reason: 'passed' | 'too-old' | 'duplicate' | 'unresolved' }
+  /** Turned away by the play tracking filter, exactly as in tracker/ingest.ts. */
+  | { status: 'filtered'; criterion: FilterCriterion; title: string };
 
 /**
  * Find the beatmap by the only two handles the log offers.
@@ -88,6 +104,21 @@ export function ingestIncompletePlay(
 
   const beatmap = ctx.resolver.resolve(md5);
   const mode = beatmap.osuPath ? beatmapMode(beatmap.osuPath) : 0;
+  const title = [beatmap.artist, beatmap.title].filter(Boolean).join(' - ') || md5.slice(0, 12);
+  const named = beatmap.version ? `${title} [${beatmap.version}]` : title;
+
+  /*
+   * The play tracking filter. `mods: null` is the whole point of passing it explicitly rather
+   * than leaving it out: lazer records no mod list for a play it discards, and the filter
+   * treats a fact it does not have as no reason to reject. The star rating is left out for the
+   * same reason -- there is no replay to price.
+   */
+  const filter = ctx.filter ?? defaultTrackingFilter();
+  if (filter.enabled) {
+    const facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
+    const rejected = filterRejects(filter, playFacts(facts, mode, null));
+    if (rejected) return { status: 'filtered', criterion: rejected, title: named };
+  }
 
   ctx.db
     .prepare(
@@ -109,15 +140,9 @@ export function ingestIncompletePlay(
     );
 
   const id = (ctx.db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;
-  const title = [beatmap.artist, beatmap.title].filter(Boolean).join(' - ') || md5.slice(0, 12);
 
   return {
     status: 'added',
-    play: {
-      id,
-      mode,
-      title: beatmap.version ? `${title} [${beatmap.version}]` : title,
-      playedAt: play.countedAt,
-    },
+    play: { id, mode, title: named, playedAt: play.countedAt },
   };
 }

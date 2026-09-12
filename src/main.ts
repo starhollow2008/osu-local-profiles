@@ -169,6 +169,15 @@ async function main(): Promise<void> {
     const time = new Date(play.playedAt).toLocaleTimeString();
     console.log(`  [${time}]   --   -- did not finish        ${play.title}`);
   });
+  /*
+   * A play the tracking filter declined. Worth a line of its own: no row is written anywhere,
+   * so without this the play simply does not appear and a filter set a notch too tight looks
+   * exactly like tracking having stopped.
+   */
+  tracker.on('filtered', (play) => {
+    const time = new Date(play.at).toLocaleTimeString();
+    console.log(`  [${time}] not tracked -- ${play.criterion.padEnd(13)} ${play.title}`);
+  });
   tracker.on('error', (e) => console.error(`  watcher error: ${explainWatchError(e)}`));
 
   /*
@@ -259,6 +268,14 @@ async function main(): Promise<void> {
     // play is only counted when osu! counted it, and osu! only counts one it was told
     // about. Signed out or offline, the game does not submit and neither side counts it.
     console.log('  Unfinished plays (quit, retried, failed) count too, while osu! is signed in.');
+  }
+  /*
+   * Said at start-up only when the filter can actually turn a play away. A profile that has
+   * set one and forgotten about it would otherwise look broken the first time a play did not
+   * appear, and this is the one setting whose effect cannot be undone afterwards.
+   */
+  if (tracker.filterNarrowing) {
+    console.log('  A play tracking filter is on -- plays it declines are not recorded at all.');
   }
   console.log('  Close this window or press Ctrl+C to stop tracking.\n');
 

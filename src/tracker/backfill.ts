@@ -4,6 +4,14 @@ import path from 'node:path';
 import type { Db } from '../db/index.ts';
 import { looksLikeReplay, parseReplay, type ReplayScore } from '../osr.ts';
 import { dedupeKey } from './ingest.ts';
+import type { BeatmapResolver } from '../clients/beatmaps.ts';
+import { scoreMods } from '../calc/pp.ts';
+import {
+  beatmapFilterFacts,
+  filterRejects,
+  playFacts,
+  type TrackingFilter,
+} from '../tracking-filter.ts';
 
 /**
  * Importing replays that were played while the app was closed.
@@ -20,6 +28,8 @@ export interface BackfillCandidate {
   mode: number;
   /** Already in this profile, so importing would be a no-op. */
   duplicate: boolean;
+  /** Turned away by the profile's play tracking filter, so importing would not bring it in. */
+  filtered: boolean;
 }
 
 export interface BackfillScan {
@@ -28,8 +38,22 @@ export interface BackfillScan {
   scanned: number;
   importable: number;
   duplicates: number;
+  /**
+   * How many of the plays found the tracking filter would decline. Everything but the star
+   * rating: that one costs a call to osu!'s calculator per play, so it is left to the import
+   * itself, and the dialog says so rather than promising a count it did not check.
+   */
+  filtered: number;
+  /** Whether the filter constrains the star rating, which is what makes that caveat worth saying. */
+  starsUnchecked: boolean;
   earliest: number | null;
   latest: number | null;
+}
+
+/** What the scan needs to apply the filter. Omitted, it reports every play as unfiltered. */
+export interface BackfillFilterContext {
+  resolver: BeatmapResolver;
+  filter: TrackingFilter;
 }
 
 function readHead(file: string, n: number): Buffer | null {
@@ -88,9 +112,12 @@ export async function scanForReplays(
   profileId: number,
   dirs: string[],
   since: number,
+  filtering?: BackfillFilterContext,
 ): Promise<BackfillScan> {
   const candidates: BackfillCandidate[] = [];
   let scanned = 0;
+  const filter = filtering?.filter;
+  const applyFilter = filter !== undefined && filter.enabled;
 
   const seenKeys = new Set<string>();
   const isStored = db.prepare('SELECT 1 AS hit FROM scores WHERE profile_id = ? AND dedupe_key = ?');
@@ -124,17 +151,32 @@ export async function scanForReplays(
       if (wasDeleted(db, profileId, key)) continue;
       const already = isStored.get(profileId, key) !== undefined;
 
-      candidates.push({ file: entry.path, playedAt, mode: score.mode, duplicate: already });
+      let filtered = false;
+      if (applyFilter && filtering && !already) {
+        const beatmap = filtering.resolver.resolve(score.beatmapMD5);
+        const facts = beatmapFilterFacts(db, filtering.resolver, beatmap);
+        filtered = filterRejects(filter, playFacts(facts, score.mode, scoreMods(score))) !== null;
+      }
+
+      candidates.push({
+        file: entry.path,
+        playedAt,
+        mode: score.mode,
+        duplicate: already,
+        filtered,
+      });
     }
   }
   candidates.sort((a, b) => a.playedAt - b.playedAt);
-  const importable = candidates.filter((c) => !c.duplicate);
+  const importable = candidates.filter((c) => !c.duplicate && !c.filtered);
 
   return {
     candidates,
     scanned,
     importable: importable.length,
-    duplicates: candidates.length - importable.length,
+    duplicates: candidates.filter((c) => c.duplicate).length,
+    filtered: candidates.filter((c) => !c.duplicate && c.filtered).length,
+    starsUnchecked: applyFilter && (filter.stars.min > 0 || filter.stars.max !== null),
     earliest: importable[0]?.playedAt ?? null,
     latest: importable[importable.length - 1]?.playedAt ?? null,
   };

@@ -47,6 +47,11 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'scores', column: 'pp_parts', definition: 'TEXT' },
   { table: 'scores', column: 'pp_nomod_parts', definition: 'TEXT' },
   { table: 'scores', column: 'pp_version', definition: 'TEXT' },
+  // Added with the play tracking filter. Filled lazily like length_ms above, so a beatmap
+  // cached before the filter existed needs no migration pass over osu!'s store.
+  { table: 'beatmaps', column: 'added_at', definition: 'INTEGER' },
+  { table: 'beatmaps', column: 'submitted_at', definition: 'INTEGER' },
+  { table: 'beatmaps', column: 'ranked_at', definition: 'INTEGER' },
 ];
 
 /**
