@@ -187,16 +187,26 @@ keeps dividing by *scored* plays, since the hits from an abandoned play are unkn
 Counting them is not a setting -- osu! counts them, so this does.
 `showIncompleteInRecent` (`yes` | `collapse` | `no`) only decides whether they are *listed*.
 
-**osu!stable is not covered, and the gap is the same shape.** The submission rule above is
-the *server's*, so stable counts fails and quits too, and stable does not save a replay for
-a failed play either -- "Option to save failed replays" is a standing request against it
-(`ppy/osu-stable-issues#254`). What is unknown is only where the evidence lives on a stable
-install, and it is unknown because there is no stable install on this machine to look at.
-**Do not guess at it in code.** `logDirOf` returns null for a stable install, so stable is
-skipped cleanly rather than half-supported, and `ingestIncompletePlay` is already
-client-agnostic -- it wants a token, a timestamp, a beatmap and a pass flag, from anywhere.
-The leads worth chasing, the ones already ruled out, and the measurement to run first are
-written up in `docs/roadmap.md` under **5.12**.
+**osu!stable cannot be covered, and that was measured, not assumed** (2026-09-11, stable
+`b20260711.1`; full evidence in `docs/roadmap.md` 5.12). The submission rule above is the
+*server's*, so stable counts fails and quits too, and stable saves no replay for them either.
+What a real install turned out to hold:
+
+- **Its logs say nothing about plays.** `Logs/` holds OpenGL initialisation, the updater, and
+  an encrypted `osu!auth.log`; none is written during gameplay. `logDirOf` returning null for
+  stable is therefore correct, not a stub.
+- **The only trace of an unfinished play is a per-beatmap "last played" time in `osu!.db`.**
+  A controlled quit, fail and retry on one difficulty produced *one* timestamp between them,
+  flushed minutes later, in a field a pass updates too. It cannot count retries, cannot tell a
+  fail from a pass, and arrives late -- so nothing is inferred from it.
+- **A pass reaches the app when the results screen is closed**, which is when stable writes
+  the replay (scores at 3:39:25, 3:41:04, 3:42:12; replays 8-23s later).
+
+The page says both of those, once, wherever a stable install is found (`renderStableNote` in
+main.js, `showStableNote` per profile). Do not build a play counter on that timestamp without
+asking: a count that silently undercounts retries is worse than a stated gap, which is the
+same reasoning as having no fallback pp calculator. `ingestIncompletePlay` stays
+client-agnostic in case a future stable ever writes a real record.
 
 ## Total Play Time follows osu!'s server rule
 
@@ -366,6 +376,25 @@ totals back. Deciding whether to offer "show more" needs *both* "the page came b
 and "the total is larger than what was returned" -- Recent Plays counts plays but draws
 rows, and a collapsed run of retries is several plays in one row, so either test alone
 leaves a button that reveals nothing.
+
+## osu!stable specifics, verified on a real install
+
+Both clients now run on this machine, and stable turned up three things worth keeping:
+
+- **The Songs folder can be moved**, and stable writes where to `BeatmapDirectory` in
+  `osu!.<windows user>.cfg`. `stableSongs` in `src/clients/detect.ts` reads it (relative
+  values resolve against the install, a stale one falls back to `<root>/Songs`). Guessing
+  `<root>/Songs` cost a moved install every title, star rating and pp value.
+- **The signed-in username is only there when stable was told to remember it.** The same cfg
+  holds `Username`, which is empty when it was not, so `detectLocalSessions` finds nothing
+  for stable and the page falls back to typing a name. That is correct behaviour, not a bug.
+- **Ranked status for a stable play comes from lazer's `online.db`.** stable ships no such
+  database, so an install with *only* stable resolves every beatmap to
+  `UNRESOLVED_STATUS`, and `countsSql` then counts none of its scores toward pp. On a
+  machine with both clients (like this one) lazer's copy covers stable's plays too. Anything
+  that changes this should be discussed first: the alternatives are parsing stable's own
+  `osu!.db` (a format that already broke a parser written to its documentation) or asking
+  osu.ppy.sh per beatmap, which is a network request per new score.
 
 ## Windows is the only verified platform
 

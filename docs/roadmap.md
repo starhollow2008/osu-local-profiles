@@ -677,9 +677,9 @@ hold for stable too. What differs is only where the evidence lives on disk.
 
 ### Unverified leads, in the order worth trying
 
-Nothing below has been confirmed, because there is no stable install here. Treat each as a
-question, not a fact, and **write the answer back into this section** either way — a lead
-ruled out is as useful to the next session as one that worked.
+These were the leads before there was a stable install to look at; **every one of them has
+since been answered** -- see *What a real stable install turned out to hold* further down.
+They are kept because the reasoning still applies to any future attempt.
 
 1. **Does stable have a `Logs/` directory, and does it record score submission?** Several
    sources say stable writes `network.log`, `runtime.log`, `osu!auth.log`, `performance.log`

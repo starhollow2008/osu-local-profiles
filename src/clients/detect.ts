@@ -202,10 +202,48 @@ export function lazerInstall(root: string): OsuInstall | null {
   };
 }
 
+/**
+ * Where a stable install keeps its beatmaps.
+ *
+ * stable lets the player move the Songs folder -- usually onto another drive -- and writes
+ * the answer to `BeatmapDirectory` in its per-user config (`osu!.<windows user>.cfg`, the
+ * same file the signed-in username comes from). It is read rather than guessed at: on a
+ * moved install `<root>/Songs` holds nothing, so every stable play would resolve to no
+ * beatmap, and therefore no title, no stars and no pp.
+ *
+ * The value is usually the bare name `Songs`; anything relative resolves against the
+ * install. A setting that points nowhere falls back, because a stale config should not cost
+ * the player their beatmaps.
+ */
+function stableSongs(root: string): string {
+  const fallback = path.join(root, 'Songs');
+
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(root).filter((name) => /^osu!\..+\.cfg$/i.test(name));
+  } catch {
+    return fallback;
+  }
+
+  for (const entry of entries) {
+    let contents: string;
+    try {
+      contents = fs.readFileSync(path.join(root, entry), 'utf8');
+    } catch {
+      continue;
+    }
+    const value = /^[ \t]*BeatmapDirectory[ \t]*=[ \t]*(.+?)[ \t]*$/im.exec(contents)?.[1];
+    if (!value) continue;
+    const resolved = path.isAbsolute(value) ? value : path.join(root, value);
+    if (exists(resolved)) return resolved;
+  }
+  return fallback;
+}
+
 /** A stable install, if that is what is at `root`. */
 export function stableInstall(root: string): OsuInstall | null {
   if (!exists(path.join(root, 'osu!.exe'))) return null;
-  const songs = path.join(root, 'Songs');
+  const songs = stableSongs(root);
   return {
     kind: 'stable',
     root,

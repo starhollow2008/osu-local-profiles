@@ -258,3 +258,54 @@ test('an ordinary watch error is passed through unchanged', () => {
   const err = Object.assign(new Error('watch /nope EPERM'), { code: 'EPERM' });
   assert.equal(explainWatchError(err), 'watch /nope EPERM');
 });
+
+/*
+ * stable can be told to keep its beatmaps somewhere else, and writes that down. A moved
+ * install whose setting was ignored would index nothing: no titles, no stars, no pp.
+ */
+test('a moved Songs folder is read from stable own config, not guessed', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-stable-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'osu!.exe'), '');
+    const moved = path.join(tmp, 'Beatmaps elsewhere');
+    fs.mkdirSync(moved);
+    fs.writeFileSync(
+      path.join(tmp, 'osu!.player.cfg'),
+      'Width = 1920\nBeatmapDirectory = Beatmaps elsewhere\nVolumeUniversal = 40\n',
+    );
+
+    assert.deepEqual(stableInstall(tmp)?.beatmapRoots, [moved]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('an absolute BeatmapDirectory is taken as given', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-stable-'));
+  const elsewhere = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-maps-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'osu!.exe'), '');
+    fs.writeFileSync(path.join(tmp, 'osu!.player.cfg'), `BeatmapDirectory = ${elsewhere}\n`);
+
+    assert.deepEqual(stableInstall(tmp)?.beatmapRoots, [elsewhere]);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    fs.rmSync(elsewhere, { recursive: true, force: true });
+  }
+});
+
+test('with no setting, or one pointing nowhere, stable keeps its default Songs', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-stable-'));
+  try {
+    fs.writeFileSync(path.join(tmp, 'osu!.exe'), '');
+    const songs = path.join(tmp, 'Songs');
+    fs.mkdirSync(songs);
+    assert.deepEqual(stableInstall(tmp)?.beatmapRoots, [songs], 'no config at all');
+
+    // A stale setting must not cost the player the beatmaps that are still there.
+    fs.writeFileSync(path.join(tmp, 'osu!.player.cfg'), 'BeatmapDirectory = D:/gone\n');
+    assert.deepEqual(stableInstall(tmp)?.beatmapRoots, [songs], 'a setting pointing nowhere');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
