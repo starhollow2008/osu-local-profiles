@@ -27,6 +27,21 @@ function maybeLink(href, inner, className) {
  * profile is configured.
  */
 export function countingNoteText(counting) {
+  /*
+   * Nothing on this machine can say whether a beatmap is ranked: only osu!lazer ships the
+   * database that records it, and this install has osu!stable alone. Every beatmap counts
+   * instead, which has to be said plainly -- it is the one case where the profile counts
+   * unranked plays without anybody having asked it to.
+   */
+  if (counting?.countUnresolved) {
+    return (
+      'No osu!lazer installation was found, and osu!stable does not record whether a beatmap ' +
+      'is ranked. Every beatmap therefore counts toward pp here -- loved, graveyarded and ' +
+      'never-submitted ones included -- and the beatmap options in Settings cannot change ' +
+      'that. The pp and rank here are not comparable with a real osu! account.'
+    );
+  }
+
   const included = [];
   if (counting?.includeUnrankedMods) included.push('mods');
   if (counting?.extraMapStatuses?.length) included.push('beatmaps');

@@ -961,6 +961,19 @@ if (stableNote.hidden.every((h) => h)) {
  * osu!'s own profile page: it lists a stable score as carrying CL, and its options menu has a
  * "lazer scoring" switch that is on by default.
  */
+/*
+ * An install with osu!stable and no osu!lazer has nothing that can say whether a beatmap is
+ * ranked, so every beatmap counts toward pp and the page has to say so. That cannot happen on
+ * a machine with lazer, so the wording is checked directly.
+ */
+console.log('\nno beatmap status source');
+const noStatus = await evaluate(
+  "import('/js/sections.js').then((m) => m.countingNoteText({ countUnresolved: true }))",
+);
+check('it says why every beatmap counts', noStatus.includes('does not record whether a beatmap is ranked'), true);
+check('and that the beatmap settings cannot change it', noStatus.includes('cannot change'), true);
+check('and that the profile is not comparable with osu!', noStatus.includes('not comparable'), true);
+
 console.log('\nosu! scoring parity');
 const scoring = JSON.parse(await evaluate(`(() => {
   const rows = [...document.querySelectorAll('#recentPlays .play-detail, #topRanks .play-detail')];

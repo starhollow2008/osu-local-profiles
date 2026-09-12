@@ -389,12 +389,16 @@ Both clients now run on this machine, and stable turned up three things worth ke
   holds `Username`, which is empty when it was not, so `detectLocalSessions` finds nothing
   for stable and the page falls back to typing a name. That is correct behaviour, not a bug.
 - **Ranked status for a stable play comes from lazer's `online.db`.** stable ships no such
-  database, so an install with *only* stable resolves every beatmap to
-  `UNRESOLVED_STATUS`, and `countsSql` then counts none of its scores toward pp. On a
-  machine with both clients (like this one) lazer's copy covers stable's plays too. Anything
-  that changes this should be discussed first: the alternatives are parsing stable's own
-  `osu!.db` (a format that already broke a parser written to its documentation) or asking
-  osu.ppy.sh per beatmap, which is a network request per new score.
+  database, so an install with *only* stable resolves every beatmap to `UNRESOLVED_STATUS`.
+  pp itself is unaffected -- it needs the `.osu`, which is in Songs -- and so are ids and
+  titles, which fall back to the file's own `[Metadata]`. Only the *status* is unknowable.
+
+  So `BeatmapResolver.knowsStatus` is false there, `eligibilityOf(settings, statusKnown)`
+  sets `countUnresolved`, and `countsSql` counts unresolved beatmaps **in addition** to the
+  usual ones: a profile that counted nothing would read zero pp, which is worse than counting
+  everything and saying so. The page says so in the Scores note (`countingNoteText`), and the
+  beatmap-status settings are dimmed there because there is no status to filter on. It is not
+  a setting and must not become one -- it follows what the machine can actually know.
 
 ## Windows is the only verified platform
 

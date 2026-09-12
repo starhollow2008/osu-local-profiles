@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { reconcileSectionOrder } from '../web/js/sections.js';
+import { countingNoteText, reconcileSectionOrder } from '../web/js/sections.js';
 
 const DEFAULT = ['me', 'recent', 'top_ranks', 'historical', 'beatmaps', 'medals'];
 
@@ -60,4 +60,17 @@ test('a page that was rearranged keeps its arrangement, with Recent Plays after 
     reconcileSectionOrder(['me', 'medals', 'recent', 'top_ranks', 'historical', 'beatmaps'], DEFAULT_110, RETIRED),
     ['me', 'recent_plays', 'medals', 'recent', 'top_ranks', 'historical', 'beatmaps'],
   );
+});
+
+test('a profile that cannot know what its beatmaps are says so, before anything else', () => {
+  const text = countingNoteText({ countUnresolved: true });
+  assert.match(text, /osu!stable does not record whether a beatmap is ranked/);
+  assert.match(text, /Every beatmap therefore counts toward pp/);
+  assert.match(text, /not comparable with a real osu! account/);
+
+  // It outranks the ordinary wording, which is about choices the user made.
+  const both = countingNoteText({ countUnresolved: true, includeUnrankedMods: true });
+  assert.equal(both, text);
+  // And with a status source it is the ordinary note again, or nothing at all.
+  assert.equal(countingNoteText({ includeUnrankedMods: false, extraMapStatuses: [] }), '');
 });

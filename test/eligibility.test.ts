@@ -439,3 +439,27 @@ test('a score tracked before both scales existed falls back to what its replay c
     h.cleanup();
   }
 });
+
+/* ------------------------------------------- an install with no status source */
+
+test('with nothing able to say what a beatmap is, every beatmap counts', () => {
+  // osu!stable ships no online.db, so a stable-only install resolves every map to
+  // UNRESOLVED_STATUS. Leaving those out would price the whole profile at zero pp.
+  const h = harness();
+  try {
+    h.add({ md5: 'unknown', pp: 100, mapStatus: UNRESOLVED_STATUS });
+
+    assert.equal(topPlays(h.db, h.profileId, 0, 100, VANILLA).length, 0, 'not counted when status is known');
+    const counted = topPlays(h.db, h.profileId, 0, 100, { ...VANILLA, countUnresolved: true });
+    assert.equal(counted.length, 1, 'counted when nothing can say');
+    assert.equal(computeStats(h.db, h.profileId, 0, { ...VANILLA, countUnresolved: true }).totalPp > 0, true);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('the flag is not a setting: it follows whether a status source exists', () => {
+  assert.equal(eligibilityOf(defaultSettings()).countUnresolved, false);
+  assert.equal(eligibilityOf(defaultSettings(), true).countUnresolved, false);
+  assert.equal(eligibilityOf(defaultSettings(), false).countUnresolved, true);
+});

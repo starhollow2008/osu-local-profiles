@@ -1,4 +1,4 @@
-import { Status, UNRANKED_MAP_STATUSES } from '../clients/beatmaps.ts';
+import { Status, UNRANKED_MAP_STATUSES, UNRESOLVED_STATUS } from '../clients/beatmaps.ts';
 import type { Settings } from '../settings.ts';
 
 /**
@@ -30,6 +30,17 @@ export interface Eligibility {
    * Total Score, Ranked Score and the level, because all of them are the same number summed.
    */
   scoring: 'lazer' | 'classic';
+  /**
+   * Count beatmaps whose status could not be resolved at all.
+   *
+   * Not a setting: it is true exactly when nothing on the machine can say whether a beatmap is
+   * ranked, which is the case for an install with osu!stable and no osu!lazer -- stable ships
+   * no equivalent of lazer's `online.db`. Leaving those scores out would price such a profile
+   * at zero pp, which is worse than counting them, so every beatmap counts and the page says
+   * so (`countingNoteText`). The beatmap-status settings have no effect while it is true,
+   * because there is no status to filter on.
+   */
+  countUnresolved: boolean;
 }
 
 /** osu!'s own rules: ranked and approved maps, default settings on ranked mods, nothing else. */
@@ -38,9 +49,10 @@ export const VANILLA: Eligibility = {
   preferStrippedPp: false,
   extraMapStatuses: [],
   scoring: 'lazer',
+  countUnresolved: false,
 };
 
-export function eligibilityOf(settings: Settings): Eligibility {
+export function eligibilityOf(settings: Settings, statusKnown = true): Eligibility {
   const includeUnrankedMods = settings.includeUnrankedMods;
   return {
     includeUnrankedMods,
@@ -48,6 +60,7 @@ export function eligibilityOf(settings: Settings): Eligibility {
     preferStrippedPp: includeUnrankedMods && settings.unrankedModPp === 'without-the-mod',
     extraMapStatuses: mapStatuses(settings.includeUnrankedMaps),
     scoring: settings.scoring === 'classic' ? 'classic' : 'lazer',
+    countUnresolved: !statusKnown,
   };
 }
 
@@ -123,7 +136,12 @@ export function starsColumn(e: Eligibility, alias = 's'): string {
 function mapSql(e: Eligibility, alias: string): string {
   // Numbers from a closed set -- osu!'s own enum plus the unresolved sentinel -- so there
   // is nothing here to parameterise.
-  const allowed = [...RANKED_STATUSES, ...e.extraMapStatuses].join(', ');
+  const allowed = [
+    ...RANKED_STATUSES,
+    ...e.extraMapStatuses,
+    // Nothing can say what these are, so counting them beats pricing the profile at zero.
+    ...(e.countUnresolved ? [UNRESOLVED_STATUS] : []),
+  ].join(', ');
   return `(${alias}.map_status IN (${allowed})
            OR (${alias}.map_status IS NULL AND ${alias}.ranked = 1))`;
 }

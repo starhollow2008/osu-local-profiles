@@ -348,6 +348,18 @@ export class BeatmapResolver {
   private readonly onlineDbs: Db[] = [];
   private readonly db: Db;
 
+  /**
+   * Whether anything here can say if a beatmap is ranked.
+   *
+   * Only lazer ships `online.db`; osu!stable records a beatmap's status nowhere this app can
+   * read. So a stable-only install resolves every map to `UNRESOLVED_STATUS`, and the profile
+   * has to be told that its beatmap settings cannot mean anything -- see `countUnresolved` in
+   * src/calc/eligibility.ts.
+   */
+  get knowsStatus(): boolean {
+    return this.onlineDbs.length > 0;
+  }
+
   constructor(db: Db, installs: OsuInstall[]) {
     this.db = db;
     for (const i of installs) {

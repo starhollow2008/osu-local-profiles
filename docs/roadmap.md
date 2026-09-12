@@ -53,6 +53,7 @@ Status values: `todo` · `in progress` · `done` · `deferred`
 | 5.38 | An interactive HTML export, fit to host       | done   |
 | 5.39 | osu!stable scores carry the Classic mod       | done   |
 | 5.40 | Lazer and classic scoring, as osu! switches them | done |
+| 5.41 | An osu!stable-only install counts pp            | done   |
 
 5.11 was added after v1.1.0 shipped, on the finding that the app was missing well over half
 of what osu! counts as a play. It is ordered before 5.10 because it can be verified on this
@@ -1893,3 +1894,36 @@ bound what it was given and left the rest NULL, so `WHERE id = ?` became `WHERE 
 A full recompute reported 45 rows updated and wrote nothing at all. The statement is now
 generated from one `UPDATE_COLUMNS` list with the values read back by name, so the two cannot
 drift apart again.
+
+## 5.41 - An osu!stable-only install counts pp
+
+**Status:** done -- not yet released.
+
+Found while reviewing the project against a real stable install (5.12). Only osu!lazer ships
+`online.db`, which is the one thing on the machine that records whether a beatmap is ranked.
+An install with stable alone therefore resolved every beatmap to `UNRESOLVED_STATUS`, and
+`countsSql` counted none of its scores: a profile that tracked plays, priced each one, and
+reported **zero pp**.
+
+What is and is not lost without that database:
+
+- **pp per score is fine.** It comes from osu!'s calculator reading the `.osu` in Songs.
+- **Ids, titles, covers and links are fine.** They fall back to the beatmap file's own
+  `[Metadata]` (`parseOsuMetadata`).
+- **Only the status is unknowable** -- ranked, loved, graveyarded, never submitted.
+
+### Decision
+
+Count every beatmap, and say so. `BeatmapResolver.knowsStatus` is false when no `online.db`
+was opened; `eligibilityOf(settings, statusKnown)` turns that into `countUnresolved`, which
+adds `UNRESOLVED_STATUS` to the statuses `countsSql` allows. The Scores note says why, and
+the *Include pp for unranked beatmaps* boxes are dimmed, because there is no status to filter
+on. Counting nothing was the worse error: it is invisible, and it makes the profile look
+broken rather than approximate.
+
+It is deliberately **not a setting**: it follows what the machine can know. Install lazer
+beside stable and statuses resolve for stable's plays too, with no configuration.
+
+The alternatives, both rejected for now: parsing stable's own `osu!.db` (the format already
+broke a parser written to its documentation -- see 5.12), and asking osu.ppy.sh per beatmap,
+which would be a network request per new score and breaks the offline-first rule.

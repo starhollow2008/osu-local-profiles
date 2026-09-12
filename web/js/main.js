@@ -1658,6 +1658,23 @@ function applySettingDependencies() {
     el.disabled = !enabled;
     el.closest('.setting').classList.toggle('setting--inactive', !enabled);
   }
+
+  /*
+   * With osu!stable alone there is no source for a beatmap's status, so every beatmap counts
+   * and these boxes cannot change anything. Dimmed and disabled rather than hidden: the
+   * reason is worth reading, and it is the same treatment a dependent setting gets.
+   */
+  if (counting?.countUnresolved) {
+    const field = $('set-includeUnrankedMaps');
+    for (const box of field.querySelectorAll('input')) box.disabled = true;
+    const setting = field.closest('.setting');
+    setting.classList.add('setting--inactive');
+    const hint = setting.querySelector('.setting__hint');
+    const note =
+      ' No osu!lazer installation was found, and osu!stable does not record a beatmap\u2019s ' +
+      'status, so every beatmap already counts and these have no effect.';
+    if (!hint.textContent.includes('no effect')) hint.textContent += note;
+  }
 }
 
 function renderSettingsFields() {

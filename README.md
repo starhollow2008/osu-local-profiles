@@ -207,7 +207,7 @@ mod list or pp for these: lazer never writes any of it down for a play it discar
 count toward your play count, monthly play counts and Most Played, and appear in Recent
 Plays as dimmed rows according to the **Unfinished plays in Recent Plays** setting.
 
-### osu!stable is different, in two ways worth knowing
+### osu!stable is different, in a few ways worth knowing
 
 Both were measured on a real stable install (`b20260711.1`), and neither is something this
 app can work around:
@@ -224,7 +224,15 @@ app can work around:
   silently undercounts is worse than one that states its gap, the same reasoning as having no
   fallback pp calculator.
 
-The page says both, once, wherever a stable install is found -- in Recent Plays and in Scores,
+- **With osu!stable and no osu!lazer, every beatmap counts toward pp.** Only lazer ships the
+  database that records whether a beatmap is ranked, so a stable-only install cannot tell a
+  ranked map from a loved, graveyarded or never-submitted one. pp is still calculated for
+  every play -- that needs only the beatmap file, which is in your Songs folder -- so rather
+  than counting nothing, the profile counts everything and says so in **Scores**. The
+  *Include pp for unranked beatmaps* settings are dimmed there, because there is no status to
+  filter on. Install osu!lazer alongside and the statuses resolve for stable's plays too.
+
+The page says both of the first two, once, wherever a stable install is found -- in Recent Plays and in Scores,
 with a **Don't show again**. On osu!lazer neither limitation applies: a play is counted the
 moment osu! accepts it, quits and retries included. The full evidence is in
 [docs/roadmap.md](docs/roadmap.md) under 5.12.

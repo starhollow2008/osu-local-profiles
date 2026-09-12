@@ -8,6 +8,12 @@
   stored per score, so switching is instant, and it moves the rows, the cards, Total Score,
   Ranked Score and the level together.
 - **osu!stable scores are listed with the Classic mod**, exactly as osu! lists them.
+- **An osu!stable-only install now counts pp.** Only osu!lazer ships the database that says
+  whether a beatmap is ranked, so without it every beatmap used to count as unranked and the
+  profile scored zero. Every beatmap now counts instead, with a note in Scores saying why and
+  the beatmap-status settings dimmed, since there is nothing to filter on.
+- **A moved osu!stable Songs folder is found**, by reading stable's own BeatmapDirectory
+  setting instead of assuming the default location.
 - **A note wherever osu!stable is found**, in Recent Plays and Scores: a stable score reaches
   the page when you leave the results screen, and plays you quit, failed or retried are not
   counted at all, because stable keeps no record of them. Both were measured on a real stable

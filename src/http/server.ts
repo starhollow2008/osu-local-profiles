@@ -346,7 +346,7 @@ export function startServer(opts: ServerOptions): http.Server {
       const mode = (Number(url.searchParams.get('mode') ?? '0') || 0) as Ruleset;
       const profileId = current();
       const settings = settingsFor(profileId);
-      const e = eligibilityOf(settings);
+      const e = eligibilityOf(settings, opts.tracker.beatmaps.knowsStatus);
 
       /*
        * The paged sections. The page shows five rows of each and asks for more as the user
@@ -839,7 +839,7 @@ export function startServer(opts: ServerOptions): http.Server {
 
       if (!scoreRoute[2]) {
         void (async () => {
-          const rules = eligibilityOf(settingsFor(owner.id));
+          const rules = eligibilityOf(settingsFor(owner.id), opts.tracker.beatmaps.knowsStatus);
           let detail = scoreDetail(opts.db, owner.id, id, rules);
           if (!detail) return json(res, { error: `there is no score ${id}` }, 404);
           /*
@@ -1243,8 +1243,11 @@ export function startServer(opts: ServerOptions): http.Server {
         settings,
         modes: modes.map((mode) => ({
           mode,
-          stats: computeStats(opts.db, id, mode, eligibilityOf(settings)),
-          rank: estimateRank(computeStats(opts.db, id, mode, eligibilityOf(settings)).totalPp, mode),
+          stats: computeStats(opts.db, id, mode, eligibilityOf(settings, opts.tracker.beatmaps.knowsStatus)),
+          rank: estimateRank(
+            computeStats(opts.db, id, mode, eligibilityOf(settings, opts.tracker.beatmaps.knowsStatus)).totalPp,
+            mode,
+          ),
           scores: opts.db
             .prepare(
               `SELECT s.*, b.artist, b.title, b.version, b.creator, b.beatmapset_id

@@ -125,7 +125,7 @@ async function main(): Promise<void> {
 
   tracker.on('score', (s) => {
     // Read per score rather than captured: the page can change these while this is running.
-    const rules = eligibilityOf(getSettings(db, tracker.profileId));
+    const rules = eligibilityOf(getSettings(db, tracker.profileId), tracker.beatmaps.knowsStatus);
 
     // A score can now carry pp without counting -- an unranked map, or unranked mods the
     // settings have not opted into. The console has to say which, or the running total
@@ -240,7 +240,12 @@ async function main(): Promise<void> {
 
   const url = `http://localhost:${config.port}`;
   // The banner reports osu!standard; other modes are a click away on the page.
-  const standing = computeStats(db, profileId, 0, eligibilityOf(getSettings(db, profileId)));
+  const standing = computeStats(
+    db,
+    profileId,
+    0,
+    eligibilityOf(getSettings(db, profileId), tracker.beatmaps.knowsStatus),
+  );
   const standingRank = estimateRank(standing.totalPp, 0);
   banner(`Tracking "${profileName}" -> ${url}`);
   console.log(
