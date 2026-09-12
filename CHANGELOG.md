@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.13.0
 
 - **Play tracking filter** (Options): choose which plays this profile records at all, by
   keyword, mode, star rating, mods, category, length and the dates a beatmap was added,

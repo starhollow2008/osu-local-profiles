@@ -77,6 +77,11 @@ where osu! shows it, and **Options -> Lazer scoring** switches between osu!'s st
 classic scales. It also says how **osu!stable** reaches the page, finds a stable Songs folder
 that was moved, and counts pp on a stable-only install instead of reporting zero.
 
+**v1.13.0** adds the **play tracking filter**: choose which plays this profile records at all,
+by keyword, mode, star rating, mods, category, length and the dates a beatmap was added,
+submitted and ranked. Off by default, and every criterion starts wide open, so switching it on
+changes nothing until you narrow something.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

@@ -1938,7 +1938,7 @@ both new features (the Lazer scoring switch and the osu!stable note).
 
 ## 5.42 - Play tracking filter
 
-**Status:** done -- unreleased.
+**Status:** done -- released as 1.13.0 (2026-09-11).
 
 Options -> **Play tracking filter**: one scrollable dialog that decides which plays are
 tracked at all. Off by default, and when it is switched on every criterion starts wide open,
