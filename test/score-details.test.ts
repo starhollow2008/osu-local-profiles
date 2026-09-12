@@ -426,3 +426,48 @@ test("a score's link is its own page, and outlives a profile switch", async () =
     assert.equal((await fetch(`${base}/api/scores/${id}/screenshot`)).status, 404);
   });
 });
+
+/*
+ * An absent page parameter must fall back to the section's own default.
+ *
+ * `Number(null)` is 0 rather than NaN, so a guard that only rejected NaN let every
+ * unparameterised `/api/profile` clamp to a page of one -- the page looked empty while the
+ * tracker was plainly picking scores up.
+ */
+test('a request with no page parameters gets the full first page of each section', async () => {
+  await withServer(async (base, h) => {
+    for (let i = 0; i < 4; i++) h.add({ md5: `map${i}` });
+
+    const sections = async (query: string) => {
+      const r = await fetch(`${base}/api/profile${query}`);
+      assert.equal(r.status, 200);
+      return (await r.json()) as { top: unknown[]; recent: unknown[] };
+    };
+
+    const bare = await sections('');
+    assert.equal(bare.recent.length, 4, 'every play, not one');
+    assert.equal(bare.top.length, 4);
+
+    // An explicit value still wins, and junk still falls back rather than emptying the page.
+    assert.equal((await sections('?recent=2')).recent.length, 2);
+    assert.equal((await sections('?recent=')).recent.length, 4);
+    assert.equal((await sections('?recent=nonsense')).recent.length, 4);
+  });
+});
+
+/*
+ * The page and its modules must revalidate.
+ *
+ * The static route sent `content-type` and nothing else, so a browser applied heuristic
+ * caching and could serve `index.html` and `/js/main.js` from its own cache without ever
+ * asking again -- an update swapped in underneath the app would still run the old UI.
+ */
+test('static assets are served with a revalidation header', async () => {
+  await withServer(async (base) => {
+    for (const asset of ['/', '/js/main.js']) {
+      const r = await fetch(`${base}${asset}`);
+      assert.equal(r.status, 200, asset);
+      assert.equal(r.headers.get('cache-control'), 'no-cache', asset);
+    }
+  });
+});

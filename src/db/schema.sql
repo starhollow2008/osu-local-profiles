@@ -127,6 +127,8 @@ CREATE TABLE IF NOT EXISTS beatmaps (
 CREATE TABLE IF NOT EXISTS osu_files (
   path       TEXT PRIMARY KEY,
   md5        TEXT NOT NULL,
+  -- 0 means this local file has no online id. Existing rows with NULL are backfilled once.
+  beatmap_id INTEGER NOT NULL DEFAULT 0,
   size       INTEGER NOT NULL,
   indexed_at INTEGER NOT NULL
 );

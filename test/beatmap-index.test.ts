@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,7 +14,10 @@ import { Tracker, type IndexState } from '../src/tracker/index.ts';
  * `Tracker.indexBeatmaps`.
  */
 
-const OSU = (title: string) => `osu file format v14\r\n\r\n[Metadata]\r\nTitle:${title}\r\n`;
+const OSU = (title: string, beatmapId?: number) =>
+  `osu file format v14\r\n\r\n[Metadata]\r\nTitle:${title}\r\n${
+    beatmapId === undefined ? '' : `BeatmapID:${beatmapId}\r\n`
+  }`;
 
 function harness() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-index-'));
@@ -63,6 +67,80 @@ test("lazer's store is sniffed by content, since its files have no names", async
     assert.equal(again[again.length - 1]!.firstRun, false);
   } finally {
     h.cleanup();
+  }
+});
+
+test('local beatmap metadata resolves an online beatmap id without online.db', async () => {
+  const h = harness();
+  try {
+    h.file('files/a/map', OSU('Offline', 5438074));
+    await indexBeatmapFiles(h.db, [
+      { path: path.join(h.tmp, 'files'), byExtension: false },
+    ]);
+
+    const row = h.db
+      .prepare('SELECT md5, beatmap_id FROM osu_files WHERE path = ?')
+      .get(path.join(h.tmp, 'files/a/map')) as { md5: string; beatmap_id: number };
+    assert.equal(row.beatmap_id, 5438074);
+    assert.equal(new BeatmapResolver(h.db, []).md5ForBeatmapId(5438074), row.md5);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('local fallback rejects zero IDs and ambiguous edited copies', async () => {
+  const h = harness();
+  try {
+    h.file('files/a/map', OSU('One', 5438074));
+    h.file('files/b/map', OSU('Two', 5438074));
+    await indexBeatmapFiles(h.db, [
+      { path: path.join(h.tmp, 'files'), byExtension: false },
+    ]);
+
+    const resolver = new BeatmapResolver(h.db, []);
+    assert.equal(resolver.md5ForBeatmapId(0), null);
+    assert.equal(resolver.md5ForBeatmapId(5438074), null);
+
+    const row = h.db.prepare('SELECT md5 FROM osu_files ORDER BY path LIMIT 1').get() as { md5: string };
+    h.db.prepare(
+      `INSERT INTO beatmaps (md5, beatmap_id, beatmapset_id, artist, title, version, creator,
+         status, cached_at) VALUES (?, 5438074, 900, 'Artist', 'Title', 'Insane', 'C', 1, 0)`,
+    ).run(row.md5);
+    assert.equal(resolver.md5ForBeatmapId(5438074), row.md5);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('an existing index backfills local beatmap ids once', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-index-migration-'));
+  const dbFile = path.join(tmp, 'test.db');
+  const file = path.join(tmp, 'files/map');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, OSU('Migrated', 5438074));
+
+  const old = new DatabaseSync(dbFile);
+  old.exec(
+    'CREATE TABLE osu_files (path TEXT PRIMARY KEY, md5 TEXT NOT NULL, size INTEGER NOT NULL, indexed_at INTEGER NOT NULL)',
+  );
+  old.prepare(
+    'INSERT INTO osu_files (path, md5, size, indexed_at) VALUES (?, ?, ?, ?)',
+  ).run(file, 'old', 0, 0);
+  old.close();
+
+  const db = openDb(dbFile);
+  try {
+    const progress: IndexProgress[] = [];
+    await indexBeatmapFiles(db, [
+      { path: path.join(tmp, 'files'), byExtension: false },
+    ], (p) => progress.push({ ...p }));
+    assert.notEqual(new BeatmapResolver(db, []).md5ForBeatmapId(5438074), null);
+    // The backfill re-reads every row, but this index was built by an earlier version and
+    // must not be announced to the user as a first run.
+    assert.equal(progress[progress.length - 1]!.firstRun, false);
+  } finally {
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
 

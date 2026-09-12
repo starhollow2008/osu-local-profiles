@@ -244,12 +244,11 @@ test('the tracker counts a play that finished without a score', { timeout: 30_00
 
   const db = openDb(path.join(tmp, 'test.db'));
   const profileId = getOrCreateProfile(db, 'Test Profile');
-  // Seeded straight into the cache, which is where md5ForBeatmapId looks first, so this
-  // needs neither online.db nor a .osu on disk.
-  db.prepare(
-    `INSERT INTO beatmaps (md5, beatmap_id, beatmapset_id, artist, title, version, creator,
-       status, cached_at) VALUES ('md5-a', 5438074, 900, 'Artist', 'Title', 'Insane', 'C', 1, 0)`,
-  ).run();
+  // The fallback must work from a local .osu when online.db is unavailable.
+  fs.writeFileSync(
+    path.join(watchDir, 'map'),
+    'osu file format v14\n\n[Metadata]\nArtist:Artist\nTitle:Title\nCreator:C\nVersion:Insane\nBeatmapID:5438074\n',
+  );
 
   const tracker = new Tracker({
     db,
@@ -261,6 +260,8 @@ test('the tracker counts a play that finished without a score', { timeout: 30_00
     trackingSince: 0,
     official: null,
   });
+
+  await tracker.indexBeatmaps([{ path: watchDir, byExtension: false }]);
 
   const token = '1775729216';
   const gotPlay = new Promise<{ title: string; mode: number }>((resolve, reject) => {

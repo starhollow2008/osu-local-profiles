@@ -2597,8 +2597,31 @@ $('resetConfirm').onclick = async () => {
 
 /* ------------------------------------------------------------------- SSE */
 
-const es = new EventSource('/api/events');
-es.addEventListener('score', (e) => {
+/*
+ * One EventSource per tab, and a browser allows only six connections to an origin at once
+ * (HTTP/1.1). A stream held open by every tab therefore spends the whole budget: at six tabs
+ * nothing is left for the page itself, and a reload hangs forever with no error to show for
+ * it. So only a *visible* tab keeps its stream; a hidden one gives the connection back and
+ * picks a fresh one up when it returns, reloading to cover whatever it missed meanwhile.
+ */
+const handlers = {};
+const on = (type, fn) => {
+  handlers[type] = fn;
+};
+
+let es = null;
+
+function openEvents() {
+  if (es) return;
+  es = new EventSource('/api/events');
+  for (const [type, fn] of Object.entries(handlers)) es.addEventListener(type, fn);
+}
+
+function closeEvents() {
+  es?.close();
+  es = null;
+}
+on('score', (e) => {
   const s = JSON.parse(e.data);
   // A play can now carry pp without counting toward the profile. Saying which keeps the
   // toast from reading as "+120pp" when the total underneath it has not moved.
@@ -2614,7 +2637,7 @@ es.addEventListener('score', (e) => {
  * the page has to reload -- but there is nothing to put in a toast beyond which map it was,
  * and no grade or accuracy, because lazer keeps none of that for a play it discards.
  */
-es.addEventListener('incomplete', (e) => {
+on('incomplete', (e) => {
   const play = JSON.parse(e.data);
   toast(`Didn't finish - ${play.title}`);
   if (play.mode === mode) loadProfile();
@@ -2625,46 +2648,46 @@ es.addEventListener('incomplete', (e) => {
  * no row is written, so a silent drop is indistinguishable from tracking having stopped. The
  * criterion is named, so a filter set one notch too tight says which notch.
  */
-es.addEventListener('filtered', (e) => {
+on('filtered', (e) => {
   const play = JSON.parse(e.data);
   toast(`Not tracked (${play.criterion}) - ${play.title}`);
   loadState();
 });
-es.addEventListener('tracking', (e) => setTracking(JSON.parse(e.data).tracking));
-es.addEventListener('reset', () => {
+on('tracking', (e) => setTracking(JSON.parse(e.data).tracking));
+on('reset', () => {
   loadProfile();
   loadState();
 });
 // An import can add dozens of scores at once, so it refreshes the page rather than
 // announcing each one the way a live play does.
-es.addEventListener('backfill', () => {
+on('backfill', () => {
   loadProfile();
   loadState();
 });
-es.addEventListener('profiles', () => {
+on('profiles', () => {
   loadProfile();
   loadState();
 });
 // Settings only change the header, but a second tab open on the same profile should not
 // be left showing the old country.
-es.addEventListener('indexing', (e) => renderIndexing(JSON.parse(e.data)));
-es.addEventListener('settings', () => loadState());
-es.addEventListener('identity', () => loadState());
+on('indexing', (e) => renderIndexing(JSON.parse(e.data)));
+on('settings', () => loadState());
+on('identity', () => loadState());
 // A second tab should not be left showing the switch the wrong way round.
-es.addEventListener('app-config', (e) => {
+on('app-config', (e) => {
   app = { ...app, config: JSON.parse(e.data) };
   renderOpenBrowser();
 });
 // Pin, unpin and remove all change what the page should be showing.
 // Another tab favouriting or unfavouriting changes this one's cards and menus.
-es.addEventListener('favorites', () => loadProfile());
-es.addEventListener('scores', () => {
+on('favorites', () => loadProfile());
+on('scores', () => {
   loadProfile();
   loadState();
 });
 // A recompute can run for a while on a large profile; report progress rather than looking
 // frozen. The final `recompute` event is handled by whoever started it.
-es.addEventListener('recompute-progress', (e) => {
+on('recompute-progress', (e) => {
   const p = JSON.parse(e.data);
   if (p.percent < 100) toast(`Recalculating stored scores... ${p.percent}%`);
 });
@@ -2677,5 +2700,27 @@ applySectionOrder();
 await loadProfile();
 // Tells the screenshot renderer the page has finished drawing itself.
 document.body.dataset.rendered = 'true';
+
+openEvents();
+
+/*
+ * `visibilitychange` covers a background tab, `pagehide` a tab being navigated away or put
+ * into the back/forward cache -- neither releases the connection on its own.
+ */
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    closeEvents();
+    return;
+  }
+  openEvents();
+  // Events that arrived while the stream was shut are simply gone; re-read rather than
+  // leave the tab showing whatever it had when it was hidden.
+  loadState();
+  loadProfile();
+});
+window.addEventListener('pagehide', closeEvents);
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) openEvents();
+});
 
 setInterval(loadState, 15000);

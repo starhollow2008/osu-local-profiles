@@ -33,6 +33,13 @@ const QUIT = `2026-09-10 01:11:55 [verbose]: Game-wide working beatmap updated t
 2026-09-10 01:12:59 [verbose]: 📺 OsuScreenStack#658(depth:5) exit from SoloPlayer#414
 2026-09-10 01:12:59 [verbose]: 📺 OsuScreenStack#658(depth:5) resume to SoloSongSelect+PlayerLoader#139`;
 
+/** Submission completion can follow gameplay exit in a real lazer log. */
+const SUBMISSION_AFTER_EXIT = `2026-09-10 01:11:55 [verbose]: Game-wide working beatmap updated to Rin Kagamine - Kokoro (Al-Azif) [Al-Azif MiX]
+2026-09-10 01:11:56 [verbose]: Score submission token retrieved (1775729216)
+2026-09-10 01:12:58 [verbose]: Beginning score submission (token:1775729216)...
+2026-09-10 01:12:59 [verbose]: 📺 OsuScreenStack#658(depth:5) exit from SoloPlayer#414
+2026-09-10 01:13:00 [verbose]: Score submission completed! (token:1775729216 id:7446699999)`;
+
 /** A retry hit within a second or two of starting: osu! discards this one itself. */
 const NO_HITS = `2026-09-10 04:21:11 [verbose]: Game-wide working beatmap updated to Marina and the Diamonds - How to Be a Heartbreaker (Nightcore & Cut Ver.) (Mita) [Amats' Hard]
 2026-09-10 04:21:12 [verbose]: Score submission token retrieved (1776173677)
@@ -55,6 +62,14 @@ test('a play that was submitted but never reached results is not passed', () => 
   assert.equal(plays.length, 1);
   assert.equal(plays[0]!.passed, false);
   assert.equal(plays[0]!.beatmapName, 'Rin Kagamine - Kokoro (Al-Azif) [Al-Azif MiX]');
+});
+
+test('submission completion after gameplay exit still reports an unfinished play', () => {
+  const plays = parseSession(SUBMISSION_AFTER_EXIT);
+  assert.equal(plays.length, 1);
+  assert.equal(plays[0]!.passed, false);
+  assert.equal(plays[0]!.token, '1775729216');
+  assert.equal(plays[0]!.onlineScoreId, '7446699999');
 });
 
 /*

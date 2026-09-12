@@ -104,6 +104,8 @@ interface OpenPlay {
   beatmapName: string | null;
   countedAt: number | null;
   onlineScoreId: string | null;
+  /** Set when gameplay ends; submission completion can be logged afterward. */
+  outcome: boolean | null;
   reported: boolean;
 }
 
@@ -149,6 +151,7 @@ export class LogSession {
         beatmapName: this.beatmap,
         countedAt: null,
         onlineScoreId: null,
+        outcome: null,
         reported: false,
       };
       return;
@@ -166,11 +169,13 @@ export class LogSession {
           beatmapName: this.beatmap,
           countedAt: null,
           onlineScoreId: null,
+          outcome: null,
           reported: false,
         };
       }
       this.current.countedAt = at;
       this.current.onlineScoreId = submitted[2]!;
+      if (this.current.outcome !== null) this.report(out, this.current.outcome);
       return;
     }
 
@@ -180,15 +185,20 @@ export class LogSession {
     // than on the eventual screen exit matters only for tidiness -- the caller drops it --
     // but it keeps a play from staying open for as long as the user reads their results.
     if (REACHED_RESULTS.test(body)) {
-      this.report(out, true);
+      this.current.outcome = true;
+      if (this.current.countedAt !== null) this.report(out, true);
       return;
     }
 
-    if (LEFT_GAMEPLAY.test(body)) this.close(out);
+    if (LEFT_GAMEPLAY.test(body)) {
+      // In real logs submission completion can follow gameplay exit by a few lines.
+      this.current.outcome = false;
+      if (this.current.countedAt !== null) this.report(out, false);
+    }
   }
 
   private close(out: LoggedPlay[]): void {
-    this.report(out, false);
+    this.report(out, this.current?.outcome ?? false);
     this.current = null;
   }
 

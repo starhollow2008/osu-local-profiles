@@ -181,16 +181,23 @@ export async function indexBeatmapFiles(
   onProgress?: (progress: IndexProgress) => void,
 ): Promise<{ scanned: number; indexed: number }> {
   const known = new Set<string>();
-  for (const r of db.prepare('SELECT path FROM osu_files').all() as { path: string }[]) {
-    known.add(r.path);
+  const indexed = db.prepare('SELECT path, beatmap_id FROM osu_files').all() as {
+    path: string;
+    beatmap_id: number | null;
+  }[];
+  for (const r of indexed) {
+    // Older rows have no ID metadata. Re-read each once to backfill it.
+    if (r.beatmap_id !== null) known.add(r.path);
   }
-  const firstRun = known.size === 0;
+  // Counted before the backfill filter: an upgrade re-reads every row, but the index has
+  // been built before and must not be announced as a first run.
+  const firstRun = indexed.length === 0;
   for (const r of db.prepare('SELECT path FROM not_beatmaps').all() as { path: string }[]) {
     known.add(r.path);
   }
 
   const insertOsu = db.prepare(
-    'INSERT OR REPLACE INTO osu_files (path, md5, size, indexed_at) VALUES (?, ?, ?, ?)',
+    'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, size, indexed_at) VALUES (?, ?, ?, ?, ?)',
   );
   const insertSkip = db.prepare('INSERT OR REPLACE INTO not_beatmaps (path, size) VALUES (?, ?)');
 
@@ -243,8 +250,10 @@ export async function indexBeatmapFiles(
           write(insertSkip, file, size);
         } else if (size >= 0) {
           try {
-            const md5 = crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex');
-            write(insertOsu, file, md5, size, Date.now());
+            const contents = fs.readFileSync(file);
+            const md5 = crypto.createHash('md5').update(contents).digest('hex');
+            const beatmapId = parseOsuMetadataText(contents.toString('utf8')).beatmapId ?? 0;
+            write(insertOsu, file, md5, beatmapId, size, Date.now());
             progress.indexed++;
           } catch {
             /* unreadable, skip */
@@ -268,10 +277,12 @@ export async function indexBeatmapFiles(
 export function indexOneFile(db: Db, file: string): void {
   try {
     if (!isBeatmapFile(file)) return;
-    const md5 = crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex');
+    const contents = fs.readFileSync(file);
+    const md5 = crypto.createHash('md5').update(contents).digest('hex');
+    const beatmapId = parseOsuMetadataText(contents.toString('utf8')).beatmapId ?? 0;
     db.prepare(
-      'INSERT OR REPLACE INTO osu_files (path, md5, size, indexed_at) VALUES (?, ?, ?, ?)',
-    ).run(file, md5, fs.statSync(file).size, Date.now());
+      'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, size, indexed_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(file, md5, beatmapId, fs.statSync(file).size, Date.now());
   } catch {
     /* ignore */
   }
@@ -286,7 +297,7 @@ interface OsuMetadata {
   beatmapsetId: number | null;
 }
 
-function parseOsuMetadata(file: string): OsuMetadata {
+function parseOsuMetadataText(text: string): OsuMetadata {
   const out: OsuMetadata = {
     artist: null,
     title: null,
@@ -295,12 +306,6 @@ function parseOsuMetadata(file: string): OsuMetadata {
     beatmapId: null,
     beatmapsetId: null,
   };
-  let text: string;
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch {
-    return out;
-  }
   const start = text.indexOf('[Metadata]');
   if (start < 0) return out;
   const nextSection = text.indexOf('[', start + 1);
@@ -319,6 +324,14 @@ function parseOsuMetadata(file: string): OsuMetadata {
     else if (key === 'BeatmapSetID') out.beatmapsetId = Number(value) || null;
   }
   return out;
+}
+
+function parseOsuMetadata(file: string): OsuMetadata {
+  try {
+    return parseOsuMetadataText(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return parseOsuMetadataText('');
+  }
 }
 
 /** `online.db`'s timestamp format -> epoch milliseconds, or null for anything unreadable. */
@@ -398,6 +411,8 @@ export class BeatmapResolver {
    * an index lookup rather than the scan the other direction would need.
    */
   md5ForBeatmapId(beatmapId: number): string | null {
+    if (beatmapId <= 0) return null;
+
     // A map already cached locally answers without opening online.db at all.
     const cached = this.db
       .prepare('SELECT md5 FROM beatmaps WHERE beatmap_id = ? LIMIT 1')
@@ -409,6 +424,21 @@ export class BeatmapResolver {
         .prepare('SELECT checksum FROM osu_beatmaps WHERE beatmap_id = ?')
         .get(beatmapId) as { checksum: string | null } | undefined;
       if (row?.checksum) return row.checksum;
+    }
+
+    // online.db is an optional downloaded cache. Local .osu metadata works on every platform.
+    // An edited copy can retain BeatmapID with a different checksum, so reject ambiguity.
+    const local = this.db
+      .prepare(
+        `SELECT f.md5, EXISTS(SELECT 1 FROM beatmaps b WHERE b.md5 = f.md5) AS cached
+           FROM osu_files f
+          WHERE f.beatmap_id = ?
+          GROUP BY f.md5
+          ORDER BY cached DESC`,
+      )
+      .all(beatmapId) as { md5: string; cached: number }[];
+    if (local.length === 1 || (local[0]?.cached === 1 && local[1]?.cached !== 1)) {
+      return local[0]!.md5;
     }
     return null;
   }
