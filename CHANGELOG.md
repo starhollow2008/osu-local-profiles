@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.12.0
 
 - **Two scoring scales, as osu! has them**: Options -> Lazer scoring, on by default. On, a
   nomod SS is 1,000,000; off, scores read on the uncapped classic scale -- what stable

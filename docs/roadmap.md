@@ -1857,7 +1857,7 @@ and the Import from osu! dialog, with favorites shared by default.
 
 ## 5.39 - osu!stable scores carry the Classic mod
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.12.0 (2026-09-11).
 
 osu! adds CL to every legacy score before scoring it (`LegacyScoreDecoder`), which is what
 selects classic slider accuracy and legacy miss estimation, and osu-web lists a stable play as
@@ -1867,7 +1867,7 @@ time and eligibility read that -- they must keep reading it.
 
 ## 5.40 - Lazer and classic scoring, as osu! switches them
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.12.0 (2026-09-11).
 
 osu!'s profile page has a **lazer scoring** switch, on by default; off shows the uncapped
 classic scale. Before this the page mixed the two without saying so: a stable play showed the
@@ -1897,7 +1897,7 @@ drift apart again.
 
 ## 5.41 - An osu!stable-only install counts pp
 
-**Status:** done -- not yet released.
+**Status:** done -- released as 1.12.0 (2026-09-11).
 
 Found while reviewing the project against a real stable install (5.12). Only osu!lazer ships
 `online.db`, which is the one thing on the machine that records whether a beatmap is ranked.

@@ -72,6 +72,11 @@ from osu!** for the avatar, banner, flag, me! and favorites; shares Favorite Bea
 profiles; lets removed scores be deleted for good; and makes the saved web page work like the
 page itself -- show more, mode tabs, View Details -- so it can be put online as a sample.
 
+**v1.12.0** matches osu!'s own profile page on two counts: scores carry the **Classic** mod
+where osu! shows it, and **Options -> Lazer scoring** switches between osu!'s standardised and
+classic scales. It also says how **osu!stable** reaches the page, finds a stable Songs folder
+that was moved, and counts pp on a stable-only install instead of reporting zero.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

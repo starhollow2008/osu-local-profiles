@@ -2,7 +2,7 @@
 
 ## Current work
 
-**v1.11.0 shipped.** The app is **osu! local profiles**, at
+**v1.12.0 shipped.** The app is **osu! local profiles**, at
 `github.com/jonathant09/osu-local-profiles`, and the user wants that to be the only name
 anywhere -- the previous one was scrubbed from the code, docs and every GitHub release. Do
 not reintroduce it, including as a compatibility alias (roadmap 5.18). Ongoing work is
