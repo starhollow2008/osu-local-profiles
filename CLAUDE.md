@@ -1,5 +1,46 @@
 # osu! local profiles
 
+The app is **osu! local profiles**, at `github.com/jonathant09/osu-local-profiles`, and that
+is the only name anywhere. The previous one was scrubbed from the code, docs and every GitHub
+release. Never reintroduce it, including as a compatibility alias (roadmap 5.18).
+
+## Rules that must not break
+
+Each has its reasoning in `docs/architecture.md`.
+
+- **Removing a score is a hide, never a `DELETE`.** Set `scores.hidden_at`; every query over
+  `scores` goes through `visibleSql()`. Deleting a removed score for good writes its
+  `dedupe_key` to `deleted_scores` first, or it comes back as a new score on the next ingest.
+- **One definition each, in `src/calc/eligibility.ts`:** `countsSql()` for "counts toward
+  pp" (never write `ranked = 1`), `ppColumn`/`scoreColumn` for the pp and score columns
+  (never `s.total_score`).
+- **Incomplete plays live in `incomplete_plays`, never in `scores`.** A row of zeroes there
+  corrupts accuracy, grades, ranked score, the level bar and medals.
+- **The play tracking filter decides what is written, so it cannot be undone.** Off by
+  default and widest when on; a fact it lacks never rejects a play; every declined play is
+  announced. `scripts/reingest.mjs` must not pass a filter.
+- **The server refuses non-loopback requests, with no switch.** Do not bring back
+  `shareOnNetwork`, and do not "fix" it by binding to `127.0.0.1` (drops `::1`).
+- **osu-web is AGPL and `ppy/osu-resources` is CC-BY-NC; this repo is MIT.** Take values
+  (colours, sizes, wording), never files, rules, paths or images.
+- **Medals: osu!'s own definitions plus Mod Introduction only.** Do not add other medal
+  groups without asking.
+- **No play counter from osu!stable's `osu!.db` last-played time** without asking: it cannot
+  count retries or tell a fail from a pass.
+- **The updater never touches `data/`**, swaps nothing until the new build is verified, and
+  refuses in a source checkout.
+- **`fs.watch` only gets paths through `watchablePath`.** On Windows a non-canonical path
+  aborts the process. Watcher tests `await sleep(SETTLED_MS)` after `start()`.
+- **Recompute's UPDATE is generated from `UPDATE_COLUMNS`.** Never hand-align placeholders.
+- **After changing `Program.cs`, run `npm run build:pp:local`.** A stale `tools/pp/` answers
+  the old protocol silently.
+- **Web modules stay bundleable** (named imports, `export function/const/class`, no
+  `export let`), and every served image goes through `assetUrl()`.
+- **me! BBCode is hostile:** escaped first, only tags written in `web/js/bbcode.js`, every
+  attribute validated. Add a case to `test/bbcode.test.ts` with any new tag.
+- **Windows launcher runs `.\node.exe`**; anything spawned through `cmd` needs
+  `windowsVerbatimArguments`.
+
 ## Before roadmap work
 
 For roadmap-tracked implementation, search [`docs/roadmap.md`](docs/roadmap.md) for the relevant entry; never read it whole. Update it only when the task changes its status.

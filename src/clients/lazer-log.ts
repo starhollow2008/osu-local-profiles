@@ -191,8 +191,10 @@ export class LogSession {
     }
 
     if (LEFT_GAMEPLAY.test(body)) {
-      // In real logs submission completion can follow gameplay exit by a few lines.
-      this.current.outcome = false;
+      // In real logs submission completion can follow gameplay exit by a few lines. Leaving
+      // the results screen exits the Player too, so a pass already settled must stay one --
+      // reported as unfinished, it would be counted again beside its own replay.
+      this.current.outcome ??= false;
       if (this.current.countedAt !== null) this.report(out, false);
     }
   }

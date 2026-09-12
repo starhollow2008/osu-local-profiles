@@ -40,6 +40,15 @@ const SUBMISSION_AFTER_EXIT = `2026-09-10 01:11:55 [verbose]: Game-wide working 
 2026-09-10 01:12:59 [verbose]: 📺 OsuScreenStack#658(depth:5) exit from SoloPlayer#414
 2026-09-10 01:13:00 [verbose]: Score submission completed! (token:1775729216 id:7446699999)`;
 
+/** A pass whose results screen was closed before its submission completed. */
+const PASS_SUBMITTED_AFTER_RESULTS = `2026-09-10 04:21:35 [verbose]: Game-wide working beatmap updated to Erika - I Don't Know (Nightcore & Cut Ver.) (Mita) [Insane]
+2026-09-10 04:21:35 [verbose]: Score submission token retrieved (1776174516)
+2026-09-10 04:21:36 [verbose]: 📺 OsuScreenStack#658(depth:6) entered SoloPlayer#100
+2026-09-10 04:22:33 [verbose]: Beginning score submission (token:1776174516)...
+2026-09-10 04:22:34 [verbose]: 📺 OsuScreenStack#658(depth:6) suspended SoloPlayer#100 (waiting on SoloResultsScreen#555)
+2026-09-10 04:22:35 [verbose]: 📺 OsuScreenStack#658(depth:5) exit from SoloPlayer#100
+2026-09-10 04:22:36 [verbose]: Score submission completed! (token:1776174516 id:7446790760)`;
+
 /** A retry hit within a second or two of starting: osu! discards this one itself. */
 const NO_HITS = `2026-09-10 04:21:11 [verbose]: Game-wide working beatmap updated to Marina and the Diamonds - How to Be a Heartbreaker (Nightcore & Cut Ver.) (Mita) [Amats' Hard]
 2026-09-10 04:21:12 [verbose]: Score submission token retrieved (1776173677)
@@ -70,6 +79,18 @@ test('submission completion after gameplay exit still reports an unfinished play
   assert.equal(plays[0]!.passed, false);
   assert.equal(plays[0]!.token, '1775729216');
   assert.equal(plays[0]!.onlineScoreId, '7446699999');
+});
+
+/*
+ * Leaving the results screen exits the Player as well. Read as a quit, a pass whose
+ * submission landed after that would be counted twice: once from its replay, and again as
+ * an unfinished play.
+ */
+test('a pass stays passed when its submission completes after the results screen closes', () => {
+  const plays = parseSession(PASS_SUBMITTED_AFTER_RESULTS);
+  assert.equal(plays.length, 1);
+  assert.equal(plays[0]!.passed, true);
+  assert.equal(plays[0]!.onlineScoreId, '7446790760');
 });
 
 /*
