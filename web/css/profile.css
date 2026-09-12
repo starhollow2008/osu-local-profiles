@@ -978,10 +978,19 @@
     align-items: stretch;
   }
 
+  /*
+   * `center`, which is what osu-web's own `play-detail.less` says, and not `baseline`.
+   *
+   * The cell stretches to the whole row, and its one child is the accuracy with the weighted
+   * percentage under it. Baseline-aligning a single flex item pins it to the top of that
+   * stretched cell, which reads correctly in Best Performance -- the "weighted x%" line fills
+   * the space underneath -- and wrong everywhere else: Pinned Scores and Recent Plays have no
+   * second line, so their accuracy floated 9px above the pp sitting beside it.
+   */
   .play-detail__score-detail {
     padding: 5px 10px;
     background-color: var(--bg-main);
-    align-items: baseline;
+    align-items: center;
   }
 
   .play-detail__mods {

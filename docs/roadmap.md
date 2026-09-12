@@ -2002,6 +2002,18 @@ applies it too, so the way to bring in everything is to switch the filter off fi
   sections are dimmed and say why, exactly as the unranked-beatmap boxes already are
   (5.41). The other six work normally.
 
+### 5.42a - the accuracy cell, fixed in 1.13.1
+
+`.play-detail__score-detail` carried `align-items: baseline` at desktop width, which osu-web's
+own `play-detail.less` does not: it says `center`. The cell stretches to the row's height and
+holds one child -- the accuracy with "weighted x%" under it -- and baseline-aligning a single
+flex item pins it to the top of that stretched cell. In Best Performance the second line fills
+the space underneath, so it read correctly; Pinned Scores and Recent Plays have no second line
+and their accuracy floated 9px above the pp beside it. Measured, fixed by matching osu-web, and
+measured again: 14px above and below, level with the pp, while Best Performance moved 1px.
+
+`npm run ui` now measures it, because the markup says nothing about it.
+
 ### What it is made of
 
 - `src/tracking-filter.ts` -- the shape, the cleaning and the matching, all pure. Nothing else

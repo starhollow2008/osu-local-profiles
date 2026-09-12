@@ -1892,6 +1892,58 @@ check('a default mod is not marked', plain.includes('mod__customised-indicator')
 check('and carries no extender, so it stays one badge wide', plain.includes('viewBox="0 0 100 70"'), true);
 
 /*
+ * Where the accuracy sits inside its cell, which only a measurement can tell you.
+ *
+ * The cell stretches to the row, and in Best Performance its second line -- "weighted x%" --
+ * fills the space under the accuracy. Pinned Scores and Recent Plays have no second line, and
+ * an `align-items: baseline` here pinned their single line to the top of a stretched cell
+ * instead, leaving the accuracy floating 9px above the pp beside it. Nothing about the markup
+ * says so; the number is the only way to see it.
+ */
+console.log('\nthe accuracy sits where it should in its cell');
+const accuracyOffsets = await evaluate(`(() => {
+  const offsets = (id) => {
+    const row = document.querySelector('#' + id + ' .play-detail');
+    if (!row) return null;
+    const cell = row.querySelector('.play-detail__score-detail');
+    const accuracy = row.querySelector('.play-detail__accuracy');
+    const pp = row.querySelector('.play-detail__pp');
+    if (!cell || !accuracy || !pp) return null;
+    const middle = (el) => {
+      const box = el.getBoundingClientRect();
+      return (box.top + box.bottom) / 2;
+    };
+    return {
+      weighted: row.querySelector('.play-detail__pp-weight') !== null,
+      // Positive is below the middle of the cell, negative above.
+      fromCentre: Math.round(middle(accuracy) - middle(cell)),
+      fromPp: Math.round(middle(accuracy) - middle(pp)),
+    };
+  };
+  return { best: offsets('topRanks'), pinned: offsets('pinnedPlays'), recent: offsets('recentPlays') };
+})()`);
+for (const [section, name] of [['recent', 'Recent Plays'], ['pinned', 'Pinned Scores']]) {
+  const measured = accuracyOffsets[section];
+  check(
+    `${name} centres the accuracy in its cell`,
+    measured === null ? SKIP : measured.fromCentre,
+    0,
+  );
+  check(
+    `and level with the pp beside it`,
+    measured === null ? SKIP : measured.fromPp,
+    0,
+  );
+}
+check(
+  'Best Performance keeps the accuracy above its weighting',
+  accuracyOffsets.best === null || !accuracyOffsets.best.weighted
+    ? SKIP
+    : accuracyOffsets.best.fromCentre < 0,
+  true,
+);
+
+/*
  * The badge's whole size comes from the row's font-size, so a missing rule shows up as a
  * badge of the wrong height rather than as anything visibly broken. Measure it rendered.
  */

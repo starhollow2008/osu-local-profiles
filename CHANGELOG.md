@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.1
+
+- **The accuracy is centred in its cell again** in Pinned Scores and Recent Plays. Only Best
+  Performance has a "weighted x%" line under the accuracy; the other two sections were
+  aligning as though they did, which left their accuracy sitting 9px above the pp beside it.
+
 ## 1.13.0
 
 - **Play tracking filter** (Options): choose which plays this profile records at all, by
