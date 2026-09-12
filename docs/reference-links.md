@@ -22,6 +22,23 @@ constraints in `CLAUDE.md` only make sense next to the thing they were derived f
 - [osu! API docs](https://osu.ppy.sh/docs/) — used only for optional enrichment; the app
   never needs it.
 
+## Scores, scales and osu!stable
+
+- osu-web's own rule for which score a page shows:
+  <https://github.com/ppy/osu-web/blob/master/resources/js/utils/score-helper.ts> --
+  `legacy_total_score`, then `classic_total_score`, then `total_score`.
+- `ScoringMode` and the display conversions live in ppy/osu's `ScoreProcessor`; this project
+  never reimplements them, it asks the pp helper
+  (`GetDisplayScore(Standardised)`, `GetDisplayScore(Classic)`, `LegacyTotalScore`).
+- osu!stable's own files, for anyone tempted to read them again: the wiki's db format page
+  (<https://osu.ppy.sh/wiki/en/Client/File_formats/Db_(file_format)>) describes `osu!.db` and
+  `scores.db`. The layout is **not** current -- a parser written to it failed on build
+  `b20260711.1` -- and what a real install does and does not record is written up in
+  `docs/roadmap.md` 5.12. Read that before trusting any of it.
+- "Option to save failed replays" is still open against stable
+  (<https://github.com/ppy/osu-stable-issues/issues/254>), which is why a failed play leaves
+  no replay to find.
+
 ## data.ppy.sh
 
 The pp-to-rank curves in `src/calc/rank-tables/` are built from the public

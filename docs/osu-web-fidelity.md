@@ -65,6 +65,7 @@ allows redistribution.
 | section panels | `.page-extra` | `bem/page-extra.less`, `bem/title.less` |
 | score rows | `.play-detail` | `profile-page/play-detail.tsx`, `bem/play-detail.less` |
 | mod badges | `modPill()` in `web/js/badges.js` | `components/mod.tsx`, `bem/mod.less`, `bem/mods.less` |
+| which score a row shows | `scoreColumn()` in `src/calc/eligibility.ts` | `utils/score-helper.ts` (`totalScore`: legacy, then classic, then standardised) |
 | most played | `.beatmap-playcount` | `profile-page/beatmap-playcount.tsx`, `bem/beatmap-playcount.less` |
 | play history chart | `#playHistory` | `profile-page/chart.tsx`, `profile-page/historical.tsx` |
 | medals | `.medals` | `profile-page/medals.tsx`, `bem/profile-badges.less` |
@@ -72,6 +73,15 @@ allows redistribution.
 | score row menu | `#playMenu` | `components/play-detail-menu.tsx` |
 | score page | `web/score.html`, `web/js/score-page.js` | `scores-show/main.tsx`, `components/header-v4.tsx` |
 | View Details card | `#scoreModal`, `web/js/score-card.js` | `scores-show/*.tsx`, `bem/score-{beatmap,info,tower,dial,player,buttons,stats}.less`, `bem/user-card.less`, `bem/legacy-rank.less`, `utils/score-helper.ts` |
+
+## Two things that look wrong and are right
+
+- **A stable play lists `CL`.** osu! adds Classic to every legacy score before scoring it, and
+  osu-web shows it, so `withClassicMod` adds it when a row or card is built. It is not in
+  `mods_json` and must not be: medals, play time and eligibility read what the player chose.
+- **The score on a row changes with a switch.** Options -> Lazer scoring picks the scale, as
+  osu!'s own profile page does; `score-helper.ts` above is the rule for which number each
+  scale shows. Both are stored per score, so nothing recalculates.
 
 ## Known deltas
 
