@@ -5,7 +5,6 @@ import {
   weightedTotal,
   weightedAccuracy,
   decodeLegacyMods,
-  modsAwardPp,
   withClassicMod,
 } from '../src/calc/pp.ts';
 import { levelFromScore, requiredScore } from '../src/calc/level.ts';
@@ -76,14 +75,6 @@ test('legacy mod bitmask decodes, collapsing implied bits', () => {
   assert.deepEqual(decodeLegacyMods(32 | 16384).map((m) => m.acronym), ['PF']);
   // 8256 is the DT+AP combination seen in the real replay corpus.
   assert.deepEqual(decodeLegacyMods(8256).map((m) => m.acronym), ['DT', 'AP']);
-});
-
-test('unranked mods make a score award no pp', () => {
-  assert.equal(modsAwardPp([]), true);
-  assert.equal(modsAwardPp([{ acronym: 'HD' }, { acronym: 'DT' }]), true);
-  assert.equal(modsAwardPp([{ acronym: 'AP' }]), false);
-  assert.equal(modsAwardPp([{ acronym: 'RX' }]), false);
-  assert.equal(modsAwardPp([{ acronym: 'DT' }, { acronym: 'AP' }]), false);
 });
 
 test('osu! scores a stable play with Classic, and the page says so', () => {

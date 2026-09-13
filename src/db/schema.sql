@@ -76,6 +76,9 @@ CREATE TABLE IF NOT EXISTS scores (
   map_status      INTEGER,
   mods_ranked     INTEGER,
   mods_countable  INTEGER,
+  -- The osu! release whose mod classes decided mods_ranked. NULL means osu! has not said: the
+  -- row predates asking it, or the helper was unavailable, and a recompute will ask.
+  mods_ranked_by  TEXT,
   -- Whether osu! itself would rank this score: the map and the mods both allow it.
   ranked          INTEGER NOT NULL DEFAULT 0,
   played_at       INTEGER NOT NULL,

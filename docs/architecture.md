@@ -28,6 +28,8 @@
 
 **pp calculated for every score, not just ranked.** Eligibility = query-time decision (`src/calc/eligibility.ts`), never stored. `scores` stores facts (`map_status`, `mods_ranked`, `mods_countable`, both pp). `countsSql()` turns settings into predicate. One definition of "counts"; never write `ranked = 1` in a new query.
 
+**Which mods are ranked is osu!'s answer.** `rankedByOsu` asks the helper (`"type": "ranked"`), which builds osu!'s own mod objects from the replay's mods and settings (or converts stable's bitmask) and reads `Mod.Ranked`. It differs by ruleset (MR ranked only in mania, HR everywhere but mania) and by setting (speed unranks DT, pitch does not), and osu! changes it between releases: a hand-kept list missed AL, SG, TC, BL, NS, AC, MU, SW, CO, FI and 4K–9K, and counted CL chosen on lazer. `scores.mods_ranked_by` holds the release that answered; NULL (helper down, or a row from before) is unranked and stale until a recompute. The Classic mod the decoder adds to stable plays is not part of the question.
+
 **Score removal = hide, not DELETE.** Replay stays on disk — a deleted row re-ingests when the file is noticed again. `scores.hidden_at` set instead; `visibleSql()` filters it from *every* query. A removed score leaves play count + level bar too.
 
 **Deleting a removed score for good keeps its key.** Row deleted, but `dedupe_key` written to `deleted_scores` first. Ingest + Import refuse a key listed there (`wasDeleted`). Never delete a score row any other way.

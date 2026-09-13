@@ -5,15 +5,6 @@ import type { OfficialCalculator, PpPart } from './official.ts';
 export const WEIGHT = 0.95;
 
 /**
- * Mods that award pp *at their default settings*. Anything outside this set (Relax,
- * Autopilot, Autoplay, Difficulty Adjust and the lazer-only fun mods) makes a score
- * unranked in osu!.
- */
-const RANKED_MODS = new Set([
-  'NF', 'EZ', 'HD', 'HR', 'SD', 'PF', 'DT', 'NC', 'HT', 'DC', 'FL', 'SO', 'TD', 'MR', 'CL',
-]);
-
-/**
  * Mods whose removal leaves a score osu! can still be asked to price: the play's hit
  * statistics scored as if the mod had not been on. Relax at 1.5x DT becomes a DT score.
  *
@@ -32,18 +23,36 @@ const STRIPPABLE_MODS = ['RX', 'AP'] as const;
 const NEVER_COUNTABLE = new Set(['AT', 'CN']);
 
 /**
- * lazer only writes `settings` when the player changed the mod from its defaults, which is
- * exactly the condition that unranks an otherwise-ranked mod (`Mod.Ranked` is
- * `UsesDefaultConfiguration` for the configurable ones). So the presence of any setting is
- * the signal -- DT at 1.45x, HT at 0.5x, HD with faded approach circles.
+ * Did the player change any of this mod's settings? lazer only writes `settings` when they
+ * did. This is *not* whether the mod is still ranked -- a changed speed unranks Double Time
+ * but a changed pitch does not -- which only osu! can say (`rankedByOsu`).
  */
 export function isCustomised(mod: LazerMod): boolean {
   return mod.settings !== undefined && Object.keys(mod.settings).length > 0;
 }
 
-/** Would osu! itself rank a score set with these mods? */
-export function modsAwardPp(mods: LazerMod[]): boolean {
-  return mods.every((m) => RANKED_MODS.has(m.acronym) && !isCustomised(m));
+/**
+ * Would osu! itself rank a score set with these mods? Asked of osu!'s own mod classes through
+ * the helper, because the answer differs by ruleset (Mirror is ranked only in mania, Hard Rock
+ * everywhere but mania) and by setting, and osu! changes it between releases. A hand-kept
+ * list here once missed Alternate, Single Tap, Traceable and the rest of lazer's newer ranked
+ * mods, and counted Classic chosen on lazer, which osu! does not rank.
+ *
+ * Null when the helper cannot answer: unknown, which counts as unranked until a recompute.
+ */
+export async function rankedByOsu(
+  score: ReplayScore,
+  official: OfficialCalculator | null,
+): Promise<boolean | null> {
+  if (!official) return null;
+  // The same choice as scoreMods: a lazer replay's own mod list, else stable's bitmask, which
+  // osu! converts itself -- including the key-count and Random bits decodeLegacyMods skips.
+  const result = await official.ranked(
+    score.extras?.mods
+      ? { ruleset: score.mode, mods: score.extras.mods }
+      : { ruleset: score.mode, legacyMods: score.legacyMods },
+  );
+  return result?.ranked ?? null;
 }
 
 /**

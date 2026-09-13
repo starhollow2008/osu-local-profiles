@@ -59,6 +59,9 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   // from a release that had neither.
   { table: 'osu_files', column: 'name', definition: 'TEXT' },
   { table: 'incomplete_plays', column: 'unsubmitted', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  // Added when osu! itself began deciding which mods are ranked. NULL marks a mods_ranked from
+  // the old hand-kept list, or one the helper could not answer, and makes the score stale.
+  { table: 'scores', column: 'mods_ranked_by', definition: 'TEXT' },
 ];
 
 /**

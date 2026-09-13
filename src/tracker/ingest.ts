@@ -5,9 +5,9 @@ import { parseReplay, type ReplayScore, type Ruleset } from '../osr.ts';
 import { awardsPp, UNRESOLVED_STATUS, type BeatmapResolver } from '../clients/beatmaps.ts';
 import {
   calculateScorePp,
-  modsAwardPp,
   modsCountable,
   modsLabel,
+  rankedByOsu,
   scoreMods,
   strippableMods,
 } from '../calc/pp.ts';
@@ -119,10 +119,7 @@ export async function ingestScore(
   const acc = accuracy(score, mode);
 
   const mapRanked = awardsPp(beatmap.status);
-  const modsRanked = modsAwardPp(mods);
   const countable = modsCountable(mods);
-  // What osu! itself would say. Kept as `ranked` so nothing downstream shifts meaning.
-  const eligible = mapRanked && modsRanked;
 
   const named = describe(beatmap, score.beatmapMD5);
 
@@ -173,6 +170,12 @@ export async function ingestScore(
       ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official, strippable)
       : null;
 
+  // Asked of osu! after the filter, so a play it turns away costs no round trip.
+  const modsRanked = await rankedByOsu(score, ctx.official);
+  // What osu! itself would say. Kept as `ranked` so nothing downstream shifts meaning. Mods
+  // osu! could not be asked about are not ranked until a recompute asks again.
+  const eligible = mapRanked && modsRanked === true;
+
   ctx.db
     .prepare(
       `INSERT INTO scores
@@ -180,9 +183,10 @@ export async function ingestScore(
          count300, count100, count50, count_geki, count_katu, count_miss,
          statistics_json, max_statistics_json,
          accuracy, max_combo, total_score, score_standard, score_classic, passed, grade, stars, pp, pp_source,
-         pp_nomod, stars_nomod, beatmap_max_combo, map_status, mods_ranked, mods_countable,
-         ranked, played_at, online_score_id, replay_path, pp_parts, pp_nomod_parts, pp_version)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         pp_nomod, stars_nomod, beatmap_max_combo, map_status, mods_ranked, mods_ranked_by,
+         mods_countable, ranked, played_at, online_score_id, replay_path, pp_parts, pp_nomod_parts,
+         pp_version)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       ctx.profileId, key, mode, score.beatmapMD5, beatmap.beatmapId, score.client,
@@ -198,7 +202,9 @@ export async function ingestScore(
       stripped?.pp ?? null, stripped?.stars ?? null,
       computed?.maxCombo ?? null,
       beatmap.status ?? UNRESOLVED_STATUS,
-      modsRanked ? 1 : 0, countable ? 1 : 0,
+      modsRanked === null ? null : modsRanked ? 1 : 0,
+      modsRanked === null ? null : (ctx.official?.version ?? 'unknown'),
+      countable ? 1 : 0,
       eligible ? 1 : 0,
       playedAt,
       score.onlineScoreId === null ? null : String(score.onlineScoreId),

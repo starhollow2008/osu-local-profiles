@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- **Which mods are ranked now comes from osu! itself.** A hand-kept list was missing lazer's
+  newer ranked mods -- Alternate, Single Tap, Traceable, Blinds, No Scope, Accuracy Challenge,
+  Muted, Swap, Cover, Fade In and 4K-9K -- so those plays counted only with **Include pp for
+  unranked mods** on. It also counted Classic chosen on lazer, Mirror outside mania and Hard Rock
+  in mania, none of which osu! ranks, and treated any changed setting as unranking: a changed
+  pitch on Double Time, or Sudden Death set to restart, keeps a play ranked in osu!. The pp
+  calculator is now asked, per game mode and setting. Scores tracked before this are offered a
+  recompute in Settings, which re-checks them -- including scores whose replay is gone.
+
 ## 1.14.0
 
 - **Plays osu! could not submit can count** (Settings -> Count plays osu! could not submit).

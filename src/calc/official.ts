@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-
+import type { LazerMod } from '../osr.ts';
 
 /**
  * Talks to the bundled `osu-pp` helper, which is a thin wrapper around osu!'s *own*
@@ -72,9 +72,28 @@ export interface PpPart {
   pp: number;
 }
 
+/**
+ * "Would osu! rank these mods?" Exactly one of `mods` (a lazer replay's, with any settings
+ * the player changed) or `legacyMods` (an osu!stable replay's bitmask) is given.
+ */
+export interface RankedRequest {
+  /** osu!'s ruleset id: 0 osu!, 1 taiko, 2 catch, 3 mania. */
+  ruleset: number;
+  mods?: LazerMod[];
+  legacyMods?: number;
+}
+
+export interface RankedResult {
+  ranked: boolean;
+  /** The acronyms osu! does not rank, as played; empty when `ranked`. */
+  unranked: string[];
+}
+
 interface Response {
   ok: boolean;
   error?: string;
+  ranked?: boolean;
+  unranked?: string[];
   stars?: number;
   maxCombo?: number;
   accuracy?: number;
@@ -205,11 +224,49 @@ export class OfficialCalculator {
     return null;
   }
 
-  calculate(request: OfficialRequest): Promise<OfficialResult | null> {
-    const run = async (): Promise<OfficialResult | null> => {
-      if (this.dead) return null;
+  async calculate(request: OfficialRequest): Promise<OfficialResult | null> {
+    const response = await this.send(request);
+    if (!response.ok || typeof response.stars !== 'number') {
+      if (response.error) this.lastError = response.error;
+      return null;
+    }
+    return {
+      stars: response.stars,
+      maxCombo: response.maxCombo ?? 0,
+      accuracy: response.accuracy ?? 0,
+      combo: response.combo ?? 0,
+      rank: response.rank ?? '',
+      isLegacy: response.isLegacy ?? false,
+      mods: response.mods ?? [],
+      pp: response.pp ?? null,
+      standardisedScore: response.standardisedScore ?? null,
+      classicScore: response.classicScore ?? null,
+      legacyTotalScore: response.legacyTotalScore ?? null,
+      stripped: response.stripped ?? false,
+      breakdown: response.breakdown ?? [],
+    };
+  }
 
-      const response = await new Promise<Response>((resolve) => {
+  /**
+   * Whether osu! ranks a mod combination, from osu!'s own mod classes. Null when the helper
+   * cannot answer -- including one built before it understood the question, which answers
+   * with an error rather than a guess.
+   */
+  async ranked(request: RankedRequest): Promise<RankedResult | null> {
+    const response = await this.send({ type: 'ranked', ...request });
+    if (!response.ok || typeof response.ranked !== 'boolean') {
+      if (response.error) this.lastError = response.error;
+      return null;
+    }
+    return { ranked: response.ranked, unranked: response.unranked ?? [] };
+  }
+
+  /** One request, one response line, queued behind any request already in flight. */
+  private send(request: object): Promise<Response> {
+    const run = async (): Promise<Response> => {
+      if (this.dead) return { ok: false };
+
+      return await new Promise<Response>((resolve) => {
         const timer = setTimeout(
           () => resolve({ ok: false, error: 'calculator timed out' }),
           REQUEST_TIMEOUT_MS,
@@ -220,26 +277,6 @@ export class OfficialCalculator {
         };
         this.child.stdin.write(`${JSON.stringify(request)}\n`);
       });
-
-      if (!response.ok || typeof response.stars !== 'number') {
-        if (response.error) this.lastError = response.error;
-        return null;
-      }
-      return {
-        stars: response.stars,
-        maxCombo: response.maxCombo ?? 0,
-        accuracy: response.accuracy ?? 0,
-        combo: response.combo ?? 0,
-        rank: response.rank ?? '',
-        isLegacy: response.isLegacy ?? false,
-        mods: response.mods ?? [],
-        pp: response.pp ?? null,
-        standardisedScore: response.standardisedScore ?? null,
-        classicScore: response.classicScore ?? null,
-        legacyTotalScore: response.legacyTotalScore ?? null,
-        stripped: response.stripped ?? false,
-        breakdown: response.breakdown ?? [],
-      };
     };
 
     const next = this.queue.then(run, run);

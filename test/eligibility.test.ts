@@ -11,33 +11,13 @@ import { defaultSettings, type Settings } from '../src/settings.ts';
 import { Status, UNRESOLVED_STATUS } from '../src/clients/beatmaps.ts';
 import {
   isCustomised,
-  modsAwardPp,
   modsCountable,
   strippableMods,
 } from '../src/calc/pp.ts';
 
 /* ------------------------------------------------------------ mod classification */
 
-test('osu! ranks only the ranked mods, at their default settings', () => {
-  assert.equal(modsAwardPp([]), true);
-  assert.equal(modsAwardPp([{ acronym: 'HD' }, { acronym: 'HR' }]), true);
-  assert.equal(modsAwardPp([{ acronym: 'RX' }]), false);
-  assert.equal(modsAwardPp([{ acronym: 'AP' }]), false);
-  assert.equal(modsAwardPp([{ acronym: 'DA' }]), false);
-});
-
-/*
- * The bug this fixes was live: a DT at 1.45x was stored as ranked because only the acronym
- * was checked. lazer writes `settings` exactly when the player left the defaults, which is
- * the same condition that unranks the mod in osu! itself.
- */
-test('a customised rate mod is not ranked, even though its acronym is', () => {
-  assert.equal(modsAwardPp([{ acronym: 'DT' }]), true);
-  assert.equal(modsAwardPp([{ acronym: 'DT', settings: { speed_change: 1.45 } }]), false);
-  assert.equal(modsAwardPp([{ acronym: 'HT', settings: { speed_change: 0.5 } }]), false);
-  // An empty settings object is not a customisation.
-  assert.equal(modsAwardPp([{ acronym: 'DT', settings: {} }]), true);
-});
+// Which mods osu! ranks is osu!'s answer, not ours: see test/ranked-mods.test.ts.
 
 test('isCustomised only fires on an actual setting', () => {
   assert.equal(isCustomised({ acronym: 'HD' }), false);

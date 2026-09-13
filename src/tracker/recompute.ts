@@ -1,12 +1,12 @@
 import fs from 'node:fs';
 import type { Db } from '../db/index.ts';
-import { parseReplay } from '../osr.ts';
+import { parseReplay, type LazerMod } from '../osr.ts';
 import { awardsPp, UNRESOLVED_STATUS, type BeatmapResolver } from '../clients/beatmaps.ts';
 import {
   calculateScorePp,
-  modsAwardPp,
   modsCountable,
   modsLabel,
+  rankedByOsu,
   scoreMods,
   strippableMods,
 } from '../calc/pp.ts';
@@ -52,10 +52,12 @@ export interface RecomputeResult {
 
 /**
  * A row is out of date if it has never been given the columns the eligibility rules read.
- * `map_status` is the marker: it is written for every score from now on, including the
+ * `map_status` is one marker: it is written for every score from now on, including the
  * `UNRESOLVED_STATUS` sentinel, so NULL means "ingested before this existed".
+ * `mods_ranked_by` is the other: NULL means osu! has not yet said whether the mods are ranked,
+ * because the row predates asking it or the helper could not answer.
  */
-const MISSING_CLAUSE = 'map_status IS NULL';
+const MISSING_CLAUSE = '(map_status IS NULL OR mods_ranked_by IS NULL)';
 
 export function countStale(db: Db, profileId: number): number {
   const row = db
@@ -89,6 +91,7 @@ const UPDATE_COLUMNS = [
   'beatmap_max_combo',
   'map_status',
   'mods_ranked',
+  'mods_ranked_by',
   'mods_countable',
   'ranked',
   'beatmap_id',
@@ -99,19 +102,31 @@ const UPDATE_COLUMNS = [
 
 type UpdateValues = Record<(typeof UPDATE_COLUMNS)[number], string | number | null>;
 
+interface StoredRow {
+  id: number;
+  replay_path: string;
+  pp: number | null;
+  mode: number;
+  mods_json: string | null;
+  map_status: number | null;
+}
+
 export async function recomputeScores(opts: RecomputeOptions): Promise<RecomputeResult> {
   const rows = opts.db
     .prepare(
-      `SELECT id, replay_path, pp FROM scores
+      `SELECT id, replay_path, pp, mode, mods_json, map_status FROM scores
         WHERE profile_id = ? AND replay_path IS NOT NULL
           ${opts.onlyMissing ? `AND ${MISSING_CLAUSE}` : ''}
           ${opts.ids ? `AND id IN (${opts.ids.map(() => '?').join(',') || 'NULL'})` : ''}
         ORDER BY played_at ASC`,
     )
-    .all(opts.profileId, ...(opts.ids ?? [])) as { id: number; replay_path: string; pp: number | null }[];
+    .all(opts.profileId, ...(opts.ids ?? [])) as unknown as StoredRow[];
 
   const update = opts.db.prepare(
     `UPDATE scores SET ${UPDATE_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+  );
+  const updateRanked = opts.db.prepare(
+    'UPDATE scores SET mods_ranked = ?, mods_ranked_by = ?, ranked = ? WHERE id = ?',
   );
 
   const result: RecomputeResult = { considered: rows.length, updated: 0, skipped: 0, gainedPp: 0 };
@@ -123,14 +138,16 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
     try {
       score = await parseReplay(fs.readFileSync(row.replay_path));
     } catch {
-      // The replay has been deleted or is unreadable. Leave the stored score untouched.
+      // The replay has been deleted or is unreadable. Leave the stored score untouched, except
+      // for asking osu! about the mods it keeps -- see recheckStoredMods.
+      await recheckStoredMods(row, opts.official, updateRanked);
       result.skipped++;
       continue;
     }
 
     const beatmap = opts.resolver.resolve(score.beatmapMD5);
     const mods = scoreMods(score);
-    const modsRanked = modsAwardPp(mods);
+    const modsRanked = await rankedByOsu(score, opts.official);
     const countable = modsCountable(mods);
 
     const computed = beatmap.osuPath
@@ -160,9 +177,10 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
       stars_nomod: stripped?.stars ?? null,
       beatmap_max_combo: computed?.maxCombo ?? null,
       map_status: beatmap.status ?? UNRESOLVED_STATUS,
-      mods_ranked: modsRanked ? 1 : 0,
+      mods_ranked: modsRanked === null ? null : modsRanked ? 1 : 0,
+      mods_ranked_by: modsRanked === null ? null : (opts.official.version ?? 'unknown'),
       mods_countable: countable ? 1 : 0,
-      ranked: awardsPp(beatmap.status) && modsRanked ? 1 : 0,
+      ranked: awardsPp(beatmap.status) && modsRanked === true ? 1 : 0,
       beatmap_id: beatmap.beatmapId,
       pp_parts: computed ? JSON.stringify(computed.breakdown) : null,
       pp_nomod_parts: stripped ? JSON.stringify(stripped.breakdown) : null,
@@ -176,4 +194,35 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
 
   opts.onProgress?.(rows.length, rows.length);
   return result;
+}
+
+/**
+ * A score whose replay is gone keeps everything it has, but the mods it was played with are
+ * stored, so osu! can still say whether they are ranked. Without this such a score would stay
+ * judged by the old hand-kept list, and stale for ever: the page would keep offering a
+ * recompute that can never finish it.
+ *
+ * An osu!stable score's stored mods are what decodeLegacyMods reads, which leaves out mania's
+ * key-count and Random bits. The replay, when there is one, carries them all.
+ */
+async function recheckStoredMods(
+  row: StoredRow,
+  official: OfficialCalculator,
+  update: ReturnType<Db['prepare']>,
+): Promise<void> {
+  if (row.map_status === null || row.mods_json === null) return;
+  let mods: LazerMod[];
+  try {
+    mods = JSON.parse(row.mods_json) as LazerMod[];
+  } catch {
+    return;
+  }
+  const answer = await official.ranked({ ruleset: row.mode, mods });
+  if (!answer) return;
+  update.run(
+    answer.ranked ? 1 : 0,
+    official.version ?? 'unknown',
+    awardsPp(row.map_status) && answer.ranked ? 1 : 0,
+    row.id,
+  );
 }

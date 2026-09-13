@@ -13,16 +13,22 @@
 // Protocol: one JSON request per line on stdin, one JSON response per line on stdout.
 // Staying resident avoids paying ~150ms of runtime startup for every score. The first line
 // out announces readiness and the osu! version whose calculators these are.
+//
+// Two kinds of request: a pp calculation (the default), and `"type": "ranked"`, which asks
+// osu!'s own mod classes whether a mod combination is ranked.
 
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using osu.Game.Beatmaps;
 using osu.Game.Beatmaps.Formats;
+using osu.Game.Beatmaps.Legacy;
 using osu.Game.IO;
+using osu.Game.Online.API;
 using osu.Game.Rulesets;
 using osu.Game.Rulesets.Catch;
 using osu.Game.Rulesets.Mania;
+using osu.Game.Rulesets.Mods;
 using osu.Game.Rulesets.Osu;
 using osu.Game.Rulesets.Scoring;
 using osu.Game.Rulesets.Taiko;
@@ -33,6 +39,9 @@ namespace OsuLocalProfiles.PpCalculator;
 
 public sealed class Request
 {
+    /// <summary>"ranked" for a ranked-mods question; absent for a pp calculation.</summary>
+    [JsonPropertyName("type")] public string? Type { get; set; }
+
     /// <summary>The .osr replay to score. lazer stores these without a file extension.</summary>
     [JsonPropertyName("replayPath")] public string ReplayPath { get; set; } = string.Empty;
 
@@ -54,6 +63,23 @@ public sealed class Request
     /// left exactly as decoded.
     /// </remarks>
     [JsonPropertyName("stripMods")] public string[]? StripMods { get; set; }
+
+    /// <summary>Ranked request: the ruleset's legacy id (0 osu!, 1 taiko, 2 catch, 3 mania).</summary>
+    [JsonPropertyName("ruleset")] public int Ruleset { get; set; }
+
+    /// <summary>Ranked request: the mods a lazer replay recorded, with any settings the player changed.</summary>
+    [JsonPropertyName("mods")] public ModRequest[]? Mods { get; set; }
+
+    /// <summary>Ranked request: an osu!stable replay's mod bitmask, used in place of <see cref="Mods"/>.</summary>
+    [JsonPropertyName("legacyMods")] public long? LegacyMods { get; set; }
+}
+
+/// <summary>One mod as lazer writes it into a replay: an acronym and its changed settings.</summary>
+public sealed class ModRequest
+{
+    [JsonPropertyName("acronym")] public string Acronym { get; set; } = string.Empty;
+
+    [JsonPropertyName("settings")] public Dictionary<string, JsonElement>? Settings { get; set; }
 }
 
 public static class Program
@@ -90,7 +116,13 @@ public static class Program
             {
                 var request = JsonSerializer.Deserialize<Request>(line, JsonOptions)
                               ?? throw new InvalidOperationException("empty request");
-                response = JsonSerializer.Serialize(Calculate(request), JsonOptions);
+                object result = request.Type switch
+                {
+                    null => Calculate(request),
+                    "ranked" => Ranked(request),
+                    _ => throw new ArgumentException($"unknown request type {request.Type}"),
+                };
+                response = JsonSerializer.Serialize(result, JsonOptions);
             }
             catch (Exception ex)
             {
@@ -156,6 +188,65 @@ public static class Program
                 .ToArray(),
             version = OsuVersion,
         };
+    }
+
+    /// <summary>
+    /// Whether osu! ranks a mod combination: osu!'s own <see cref="Mod.Ranked"/> on each mod,
+    /// built the way osu! builds it from a replay.
+    /// </summary>
+    /// <remarks>
+    /// Which mods are ranked differs by ruleset (Mirror only in mania, Hard Rock everywhere
+    /// but mania) and by setting (a changed speed unranks Double Time; a changed pitch does
+    /// not), and osu! changes the list between releases. Asking osu! keeps all of that in one
+    /// place. Needs no beatmap, so it answers for plays whose .osu is not on disk.
+    ///
+    /// An osu!stable bitmask goes through osu!'s own legacy conversion. The Classic mod the
+    /// replay decoder adds to stable plays is deliberately not part of this: osu! ranks stable
+    /// plays, while a lazer player choosing Classic is unranked.
+    /// </remarks>
+    private static object Ranked(Request request)
+    {
+        var ruleset = RulesetFor(request.Ruleset);
+
+        Mod[] mods = request.LegacyMods is long bits
+            ? ruleset.ConvertFromLegacyMods((LegacyMods)bits).ToArray()
+            : (request.Mods ?? Array.Empty<ModRequest>())
+                // An acronym this ruleset does not have comes back as osu!'s UnknownMod, which
+                // is not ranked.
+                .Select(m => new APIMod { Acronym = m.Acronym, Settings = SettingValues(m.Settings) }.ToMod(ruleset))
+                .ToArray();
+
+        var unranked = mods.Where(m => !m.Ranked).Select(m => m.Acronym).ToArray();
+
+        return new
+        {
+            ok = true,
+            ranked = unranked.Length == 0,
+            unranked,
+            version = OsuVersion,
+        };
+    }
+
+    /// <summary>JSON setting values as the plain values osu!'s bindables parse.</summary>
+    private static Dictionary<string, object> SettingValues(Dictionary<string, JsonElement>? settings)
+    {
+        var values = new Dictionary<string, object>();
+        if (settings == null) return values;
+
+        foreach (var (name, value) in settings)
+        {
+            values[name] = value.ValueKind switch
+            {
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                // Whole numbers stay integral so an enum setting written as a number parses.
+                JsonValueKind.Number => value.TryGetInt64(out long whole) ? whole : value.GetDouble(),
+                JsonValueKind.String => value.GetString()!,
+                _ => throw new ArgumentException($"setting {name} has an unsupported value"),
+            };
+        }
+
+        return values;
     }
 
     private static Ruleset RulesetFor(int legacyId) => legacyId switch

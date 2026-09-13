@@ -8,7 +8,7 @@ import { detectInstalls } from '../src/clients/detect.ts';
 import { BeatmapResolver, awardsPp } from '../src/clients/beatmaps.ts';
 import { Tracker } from '../src/tracker/index.ts';
 import { parseReplay, looksLikeReplay } from '../src/osr.ts';
-import { modsAwardPp, scoreMods } from '../src/calc/pp.ts';
+import { rankedByOsu } from '../src/calc/pp.ts';
 import { computeStats } from '../src/calc/stats.ts';
 import { OfficialCalculator } from '../src/calc/official.ts';
 import { updateSettings } from '../src/settings.ts';
@@ -46,7 +46,11 @@ function seedIndex(db: Db): number {
 }
 
 /** Find a real replay whose map is ranked and whose mods keep it pp-eligible. */
-async function findScorableReplay(db: Db, resolver: BeatmapResolver): Promise<string | null> {
+async function findScorableReplay(
+  db: Db,
+  resolver: BeatmapResolver,
+  official: OfficialCalculator | null,
+): Promise<string | null> {
   const real = openReadOnly(REAL_DB);
   if (!real) return null;
   // Every non-.osu file the indexer examined lands here, replays included.
@@ -65,7 +69,8 @@ async function findScorableReplay(db: Db, resolver: BeatmapResolver): Promise<st
     }
     const map = resolver.resolve(score.beatmapMD5);
     if (!map.osuPath || !awardsPp(map.status)) continue;
-    if (!modsAwardPp(scoreMods(score))) continue;
+    // Only osu! can say the mods are ranked; with no calculator, any passable replay will do.
+    if (official && (await rankedByOsu(score, official)) !== true) continue;
     return p;
   }
   return null;
@@ -88,7 +93,10 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
   const resolver = new BeatmapResolver(db, installs);
 
   const official = await OfficialCalculator.create();
-  const source = await findScorableReplay(db, resolver);
+  // However the test ends. A live pp helper or watcher keeps this file's process open, so a
+  // skip or a failed assertion would otherwise hang the whole suite instead of reporting.
+  t.after(() => official?.dispose());
+  const source = await findScorableReplay(db, resolver, official);
   if (!source) return t.skip('no pp-eligible replay available to replay through the watcher');
 
   const tracker = new Tracker({
@@ -99,6 +107,7 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
     trackingSince: 0, // accept the historical replay we are about to drop in
     official,
   });
+  t.after(() => tracker.stop());
 
   const gotScore = new Promise<{ pp: number | null; grade: string; accuracy: number; title: string }>(
     (resolve, reject) => {
@@ -165,7 +174,8 @@ test('a play the filter declines is not recorded at all', { timeout: 120_000 }, 
   if (seedIndex(db) === 0) return t.skip('beatmap index is empty');
   const profileId = getOrCreateProfile(db, 'Test Profile');
   const resolver = new BeatmapResolver(db, installs);
-  const source = await findScorableReplay(db, resolver);
+  // Declined before it is ever priced, so any replay will do and no calculator is needed.
+  const source = await findScorableReplay(db, resolver, null);
   if (!source) return t.skip('no replay available to drop through the watcher');
 
   // A keyword no beatmap on this machine can contain, so the rejection is unambiguous.
