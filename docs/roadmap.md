@@ -2113,3 +2113,80 @@ The reproduction is `dotnet publish -p:PublishTrimmed=true
 -p:JsonSerializerIsReflectionEnabledByDefault=true`, pruned with `shouldPrune` from
 `scripts/build-pp-helper.mjs`, compared field by field against the shipped helper on real
 replays.
+
+## 5.45 - Plays osu! could not submit
+
+**Status:** done -- unreleased.
+
+Offline or signed out, osu! submits nothing and counts nothing, so the unfinished plays read from
+`Score submission completed!` went silent with it. The user asked for them anyway, as an estimate
+kept apart from what osu! counted.
+
+### What lazer writes with no token
+
+Read off this machine's 20 session logs rather than assumed:
+
+- `SubmittingPlayer.submitScore` logs **`No token, skipping score submission`** -- 94 times -- just
+  before the gameplay screen exits (93) or within a few seconds after it (1). Distinct from `No
+  hits registered`, which is osu! discarding a play it *could* have submitted.
+- Every retry is a new gameplay screen: `SoloPlayer#819` -> `#134` -> `#510` in eleven seconds.
+- The beatmap is the most recent `Game-wide working beatmap updated to` before `entered
+  SoloPlayer#N` -- a local line, difficulty name included.
+- Other screens enter too, and none is a play to estimate: `MultiplayerPlayer` (12), `ReplayPlayer`
+  (4), `SkinEditorOverlay+EndlessPlayer` (3), `DailyChallengePlayer` (2), against 353 `SoloPlayer`.
+
+59 attempts in all (42 in one offline session), a median of 18 s in gameplay, 7 under 5 s. Another
+15 no-token screens reached results -- passes, whose replays are on disk -- and are excluded.
+
+### Decisions
+
+- **Only what lazer states.** An attempt is a `SoloPlayer` screen that logged `No token`, did not
+  reach results, and closed. A screen that had a token is never one, whatever follows it.
+- **Recorded always, counted by choice.** `incomplete_plays.unsubmitted = 1`, and the setting
+  `countUnsubmittedAttempts` -- first off by default, then **on**, at the user's call (below).
+  Recording cannot wait for the setting: the log is only followed live, so an attempt skipped
+  today is gone. `incompleteSql(e)` is the one definition, so every figure that reads
+  unfinished plays moves together, and Settings says how many have been recorded before anyone
+  switches it on.
+- **Matched by name.** No submission means no beatmap id. The cache of beatmaps that have a score
+  matched 12 of the 59; `osu_files.name` -- lazer's own `Artist - Title (Creator) [Version]`,
+  built from each `.osu` -- matched all 59 with none ambiguous, and needs no `online.db`, which
+  suits the Linux case the PR before this was about. It is backfilled once, in the same re-read
+  as that PR's still-unreleased `beatmap_id` backfill.
+- **What the estimate cannot know** is whether osu! would have counted it online (at least one
+  non-miss judgement), so an attempt quit before hitting anything is included. The setting's hint
+  says so.
+
+### Found on the way: section boundaries in .osu parsing
+
+Checking the stored names against the logs turned up an older bug. `parseOsuMetadataText` and
+`beatmapMode` ended a section at the next `[` *anywhere*, and `[` is ordinary inside a value.
+Across 12,811 beatmaps that lost 293 names, corrupted 34, and filed 23 beatmaps under the wrong
+mode: the mania and taiko difficulties of a Bad Apple!! set whose audio file is `[HD] Epic Trance
+- ...` read as osu!standard, which already misfiled unfinished plays osu! *had* counted.
+`osuSection` ends a section at the next line beginning with `[`. Checked against an independent
+line-by-line reading of every indexed file: 0 names and 0 modes differ, and 2 files are genuinely
+missing part of a name, down from 295.
+
+### Verified
+
+On a copy of the dev database, the production parser and resolver over all 20 logs: 59 attempts,
+59 matched, 59 recorded, and none added again on a second read. 380 tests, including the real
+offline sequence from log 1788778412 and a regression test for a bracket inside a value.
+
+### Then: on by default, and past attempts imported
+
+- **On by default.** The user's reasoning: a play made offline or signed out never reaches the osu!
+  profile anyway, so counting it contradicts nothing osu! shows -- it only covers play osu! had no
+  chance to see. The Scores note now mentions them only once a profile has some recorded, or it
+  would be said to every profile by default.
+- **Import past plays reads the logs.** The live watcher follows a log from its end, so the 59
+  attempts already on disk were out of reach. `src/tracker/log-backfill.ts` reads the logs from
+  the cutoff on; the dialog offers three sources -- replays, unfinished plays osu! counted,
+  attempts osu! could not submit -- each ticked with its count, because asking for past offline
+  attempts must not import past replays with them. Preview and import share
+  `checkIncompletePlay` and `checkUnsubmittedAttempt`, so the preview's counts are the import's.
+  An import that names no sources still means replays alone.
+- **What it costs.** The app code grew by 22 KB, 6.9 KB compressed, against an 87 MB download. The
+  database grew by 1.65 MB on this machine (17.07 MB to 18.72 MB compacted): 734 KB of beatmap
+  names for 12,811 beatmaps and the index on them, about 128 bytes a beatmap.

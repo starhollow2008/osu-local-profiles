@@ -13,9 +13,10 @@ import type { OsuInstall } from './detect.ts';
  *
  * lazer's log is the only local record of the other 26. Like `osu-web.ts` this is a private
  * detail of osu! rather than a documented interface, so every pattern below is written to
- * *fail closed*: an unrecognised line is ignored, and a play is only ever reported when the
- * game itself said, in as many words, that osu! accepted the submission. Inventing a play
- * would be far worse than missing one.
+ * *fail closed*: an unrecognised line is ignored, and something is only ever reported when the
+ * game itself said so in as many words -- that osu! accepted a submission, or, for an attempt
+ * made offline or signed out, that it had no token to submit with (`UnsubmittedAttempt`).
+ * Inventing a play would be far worse than missing one.
  *
  * Timestamps in these logs are UTC. (The session file is named for the unix second it
  * started -- 1789001733 -> 2026-09-10T00:55:33Z -- and its first line reads
@@ -98,6 +99,82 @@ function parseTimestamp(m: RegExpMatchArray): number {
   return Date.UTC(+m[1]!, +m[2]! - 1, +m[3]!, +m[4]!, +m[5]!, +m[6]!);
 }
 
+/*
+ * The second half of the grammar: solo gameplay screens, followed on their own so that a play
+ * osu! had no token for can still be seen. `SoloPlayer` exactly, with a space before it --
+ * watching a replay (`ReplayPlayer`), the skin editor's `EndlessPlayer`, multiplayer and the
+ * daily challenge each enter a screen of their own, and none of them is a play to estimate.
+ * Across this machine's logs that was 353 solo screens against 21 of all the others.
+ */
+const ENTERED_SOLO = / entered SoloPlayer#(\d+)/;
+const LEFT_SOLO = / exit from SoloPlayer#(\d+)/;
+const SOLO_REACHED_RESULTS = / suspended SoloPlayer#(\d+) \(waiting on \w*ResultsScreen#/;
+
+/**
+ * `SubmittingPlayer.submitScore` finding it has no token: osu! was offline or signed out, the
+ * token request failed, or the beatmap is one osu! cannot submit. Distinct from `No hits
+ * registered`, which is osu! discarding a play it *could* have submitted -- that one stays
+ * uncounted, exactly as osu! leaves it.
+ */
+const NO_TOKEN = /^No token, skipping score submission$/;
+
+/**
+ * How late a `No token` line may still belong to the screen that just closed. Measured on
+ * this machine's logs: 93 of 94 came just before their screen's exit, and the one exception
+ * came after it, within a few seconds.
+ */
+const LATE_NO_TOKEN_MS = 5_000;
+
+/**
+ * A gameplay screen entered this recently cannot be the one a `No token` line is about,
+ * because that line is written as a play *ends*. Log timestamps are whole seconds, so this
+ * means "the same second or the next" -- which is what a quick retry looks like.
+ */
+const JUST_ENTERED_MS = 1_000;
+
+/**
+ * An attempt osu! logged it had no token for, and so never counted.
+ *
+ * Offline or signed out, lazer never asks for a token and never submits, so neither line the
+ * plays above are built from is ever written. What *is* written, locally, is the screen stack
+ * entering and leaving gameplay and `SubmittingPlayer` saying in as many words that it had no
+ * token -- which is what this is built from, and nothing weaker. A play that reached a results
+ * screen is excluded: lazer imported it, so it arrives as a replay.
+ *
+ * What the log cannot say is whether osu! *would* have counted it had it been online -- the
+ * rule there is at least one non-miss judgement -- so an attempt quit before hitting anything
+ * is included. On this machine's logs that was 7 of 59.
+ */
+export interface UnsubmittedAttempt {
+  /** The gameplay screen's instance number: `217` in `SoloPlayer#217`. */
+  player: string;
+  /** When gameplay was entered. */
+  startedAt: number;
+  /** When it was left -- the quit, the fail or the retry. */
+  endedAt: number;
+  /** The beatmap the game was on as gameplay began, as `Artist - Title (Creator) [Version]`. */
+  beatmapName: string | null;
+}
+
+/** An unsubmitted attempt and the session log it came from, which is what makes it unique. */
+export interface SessionAttempt extends UnsubmittedAttempt {
+  /** The `<unix seconds>` lazer named the session's log files with. */
+  session: string;
+}
+
+/** Everything one stretch of the log produced. */
+export interface LogEvents {
+  plays: LoggedPlay[];
+  attempts: UnsubmittedAttempt[];
+}
+
+/** For tests and batch reads: every counted play and every unsubmitted attempt in a session. */
+export function parseSessionEvents(runtime: string): LogEvents {
+  const session = new LogSession();
+  const events = session.feedEvents(runtime.split(/\r?\n/));
+  return { plays: [...events.plays, ...session.flush()], attempts: events.attempts };
+}
+
 interface OpenPlay {
   token: string;
   startedAt: number | null;
@@ -106,6 +183,18 @@ interface OpenPlay {
   onlineScoreId: string | null;
   /** Set when gameplay ends; submission completion can be logged afterward. */
   outcome: boolean | null;
+  reported: boolean;
+}
+
+interface OpenScreen {
+  player: string;
+  enteredAt: number;
+  beatmapName: string | null;
+  /** A token was retrieved for this screen, so a stray `No token` can never be about it. */
+  hadToken: boolean;
+  noToken: boolean;
+  passed: boolean;
+  endedAt: number | null;
   reported: boolean;
 }
 
@@ -120,19 +209,119 @@ interface OpenPlay {
 export class LogSession {
   private beatmap: string | null = null;
   private current: OpenPlay | null = null;
+  /** The solo gameplay screen open now, if any. */
+  private screen: OpenScreen | null = null;
+  /** The one that closed most recently, for a `No token` line that lands just after it. */
+  private lastScreen: OpenScreen | null = null;
+  /** A token has been retrieved that no gameplay screen has claimed yet. */
+  private tokenPending = false;
 
   /** Lines from the log, in order. Returns the plays that finished within them. */
   feed(lines: Iterable<string>): LoggedPlay[] {
-    const out: LoggedPlay[] = [];
-    for (const line of lines) this.line(line, out);
-    return out;
+    return this.feedEvents(lines).plays;
   }
 
-  private line(line: string, out: LoggedPlay[]): void {
+  /** Lines from the log, in order: the plays osu! counted, and the attempts it could not submit. */
+  feedEvents(lines: Iterable<string>): LogEvents {
+    const plays: LoggedPlay[] = [];
+    const attempts: UnsubmittedAttempt[] = [];
+    for (const line of lines) this.line(line, plays, attempts);
+    return { plays, attempts };
+  }
+
+  /**
+   * Solo gameplay screens, followed independently of the submissions above.
+   *
+   * Independently on purpose. The play logic keys everything on a token, and an attempt
+   * with no token has nothing for it to hold; sharing one state machine would mean every
+   * change to either risked the other. This never returns early from `line()`, so each line
+   * still reaches the play logic after it.
+   */
+  private trackScreen(at: number, body: string, attempts: UnsubmittedAttempt[]): void {
+    if (TOKEN.test(body)) {
+      this.tokenPending = true;
+      return;
+    }
+
+    const entered = ENTERED_SOLO.exec(body);
+    if (entered) {
+      // A screen still open here missed its exit line; it is dropped unreported rather than
+      // guessed at.
+      this.screen = {
+        player: entered[1]!,
+        enteredAt: at,
+        beatmapName: this.beatmap,
+        hadToken: this.tokenPending,
+        noToken: false,
+        passed: false,
+        endedAt: null,
+        reported: false,
+      };
+      this.tokenPending = false;
+      return;
+    }
+
+    if (NO_TOKEN.test(body)) {
+      const current = this.screen;
+      const last = this.lastScreen;
+      /*
+       * Nearly always logged just before the screen exits. The exception lands after -- and a
+       * retry may already have entered the next screen by then, which cannot have ended the
+       * instant it began. A screen that had a token cannot be the one osu! says had none.
+       */
+      const lateForLast =
+        last !== null &&
+        !last.noToken &&
+        !last.hadToken &&
+        last.endedAt !== null &&
+        at - last.endedAt <= LATE_NO_TOKEN_MS &&
+        (current === null || at - current.enteredAt <= JUST_ENTERED_MS);
+      if (lateForLast) {
+        last.noToken = true;
+        this.reportAttempt(last, attempts);
+      } else if (current) {
+        current.noToken = true;
+      }
+      return;
+    }
+
+    const results = SOLO_REACHED_RESULTS.exec(body);
+    if (results) {
+      const screen = this.screen;
+      if (screen && screen.player === results[1]) screen.passed = true;
+      return;
+    }
+
+    const left = LEFT_SOLO.exec(body);
+    const screen = this.screen;
+    if (left && screen && screen.player === left[1]) {
+      screen.endedAt = at;
+      this.reportAttempt(screen, attempts);
+      this.lastScreen = screen;
+      this.screen = null;
+    }
+  }
+
+  private reportAttempt(screen: OpenScreen, attempts: UnsubmittedAttempt[]): void {
+    // Only a screen osu! itself said had no token, that did not reach results, and that has
+    // actually closed -- a play still being played is not over.
+    if (screen.reported || !screen.noToken || screen.passed || screen.endedAt === null) return;
+    screen.reported = true;
+    attempts.push({
+      player: screen.player,
+      startedAt: screen.enteredAt,
+      endedAt: screen.endedAt,
+      beatmapName: screen.beatmapName,
+    });
+  }
+
+  private line(line: string, out: LoggedPlay[], attempts: UnsubmittedAttempt[]): void {
     const parsed = LINE.exec(line);
     if (!parsed) return;
     const at = parseTimestamp(parsed);
     const body = parsed[7]!;
+
+    this.trackScreen(at, body, attempts);
 
     const beatmap = BEATMAP.exec(body);
     if (beatmap) {

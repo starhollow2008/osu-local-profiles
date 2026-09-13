@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+- **Plays osu! could not submit can count** (Settings -> Count plays osu! could not submit).
+  Quits, fails and retries while osu! is offline or signed out used to leave no trace, because
+  osu! counts nothing it cannot submit. They are now read from osu!lazer's own log -- only where
+  the game says, in as many words, that it had no token -- and count by default toward the play
+  count, monthly play counts, Most Played, Recent Plays (labelled "Not submitted") and Total Play
+  Time together. osu! never received them, so this takes nothing away from your osu! profile;
+  turn it off to match that profile exactly. Works without osu!lazer's online beatmap database.
+- **Import past plays reads osu!lazer's logs too**, so a past session comes back whole: finished
+  plays from their replays, and the quits, fails and retries osu! counted or could not submit.
+  Each kind is its own tick box with its count, so past offline attempts can be brought in
+  without past replays.
+- **Beatmaps with a `[` in their details are read correctly.** A mapper called
+  `cRyo[iceeicee]`, a title tagged `[CV. ...]` or an audio file named `[HD] ...` used to cut a
+  beatmap's details short. On one real library that lost 327 beatmap names and put 23 beatmaps
+  -- and any unfinished plays on them -- under the wrong game mode.
+
 ## 1.13.2
 
 - **The launcher says when the folder is incomplete**, instead of failing with a message that

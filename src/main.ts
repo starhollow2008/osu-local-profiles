@@ -167,7 +167,10 @@ async function main(): Promise<void> {
    */
   tracker.on('incomplete', (play) => {
     const time = new Date(play.playedAt).toLocaleTimeString();
-    console.log(`  [${time}]   --   -- did not finish        ${play.title}`);
+    // Labelled apart: an attempt osu! could not submit may not count at all, depending on the
+    // profile's setting, and a line that read like a counted play would say otherwise.
+    const what = play.unsubmitted ? 'not submitted to osu!' : 'did not finish';
+    console.log(`  [${time}]   --   -- ${what.padEnd(22)}${play.title}`);
   });
   /*
    * A play the tracking filter declined. Worth a line of its own: no row is written anywhere,
@@ -264,10 +267,11 @@ async function main(): Promise<void> {
   );
   console.log('  Play osu! (online or offline) and scores will appear below.');
   if (installs.some((i) => i.kind === 'lazer')) {
-    // Worth saying plainly, because the difference is invisible otherwise: an unfinished
-    // play is only counted when osu! counted it, and osu! only counts one it was told
-    // about. Signed out or offline, the game does not submit and neither side counts it.
-    console.log('  Unfinished plays (quit, retried, failed) count too, while osu! is signed in.');
+    // Worth saying plainly, because the difference is invisible otherwise. Signed in, an
+    // unfinished play counts when osu! counted it; offline or signed out, osu! submits
+    // nothing, so the attempt is read from its log instead -- and counts unless Settings says
+    // not to.
+    console.log('  Unfinished plays (quit, retried, failed) count too, online or offline.');
   }
   /*
    * Said at start-up only when the filter can actually turn a play away. A profile that has

@@ -181,13 +181,14 @@ export async function indexBeatmapFiles(
   onProgress?: (progress: IndexProgress) => void,
 ): Promise<{ scanned: number; indexed: number }> {
   const known = new Set<string>();
-  const indexed = db.prepare('SELECT path, beatmap_id FROM osu_files').all() as {
+  const indexed = db.prepare('SELECT path, beatmap_id, name FROM osu_files').all() as {
     path: string;
     beatmap_id: number | null;
+    name: string | null;
   }[];
   for (const r of indexed) {
-    // Older rows have no ID metadata. Re-read each once to backfill it.
-    if (r.beatmap_id !== null) known.add(r.path);
+    // Older rows have no id or name metadata. Re-read each once to backfill both.
+    if (r.beatmap_id !== null && r.name !== null) known.add(r.path);
   }
   // Counted before the backfill filter: an upgrade re-reads every row, but the index has
   // been built before and must not be announced as a first run.
@@ -197,7 +198,7 @@ export async function indexBeatmapFiles(
   }
 
   const insertOsu = db.prepare(
-    'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, size, indexed_at) VALUES (?, ?, ?, ?, ?)',
+    'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, name, size, indexed_at) VALUES (?, ?, ?, ?, ?, ?)',
   );
   const insertSkip = db.prepare('INSERT OR REPLACE INTO not_beatmaps (path, size) VALUES (?, ?)');
 
@@ -252,8 +253,8 @@ export async function indexBeatmapFiles(
           try {
             const contents = fs.readFileSync(file);
             const md5 = crypto.createHash('md5').update(contents).digest('hex');
-            const beatmapId = parseOsuMetadataText(contents.toString('utf8')).beatmapId ?? 0;
-            write(insertOsu, file, md5, beatmapId, size, Date.now());
+            const meta = parseOsuMetadataText(contents.toString('utf8'));
+            write(insertOsu, file, md5, meta.beatmapId ?? 0, beatmapDisplayName(meta), size, Date.now());
             progress.indexed++;
           } catch {
             /* unreadable, skip */
@@ -279,10 +280,10 @@ export function indexOneFile(db: Db, file: string): void {
     if (!isBeatmapFile(file)) return;
     const contents = fs.readFileSync(file);
     const md5 = crypto.createHash('md5').update(contents).digest('hex');
-    const beatmapId = parseOsuMetadataText(contents.toString('utf8')).beatmapId ?? 0;
+    const meta = parseOsuMetadataText(contents.toString('utf8'));
     db.prepare(
-      'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, size, indexed_at) VALUES (?, ?, ?, ?, ?)',
-    ).run(file, md5, beatmapId, fs.statSync(file).size, Date.now());
+      'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, name, size, indexed_at) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(file, md5, meta.beatmapId ?? 0, beatmapDisplayName(meta), fs.statSync(file).size, Date.now());
   } catch {
     /* ignore */
   }
@@ -297,6 +298,27 @@ interface OsuMetadata {
   beatmapsetId: number | null;
 }
 
+/**
+ * One section of a .osu file: from its header line to the next line that *begins* with `[`.
+ *
+ * Not to the next `[` anywhere, which was the rule before and is wrong -- `[` is ordinary inside
+ * a value: mappers named `cRyo[iceeicee]`, artists tagged `[CV. ...]`, audio files named
+ * `[HD] ...`. Measured across this machine's 12,811 beatmaps, that rule lost or corrupted 327
+ * names and filed 23 beatmaps under the wrong mode.
+ */
+function osuSection(text: string, header: string): string | null {
+  let body: number;
+  if (text.startsWith(header)) {
+    body = header.length;
+  } else {
+    const at = text.indexOf(`\n${header}`);
+    if (at < 0) return null;
+    body = at + 1 + header.length;
+  }
+  const next = text.indexOf('\n[', body);
+  return text.slice(body, next < 0 ? undefined : next);
+}
+
 function parseOsuMetadataText(text: string): OsuMetadata {
   const out: OsuMetadata = {
     artist: null,
@@ -306,10 +328,8 @@ function parseOsuMetadataText(text: string): OsuMetadata {
     beatmapId: null,
     beatmapsetId: null,
   };
-  const start = text.indexOf('[Metadata]');
-  if (start < 0) return out;
-  const nextSection = text.indexOf('[', start + 1);
-  const section = text.slice(start, nextSection < 0 ? undefined : nextSection);
+  const section = osuSection(text, '[Metadata]');
+  if (section === null) return out;
 
   for (const line of section.split(NEWLINE)) {
     const sep = line.indexOf(':');
@@ -324,6 +344,23 @@ function parseOsuMetadataText(text: string): OsuMetadata {
     else if (key === 'BeatmapSetID') out.beatmapsetId = Number(value) || null;
   }
   return out;
+}
+
+/**
+ * lazer's own name for a beatmap -- `BeatmapInfo.ToString()`, `Artist - Title (Creator)
+ * [Version]` from the romanised metadata -- which is exactly what its log writes when the game
+ * changes beatmap. Building the same string from a `.osu` is therefore an equality test, not a
+ * guess. Measured against this machine's logs it matched all 59 attempts osu! could not submit,
+ * where the beatmap cache alone matched 12. '' when any of the four is missing.
+ */
+export function beatmapDisplayName(meta: {
+  artist: string | null;
+  title: string | null;
+  creator: string | null;
+  version: string | null;
+}): string {
+  if (!meta.artist || !meta.title || !meta.creator || !meta.version) return '';
+  return `${meta.artist} - ${meta.title} (${meta.creator}) [${meta.version}]`;
 }
 
 function parseOsuMetadata(file: string): OsuMetadata {
@@ -357,11 +394,9 @@ export function beatmapMode(file: string): Ruleset {
     return 0;
   }
 
-  const start = text.indexOf('[General]');
-  if (start < 0) return 0;
-  // The next section header, so a `Mode:` further down the file cannot be picked up.
-  const nextSection = text.indexOf('[', start + 1);
-  const section = text.slice(start, nextSection < 0 ? undefined : nextSection);
+  // [General] alone, so a `Mode:` further down the file cannot be picked up.
+  const section = osuSection(text, '[General]');
+  if (section === null) return 0;
 
   for (const line of section.split(NEWLINE)) {
     const sep = line.indexOf(':');
@@ -441,6 +476,37 @@ export class BeatmapResolver {
       return local[0]!.md5;
     }
     return null;
+  }
+
+  /**
+   * The MD5 of a beatmap named as lazer names it in its log, `Artist - Title (Creator) [Version]`.
+   *
+   * The only handle an attempt osu! could not submit has: offline there is no submission
+   * request, so no beatmap id. A beatmap already resolved from a real score answers first; then
+   * every local `.osu`, by the name the index built from its own metadata, which is what makes
+   * this work with no `online.db` and on every platform. A name shared by two different files --
+   * an edited copy keeps its name under another checksum -- resolves to neither, the same rule
+   * `md5ForBeatmapId` applies to ids.
+   */
+  md5ForBeatmapName(name: string): string | null {
+    if (!name) return null;
+
+    const cached = this.db
+      .prepare(
+        `SELECT DISTINCT md5 FROM beatmaps
+          WHERE artist IS NOT NULL AND title IS NOT NULL
+                AND creator IS NOT NULL AND version IS NOT NULL
+                AND artist || ' - ' || title || ' (' || creator || ') [' || version || ']' = ?
+          LIMIT 2`,
+      )
+      .all(name) as { md5: string }[];
+    if (cached.length === 1) return cached[0]!.md5;
+    if (cached.length > 1) return null;
+
+    const local = this.db
+      .prepare('SELECT DISTINCT md5 FROM osu_files WHERE name = ? LIMIT 2')
+      .all(name) as { md5: string }[];
+    return local.length === 1 ? local[0]!.md5 : null;
   }
 
   /**

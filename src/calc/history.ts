@@ -2,7 +2,7 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { bonusPp, weightedTotal } from './pp.ts';
 import { levelFromScore } from './level.ts';
-import { countsSql, ppColumn, scoreColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
+import { incompleteSql, countsSql, ppColumn, scoreColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
 import type { Medal, MedalFamily } from './medals.ts';
 
 /**
@@ -169,7 +169,7 @@ export function buildHistory(
     .prepare(
       `SELECT s.played_at
          FROM incomplete_plays s
-        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+        WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}
         ORDER BY s.played_at ASC`,
     )
     .all(profileId, mode) as { played_at: number }[];

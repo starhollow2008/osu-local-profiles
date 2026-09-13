@@ -10,10 +10,19 @@ import {
 } from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
 import { LogWatcher } from './log-watcher.ts';
-import { logDirOf, type ResolvedLoggedPlay } from '../clients/lazer-log.ts';
-import { ingestIncompletePlay, type IngestedIncomplete } from './incomplete.ts';
+import { logDirOf, type ResolvedLoggedPlay, type SessionAttempt } from '../clients/lazer-log.ts';
+import {
+  checkIncompletePlay,
+  checkUnsubmittedAttempt,
+  ingestIncompletePlay,
+  ingestUnsubmittedAttempt,
+  type IncompleteCheck,
+  type IncompleteContext,
+  type IngestedIncomplete,
+} from './incomplete.ts';
 import { ingestReplayFile, type IngestedScore } from './ingest.ts';
 import { scanForReplays, type BackfillScan } from './backfill.ts';
+import { scanLogsForPlays } from './log-backfill.ts';
 import { countStale, recomputeScores, type RecomputeResult } from './recompute.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { getSettings } from '../settings.ts';
@@ -31,7 +40,10 @@ export interface TrackerOptions {
 
 export interface TrackerEvents {
   score: [IngestedScore];
-  /** A play osu! counted that finished without a score: a quit, a retry, or an HP fail. */
+  /**
+   * A play that finished without a score: a quit, a retry, or an HP fail. Either one osu!
+   * counted, or -- `unsubmitted` -- one it had no token for and never counted.
+   */
   incomplete: [IngestedIncomplete];
   skip: [{ reason: string }];
   /**
@@ -73,8 +85,13 @@ export interface IndexState extends IndexProgress {
 const QUIET_INDEX_MS = 1500;
 
 export interface BackfillResult {
+  /** Finished plays imported from their replays. */
   imported: number;
-  /** Already tracked, or rejected by the parser. */
+  /** Unfinished plays osu! counted, imported from lazer's logs. */
+  unfinished: number;
+  /** Attempts osu! could not submit, imported from lazer's logs. */
+  attempts: number;
+  /** Already tracked, rejected by the parser, or on a beatmap that is not installed. */
   skipped: number;
   /**
    * Declined by the play tracking filter. Counted apart from `skipped`, because the answer to
@@ -85,6 +102,35 @@ export interface BackfillResult {
   scanned: number;
   since: number;
 }
+
+/**
+ * Which kinds of past play an import brings in. Separate, because they are separate decisions:
+ * bringing in last week's offline retries says nothing about wanting last week's replays too.
+ */
+export interface BackfillSources {
+  replays: boolean;
+  unfinished: boolean;
+  attempts: boolean;
+}
+
+/** Replays alone: what an import meant before it read logs, and what naming nothing still gets. */
+export const REPLAYS_ONLY: BackfillSources = { replays: true, unfinished: false, attempts: false };
+
+/** The logs' half of a preview, counted by the same checks the import makes before it writes. */
+export interface LogBackfillPreview {
+  unfinished: number;
+  attempts: number;
+  /** Already in this profile. */
+  alreadyTracked: number;
+  /** On a beatmap that is not installed, so there is no mode to file it under. */
+  unresolved: number;
+  filtered: number;
+  sessions: number;
+  earliest: number | null;
+  latest: number | null;
+}
+
+export type BackfillPreview = BackfillScan & { log: LogBackfillPreview };
 
 /**
  * Watches every detected osu! install and turns new replays into tracked scores.
@@ -265,6 +311,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       this.logWatcher = new LogWatcher({
         dirs: logDirs,
         onPlays: (plays) => this.handleLoggedPlays(plays),
+        onAttempts: (attempts) => this.handleUnsubmittedAttempts(attempts),
         onError: (e) => this.emit('error', e),
       });
       this.logWatcher.start();
@@ -287,66 +334,155 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   }
 
   /** Preview what an import would bring in, without changing anything. */
-  previewBackfill(since: number): Promise<BackfillScan> {
-    return this.enqueue(() =>
-      scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since, {
-        resolver: this.opts.resolver,
-        // So the preview counts what the import will actually decline, rather than promising
-        // plays the same filter is about to turn away.
-        filter: this.currentFilter(),
-      }),
-    );
-  }
-
-  /**
-   * Import replays played since `since`.
-   *
-   * Runs through the same serialised queue as live ingestion, so a play landing mid-import
-   * cannot interleave its writes. Individual scores are not emitted: importing a session
-   * can add dozens at once, and a toast per score would bury the page.
-   */
-  backfill(since: number): Promise<BackfillResult> {
+  previewBackfill(since: number): Promise<BackfillPreview> {
     return this.enqueue(async () => {
-      const scan = await scanForReplays(
+      const replays = await scanForReplays(
         this.opts.db,
         this.opts.profileId,
         this.replayDirs(),
         since,
+        {
+          resolver: this.opts.resolver,
+          // So the preview counts what the import will actually decline, rather than promising
+          // plays the same filter is about to turn away.
+          filter: this.currentFilter(),
+        },
       );
+      return { ...replays, log: this.previewLogs(since) };
+    });
+  }
 
+  /**
+   * The logs' half of a preview. Every play goes through the check its import runs before
+   * writing, so each number here is one the import reproduces.
+   */
+  private previewLogs(since: number): LogBackfillPreview {
+    const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
+    const ctx = this.importContext(since);
+    const preview: LogBackfillPreview = {
+      unfinished: 0,
+      attempts: 0,
+      alreadyTracked: scan.alreadyTracked,
+      unresolved: 0,
+      filtered: 0,
+      sessions: scan.sessions,
+      earliest: null,
+      latest: null,
+    };
+    const tally = (checked: IncompleteCheck, kind: 'unfinished' | 'attempts', at: number) => {
+      if (checked.status === 'ready') {
+        preview[kind]++;
+        preview.earliest = preview.earliest === null ? at : Math.min(preview.earliest, at);
+        preview.latest = preview.latest === null ? at : Math.max(preview.latest, at);
+      } else if (checked.status === 'filtered') {
+        preview.filtered++;
+      } else if (checked.reason === 'unresolved') {
+        preview.unresolved++;
+      } else if (checked.reason === 'duplicate') {
+        preview.alreadyTracked++;
+      }
+    };
+    for (const play of scan.unfinished) {
+      tally(checkIncompletePlay(play, ctx), 'unfinished', play.countedAt);
+    }
+    for (const attempt of scan.attempts) {
+      tally(checkUnsubmittedAttempt(attempt, ctx), 'attempts', attempt.endedAt);
+    }
+    return preview;
+  }
+
+  /** An import's context: its chosen cutoff stands in for the profile's own, as for replays. */
+  private importContext(since: number): IncompleteContext {
+    return {
+      db: this.opts.db,
+      resolver: this.opts.resolver,
+      profileId: this.opts.profileId,
+      trackingSince: since,
+      filter: this.currentFilter(),
+    };
+  }
+
+  /**
+   * Import past plays since `since`: finished plays from their replays, and -- when asked -- the
+   * unfinished plays osu! counted and the attempts it could not submit, from lazer's logs.
+   *
+   * Runs through the same serialised queue as live ingestion, so a play landing mid-import
+   * cannot interleave its writes. Individual plays are not emitted: importing a session can
+   * add dozens at once, and a toast per play would bury the page. Naming no sources means
+   * replays alone, which is what an import meant before it read logs.
+   */
+  backfill(since: number, sources: BackfillSources = REPLAYS_ONLY): Promise<BackfillResult> {
+    return this.enqueue(async () => {
       let imported = 0;
+      let unfinished = 0;
+      let attempts = 0;
       let skipped = 0;
       let filtered = 0;
+      let scanned = 0;
       // The filter applies to an import too: this is the same tracking decision made later,
       // so a profile cannot be filled with what live tracking would have declined.
       const filter = this.currentFilter();
-      for (const candidate of scan.candidates) {
-        if (candidate.duplicate) {
-          skipped++;
-          continue;
-        }
-        const result = await ingestReplayFile(candidate.file, {
-          db: this.opts.db,
-          resolver: this.opts.resolver,
-          profileId: this.opts.profileId,
-          // The chosen cutoff replaces the profile's own, which is the whole point: these
-          // are plays from before tracking started that the user has asked for by hand.
-          trackingSince: since,
-          official: this.opts.official,
-          filter,
-        });
-        if (result.status === 'added') {
-          imported++;
-          this.added++;
-        } else if (result.status === 'filtered') {
-          filtered++;
-          this.filtered++;
-        } else {
-          skipped++;
+
+      if (sources.replays) {
+        const scan = await scanForReplays(
+          this.opts.db,
+          this.opts.profileId,
+          this.replayDirs(),
+          since,
+        );
+        scanned = scan.scanned;
+        for (const candidate of scan.candidates) {
+          if (candidate.duplicate) {
+            skipped++;
+            continue;
+          }
+          const result = await ingestReplayFile(candidate.file, {
+            db: this.opts.db,
+            resolver: this.opts.resolver,
+            profileId: this.opts.profileId,
+            // The chosen cutoff replaces the profile's own, which is the whole point: these
+            // are plays from before tracking started that the user has asked for by hand.
+            trackingSince: since,
+            official: this.opts.official,
+            filter,
+          });
+          if (result.status === 'added') {
+            imported++;
+            this.added++;
+          } else if (result.status === 'filtered') {
+            filtered++;
+            this.filtered++;
+          } else {
+            skipped++;
+          }
         }
       }
 
-      return { imported, skipped, filtered, scanned: scan.scanned, since };
+      if (sources.unfinished || sources.attempts) {
+        const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
+        const ctx = this.importContext(since);
+        const tally = (status: 'added' | 'skipped' | 'filtered'): boolean => {
+          if (status === 'filtered') {
+            filtered++;
+            this.filtered++;
+          } else if (status === 'skipped') {
+            skipped++;
+          }
+          return status === 'added';
+        };
+        if (sources.unfinished) {
+          for (const play of scan.unfinished) {
+            if (tally(ingestIncompletePlay(play, ctx).status)) unfinished++;
+          }
+        }
+        if (sources.attempts) {
+          for (const attempt of scan.attempts) {
+            if (tally(ingestUnsubmittedAttempt(attempt, ctx).status)) attempts++;
+          }
+        }
+      }
+
+      return { imported, unfinished, attempts, skipped, filtered, scanned, since };
     });
   }
 
@@ -405,6 +541,10 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     return this.opts.official?.version ?? null;
   }
 
+  private logDirs(): string[] {
+    return this.opts.installs.map((i) => logDirOf(i)).filter((d): d is string => d !== null);
+  }
+
   private replayDirs(): string[] {
     return this.opts.installs.map((i) => i.replayDir);
   }
@@ -443,6 +583,34 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           else if (result.status === 'filtered') this.reportFiltered(result, 'incomplete');
           // A passed play is not a skip worth reporting: its replay is the event.
           else if (result.reason !== 'passed') this.emit('skip', { reason: result.reason });
+        }
+      })
+      .catch((e: unknown) => {
+        this.emit('error', e as Error);
+      });
+  }
+
+  /**
+   * Record the attempts osu! logged it had no token for.
+   *
+   * Queued exactly like the plays osu! did count, so the two can never interleave their writes,
+   * and an attempt and a replay arriving together are handled in the order they happened.
+   */
+  private handleUnsubmittedAttempts(attempts: SessionAttempt[]): void {
+    this.arrived();
+    this.queue = this.queue
+      .then(() => {
+        for (const attempt of attempts) {
+          const result = ingestUnsubmittedAttempt(attempt, {
+            db: this.opts.db,
+            resolver: this.opts.resolver,
+            profileId: this.opts.profileId,
+            trackingSince: this.opts.trackingSince,
+            filter: this.currentFilter(),
+          });
+          if (result.status === 'added') this.emit('incomplete', result.play);
+          else if (result.status === 'filtered') this.reportFiltered(result, 'incomplete');
+          else this.emit('skip', { reason: result.reason });
         }
       })
       .catch((e: unknown) => {

@@ -129,6 +129,11 @@ CREATE TABLE IF NOT EXISTS osu_files (
   md5        TEXT NOT NULL,
   -- 0 means this local file has no online id. Existing rows with NULL are backfilled once.
   beatmap_id INTEGER NOT NULL DEFAULT 0,
+  -- lazer's own name for the beatmap, `Artist - Title (Creator) [Version]`, built from the
+  -- file's [Metadata]. It is how an attempt osu! could not submit finds its beatmap: the log
+  -- names the map and nothing else. '' when the file lacks one of the four; NULL on rows
+  -- indexed before this existed, which the index backfills once. See md5ForBeatmapName.
+  name       TEXT,
   size       INTEGER NOT NULL,
   indexed_at INTEGER NOT NULL
 );
@@ -153,7 +158,8 @@ CREATE TABLE IF NOT EXISTS incomplete_plays (
   id          INTEGER PRIMARY KEY,
   profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   -- lazer's submission token: server-issued and unique per play, so re-reading a log can
-  -- never duplicate one.
+  -- never duplicate one. An attempt osu! could not submit has no token, and is keyed
+  -- `unsubmitted:<log session>:<gameplay screen>:<started>` instead; see attemptKey.
   dedupe_key  TEXT    NOT NULL,
   mode        INTEGER NOT NULL,
   -- Both may be null: a play can be counted before its beatmap can be resolved locally.
@@ -167,6 +173,10 @@ CREATE TABLE IF NOT EXISTS incomplete_plays (
   -- play lasted, which is what Total Play Time needs. Null when the log was joined mid-play.
   started_at  INTEGER,
   online_score_id TEXT,
+  -- 1 for an attempt osu! logged it had no token for -- played offline, signed out, or on a
+  -- beatmap osu! cannot submit -- so osu! never counted it. Recorded either way; whether it
+  -- counts is the profile's countUnsubmittedAttempts setting, read through incompleteSql().
+  unsubmitted INTEGER NOT NULL DEFAULT 0,
   -- Removed from the profile by the user, exactly as on `scores`, so visibleSql() applies
   -- to this table verbatim.
   hidden_at   INTEGER,

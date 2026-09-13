@@ -8,6 +8,7 @@ import {
   type LoggedPlay,
   type LogSessionFiles,
   type ResolvedLoggedPlay,
+  type SessionAttempt,
 } from '../clients/lazer-log.ts';
 
 /** A single write produces several change events; wait for them to stop. */
@@ -27,6 +28,11 @@ export interface LogWatcherOptions {
   /** lazer log directories, one per install. */
   dirs: string[];
   onPlays: (plays: ResolvedLoggedPlay[]) => void;
+  /**
+   * Attempts osu! logged it had no token for -- offline, signed out, or an unsubmittable
+   * beatmap. Optional, so a caller that only wants what osu! counted need not handle them.
+   */
+  onAttempts?: (attempts: SessionAttempt[]) => void;
   onError?: (err: Error) => void;
 }
 
@@ -203,8 +209,12 @@ export class LogWatcher {
       // or the start of a line still being written.
       follow.partial = lines.pop() ?? '';
 
-      const plays = follow.session.feed(lines);
+      const { plays, attempts } = follow.session.feedEvents(lines);
       if (plays.length > 0) this.opts.onPlays(this.attachBeatmaps(follow, plays));
+      // The session id is what makes an attempt unique: it has no token to be keyed by.
+      if (attempts.length > 0) {
+        this.opts.onAttempts?.(attempts.map((a) => ({ ...a, session: follow.id })));
+      }
     } catch (e) {
       this.opts.onError?.(e as Error);
     }

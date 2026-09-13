@@ -27,6 +27,16 @@ function maybeLink(href, inner, className) {
  * profile is configured.
  */
 export function countingNoteText(counting) {
+  // The play count's own departure from osu!, said beside whatever the pp note says -- or on
+  // its own, since counting these changes no pp at all.
+  // Only once something is actually counted: on by default, it would otherwise be said to
+  // every profile, whether or not it had ever played offline.
+  const plays =
+    counting?.countUnsubmitted && counting.unsubmittedAttempts > 0
+      ? 'Plays osu! could not submit - quit, failed or retried while offline or signed out - ' +
+        'count here too, so the play count runs ahead of osu!’s.'
+      : '';
+
   /*
    * Nothing on this machine can say whether a beatmap is ranked: only osu!lazer ships the
    * database that records it, and this install has osu!stable alone. Every beatmap counts
@@ -38,14 +48,15 @@ export function countingNoteText(counting) {
       'No osu!lazer installation was found, and osu!stable does not record whether a beatmap ' +
       'is ranked. Every beatmap therefore counts toward pp here -- loved, graveyarded and ' +
       'never-submitted ones included -- and the beatmap options in Settings cannot change ' +
-      'that. The pp and rank here are not comparable with a real osu! account.'
+      'that. The pp and rank here are not comparable with a real osu! account.' +
+      (plays ? ` ${plays}` : '')
     );
   }
 
   const included = [];
   if (counting?.includeUnrankedMods) included.push('mods');
   if (counting?.extraMapStatuses?.length) included.push('beatmaps');
-  if (included.length === 0) return '';
+  if (included.length === 0) return plays;
 
   let text = `This profile counts plays on ${included.join(' and ')} osu! does not rank. `;
   if (counting.includeUnrankedMods) {
@@ -54,7 +65,7 @@ export function countingNoteText(counting) {
         'awards - those are marked with *. '
       : 'Relax and Autopilot plays use osu!’s own pp for the mods as played. ';
   }
-  return `${text}The pp and rank here are not comparable with a real osu! account.`;
+  return `${text}The pp and rank here are not comparable with a real osu! account.${plays ? ` ${plays}` : ''}`;
 }
 
 /**
@@ -260,9 +271,15 @@ export function incompleteRow(play, { actions = false } = {}) {
     </div>
   </div>
   <div class="play-detail__group play-detail__group--bottom">
-    <div class="play-detail__score-detail">
-      <span class="play-detail__didnt-finish"
-            title="Started but not finished - quit, retried, or failed. osu! counts this toward your play count, but there is no score to show: lazer only saves a replay for a map played to the end.">Didn&rsquo;t finish</span>
+    <div class="play-detail__score-detail">${
+      // Listed at all only while the profile counts attempts osu! could not submit, and then
+      // labelled apart, because osu! itself never counted it.
+      play.unsubmitted
+        ? `<span class="play-detail__didnt-finish"
+            title="Started but not finished while osu! could not submit it - offline, signed out, or a beatmap osu! cannot submit. osu! never counted this; it is listed because this profile counts plays osu! could not submit.">Not submitted</span>`
+        : `<span class="play-detail__didnt-finish"
+            title="Started but not finished - quit, retried, or failed. osu! counts this toward your play count, but there is no score to show: lazer only saves a replay for a map played to the end.">Didn&rsquo;t finish</span>`
+    }
     </div>
     <div class="play-detail__mods-pp">${attempts}</div>
     ${

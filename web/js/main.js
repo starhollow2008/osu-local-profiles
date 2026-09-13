@@ -142,10 +142,24 @@ const SETTINGS_FIELDS = [
       ['no', 'hide them'],
     ],
     hint:
-      'Plays that were started but never finished - quit, retried, or failed. They always ' +
-      'count toward your play count, monthly play counts and Most Played, because osu! ' +
-      'counts them too; this only decides whether they are listed here. There is no score ' +
-      'to show for them: osu!lazer saves a replay only for a map played to the end.',
+      'Plays that were started but never finished - quit, retried, or failed. The ones osu! ' +
+      'counted always count toward your play count, monthly play counts and Most Played, ' +
+      'because osu! counts them too; this only decides whether they are listed here. There is ' +
+      'no score to show for them: osu!lazer saves a replay only for a map played to the end.',
+  },
+  {
+    key: 'countUnsubmittedAttempts',
+    type: 'toggle',
+    label: 'Count plays osu! could not submit',
+    // A function, so it can say how many have been recorded before anyone decides to count them.
+    hint: () =>
+      'Quits, fails and retries while osu! was offline or signed out, read from osu!lazer’s ' +
+      'own log. osu! never received these, so they count here by default - toward your play ' +
+      'count, monthly play counts, Most Played, Recent Plays and Total Play Time. Turn this ' +
+      'off to match exactly what your osu! profile shows. They are recorded either way' +
+      (unsubmittedAttempts > 0
+        ? ` - ${fmt(unsubmittedAttempts)} so far.`
+        : '. None have been recorded yet.'),
   },
   {
     key: 'includeUnrankedMaps',
@@ -210,6 +224,8 @@ let hiddenScoreCount = 0;
 /** Whether the play tracking filter can turn a play away, and how many it has. */
 let filterNarrowing = false;
 let playsFiltered = 0;
+/** Attempts osu! could not submit that this profile has recorded, counted or not. */
+let unsubmittedAttempts = 0;
 /** Which clients were found, so the page can say how the one being watched behaves. */
 let installKinds = [];
 let sharing = { canScreenshot: false };
@@ -359,7 +375,8 @@ function renderRank(data) {
  */
 function renderCountingNote(next) {
   counting = next ?? null;
-  const text = countingNoteText(counting);
+  // The count goes with it: the play-count sentence is only worth saying once attempts exist.
+  const text = countingNoteText(counting && { ...counting, unsubmittedAttempts });
   const note = $('countingNote');
 
   // Two conditions, and they are not the same one: there is something to warn about, and
@@ -582,6 +599,7 @@ async function loadState() {
   ppCalculator = s.ppCalculator ?? ppCalculator;
   renderPpCalculator();
   hiddenScoreCount = s.hiddenScores ?? 0;
+  unsubmittedAttempts = s.unsubmittedAttempts ?? 0;
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
 
@@ -1703,7 +1721,7 @@ function renderSettingsFields() {
         <span>${escapeHtml(f.label)}</span>
         ${settingControl(f)}
       </label>
-      <div class="setting__hint">${escapeHtml(f.hint ?? '')}</div>
+      <div class="setting__hint">${escapeHtml((typeof f.hint === 'function' ? f.hint() : f.hint) ?? '')}</div>
     </div>`,
   ).join('');
 
@@ -2388,9 +2406,42 @@ const sinceValue = () => new Date($('backfillSince').value).getTime();
 /** Any change to the cutoff invalidates the preview, so Import has to be earned again. */
 function resetBackfillPreview(message) {
   $('backfillSummary').innerHTML = message;
+  $('backfillSources').hidden = true;
+  $('backfillSources').innerHTML = '';
   $('backfillConfirm').disabled = true;
   $('backfillConfirm').textContent = 'Import';
 }
+
+/**
+ * Each kind of past play a preview found, a ticked box with its count. Replays, unfinished plays
+ * osu! counted and attempts osu! could not submit are separate choices because they are separate
+ * decisions: last week's offline retries say nothing about wanting last week's replays too.
+ */
+function renderBackfillSources(counts) {
+  const kinds = [
+    ['replays', 'Finished plays, from replays', counts.replays],
+    ['unfinished', 'Unfinished plays osu! counted', counts.unfinished],
+    ['attempts', 'Plays osu! could not submit', counts.attempts],
+  ].filter(([, , n]) => n > 0);
+  $('backfillSources').innerHTML = kinds
+    .map(
+      ([kind, label, n]) =>
+        `<label class="checkgroup__item"><input type="checkbox" data-source="${kind}" data-count="${n}" checked> ${escapeHtml(label)} (${fmt(n)})</label>`,
+    )
+    .join('');
+  $('backfillSources').hidden = kinds.length === 0;
+  updateBackfillConfirm();
+}
+
+/** Import names how much it will bring in, and is only on while that is something. */
+function updateBackfillConfirm() {
+  const ticked = [...$('backfillSources').querySelectorAll('input[data-source]:checked')];
+  const total = ticked.reduce((sum, box) => sum + Number(box.dataset.count), 0);
+  $('backfillConfirm').disabled = total === 0;
+  $('backfillConfirm').textContent = total > 0 ? `Import ${fmt(total)}` : 'Import';
+}
+
+$('backfillSources').onchange = updateBackfillConfirm;
 
 function openBackfill() {
   setMenuOpen(false);
@@ -2448,23 +2499,30 @@ $('backfillCheck').onclick = async () => {
      * answer to "why would only three of forty come in" is the filter, and switching it off is
      * the way to import everything.
      */
-    const filtered =
-      d.filtered > 0
-        ? ` ${fmt(d.filtered)} would be left out by the play tracking filter.`
-        : '';
     // The star rating is the one criterion the preview does not check -- it costs a call to
     // osu!'s calculator per play -- so when it is set, the count is an upper bound and says so.
     const unchecked = d.starsUnchecked
       ? ' The filter’s star rating is checked as each play is imported, so a few more may be left out.'
       : '';
 
-    if (d.importable === 0) {
+    // lazer's logs: the unfinished plays osu! counted and the attempts it could not submit.
+    const log = d.log ?? { unfinished: 0, attempts: 0, alreadyTracked: 0, unresolved: 0, filtered: 0 };
+    const found = d.importable + log.unfinished + log.attempts;
+    const tracked = d.duplicates + log.alreadyTracked;
+    const declined = d.filtered + log.filtered;
+    const plural = (n, word) => `${fmt(n)} ${word}${n === 1 ? '' : 's'}`;
+    /*
+     * The tracking filter applies to an import too, so the preview says what it would decline:
+     * the answer to "why only three of forty" is the filter, and switching it off imports them.
+     */
+    const filtered =
+      declined > 0 ? ` ${fmt(declined)} would be left out by the play tracking filter.` : '';
+
+    if (found === 0) {
       resetBackfillPreview(
-        d.duplicates > 0 || d.filtered > 0
+        tracked > 0 || declined > 0
           ? `Nothing to import.${escapeHtml(
-              d.duplicates > 0
-                ? ` ${fmt(d.duplicates)} play${d.duplicates === 1 ? '' : 's'} found since then are already tracked.`
-                : '',
+              tracked > 0 ? ` ${plural(tracked, 'play')} found since then are already tracked.` : '',
             )}${escapeHtml(filtered)}`
           : `No plays found since then (${fmt(d.scanned)} files checked).`,
       );
@@ -2473,13 +2531,17 @@ $('backfillCheck').onclick = async () => {
 
     const span =
       d.earliest && d.latest
-        ? ` They run from ${new Date(d.earliest).toLocaleString()} to ${new Date(d.latest).toLocaleString()}.`
+        ? ` Finished plays run from ${new Date(d.earliest).toLocaleString()} to ${new Date(d.latest).toLocaleString()}.`
         : '';
-    const dupes = d.duplicates > 0 ? ` ${fmt(d.duplicates)} already tracked and will be left alone.` : '';
+    const dupes = tracked > 0 ? ` ${fmt(tracked)} already tracked and will be left alone.` : '';
+    // A logged play on a beatmap no longer installed has no mode to be filed under.
+    const unresolved =
+      log.unresolved > 0
+        ? ` ${plural(log.unresolved, 'unfinished play')} on beatmaps that are not installed will be skipped.`
+        : '';
     $('backfillSummary').innerHTML =
-      `<b>${fmt(d.importable)} play${d.importable === 1 ? '' : 's'}</b> would be imported.${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(unchecked)}`;
-    $('backfillConfirm').disabled = false;
-    $('backfillConfirm').textContent = `Import ${fmt(d.importable)}`;
+      `<b>${plural(found, 'play')}</b> found.${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(unresolved)}${escapeHtml(unchecked)} Untick anything you do not want.`;
+    renderBackfillSources({ replays: d.importable, unfinished: log.unfinished, attempts: log.attempts });
   } catch (err) {
     resetBackfillPreview(`Check failed: ${escapeHtml(err.message)}`);
   } finally {
@@ -2493,9 +2555,13 @@ $('backfillConfirm').onclick = async () => {
   $('backfillCheck').disabled = true;
   $('backfillConfirm').textContent = 'Importing...';
   try {
-    const d = await postJson('/api/backfill', { since, confirm: true }, 'import failed');
+    const sources = [...$('backfillSources').querySelectorAll('input[data-source]:checked')].map(
+      (box) => box.dataset.source,
+    );
+    const d = await postJson('/api/backfill', { since, confirm: true, sources }, 'import failed');
+    const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
     toast(
-      `Imported ${fmt(d.imported)} past play${d.imported === 1 ? '' : 's'}` +
+      `Imported ${fmt(total)} past play${total === 1 ? '' : 's'}` +
         (d.filtered > 0 ? ` - ${fmt(d.filtered)} left out by the filter` : ''),
     );
     closeBackfill();
@@ -2639,7 +2705,9 @@ on('score', (e) => {
  */
 on('incomplete', (e) => {
   const play = JSON.parse(e.data);
-  toast(`Didn't finish - ${play.title}`);
+  // An attempt osu! could not submit may not count at all, depending on the setting, so the
+  // toast says which kind it was rather than reading like a counted play.
+  toast(play.unsubmitted ? `Not submitted to osu! - ${play.title}` : `Didn't finish - ${play.title}`);
   if (play.mode === mode) loadProfile();
   loadState();
 });

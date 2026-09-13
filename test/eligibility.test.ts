@@ -67,7 +67,9 @@ function rules(patch: Partial<Settings>) {
 }
 
 test('the pp basis only applies while unranked mods are counted at all', () => {
-  assert.deepEqual(rules({}), VANILLA);
+  // Default settings are osu!'s own rules in all but one respect: attempts osu! could not submit
+  // count by default, because osu! never received them to count.
+  assert.deepEqual(rules({}), { ...VANILLA, countUnsubmitted: true });
   // The default basis is the "as if the mod were off" one the user asked for.
   assert.equal(rules({ includeUnrankedMods: true }).preferStrippedPp, true);
   assert.equal(

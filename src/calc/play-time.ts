@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import type { Db } from '../db/index.ts';
 import type { LazerMod, Ruleset } from '../osr.ts';
-import { visibleSql } from './eligibility.ts';
+import { incompleteSql, VANILLA, visibleSql, type Eligibility } from './eligibility.ts';
 
 /**
  * Total Play Time, computed the way osu! computes it.
@@ -113,7 +113,12 @@ function fillBeatmapLengths(db: Db): void {
 }
 
 /** Total seconds played in one mode, scored plays and incomplete ones together. */
-export function playTimeSeconds(db: Db, profileId: number, mode: Ruleset): number {
+export function playTimeSeconds(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  e: Eligibility = VANILLA,
+): number {
   fillBeatmapLengths(db);
 
   let ms = 0;
@@ -152,7 +157,7 @@ export function playTimeSeconds(db: Db, profileId: number, mode: Ruleset): numbe
     .prepare(
       `SELECT s.started_at, s.played_at, b.length_ms
          FROM incomplete_plays s LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()} AND s.started_at IS NOT NULL`,
+        WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)} AND s.started_at IS NOT NULL`,
     )
     .all(profileId, mode) as { started_at: number; played_at: number; length_ms: number | null }[];
 

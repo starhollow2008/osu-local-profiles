@@ -612,7 +612,8 @@
     <h3 id="backfillTitle">Import past plays</h3>
     <p>
       Plays set while this app was closed were never tracked. Choose how far back to look
-      and they will be imported from that moment onward.
+      and they will be imported from that moment onward &mdash; finished plays from their
+      replays, and quits, fails and retries from osu!lazer&rsquo;s own logs.
     </p>
     <div class="warn">
       Go back only as far as the session you played with this playstyle. Anything earlier
@@ -636,6 +637,9 @@
     <div class="backfill-summary" id="backfillSummary">
       Pick a time, then check what would be imported.
     </div>
+
+    <!-- Filled in by a preview: each kind of past play it found, as its own choice. -->
+    <div class="checkgroup backfill-sources" id="backfillSources" hidden></div>
 
     <div class="actions">
       <button id="backfillCancel" type="button">Cancel</button>

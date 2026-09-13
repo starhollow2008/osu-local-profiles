@@ -203,6 +203,8 @@ check(
   await evaluate("document.getElementById('backfillConfirm').disabled"),
   true,
 );
+// The kinds to import are offered by a preview, each with its count; before one, nothing is.
+check('the kinds of play to import are hidden until a preview has run', await shown('backfillSources'), 'none');
 await evaluate("document.getElementById('backfillCancel').click()");
 check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
 
@@ -1236,6 +1238,25 @@ check(
   await evaluate("document.getElementById('set-includeUnrankedMods').type"),
   'checkbox',
 );
+/*
+ * Counting attempts osu! could not submit is a plain toggle, and the only setting whose hint is
+ * generated rather than fixed -- it says how many have been recorded -- so it is the one that
+ * would render empty if the hint function were ever called wrongly.
+ */
+check(
+  'the unsubmitted-attempts toggle is a checkbox',
+  await evaluate("document.getElementById('set-countUnsubmittedAttempts').type"),
+  'checkbox',
+);
+check(
+  'and its hint says how many attempts have been recorded',
+  await evaluate(`(() => {
+    const hint = document.getElementById('set-countUnsubmittedAttempts')
+      .closest('.setting').querySelector('.setting__hint').textContent;
+    return hint.includes('so far.') || hint.includes('None have been recorded yet.');
+  })()`),
+  true,
+);
 // Six beatmap states, each its own box: they are separate decisions, not one switch.
 check(
   'every unranked beatmap state has its own box',
@@ -1387,7 +1408,11 @@ check(
 check(
   'the menu opens beside the row that asked for it',
   await evaluate(`(() => {
-    const button = document.querySelector('#recentPlays [data-play-menu]');
+    // An unpinned score's menu: Recent Plays can begin with an unfinished play, whose menu
+    // has no Pin at all, and the check below is about an unpinned score.
+    const button = document.querySelector(
+      '#recentPlays [data-play-menu][data-kind="score"][data-pinned="0"]',
+    );
     if (!button) return 'no scores tracked';
     button.click();
     const menu = document.getElementById('playMenu');
@@ -1903,7 +1928,8 @@ check('and carries no extender, so it stays one badge wide', plain.includes('vie
 console.log('\nthe accuracy sits where it should in its cell');
 const accuracyOffsets = await evaluate(`(() => {
   const offsets = (id) => {
-    const row = document.querySelector('#' + id + ' .play-detail');
+    // The first score row: an unfinished play has no accuracy cell to measure.
+    const row = document.querySelector('#' + id + ' .play-detail:not(.play-detail--incomplete)');
     if (!row) return null;
     const cell = row.querySelector('.play-detail__score-detail');
     const accuracy = row.querySelector('.play-detail__accuracy');

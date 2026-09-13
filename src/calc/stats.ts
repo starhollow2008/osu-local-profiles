@@ -4,7 +4,7 @@ import { bonusPp, weightedAccuracy, weightedTotal, withClassicMod } from './pp.t
 import { levelFromScore, type Level } from './level.ts';
 import { playTimeSeconds } from './play-time.ts';
 import type { Grade } from './grade.ts';
-import {
+import { incompleteSql,
   countsSql,
   ppColumn,
   scoreColumn,
@@ -216,7 +216,7 @@ export function computeStats(
   const incomplete = db
     .prepare(
       `SELECT COUNT(*) AS n FROM incomplete_plays s
-        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}`,
+        WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}`,
     )
     .get(profileId, mode) as { n: number };
 
@@ -255,7 +255,7 @@ export function computeStats(
      */
     hitsPerPlay: totals.playcount > 0 ? Math.floor(totals.total_hits / totals.playcount) : 0,
     maxCombo: totals.max_combo,
-    playTime: playTimeSeconds(db, profileId, mode),
+    playTime: playTimeSeconds(db, profileId, mode, e),
     level: levelFromScore(totals.total_score),
     grades,
     distinctRankedBeatmaps: best.length,
@@ -360,6 +360,8 @@ export interface IncompletePlay {
   playedAt: number;
   /** Consecutive attempts on this beatmap folded into this row; 1 unless collapsed. */
   attempts: number;
+  /** An attempt osu! could not submit, listed only while the profile counts them. */
+  unsubmitted: boolean;
 }
 
 export type RecentEntry = Play | IncompletePlay;
@@ -408,11 +410,11 @@ export function recentPlays(
 
   const abandoned = db
     .prepare(
-      `SELECT s.id, s.beatmap_md5, s.beatmap_id, s.beatmap_name, s.played_at,
+      `SELECT s.id, s.beatmap_md5, s.beatmap_id, s.beatmap_name, s.played_at, s.unsubmitted,
               b.beatmapset_id, b.artist, b.title, b.version, b.creator
          FROM incomplete_plays s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-        WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+        WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}
         ORDER BY s.played_at DESC
         LIMIT ?`,
     )
@@ -440,6 +442,7 @@ function toIncomplete(r: Row): IncompletePlay {
     creator: (r['creator'] as string | null) ?? null,
     playedAt: r['played_at'] as number,
     attempts: 1,
+    unsubmitted: r['unsubmitted'] === 1,
   };
 }
 
@@ -458,7 +461,10 @@ function collapseRuns(entries: RecentEntry[]): RecentEntry[] {
       entry.kind === 'incomplete' &&
       previous?.kind === 'incomplete' &&
       previous.beatmapMd5 !== null &&
-      previous.beatmapMd5 === entry.beatmapMd5
+      previous.beatmapMd5 === entry.beatmapMd5 &&
+      // A run folds only attempts of one kind, so the row's label stays true of every attempt
+      // it stands for.
+      previous.unsubmitted === entry.unsubmitted
     ) {
       previous.attempts++;
       continue;
@@ -476,20 +482,30 @@ function collapseRuns(entries: RecentEntry[]): RecentEntry[] {
  * only exists while there is more. Both need the real total, which is a `COUNT` rather than
  * the length of a page.
  */
-export function recentPlayTotal(db: Db, profileId: number, mode: Ruleset): number {
+export function recentPlayTotal(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  e: Eligibility = VANILLA,
+): number {
   const row = db
     .prepare(
       `SELECT (SELECT COUNT(*) FROM scores s
                 WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()})
             + (SELECT COUNT(*) FROM incomplete_plays s
-                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}) AS n`,
+                WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}) AS n`,
     )
     .get(profileId, mode, profileId, mode) as { n: number };
   return row.n;
 }
 
 /** Distinct beatmaps played, which is how many rows Most Played can ever show. */
-export function mostPlayedTotal(db: Db, profileId: number, mode: Ruleset): number {
+export function mostPlayedTotal(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  e: Eligibility = VANILLA,
+): number {
   const row = db
     .prepare(
       `SELECT COUNT(*) AS n FROM (
@@ -497,7 +513,7 @@ export function mostPlayedTotal(db: Db, profileId: number, mode: Ruleset): numbe
           WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
           UNION
          SELECT s.beatmap_md5 FROM incomplete_plays s
-          WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+          WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}
                 AND s.beatmap_md5 IS NOT NULL)`,
     )
     .get(profileId, mode, profileId, mode) as { n: number };
@@ -511,7 +527,13 @@ export function mostPlayedTotal(db: Db, profileId: number, mode: Ruleset): numbe
  * retrying twenty times shows up as the two runs they managed to finish -- which is the
  * opposite of what this section is for.
  */
-export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15): MostPlayed[] {
+export function mostPlayed(
+  db: Db,
+  profileId: number,
+  mode: Ruleset,
+  limit = 15,
+  e: Eligibility = VANILLA,
+): MostPlayed[] {
   const rows = db
     .prepare(
       `SELECT p.beatmap_md5, MAX(p.beatmap_id) AS beatmap_id,
@@ -523,7 +545,7 @@ export function mostPlayed(db: Db, profileId: number, mode: Ruleset, limit = 15)
                 UNION ALL
                SELECT s.beatmap_md5, s.beatmap_id, s.played_at
                  FROM incomplete_plays s
-                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
+                WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}
                       AND s.beatmap_md5 IS NOT NULL) p
          LEFT JOIN beatmaps b ON b.md5 = p.beatmap_md5
         GROUP BY p.beatmap_md5
@@ -565,15 +587,31 @@ export function mostRecentMode(db: Db, profileId: number): Ruleset {
  * A play that was quit still happened, and it is in the mode's play count, so the mode has
  * to be reachable -- otherwise the profile would hold plays with no tab to see them under.
  */
-export function modesWithPlays(db: Db, profileId: number): Ruleset[] {
+export function modesWithPlays(db: Db, profileId: number, e: Eligibility = VANILLA): Ruleset[] {
   const rows = db
     .prepare(
       `SELECT DISTINCT mode FROM (
          SELECT s.mode FROM scores s WHERE s.profile_id = ? AND ${visibleSql()}
          UNION ALL
-         SELECT s.mode FROM incomplete_plays s WHERE s.profile_id = ? AND ${visibleSql()})
+         SELECT s.mode FROM incomplete_plays s WHERE s.profile_id = ? AND ${incompleteSql(e)})
        ORDER BY mode`,
     )
     .all(profileId, profileId) as { mode: number }[];
   return rows.map((r) => r.mode as Ruleset);
+}
+
+/**
+ * How many attempts osu! could not submit this profile has recorded, whether or not they count.
+ *
+ * For Settings, so the option that would count them can say what it would add before anyone
+ * switches it on. Every mode, because the option is the profile's, not a mode's.
+ */
+export function unsubmittedAttemptCount(db: Db, profileId: number): number {
+  const row = db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM incomplete_plays s
+        WHERE s.profile_id = ? AND ${visibleSql()} AND s.unsubmitted = 1`,
+    )
+    .get(profileId) as { n: number };
+  return row.n;
 }

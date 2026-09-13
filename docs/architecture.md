@@ -16,6 +16,8 @@
 
 **`online.db`** is a plain SQLite file shipped by lazer: `osu_beatmaps(beatmap_id, beatmapset_id, checksum, approved, ...)`, ~234k rows, `checksum` = beatmap MD5. Open read-only, never write. Cross-platform; fetched asynchronously by lazer when absent, refreshed if >1 month old. Not guaranteed to exist on any platform.
 
+**A `.osu` section ends at the next line beginning with `[`, never at the next `[`** (`osuSection` in `src/clients/beatmaps.ts`). `[` is ordinary inside values — mappers like `cRyo[iceeicee]`, artists tagged `[CV. …]`, audio files named `[HD] …`. The old rule lost or corrupted 327 of 12,811 beatmap names here and filed 23 beatmaps under the wrong mode (roadmap 5.45).
+
 ## pp: osu!'s own code
 
 `tools/PpCalculator/Program.cs` references official `ppy.osu.Game.Rulesets.*` NuGet packages. Driven over JSON-lines pipe from `src/calc/official.ts`.
@@ -57,6 +59,14 @@ Log timestamps: **UTC**. Beatmap ID in network log's submission `PUT`, joined to
 **`incomplete_plays` rows are NOT in `scores`.** An abandoned play has no accuracy, combo, mods, pp, or total score. A row of zeroes in `scores` corrupts weighted accuracy, grade counts, ranked score, level bar, medals. Only 4 aggregates read `incomplete_plays`: play count, monthly play counts, Most Played, Recent Plays. `hitsPerPlay` divides by *scored* plays only.
 
 Counting them is not optional (osu! counts them). `showIncompleteInRecent` (`yes` | `collapse` | `no`) only controls listing.
+
+**Offline or signed out, osu! counts nothing — but lazer still says so** (roadmap 5.45). With no token, `SubmittingPlayer.submitScore` logs `No token, skipping score submission`, just before the solo gameplay screen exits (93 of 94 here; the one exception came a few seconds after). That line against a `SoloPlayer#N` screen that did not reach results is an *unsubmitted attempt*. It is never inferred from a token merely being absent; a screen that had a token is never one; `ReplayPlayer`, the skin editor's `EndlessPlayer` and multiplayer screens never are. It is distinct from `No hits registered`, which is osu!'s own discard and stays uncounted.
+
+Stored in `incomplete_plays` with `unsubmitted = 1`, keyed `unsubmitted:<log session>:<screen>:<entered>` (screen numbers repeat within a day). **Recorded always** — the log is only followed live, so an attempt skipped today is gone — and **counted only through `incompleteSql(e)`**, when the profile's `countUnsubmittedAttempts` is on — **on by default**, at the user's call: osu! never received these, so counting them takes nothing from what osu! shows. The Scores note mentions them only once some are recorded.
+
+**Import past plays reads the logs too** (`src/tracker/log-backfill.ts`): counted unfinished plays and unsubmitted attempts from the cutoff on, each kind a separate source beside replays. Preview and import go through the same `checkIncompletePlay`/`checkUnsubmittedAttempt`, so the preview's numbers are the import's. An import naming no sources means replays alone, as before. Every figure that reads unfinished plays goes through it: play count, monthly play counts, Most Played, Recent Plays, Total Play Time, modes with plays.
+
+An attempt has no beatmap id (no submission request), so it is matched by the log's `Game-wide working beatmap updated to` name against `osu_files.name` — lazer's `BeatmapInfo.ToString()`, `Artist - Title (Creator) [Version]`, built from each `.osu`, unique matches only. Measured on 20 real logs: 59 attempts, 59 matched, where the beatmap cache alone matched 12. Needs no `online.db`.
 
 **osu!stable incomplete plays cannot be covered** (measured 2026-09-11, stable `b20260711.1`):
 

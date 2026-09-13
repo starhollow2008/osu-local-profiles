@@ -2626,6 +2626,11 @@
   color: hsl(var(--hsl-c1));
 }
 
+/* The kinds of past play a preview found, each its own choice. */
+.backfill-sources {
+  margin-top: 10px;
+}
+
 .modal .actions button.danger {
   background-color: #a11;
   color: #fff;

@@ -85,6 +85,17 @@ export interface Settings {
    */
   showIncompleteInRecent: IncompleteDisplay;
   /**
+   * Whether attempts osu! could not submit count as plays: quits, fails and retries while osu!
+   * was offline or signed out, read from lazer's log (src/clients/lazer-log.ts).
+   *
+   * On by default, at the user's call: osu! never received these, so counting them takes nothing
+   * from the agreement with osu! the rest of the play count keeps -- it only covers play osu! had
+   * no chance to see. They are recorded either way, and switching this moves the play count,
+   * monthly play counts, Most Played, Recent Plays and Total Play Time together, never one
+   * without the others.
+   */
+  countUnsubmittedAttempts: boolean;
+  /**
    * The order the profile's sections appear in, as their ids.
    *
    * Reconciled against the code's own list on every read: ids that no longer exist are
@@ -209,6 +220,11 @@ const DEFS: Defs = {
   showIncompleteInRecent: {
     default: 'collapse',
     coerce: (raw) => (raw === 'yes' || raw === 'no' ? raw : 'collapse'),
+  },
+  countUnsubmittedAttempts: {
+    default: true,
+    // Defaults to on, so anything but an explicit "off" counts them.
+    coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
   },
   showCountingNote: {
     default: true,

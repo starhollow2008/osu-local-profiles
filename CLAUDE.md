@@ -16,6 +16,12 @@ Each has its reasoning in `docs/architecture.md`.
   (never `s.total_score`).
 - **Incomplete plays live in `incomplete_plays`, never in `scores`.** A row of zeroes there
   corrupts accuracy, grades, ranked score, the level bar and medals.
+- **Attempts osu! could not submit count only through `incompleteSql()`.** Stored with
+  `incomplete_plays.unsubmitted = 1` and recorded always; counted when the profile's
+  `countUnsubmittedAttempts` is on (the default). Never read `incomplete_plays` for a figure
+  without it.
+- **A `.osu` section ends at a line beginning with `[`** (`osuSection`), never at the next `[`,
+  which is ordinary inside values.
 - **The play tracking filter decides what is written, so it cannot be undone.** Off by
   default and widest when on; a fact it lacks never rejects a play; every declined play is
   announced. `scripts/reingest.mjs` must not pass a filter.

@@ -212,10 +212,30 @@ accepted each submission:
 ```
 
 This needs osu! to be signed in, which is also exactly when osu! counts the play -- so the
-two agree, and both go quiet together when you play offline. There is no accuracy, combo,
-mod list or pp for these: lazer never writes any of it down for a play it discards. They
-count toward your play count, monthly play counts and Most Played, and appear in Recent
-Plays as dimmed rows according to the **Unfinished plays in Recent Plays** setting.
+two agree. There is no accuracy, combo, mod list or pp for these: lazer never writes any of
+it down for a play it discards. They count toward your play count, monthly play counts and
+Most Played, and appear in Recent Plays as dimmed rows according to the **Unfinished plays in
+Recent Plays** setting.
+
+#### Offline or signed out
+
+osu! counts nothing it cannot submit, so a quit, fail or retry while offline is not a play on
+osu!. lazer still writes one line about it -- `No token, skipping score submission` -- and
+that is what this reads: only a solo play the game said it had no token for, that did not
+reach a results screen (a pass is already tracked from its replay). The beatmap is matched by
+the name the log gives it, against every beatmap installed, so this works without osu!lazer's
+online beatmap database.
+
+They count by default, toward the play count, monthly play counts, Most Played, Recent Plays
+(as **Not submitted**) and Total Play Time together: osu! never received them, so counting them
+takes nothing away from what your osu! profile shows -- it only covers play osu! had no chance
+to see. Turn off **Settings -> Count plays osu! could not submit** to match your osu! profile
+exactly; they are recorded either way, so turning it back on loses nothing. The one thing the
+log cannot say is whether osu! would have counted the attempt had it been online -- osu! ignores
+a play with no hits at all -- so an attempt quit before hitting anything counts here.
+
+Attempts from before the app was running are still in osu!lazer's logs, and **Import past
+plays** can bring them in: see below.
 
 ### osu!stable is different, in a few ways worth knowing
 
@@ -815,6 +835,13 @@ everything from them -- but these are portable and outlive the app.
 Scores are only tracked while the app is running, so a session played with it closed is
 missed. **Options -> Import past plays** covers that: pick how far back to look, check what
 would be imported, then confirm.
+
+It reads osu!lazer's own logs as well as your replays, so a past session comes back whole: the
+finished plays from their replays, the quits, fails and retries osu! counted, and the ones made
+offline or signed out that osu! could not submit. The check lists each kind with its count, all
+ticked, and you untick what you do not want -- bringing in last week's offline attempts does not
+have to bring in last week's replays. A play on a beatmap you no longer have installed is
+skipped, and the check says how many.
 
 It never runs by itself, and the warning in the dialog is the important part -- reach back
 further than the session you actually played with this playstyle and you will pull in plays

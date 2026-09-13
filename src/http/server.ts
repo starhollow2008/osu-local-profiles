@@ -8,6 +8,7 @@ import type { Tracker } from '../tracker/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
 import type { Ruleset } from '../osr.ts';
 import {
+  unsubmittedAttemptCount,
   computeStats,
   modesWithPlays,
   mostPlayed,
@@ -49,6 +50,7 @@ import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { appVersion } from '../config.ts';
 import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { filterNarrows } from '../tracking-filter.ts';
+import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
@@ -232,8 +234,8 @@ export function startServer(opts: ServerOptions): http.Server {
         medalTotal: earnedMedalCount(opts.db, profileId, e, { mode, summary: medals }),
         // Every event, newest first; the request slices off the page it asked for.
         history: buildHistory(opts.db, profileId, mode, Number.POSITIVE_INFINITY, e, medalEvents(medals.medals)),
-        recentTotal: recentPlayTotal(opts.db, profileId, mode),
-        mostPlayedCount: mostPlayedTotal(opts.db, profileId, mode),
+        recentTotal: recentPlayTotal(opts.db, profileId, mode, e),
+        mostPlayedCount: mostPlayedTotal(opts.db, profileId, mode, e),
       };
     });
 
@@ -343,10 +345,18 @@ export function startServer(opts: ServerOptions): http.Server {
         staleScores: opts.tracker.staleScores,
         // Scores removed from the profile. They are never deleted, so they can be put back.
         hiddenScores: hiddenCount(opts.db, current()),
+        // Attempts osu! could not submit -- offline, signed out, or an unsubmittable beatmap.
+        // Recorded whether or not they count, so Settings can say how many there are before
+        // anyone decides to count them.
+        unsubmittedAttempts: unsubmittedAttemptCount(opts.db, current()),
         // Whether the Share dialog can offer an image as well as a web page.
         sharing: { canScreenshot: findBrowser() !== null },
         defaultMode: mostRecentMode(opts.db, current()),
-        modesWithPlays: modesWithPlays(opts.db, current()),
+        modesWithPlays: modesWithPlays(
+          opts.db,
+          current(),
+          eligibilityOf(settings, opts.tracker.beatmaps.knowsStatus),
+        ),
         installs: opts.installs.map((i) => ({
           kind: i.kind,
           root: i.root,
@@ -405,8 +415,9 @@ export function startServer(opts: ServerOptions): http.Server {
         ),
         // Recent Plays reads only the newest rows through an index, so it is not worth keeping.
         recent: recentPlays(opts.db, profileId, mode, page('recent', 25), e, settings.showIncompleteInRecent),
-        mostPlayed: remember(`mostPlayed:${profileId}:${mode}:${page('mostPlayed', 15)}`, () =>
-          mostPlayed(opts.db, profileId, mode, page('mostPlayed', 15)),
+        // Keyed by the rules too: whether unsubmitted attempts count changes what it lists.
+        mostPlayed: remember(`mostPlayed:${rulesKey}:${page('mostPlayed', 15)}`, () =>
+          mostPlayed(opts.db, profileId, mode, page('mostPlayed', 15), e),
         ),
         // Favourites are the profile's, not a mode's, exactly as osu!'s are the account's.
         favorites: listFavorites(opts.db, favorites(), page('favorites', 6), opts.tracker.beatmaps),
@@ -1097,10 +1108,21 @@ export function startServer(opts: ServerOptions): http.Server {
         void (async () => {
           let since: number;
           let confirmed = false;
+          let sources: BackfillSources = REPLAYS_ONLY;
           try {
-            const parsed = JSON.parse(body) as { since?: number; confirm?: boolean };
+            const parsed = JSON.parse(body) as { since?: number; confirm?: boolean; sources?: unknown };
             since = Number(parsed.since);
             confirmed = parsed.confirm === true;
+            // Which kinds of past play to bring in. Absent means replays alone, which is what an
+            // import meant before it read lazer's logs; a name it does not know is ignored.
+            if (Array.isArray(parsed.sources)) {
+              const named = new Set(parsed.sources);
+              sources = {
+                replays: named.has('replays'),
+                unfinished: named.has('unfinished'),
+                attempts: named.has('attempts'),
+              };
+            }
           } catch {
             return json(res, { error: 'expected a JSON body with a "since" timestamp' }, 400);
           }
@@ -1128,14 +1150,17 @@ export function startServer(opts: ServerOptions): http.Server {
                 starsUnchecked: scan.starsUnchecked,
                 earliest: scan.earliest,
                 latest: scan.latest,
+                // lazer's logs: counts only, by the same checks the import will make.
+                log: scan.log,
               });
             }
 
-            const result = await opts.tracker.backfill(since);
+            const result = await opts.tracker.backfill(since, sources);
             broadcast('backfill', result);
             console.log(
               `\n  imported ${result.imported} past play(s) from ` +
                 `${new Date(since).toLocaleString()}` +
+                `${result.unfinished + result.attempts > 0 ? `, and from osu!lazer's logs ${result.unfinished} unfinished and ${result.attempts} not submitted` : ''}` +
                 `${result.filtered > 0 ? ` (${result.filtered} declined by the tracking filter)` : ''}\n`,
             );
             return json(res, result);

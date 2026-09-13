@@ -41,6 +41,12 @@ export interface Eligibility {
    * because there is no status to filter on.
    */
   countUnresolved: boolean;
+  /**
+   * Count attempts osu! logged it had no token for -- offline, signed out, or an unsubmittable
+   * beatmap -- as plays. The profile's `countUnsubmittedAttempts` setting, on by default. It
+   * never touches pp: these rows carry none. See `incompleteSql`.
+   */
+  countUnsubmitted: boolean;
 }
 
 /** osu!'s own rules: ranked and approved maps, default settings on ranked mods, nothing else. */
@@ -50,6 +56,7 @@ export const VANILLA: Eligibility = {
   extraMapStatuses: [],
   scoring: 'lazer',
   countUnresolved: false,
+  countUnsubmitted: false,
 };
 
 export function eligibilityOf(settings: Settings, statusKnown = true): Eligibility {
@@ -61,6 +68,7 @@ export function eligibilityOf(settings: Settings, statusKnown = true): Eligibili
     extraMapStatuses: mapStatuses(settings.includeUnrankedMaps),
     scoring: settings.scoring === 'classic' ? 'classic' : 'lazer',
     countUnresolved: !statusKnown,
+    countUnsubmitted: settings.countUnsubmittedAttempts === true,
   };
 }
 
@@ -80,6 +88,20 @@ function mapStatuses(names: readonly string[] | undefined): number[] {
     if (typeof status === 'number') out.add(status);
   }
   return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * Which rows of `incomplete_plays` count as plays under these settings: every play osu!
+ * counted, always, and the attempts osu! could not submit only when the profile has asked.
+ *
+ * The one definition of it, as `countsSql` is for pp. Every query over `incomplete_plays` that
+ * feeds a figure reads this, so an attempt can never count in the play count while missing
+ * from Most Played, or the reverse. It includes `visibleSql`, so a caller needs nothing else.
+ */
+export function incompleteSql(e: Eligibility, alias = 's'): string {
+  return e.countUnsubmitted
+    ? visibleSql(alias)
+    : `(${visibleSql(alias)} AND ${alias}.unsubmitted = 0)`;
 }
 
 /**

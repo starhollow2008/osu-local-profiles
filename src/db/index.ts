@@ -54,6 +54,11 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'beatmaps', column: 'added_at', definition: 'INTEGER' },
   { table: 'beatmaps', column: 'submitted_at', definition: 'INTEGER' },
   { table: 'beatmaps', column: 'ranked_at', definition: 'INTEGER' },
+  // Added with attempts osu! could not submit. NULL marks rows indexed before names were read,
+  // which the index backfills once -- in the same pass as beatmap_id above for anyone upgrading
+  // from a release that had neither.
+  { table: 'osu_files', column: 'name', definition: 'TEXT' },
+  { table: 'incomplete_plays', column: 'unsubmitted', definition: 'INTEGER NOT NULL DEFAULT 0' },
 ];
 
 /**
@@ -73,6 +78,9 @@ function migrate(db: Db): void {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
   db.exec('CREATE INDEX IF NOT EXISTS osu_files_beatmap_id ON osu_files (beatmap_id)');
+  // Here rather than in schema.sql: on an existing database the column does not exist until
+  // the loop above has added it, and schema.sql runs first.
+  db.exec('CREATE INDEX IF NOT EXISTS osu_files_name ON osu_files (name)');
 }
 
 /** Read-only handle for a database owned by the osu! client (never written to). */
