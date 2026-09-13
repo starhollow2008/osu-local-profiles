@@ -349,7 +349,7 @@ profile, so the curve comes from the public dumps instead.
 |---|---|---|
 | `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
-| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Open in browser on start** |
+| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Other settings -> Open in browser on start** |
 | `checkForUpdates` | `true` | ask GitHub once at startup whether a newer release exists |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
@@ -537,7 +537,7 @@ only: medals, play time and pp eligibility all read the mods you actually chose.
 
 ## Sharing the profile
 
-**Options -> Share this profile.**
+**Options -> Share & back up.**
 
 - **Save as a web page** -- this page as one `.html` file that **works like it**: show more,
   the mode tabs, View Details, the medal cards, the charts and the song previews all respond.
@@ -751,7 +751,9 @@ clears those along with everything else.
 ## Other settings
 
 **Options -> Other settings**, and everything there belongs to the profile you are on -- two
-playstyles are two profiles and should not share a description or how their scores count.
+playstyles are two profiles and should not share how their scores count. The one exception is
+**Open in browser on start**, under *This install*: whether starting the app opens this page
+is about the install, not a profile, so it is saved to `data/config.json`.
 
 ### Include pp for unranked mods
 
@@ -837,17 +839,19 @@ is left exactly as it is.
 **Options -> Profiles** manages several playstyles side by side -- "left hand", "mouse
 only", "tablet again" -- each with its own scores, pp, level and start date. Only the
 selected one records plays. A new profile starts empty and tracks from the moment you
-create it, never from earlier plays. The same dialog edits the profile being tracked, imports
-from an osu! account, and holds **Keep Favorite Beatmaps the same on every profile**.
+create it, never from earlier plays. The same dialog edits and resets the profile being
+tracked, imports from an osu! account, and holds **Keep Favorite Beatmaps the same on every
+profile**.
 
 Deleting a profile takes its tracked scores with it and needs an explicit confirmation.
-The last remaining profile cannot be deleted; reset it instead.
+The last remaining profile cannot be deleted; reset it instead, with **Reset this profile** at
+the end of Edit profile.
 
 ## Backing up and exporting
 
-- **Options -> Export this profile** downloads the active profile as JSON: every score with
+- **Options -> Share & back up -> Export this profile** downloads the active profile as JSON: every score with
   its beatmap, plus the computed totals and rank.
-- **Options -> Back up everything** downloads a copy of the whole database, all profiles
+- **Options -> Share & back up -> Back up everything** downloads a copy of the whole database, all profiles
   included. It is written with `VACUUM INTO` rather than copied, because the database runs
   in WAL mode and a plain file copy can miss recent writes.
 

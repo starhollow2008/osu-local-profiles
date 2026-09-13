@@ -23,22 +23,16 @@
         <div class="menu" id="optionsMenu" hidden>
           <button id="optProfiles" type="button">Profiles</button>
           <button id="optSettings" type="button">Other settings</button>
+          <div class="sep"></div>
+          <div class="menu__heading">Tracking</div>
           <button id="optBackfill" type="button">Import past plays</button>
           <button id="optFilter" type="button">Play tracking filter</button>
+          <div class="sep"></div>
           <button id="optLazerScoring" class="menu__toggle" type="button" role="menuitemcheckbox"
                   aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale.">
             <span>Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
           </button>
-          <button id="optOpenBrowser" class="menu__toggle" type="button" role="menuitemcheckbox"
-                  aria-checked="true" title="Open this page in your browser whenever the app starts">
-            <span>Open in browser on start</span><span class="menu__switch" aria-hidden="true"></span>
-          </button>
-          <div class="sep"></div>
-          <button id="optShare" type="button">Share this profile</button>
-          <button id="optExport" type="button">Export this profile (JSON)</button>
-          <button id="optBackup" type="button">Back up everything (database)</button>
-          <div class="sep"></div>
-          <button id="optReset" class="danger" type="button">Reset profile</button>
+          <button id="optShare" type="button">Share &amp; back up</button>
           <div class="sep"></div>
           <div class="note" id="optInfo">&nbsp;</div>
         </div>
@@ -371,7 +365,9 @@
 
 <div class="backdrop" id="shareModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
-    <h3 id="shareTitle">Share this profile</h3>
+    <h3 id="shareTitle">Share &amp; back up</h3>
+
+    <h4 class="identity-heading">Share</h4>
 
     <div class="share-option">
       <div class="share-option__detail">
@@ -392,6 +388,29 @@
         <div class="setting__hint" id="shareScreenshotNote">&nbsp;</div>
       </div>
       <button type="button" id="shareScreenshot">Save&hellip;</button>
+    </div>
+
+    <h4 class="identity-heading">Back up</h4>
+
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b>Export this profile (JSON)</b>
+        <div class="setting__hint">
+          Every score this profile has tracked, with its beatmap, plus the computed totals and
+          rank.
+        </div>
+      </div>
+      <button type="button" id="shareExport">Download</button>
+    </div>
+
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b>Back up everything (database)</b>
+        <div class="setting__hint">
+          A copy of the whole database, every profile included.
+        </div>
+      </div>
+      <button type="button" id="shareBackup">Download</button>
     </div>
 
     <div class="profile-hint" id="shareHint">&nbsp;</div>
@@ -462,6 +481,21 @@
     </p>
 
     <div id="settingsFields"></div>
+
+    <div class="removed-scores" id="installSettings">
+      <h4>This install</h4>
+      <div class="setting">
+        <label class="field">
+          <span>Open in browser on start</span>
+          <input type="checkbox" id="openBrowserSetting">
+        </label>
+        <div class="setting__hint">
+          Open this page in your browser whenever the app starts. This one is not a profile's:
+          it decides what happens before any profile is on screen, so it is saved for the whole
+          install, in <code>data/config.json</code>.
+        </div>
+      </div>
+    </div>
 
     <div class="removed-scores" id="removedScores" hidden>
       <h4>Removed scores<span class="title__count" id="removedCount">0</span></h4>
@@ -566,6 +600,16 @@
 
       <div class="identity-found" id="identityFound"></div>
       <div class="profile-hint" id="identityHint">&nbsp;</div>
+      <div class="share-option profile-danger">
+        <div class="share-option__detail">
+          <b>Reset this profile</b>
+          <div class="setting__hint">
+            Erases everything tracked for this profile and starts it again from zero. It asks
+            first, and your osu! account and replay files are not touched.
+          </div>
+        </div>
+        <button type="button" class="danger-button" id="profileReset">Reset</button>
+      </div>
     </section>
 
     <section class="profile-section" id="importSection">

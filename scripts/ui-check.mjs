@@ -166,9 +166,11 @@ check('options menu closes', await shown('optionsMenu'), 'none');
 
 console.log('\nafter choosing Reset profile');
 await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optReset').click()");
+await evaluate("document.getElementById('optProfiles').click()");
+await evaluate("document.getElementById('profileReset').click()");
 check('reset dialog opens', await shown('resetModal'), 'grid');
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
+check('and Profiles closed behind it', await shown('profilesModal'), 'none');
 console.log(`  summary text: "${await evaluate("document.getElementById('resetSummary').textContent")}"`);
 
 console.log('\nafter clicking Cancel');
@@ -177,7 +179,8 @@ check('reset dialog closes', await shown('resetModal'), 'none');
 
 console.log('\nafter reopening and clicking the backdrop');
 await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optReset').click()");
+await evaluate("document.getElementById('optProfiles').click()");
+await evaluate("document.getElementById('profileReset').click()");
 await evaluate(`(() => {
   const el = document.getElementById('resetModal');
   el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -186,7 +189,8 @@ check('backdrop click closes it', await shown('resetModal'), 'none');
 
 console.log('\nafter reopening and pressing Escape');
 await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optReset').click()");
+await evaluate("document.getElementById('optProfiles').click()");
+await evaluate("document.getElementById('profileReset').click()");
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
@@ -552,36 +556,57 @@ check(
 );
 
 console.log('\nopen in browser on start');
-// Read, flip, read back from the server, flip back: the check must leave config.json as it
-// found it, since it runs against a real install.
+/*
+ * In Other settings, under This install. Read, flip and save, read back from the server, then
+ * flip back and save again: the check must leave config.json as it found it, since it runs
+ * against a real install.
+ */
 const toggle = await evaluate(`(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const state = async () => (await (await fetch('/api/state')).json()).app.config.openBrowser;
-  document.getElementById('optionsBtn').click();
-  const button = document.getElementById('optOpenBrowser');
+  const open = () => {
+    document.getElementById('optionsBtn').click();
+    document.getElementById('optSettings').click();
+  };
+  const box = () => document.getElementById('openBrowserSetting');
+  // Save can offer a recompute with a native confirm(), which would hold this check until
+  // someone answered it. Declined here, and put back below.
+  const realConfirm = window.confirm;
+  window.confirm = () => false;
   const before = await state();
-  const shownBefore = button.getAttribute('aria-checked') === String(before);
-  button.click();
-  await new Promise((r) => setTimeout(r, 300));
+  open();
+  const inSettings = document.getElementById('settingsModal').contains(box());
+  const shownBefore = box().checked === before;
+  box().checked = !before;
+  document.getElementById('settingsSave').click();
+  await wait(1500);
   const after = await state();
-  const menuOpen = getComputedStyle(document.getElementById('optionsMenu')).display !== 'none';
-  const shownAfter = button.getAttribute('aria-checked') === String(after);
-  button.click();
-  await new Promise((r) => setTimeout(r, 300));
+  open();
+  const shownAfter = box().checked === after;
+  box().checked = before;
+  document.getElementById('settingsSave').click();
+  await wait(1500);
   const restored = (await state()) === before;
-  document.body.click();
-  return { shownBefore, flipped: after === !before, shownAfter, menuOpen, restored };
+  window.confirm = realConfirm;
+  return { inSettings, shownBefore, flipped: after === !before, shownAfter, restored };
 })()`);
-check('the switch shows the saved setting', toggle.shownBefore, true);
-check('pressing it saves the opposite', toggle.flipped, true);
-check('and the switch follows', toggle.shownAfter, true);
-check('the menu stays open while it is pressed', toggle.menuOpen, true);
-check('pressing it again puts it back', toggle.restored, true);
+check('it is in Other settings', toggle.inSettings, true);
+check('the box shows the saved setting', toggle.shownBefore, true);
+check('saving it flipped saves the opposite', toggle.flipped, true);
+check('and the box follows when the dialog is opened again', toggle.shownAfter, true);
+check('saving it back puts it back', toggle.restored, true);
 
 console.log('\nshare dialog');
 check('the share dialog is hidden on load', await shown('shareModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optShare').click()");
 check('it opens', await shown('shareModal'), 'grid');
+check('it is called Share & back up', await evaluate("document.getElementById('shareTitle').textContent"), 'Share & back up');
+check(
+  'exporting and backing up are offered in it',
+  await evaluate("!!document.getElementById('shareExport') && !!document.getElementById('shareBackup')"),
+  true,
+);
 check(
   'the web page export is the primary action',
   await evaluate("document.getElementById('shareHtml').classList.contains('primary')"),
@@ -1042,6 +1067,40 @@ check(
   'Edit profile and Import from osu! are part of Profiles, not the menu',
   menuLabels.includes('Edit profile') || menuLabels.includes('Import from osu!'),
   false,
+);
+
+check('the menu is six entries', menuLabels.length, 6);
+check(
+  'Open in browser, Export, Back up and Reset have left it',
+  await evaluate("['optOpenBrowser', 'optExport', 'optBackup', 'optReset'].filter((id) => document.getElementById(id)).length"),
+  0,
+);
+check('sharing and backing up are one entry', menuLabels.includes('Share & back up'), true);
+check(
+  'Import past plays and Play tracking filter sit under a Tracking heading',
+  await evaluate(`(() => {
+    const heading = [...document.querySelectorAll('#optionsMenu .menu__heading')]
+      .find((h) => h.textContent.trim() === 'Tracking');
+    const first = heading?.nextElementSibling;
+    return first?.id === 'optBackfill' && first.nextElementSibling?.id === 'optFilter';
+  })()`),
+  true,
+);
+check(
+  'Reset lives in Profiles, under Edit profile',
+  await evaluate("document.getElementById('profileEdit').contains(document.getElementById('profileReset'))"),
+  true,
+);
+// Laid out as a share option, whose grey button style is more specific than the danger one.
+check(
+  'and its button is red',
+  await evaluate("parseInt(getComputedStyle(document.getElementById('profileReset')).backgroundColor.slice(4), 10) > 150"),
+  true,
+);
+check(
+  'Open in browser on start lives in Other settings',
+  await evaluate("document.getElementById('settingsModal').contains(document.getElementById('openBrowserSetting'))"),
+  true,
 );
 
 console.log('\nprofiles: edit profile');

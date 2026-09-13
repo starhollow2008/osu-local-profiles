@@ -1408,6 +1408,16 @@
   margin: 5px 3px;
 }
 
+/* A small label over a group of related entries. */
+.menu__heading {
+  padding: 6px 11px 2px;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small-2);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .menu .note {
   padding: 6px 11px 8px;
   color: hsl(var(--hsl-f1));
@@ -1450,6 +1460,16 @@
 
 .share-option button.primary:hover:not(:disabled) {
   background-color: hsl(var(--hsl-p));
+}
+
+/* Reset in Profiles is laid out as a share option, but stays the red of every destructive button. */
+.share-option button.danger-button {
+  color: #fff;
+  background-color: hsl(0 60% 45%);
+}
+
+.share-option button.danger-button:hover:not(:disabled) {
+  background-color: hsl(0 70% 55%);
 }
 
 .share-option button:disabled {
@@ -2656,6 +2676,11 @@
 /* A section's own confirm button, at the end of the section rather than in the footer. */
 .modal .actions--inline {
   margin-top: 10px;
+}
+
+/* Reset, at the end of Edit profile: set apart from the fields above it. */
+.profile-danger {
+  margin-top: 8px;
 }
 
 /* Lent to the welcome, Import from osu! needs no rule above it: it is the welcome's content. */

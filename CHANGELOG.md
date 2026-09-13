@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **The Options menu is down to six entries.** Import past plays and Play tracking filter sit
+  under a **Tracking** heading. **Share & back up** is one dialog for saving the page, saving
+  an image, exporting the profile as JSON and backing up the database. **Reset** moved into
+  Profiles, at the end of Edit profile, since it only touches the profile being tracked, and
+  **Open in browser on start** moved into Other settings, under This install.
+
 ## 1.15.0
 
 - **Options is shorter, and Profiles holds everything about a profile.** Edit profile, Import

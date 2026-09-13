@@ -592,7 +592,6 @@ async function loadState() {
   refreshOpenProfiles();
 
   app = s.app ?? app;
-  renderOpenBrowser();
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
@@ -761,35 +760,6 @@ $('optLazerScoring').onclick = async () => {
 };
 
 /* ------------------------------------------------------- open on start */
-
-/*
- * "Open in browser on start": whether launching the app opens this page. It belongs to the
- * install, not the profile -- it decides what happens before any profile is on screen -- so
- * it is saved to data/config.json rather than with the profile's settings. On by default.
- *
- * The menu stays open when it is pressed, so the switch visibly flips under the pointer.
- */
-function renderOpenBrowser() {
-  const on = app.config?.openBrowser !== false;
-  $('optOpenBrowser').setAttribute('aria-checked', String(on));
-}
-
-$('optOpenBrowser').onclick = async () => {
-  const next = app.config?.openBrowser === false;
-  app = { ...app, config: { ...app.config, openBrowser: next } };
-  renderOpenBrowser();
-  try {
-    const d = await postJson('/api/app-config', { openBrowser: next }, 'saving that failed');
-    app = { ...app, config: d.config };
-    renderOpenBrowser();
-    toast(next ? 'This page will open when the app starts' : 'The app will start without opening this page');
-  } catch (err) {
-    // Put back what the server actually has, rather than leaving the switch lying.
-    app = { ...app, config: { ...app.config, openBrowser: !next } };
-    renderOpenBrowser();
-    toast(err.message);
-  }
-};
 
 /* ----------------------------------------------------------------- update */
 
@@ -1910,6 +1880,7 @@ function openSettings() {
   void renderRemovedScores();
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
+  $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   settingsHint(' ');
   $('settingsModal').hidden = false;
   $('settingsCancel').focus();
@@ -1942,6 +1913,17 @@ $('settingsSave').onclick = async () => {
         String(d.settings[f.key] ?? '') === '',
     );
     settings = d.settings;
+
+    /*
+     * "Open in browser on start" belongs to the install rather than the profile -- it decides
+     * what happens before any profile is on screen -- so it goes to data/config.json, and only
+     * when it changed.
+     */
+    const openBrowser = $('openBrowserSetting').checked;
+    if (openBrowser !== (app.config?.openBrowser !== false)) {
+      const c = await postJson('/api/app-config', { openBrowser }, 'saving that failed');
+      app = { ...app, config: c.config };
+    }
 
     closeSettings();
     // The eligibility settings change every number on the page, not just the header.
@@ -2464,18 +2446,16 @@ $('newProfileName').onkeydown = (e) => {
 /* ------------------------------------------------------- export and backup */
 
 /*
- * Both are plain downloads. Navigating rather than fetching lets the browser handle the
+ * Both are plain downloads, from Share & back up. Navigating rather than fetching lets the browser handle the
  * save dialog and the filename from content-disposition, and keeps a 20MB database out
  * of the page's memory.
  */
-$('optExport').onclick = () => {
-  setMenuOpen(false);
+$('shareExport').onclick = () => {
   window.location.href = '/api/export';
   toast('Exporting this profile as JSON');
 };
 
-$('optBackup').onclick = () => {
-  setMenuOpen(false);
+$('shareBackup').onclick = () => {
   window.location.href = '/api/backup';
   toast('Backing up every profile');
 };
@@ -2720,7 +2700,12 @@ function closeReset() {
   $('resetModal').hidden = true;
 }
 
-$('optReset').onclick = openReset;
+// From Profiles, under Edit profile, since it only touches the profile being tracked. Profiles
+// closes first, so the question is not asked from behind it.
+$('profileReset').onclick = () => {
+  closeProfiles();
+  openReset();
+};
 $('resetCancel').onclick = closeReset;
 // Clicking the dimmed background cancels; clicking inside the dialog does not.
 $('resetModal').onclick = (e) => {
@@ -2828,10 +2813,9 @@ on('profiles', () => {
 on('indexing', (e) => renderIndexing(JSON.parse(e.data)));
 on('settings', () => loadState());
 on('identity', () => loadState());
-// A second tab should not be left showing the switch the wrong way round.
+// A second tab should read the install's options as they now are.
 on('app-config', (e) => {
   app = { ...app, config: JSON.parse(e.data) };
-  renderOpenBrowser();
 });
 // Pin, unpin and remove all change what the page should be showing.
 // Another tab favouriting or unfavouriting changes this one's cards and menus.
