@@ -94,6 +94,11 @@ Alternate, Single Tap, Traceable and lazer's other newer ranked mods count. A br
 is offered an osu! account import once, macOS asks for one approval instead of one per file,
 and a score's menu stays beside its score as the page scrolls.
 
+**v1.16.0** brings the Options menu down to six entries: Import past plays and Play tracking
+filter sit under a **Tracking** heading, **Share & back up** holds saving the page or an image,
+the JSON export and the database backup, **Reset** is at the end of Edit profile in Profiles, and
+**Open in browser on start** is in Other settings.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

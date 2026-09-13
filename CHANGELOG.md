@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.16.0
 
 - **The Options menu is down to six entries.** Import past plays and Play tracking filter sit
   under a **Tracking** heading. **Share & back up** is one dialog for saving the page, saving
