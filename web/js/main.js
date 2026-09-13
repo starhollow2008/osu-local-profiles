@@ -77,28 +77,12 @@ const SECTIONS = [
 const GRADE_ORDER = ['XH', 'X', 'SH', 'S', 'A'];
 
 /**
- * The Settings dialog is generated from this list, so adding a setting is one entry here
+ * The Other settings dialog is generated from this list, so adding a setting is one entry here
  * plus one entry in `DEFS` in src/settings.ts. `key` matches the setting name exactly --
  * the dialog posts the whole field set as a patch and the server ignores anything it does
  * not recognise.
  */
 const SETTINGS_FIELDS = [
-  {
-    key: 'country',
-    type: 'text',
-    label: 'Country',
-    maxlength: 2,
-    placeholder: 'e.g. US',
-    hint: 'Two-letter code, shown beside the profile name. Leave empty for none.',
-  },
-  {
-    key: 'tagline',
-    type: 'text',
-    label: 'Playstyle',
-    maxlength: 120,
-    placeholder: 'e.g. left hand, mouse only',
-    hint: 'What this profile is tracking. Shown under the name.',
-  },
   {
     key: 'includeUnrankedMods',
     type: 'toggle',
@@ -443,7 +427,7 @@ function renderFavoritesNote(total) {
 
 $('favoritesNote').onclick = async (e) => {
   if (e.target.closest('[data-import-favorites]')) {
-    void openImport({ favoritesOnly: true });
+    openProfiles({ section: 'import', favoritesOnly: true });
     return;
   }
   if (!e.target.closest('[data-dismiss-note]')) return;
@@ -605,6 +589,7 @@ async function loadState() {
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
   welcomeOffered = Boolean(s.welcome);
+  refreshOpenProfiles();
 
   app = s.app ?? app;
   renderOpenBrowser();
@@ -739,8 +724,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
   if (!$('playMenu').hidden) closePlayMenu();
-  if (!$('identityModal').hidden) closeIdentity();
-  if (!$('importModal').hidden) closeImport();
+  if (!$('welcomeModal').hidden) closeWelcome();
   if (!$('shareModal').hidden) closeShare();
   if (!$('updateModal').hidden) closeUpdate();
 });
@@ -1304,17 +1288,22 @@ $('aboutSave').onclick = async () => {
 /* ---------------------------------------------------------------- identity */
 
 /*
- * The profile's name, picture and banner, and the optional osu! account they can be
- * borrowed from.
+ * Options -> Profiles holds everything about a profile, in one dialog at the user's request:
+ * which one is tracking, then Edit profile -- its name, flag, playstyle, picture and banner --
+ * then Import from osu!, then how profiles share favorites. Those were once four places (Edit
+ * profile, Import from osu!, Settings and Profiles). The avatar and the name open it at Edit
+ * profile.
  *
- * Four sources, in the order they cost the user anything: what osu! is signed in as (read
- * from its own config file, no network), a looked-up account, a file from disk, or nothing
- * at all -- which is the default, and draws an avatar from the profile's name.
+ * Four sources for the picture and banner, in the order they cost the user anything: what osu!
+ * is signed in as (read from its own config file, no network), a looked-up account, a file from
+ * disk, or nothing at all -- which is the default, and draws an avatar from the profile's name.
  */
 
 let identitySuggestions = { sessions: [], linked: null };
 /** Which image an "Upload..." press is choosing a file for. */
 let uploadKind = null;
+/** The profile Edit profile was last filled from, so switching profiles fills it again. */
+let editing = { id: null, name: null };
 
 const identityHint = (message, isError) => hint('identityHint', message, isError);
 const identityAction = (payload) => postJson('/api/identity', payload);
@@ -1332,11 +1321,11 @@ function renderIdentityPreviews() {
 
   for (const kind of ['avatar', 'cover']) {
     const has = kind === 'avatar' ? profile?.hasAvatar : profile?.hasCover;
-    $('identityModal').querySelector(`[data-clear="${kind}"]`).disabled = !has;
+    $('profileEdit').querySelector(`[data-clear="${kind}"]`).disabled = !has;
   }
 }
 
-/** The osu! account this profile is linked to, if any. Importing has a dialog of its own. */
+/** The osu! account this profile is linked to, if any. */
 function renderIdentitySuggestions() {
   const bits = [];
   if (identitySuggestions.linked) {
@@ -1351,75 +1340,105 @@ function renderIdentitySuggestions() {
   $('identityFound').innerHTML = bits.join('');
 }
 
-async function openIdentity() {
-  // A shared copy is read-only.
-  if (isStatic) return;
-  setMenuOpen(false);
-  $('identityProfileName').textContent = profile?.name ?? 'this profile';
+/** Edit profile, filled from the profile being tracked. */
+function renderProfileEdit() {
+  editing = { id: profile?.id ?? null, name: profile?.name ?? null };
+  const name = profile?.name ?? 'this profile';
+  $('identityProfileName').textContent = name;
+  $('importProfileName').textContent = name;
   $('identityName').value = profile?.name ?? '';
-  identityHint(' ');
+  $('identityCountry').value = settings.country ?? '';
+  $('identityTagline').value = settings.tagline ?? '';
+  identityHint('\u00a0');
   renderIdentityPreviews();
-  $('identityFound').innerHTML = '';
-  $('identityModal').hidden = false;
-  $('identityClose').focus();
+}
 
+/** The linked account, and what osu! is signed in as. Read locally: nothing is asked of osu!. */
+async function loadSuggestions() {
   try {
     identitySuggestions = await identityAction({ action: 'suggestions' });
-    // Only render if the dialog is still open: reading osu!'s config is cheap but not free.
-    if (!$('identityModal').hidden) renderIdentitySuggestions();
   } catch {
-    /* suggestions are a convenience; typing a name always works */
+    // A convenience; typing a name always works.
+    return;
+  }
+  renderIdentitySuggestions();
+  renderImportSuggestions();
+}
+
+/*
+ * From loadState, while Profiles is open. Switching, creating or deleting a profile in the list
+ * changes which profile the rest of the dialog is about, so it is filled again. A rename of that
+ * profile updates its name, unless the name field has been typed over.
+ */
+function refreshOpenProfiles() {
+  if ($('profilesModal').hidden) return;
+  if (profile?.id !== editing.id) {
+    renderProfileEdit();
+    resetImport();
+    void loadSuggestions();
+    return;
+  }
+  if (profile?.name !== editing.name) {
+    if ($('identityName').value === editing.name) $('identityName').value = profile?.name ?? '';
+    editing = { ...editing, name: profile?.name ?? null };
+    $('identityProfileName').textContent = profile?.name ?? 'this profile';
+    $('importProfileName').textContent = profile?.name ?? 'this profile';
   }
 }
 
-const closeIdentity = () => {
-  $('identityModal').hidden = true;
-};
-
-$('optIdentity').onclick = openIdentity;
-$('identityClose').onclick = closeIdentity;
-$('identityModal').onclick = (e) => {
-  if (e.target === $('identityModal')) closeIdentity();
-};
-$('avatar').onclick = openIdentity;
-$('pname').onclick = openIdentity;
+$('avatar').onclick = () => openProfiles({ section: 'edit' });
+$('pname').onclick = () => openProfiles({ section: 'edit' });
 $('pname').onkeydown = (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
-    openIdentity();
+    openProfiles({ section: 'edit' });
   }
 };
 
-/* Renaming here is the same operation the Profiles dialog performs. */
+/*
+ * One Save for the three text fields. The name is a rename -- the list's Rename does the same.
+ * Country and playstyle are this profile's settings: the server cleans them and hands them back,
+ * and that is what is shown, so a rejected country code comes back empty rather than appearing
+ * to have saved.
+ */
 $('identitySave').onclick = async () => {
   const name = $('identityName').value.trim();
   if (!name) {
     identityHint('Give the profile a name.', true);
     return;
   }
-  if (name === profile?.name) {
-    identityHint('That is already its name.');
-    return;
-  }
+  const country = $('identityCountry').value.trim();
+  const tagline = $('identityTagline').value.trim();
+
+  $('identitySave').disabled = true;
   try {
-    await profileAction({ action: 'rename', id: profile.id, name });
-    await loadState();
-    $('identityProfileName').textContent = name;
-    renderIdentityPreviews();
-    toast(`Renamed to "${name}"`);
-    identityHint(' ');
+    if (name !== profile?.name) await profileAction({ action: 'rename', id: profile.id, name });
+    const d = await postJson('/api/settings', { country, tagline }, 'saving failed');
+    settings = d.settings;
+    await Promise.all([loadState(), loadProfile()]);
+    renderProfileEdit();
+    if (country !== '' && !d.settings.country) {
+      identityHint('Saved - the country was not a two-letter code, so it was cleared.', true);
+    } else {
+      identityHint('Saved.');
+    }
+    toast('Profile saved');
   } catch (err) {
     identityHint(err.message, true);
+  } finally {
+    $('identitySave').disabled = false;
   }
 };
 
-$('identityName').onkeydown = (e) => {
-  if (e.key === 'Enter') $('identitySave').click();
-};
+for (const id of ['identityName', 'identityCountry', 'identityTagline']) {
+  $(id).onkeydown = (e) => {
+    if (e.key === 'Enter') $('identitySave').click();
+  };
+}
 
 /* --- images ------------------------------------------------------------- */
 
-$('identityModal').addEventListener('click', async (e) => {
+$('profileEdit').addEventListener('click', async (e) => {
   const upload = e.target.closest('[data-upload]');
   if (upload) {
     uploadKind = upload.dataset.upload;
@@ -1480,16 +1499,11 @@ $('identityFile').onchange = async () => {
 
 /* --- importing from an osu! account ------------------------------------ */
 
-$('identityImport').onclick = () => {
-  closeIdentity();
-  void openImport();
-};
-
 /*
- * Options -> Import from osu!: look an account up, then copy what was chosen from it. Nothing
+ * Profiles -> Import from osu!: look an account up, then copy what was chosen from it. Nothing
  * happens until a button is pressed. It was once never a prompt at start-up, at the user's
- * request; later, at the user's request, a brand-new install opens it once by itself as the
- * welcome (src/welcome.ts), and closing that in any way ends it for good.
+ * request; later, at the user's request, a brand-new install shows this section once by itself
+ * as the welcome (src/welcome.ts), and closing that in any way ends it for good.
  * Avatar, banner, flag and me! are ticked by default; favorites are not, because they add
  * to a list rather than replacing one thing.
  */
@@ -1502,7 +1516,7 @@ let importUser = null;
 
 function importChoices() {
   const out = {};
-  for (const box of $('importModal').querySelectorAll('[data-import]')) out[box.dataset.import] = box.checked;
+  for (const box of $('importSection').querySelectorAll('[data-import]')) out[box.dataset.import] = box.checked;
   return out;
 }
 
@@ -1527,61 +1541,36 @@ function renderImportNote() {
 const joinList = (items) =>
   items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 
-/** True while the dialog is the one-time welcome, so leaving it ends the welcome for good. */
-let welcoming = false;
-
-async function openImport({ favoritesOnly = false, welcome = false } = {}) {
-  setMenuOpen(false);
-  welcoming = welcome;
-  $('importWelcome').hidden = !welcome;
-  $('importDismiss').hidden = !welcome;
-  $('importTitle').textContent = welcome ? 'Welcome to osu! local profiles' : 'Import from osu!';
-  $('importClose').textContent = welcome ? 'Skip' : 'Close';
+/** Nothing looked up, and the default ticks -- or favorites alone, from the favorites reminder. */
+function resetImport({ favoritesOnly = false } = {}) {
   const choices = favoritesOnly ? IMPORT_FAVORITES_ONLY : IMPORT_DEFAULTS;
-  for (const box of $('importModal').querySelectorAll('[data-import]')) box.checked = choices[box.dataset.import];
+  for (const box of $('importSection').querySelectorAll('[data-import]')) box.checked = choices[box.dataset.import];
   $('importProfileName').textContent = profile?.name ?? 'this profile';
+  $('importQuery').value = '';
   importUser = null;
   $('importFound').innerHTML = '';
-  importHint(' ');
+  importHint('\u00a0');
   renderImportNote();
-  $('importModal').hidden = false;
-  $('importQuery').focus();
-
-  // The linked account, or the one osu! is signed in as: neither costs a request.
-  try {
-    const found = await identityAction({ action: 'suggestions' });
-    if ($('importModal').hidden) return;
-    if (found.linked && !$('importQuery').value) $('importQuery').value = found.linked.username;
-    $('importFound').innerHTML = (found.sessions ?? [])
-      .filter((session) => session.username !== found.linked?.username)
-      .map(
-        (session) => `<button type="button" class="identity-suggestion" data-query="${escapeHtml(session.username)}">
-           Use <b>${escapeHtml(session.username)}</b>
-           <span>signed in to osu!${escapeHtml(session.client)}</span>
-         </button>`,
-      )
-      .join('');
-  } catch {
-    /* a convenience; typing a name always works */
-  }
 }
 
-const closeImport = () => {
-  $('importModal').hidden = true;
-  if (!welcoming) return;
-  welcoming = false;
-  // However it was left -- Skip, the x, Escape, the backdrop, or an import -- it is not
-  // offered again. A save that fails only means it is offered once more next time.
-  postJson('/api/welcome', {}).catch(() => {});
-};
+/** The linked account, or the one osu! is signed in as: neither costs a request. */
+function renderImportSuggestions() {
+  const found = identitySuggestions;
+  if (found.linked && !$('importQuery').value) $('importQuery').value = found.linked.username;
+  // An account already looked up is showing there; the suggestions would replace it.
+  if (importUser) return;
+  $('importFound').innerHTML = (found.sessions ?? [])
+    .filter((session) => session.username !== found.linked?.username)
+    .map(
+      (session) => `<button type="button" class="identity-suggestion" data-query="${escapeHtml(session.username)}">
+         Use <b>${escapeHtml(session.username)}</b>
+         <span>signed in to osu!${escapeHtml(session.client)}</span>
+       </button>`,
+    )
+    .join('');
+}
 
-$('optImport').onclick = () => void openImport();
-$('importClose').onclick = closeImport;
-$('importDismiss').onclick = closeImport;
-$('importModal').onclick = (e) => {
-  if (e.target === $('importModal')) closeImport();
-};
-$('importModal').addEventListener('change', (e) => {
+$('importSection').addEventListener('change', (e) => {
   if (e.target.closest('[data-import]')) renderImportNote();
 });
 $('importFound').addEventListener('click', (e) => {
@@ -1646,14 +1635,82 @@ $('importGo').onclick = async () => {
     const what = d.done.length ? `Imported ${joinList(d.done)} from ${d.user.username}` : `Linked to ${d.user.username}`;
     if (d.failures.length) {
       importHint(`${what}, but ${d.failures.join('; ')}`, true);
-    } else {
-      closeImport();
-      toast(`${what}.`);
+      return;
     }
+    toast(`${what}.`);
+    if (welcoming) {
+      closeWelcome();
+      return;
+    }
+    // In Profiles, Edit profile above shows what was just copied, and the new link.
+    renderProfileEdit();
+    void loadSuggestions();
+    importHint(`${what}.`);
   } catch (err) {
     importHint(err.message, true);
   } finally {
     renderImportNote();
+  }
+};
+
+/* --- the one-time welcome ----------------------------------------------- */
+
+/** True while the welcome is showing, so leaving it in any way ends the welcome for good. */
+let welcoming = false;
+
+/*
+ * The welcome borrows Import from osu! out of Profiles rather than keeping a copy of it: one
+ * set of controls and one set of handlers. The section goes back where it came from when the
+ * welcome closes.
+ */
+async function openWelcome() {
+  welcoming = true;
+  $('welcomeSlot').append($('importSection'));
+  $('importHeading').hidden = true;
+  resetImport();
+  $('welcomeModal').hidden = false;
+  $('importQuery').focus();
+  await loadSuggestions();
+}
+
+function closeWelcome() {
+  if (!welcoming) return;
+  welcoming = false;
+  $('welcomeModal').hidden = true;
+  $('importHeading').hidden = false;
+  $('sharedSection').before($('importSection'));
+  // However it was left -- Skip, the x, Escape, the backdrop, or an import -- it is not
+  // offered again. A save that fails only means it is offered once more next time.
+  postJson('/api/welcome', {}).catch(() => {});
+}
+
+$('welcomeSkip').onclick = closeWelcome;
+$('welcomeDismiss').onclick = closeWelcome;
+$('welcomeModal').onclick = (e) => {
+  if (e.target === $('welcomeModal')) closeWelcome();
+};
+
+/* --- every profile ------------------------------------------------------ */
+
+/*
+ * Belongs to the install rather than a profile, so it goes to config.json -- straight away, the
+ * way a switch does: nothing else in Profiles waits for a Save either.
+ */
+$('sharedFavorites').onchange = async () => {
+  const shareFavorites = $('sharedFavorites').checked;
+  try {
+    const c = await postJson('/api/app-config', { sharedFavorites: shareFavorites }, 'saving that failed');
+    app = { ...app, config: c.config };
+    renderImportNote();
+    await loadProfile();
+    toast(
+      shareFavorites
+        ? 'Favorite beatmaps are shared by every profile'
+        : 'Each profile keeps its own favorite beatmaps',
+    );
+  } catch (err) {
+    $('sharedFavorites').checked = !shareFavorites;
+    toast(err.message);
   }
 };
 
@@ -1853,7 +1910,6 @@ function openSettings() {
   void renderRemovedScores();
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
-  $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
   settingsHint(' ');
   $('settingsModal').hidden = false;
   $('settingsCancel').focus();
@@ -1887,12 +1943,6 @@ $('settingsSave').onclick = async () => {
     );
     settings = d.settings;
 
-    // Belongs to the install rather than the profile, so it goes to config.json.
-    const shareFavorites = $('sharedFavorites').checked;
-    if (shareFavorites !== (app.config?.sharedFavorites !== false)) {
-      const c = await postJson('/api/app-config', { sharedFavorites: shareFavorites }, 'saving that failed');
-      app = { ...app, config: c.config };
-    }
     closeSettings();
     // The eligibility settings change every number on the page, not just the header.
     await Promise.all([loadState(), loadProfile()]);
@@ -2311,18 +2361,31 @@ async function profileAction(payload) {
   return data;
 }
 
-function openProfiles() {
+/**
+ * `section` opens it scrolled to Edit profile ('edit') or Import from osu! ('import'): the
+ * avatar and the name open it at the first, the favorites reminder at the second, with only
+ * favorites ticked.
+ */
+function openProfiles({ section = null, favoritesOnly = false } = {}) {
+  // A shared copy is read-only.
+  if (isStatic) return;
   setMenuOpen(false);
   $('newProfileName').value = '';
   profileHint('A new profile starts empty and tracks from the moment you create it.');
   renderProfiles();
+  renderProfileEdit();
+  resetImport({ favoritesOnly });
+  $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
   $('profilesModal').hidden = false;
-  $('profilesClose').focus();
+  $('profilesModal').querySelector('.modal').scrollTop = 0;
+  $('profilesClose').focus({ preventScroll: true });
+  if (section) $(section === 'import' ? 'importSection' : 'profileEdit').scrollIntoView({ block: 'start' });
+  void loadSuggestions();
 }
 
 const closeProfiles = () => { $('profilesModal').hidden = true; };
 
-$('optProfiles').onclick = openProfiles;
+$('optProfiles').onclick = () => openProfiles();
 $('profilesClose').onclick = closeProfiles;
 $('profilesModal').onclick = (e) => {
   if (e.target === $('profilesModal')) closeProfiles();
@@ -2791,7 +2854,7 @@ document.body.dataset.rendered = 'true';
 // A brand-new install is offered the account import once. Never on a shared copy, and never
 // under ?export=1, which is what the Share image is rendered from.
 if (welcomeOffered && !isStatic && !document.body.classList.contains('export-mode')) {
-  void openImport({ welcome: true });
+  void openWelcome();
 }
 
 openEvents();

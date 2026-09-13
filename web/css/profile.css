@@ -2608,15 +2608,15 @@
 }
 
 /*
- * The import dialog doubling as the one-time welcome on a brand-new install. It is optional
+ * The one-time welcome on a brand-new install, showing Import from osu! out of Profiles. It is optional
  * and has to look it: a close button in the corner as well as Skip, and a plain statement that
  * nothing is lost by leaving.
  */
-.modal--import {
+.modal--welcome {
   position: relative;
 }
 
-.modal--import h3 {
+.modal--welcome h3 {
   padding-right: 32px;
 }
 
@@ -2637,6 +2637,31 @@
 .modal__dismiss:hover {
   color: hsl(var(--hsl-c1));
   background-color: hsl(var(--hsl-b3));
+}
+
+/*
+ * Profiles is several dialogs' worth of controls in one -- the list, Edit profile, Import from
+ * osu! and Every profile -- so each part is set off with a rule, as Other settings sets off its
+ * own groups.
+ */
+.profile-section {
+  margin-top: 16px;
+  border-top: 1px solid hsl(var(--hsl-b3));
+}
+
+.profile-section .identity-heading {
+  margin-top: 12px;
+}
+
+/* A section's own confirm button, at the end of the section rather than in the footer. */
+.modal .actions--inline {
+  margin-top: 10px;
+}
+
+/* Lent to the welcome, Import from osu! needs no rule above it: it is the welcome's content. */
+#welcomeSlot .profile-section {
+  margin-top: 0;
+  border-top: 0;
 }
 
 .welcome-intro {

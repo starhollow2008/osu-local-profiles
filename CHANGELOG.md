@@ -2,17 +2,21 @@
 
 ## Unreleased
 
+- **Options is shorter, and Profiles holds everything about a profile.** Edit profile, Import
+  from osu! and Keep Favorite Beatmaps the same on every profile are now parts of **Profiles**,
+  below the profile list, and a profile's country and playstyle are edited there instead of in
+  Settings. Settings is now **Other settings**, and no option ends in "..." any more.
 - **macOS asks for one approval instead of many.** A download's files are quarantined, and
   macOS refused the pp calculator and each of its libraries separately, one trip to Privacy &
   Security at a time. Now only the launcher needs **Open Anyway**: it lifts the quarantine from
   the rest of its own folder before starting the app. The instructions are updated for macOS
   15, where right-click -> Open no longer gets past the block. Allowing apps from anywhere is
   not needed.
-- **A welcome on first launch offers to bring in an osu! account.** A brand-new install opens
-  the Import from osu! dialog once, marked optional, with the account osu! is signed in as
+- **A welcome on first launch offers to bring in an osu! account.** A brand-new install shows
+  Import from osu! once, marked optional, with the account osu! is signed in as
   already suggested and the same choice of avatar, banner, flag, me! and favorite beatmaps.
   Skip, the close button, Escape or clicking outside it all dismiss it for good, and it stays
-  under Options -> Import from osu!. An install updated from an earlier version never sees it.
+  under Options -> Profiles. An install updated from an earlier version never sees it.
 - **Which mods are ranked now comes from osu! itself.** A hand-kept list was missing lazer's
   newer ranked mods -- Alternate, Single Tap, Traceable, Blinds, No Scope, Accuracy Challenge,
   Muted, Swap, Cover, Fade In and 4K-9K -- so those plays counted only with **Include pp for
@@ -20,7 +24,7 @@
   in mania, none of which osu! ranks, and treated any changed setting as unranking: a changed
   pitch on Double Time, or Sudden Death set to restart, keeps a play ranked in osu!. The pp
   calculator is now asked, per game mode and setting. Scores tracked before this are offered a
-  recompute in Settings, which re-checks them -- including scores whose replay is gone.
+  recompute in Other settings, which re-checks them -- including scores whose replay is gone.
 
 ## 1.14.0
 

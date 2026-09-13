@@ -1024,16 +1024,45 @@ check(
   true,
 );
 
-console.log('\nedit profile dialog');
-check('the identity dialog is hidden on load', await shown('identityModal'), 'none');
+/*
+ * The options menu, as the user asked for it: no trailing ellipses, Settings called Other
+ * settings, and Edit profile and Import from osu! folded into Profiles.
+ */
+console.log('\noptions menu');
+const menuLabels = JSON.parse(
+  await evaluate("JSON.stringify([...document.querySelectorAll('#optionsMenu > button')].map((b) => b.textContent.trim()))"),
+);
+check(
+  'no option ends in an ellipsis',
+  JSON.stringify(menuLabels.filter((l) => l.endsWith('…') || l.endsWith('...'))),
+  '[]',
+);
+check('Settings is called Other settings', menuLabels.includes('Other settings') && !menuLabels.includes('Settings'), true);
+check(
+  'Edit profile and Import from osu! are part of Profiles, not the menu',
+  menuLabels.includes('Edit profile') || menuLabels.includes('Import from osu!'),
+  false,
+);
+
+console.log('\nprofiles: edit profile');
+check('the profiles dialog is hidden on load', await shown('profilesModal'), 'none');
 // The avatar and the name are the affordance -- osu!'s own header has no button here.
 check(
-  'the avatar opens it',
+  'the avatar opens Profiles',
   await evaluate(`(() => {
     document.getElementById('avatar').click();
-    return getComputedStyle(document.getElementById('identityModal')).display;
+    return getComputedStyle(document.getElementById('profilesModal')).display;
   })()`),
   'grid',
+);
+check(
+  'scrolled to Edit profile',
+  await evaluate(`(() => {
+    const m = document.querySelector('#profilesModal .modal').getBoundingClientRect();
+    const s = document.getElementById('profileEdit').getBoundingClientRect();
+    return s.top >= m.top - 1 && s.top < m.top + m.height / 2;
+  })()`),
+  true,
 );
 check(
   'it is prefilled with the profile name',
@@ -1043,33 +1072,40 @@ check(
   true,
 );
 check(
+  'country and playstyle are edited here',
+  await evaluate("!!document.getElementById('identityCountry') && !!document.getElementById('identityTagline')"),
+  true,
+);
+check(
   'both images offer upload and remove',
   // No nested template literals here: the inner one would interpolate in this one.
   await evaluate(
     "['avatar', 'cover'].every((k) => " +
-      "document.querySelector('[data-upload=' + JSON.stringify(k) + ']') && " +
-      "document.querySelector('[data-clear=' + JSON.stringify(k) + ']'))",
+      "document.querySelector('#profileEdit [data-upload=' + JSON.stringify(k) + ']') && " +
+      "document.querySelector('#profileEdit [data-clear=' + JSON.stringify(k) + ']'))",
   ),
   true,
 );
 // The file picker must never be visible: it is opened from script.
 check('the file picker stays out of the layout', await shown('identityFile'), 'none');
 check(
-  'looking up an account needs a press, and says so',
-  await evaluate(
-    "document.querySelector('.identity-heading + .setting__hint').textContent.includes('when you press the button')",
-  ),
+  'its parts come in order: the list, Edit profile, Import from osu!, Every profile',
+  await evaluate(`(() => {
+    const tops = ['profileList', 'profileEdit', 'importSection', 'sharedSection']
+      .map((id) => document.getElementById(id).getBoundingClientRect().top);
+    return tops.every((top, i) => i === 0 || top > tops[i - 1]);
+  })()`),
   true,
 );
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
-check('Escape closes the identity dialog', await shown('identityModal'), 'none');
+check('Escape closes Profiles', await shown('profilesModal'), 'none');
 
 await evaluate("document.getElementById('pname').click()");
-check('the name opens it too', await shown('identityModal'), 'grid');
-await evaluate("document.getElementById('identityClose').click()");
-check('Close closes it', await shown('identityModal'), 'none');
+check('the name opens it too', await shown('profilesModal'), 'grid');
+await evaluate("document.getElementById('profilesClose').click()");
+check('Close closes it', await shown('profilesModal'), 'none');
 
 /*
  * The osu!stable note. Both halves of it were measured (roadmap 5.12): stable writes a score
@@ -1159,16 +1195,19 @@ check('and the switch reads as off while it is', switched.checked, 'false');
 check('switching back restores the totals', switched.restored, true);
 check('and the switch with them', switched.back, 'true');
 
-console.log('\nimport from osu!');
-check('the import dialog is hidden on load', await shown('importModal'), 'none');
-check('Options offers it', await evaluate("!!document.getElementById('optImport')"), true);
+console.log('\nprofiles: import from osu!');
 await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optImport').click()");
-check('it opens', await shown('importModal'), 'grid');
+await evaluate("document.getElementById('optProfiles').click()");
+check('Options -> Profiles opens it', await shown('profilesModal'), 'grid');
+check(
+  'with Import from osu! inside it',
+  await evaluate("document.getElementById('profilesModal').contains(document.getElementById('importSection'))"),
+  true,
+);
 check(
   'avatar, banner, flag and me! are ticked; favorites are not',
   await evaluate(`JSON.stringify(Object.fromEntries(
-    [...document.querySelectorAll('#importModal [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
+    [...document.querySelectorAll('#importSection [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
   JSON.stringify({ avatar: true, cover: true, country: true, aboutMe: true, favorites: false }),
 );
 check(
@@ -1176,8 +1215,19 @@ check(
   await evaluate("document.getElementById('importFound').querySelector('.identity-candidate') === null"),
   true,
 );
-await evaluate("document.getElementById('importClose').click()");
-check('Close closes it', await shown('importModal'), 'none');
+check(
+  'Keep Favorite Beatmaps the same is in Profiles',
+  await evaluate("document.getElementById('profilesModal').contains(document.getElementById('sharedFavorites'))"),
+  true,
+);
+check(
+  'and favorites are shared by every profile unless switched off',
+  await evaluate("document.getElementById('sharedFavorites').checked"),
+  true,
+);
+check('the welcome is not showing on an install that is not new', await shown('welcomeModal'), 'none');
+await evaluate("document.getElementById('profilesClose').click()");
+check('Close closes Profiles', await shown('profilesModal'), 'none');
 check(
   'the favorites reminder only shows while the list is empty',
   await evaluate(`(() => {
@@ -1192,9 +1242,13 @@ check('settings dialog is hidden on load', await shown('settingsModal'), 'none')
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optSettings').click()");
 check('settings dialog opens', await shown('settingsModal'), 'grid');
+check('it is called Other settings', await evaluate("document.getElementById('settingsTitle').textContent"), 'Other settings');
 check(
-  'favorites are shared by every profile unless switched off',
-  await evaluate("document.getElementById('sharedFavorites').checked"),
+  'country, playstyle and shared favorites have moved to Profiles',
+  await evaluate(
+    "!document.getElementById('set-country') && !document.getElementById('set-tagline') && " +
+      "!document.getElementById('settingsModal').contains(document.getElementById('sharedFavorites'))",
+  ),
   true,
 );
 check('options menu closed behind it', await shown('optionsMenu'), 'none');

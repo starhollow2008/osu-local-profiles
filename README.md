@@ -239,7 +239,7 @@ online beatmap database.
 They count by default, toward the play count, monthly play counts, Most Played, Recent Plays
 (as **Not submitted**) and Total Play Time together: osu! never received them, so counting them
 takes nothing away from what your osu! profile shows -- it only covers play osu! had no chance
-to see. Turn off **Settings -> Count plays osu! could not submit** to match your osu! profile
+to see. Turn off **Other settings -> Count plays osu! could not submit** to match your osu! profile
 exactly; they are recorded either way, so turning it back on loses nothing. The one thing the
 log cannot say is whether osu! would have counted the attempt had it been online -- osu! ignores
 a play with no hits at all -- so an attempt quit before hitting anything counts here.
@@ -323,7 +323,7 @@ Two hosts are contacted, both public and unauthenticated, and both optional:
 |---|---|---|
 | `assets.ppy.sh` | beatmap cover art, and medal icons | a drawn placeholder shows instead |
 | `data.ppy.sh` | the rank-curve dumps, only when you run `npm run rank:refresh` by hand | nothing; the checked-in curves keep working |
-| `osu.ppy.sh` | one page fetch when you press **Look up** in Edit profile, to find a name, picture and banner | it says so; type a name and upload an image instead |
+| `osu.ppy.sh` | one page fetch when you press **Look up** in Profiles, to find a name, picture and banner | it says so; type a name and upload an image instead |
 
 The profile lookup reads the public profile page -- the same user object osu!'s API returns
 for `/users/{user}`, which the page embeds in order to render itself. One request per press
@@ -349,7 +349,7 @@ profile, so the curve comes from the public dumps instead.
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
 
 `country` and `tagline` are only the starting point. Both are editable from **Options ->
-Settings** and are stored per profile from then on, so two playstyles can carry different
+Profiles**, under Edit profile, and are stored per profile from then on, so two playstyles can carry different
 descriptions and clearing one stays cleared.
 
 Drop an image at `data/avatar.png` or `data/cover.jpg` (`.jpg`/`.jpeg`/`.png`/`.webp` all
@@ -411,9 +411,12 @@ leaving the destructive button as the only one that worked. No unit test would c
 
 ## Editing the profile
 
-**Options -> Edit profile**, or click the avatar or the name.
+**Options -> Profiles**, under *Edit profile* -- or click the avatar or the name, which open
+Profiles there.
 
 - **Name** -- renames the profile. Nothing it has tracked changes.
+- **Country** -- a two-letter code, shown beside the name the way osu! shows a flag.
+- **Playstyle** -- what this profile is tracking, shown under the name.
 - **Picture** and **Banner** -- upload a PNG, JPEG, WebP or GIF, or import them from an
   osu! account (below). Both are stored per profile, so two playstyles are two identities.
 
@@ -422,7 +425,7 @@ and the banner falls back to the cover art of the profile's best play.
 
 ## Importing from an osu! profile
 
-**Options -> Import from osu!**. Type a username, a user id or a link to a profile, press
+**Options -> Profiles**, under *Import from osu!*. Type a username, a user id or a link to a profile, press
 **Look up**, tick what to copy, and press **Import**.
 
 | What | Ticked to begin with |
@@ -434,7 +437,7 @@ and the banner falls back to the cover art of the profile's best play.
 | Favorite beatmaps | no -- they are added to the list |
 
 Importing also links the profile to that account. It is never automatic. A brand-new install
-offers this dialog once, as a welcome marked optional; Skip, the close button, Escape or
+offers this once, as a welcome marked optional; Skip, the close button, Escape or
 clicking outside it dismisses it for good, and an install updated from an earlier version is
 never asked. Either way nothing is sent to `osu.ppy.sh` until you press a button -- one
 request to find the account, one per picture, and one per hundred favorites. No login and no
@@ -515,7 +518,7 @@ Both numbers come from osu!'s own code -- the pp helper returns them beside the 
 are stored per score, so switching is instant and never needs a recalculation. It moves every
 score-shaped number together: the score on each row and card, Total Score, Ranked Score, and
 the level, which is a function of total score. A score tracked before this existed shows the
-single number its replay carried, until **Settings** recalculates it.
+single number its replay carried, until **Other settings** recalculates it.
 
 Which number classic shows is osu!'s own rule: the score stable recorded if there is one,
 otherwise osu!'s classic conversion of a lazer play.
@@ -641,9 +644,9 @@ seconds after the music stops. The volume, mute and autoplay choices are remembe
 browser.
 
 **Every profile shares one list** by default, since what you like to play does not change
-with how you play it. Turn that off under **Settings -> Every profile** and each profile keeps
+with how you play it. Turn that off under **Options -> Profiles -> Every profile** and each profile keeps
 its own copy of the list as it stands; turning it back on merges them. **Import** the
-favorites of any osu! account from **Options -> Import from osu!** -- one request per
+favorites of any osu! account from **Options -> Profiles** -- one request per
 hundred, which carries every card's details. While the list is empty it says how to fill
 it, with **Don't show again** for anyone who would rather not.
 
@@ -728,7 +731,7 @@ Every score row has a **⋯** menu.
   pp, play count, ranked score, level, the charts and Most Played.
 
 Removing never deletes anything. The score is marked hidden and can be put back from
-**Options -> Settings**, under *Removed scores*. That is not only a convenience: the replay
+**Options -> Other settings**, under *Removed scores*. That is not only a convenience: the replay
 file is still in osu!'s store, so a genuinely deleted row would be re-imported the next
 time it was noticed -- and with nothing left to recognise it by, it would come back looking
 like a brand new play.
@@ -738,9 +741,9 @@ once more), or **Delete all permanently**. The score is deleted; what is kept is
 replay's fingerprint, so the replay still in osu!'s store is never imported again. A reset
 clears those along with everything else.
 
-## Settings
+## Other settings
 
-**Options -> Settings**, and everything there belongs to the profile you are on -- two
+**Options -> Other settings**, and everything there belongs to the profile you are on -- two
 playstyles are two profiles and should not share a description or how their scores count.
 
 ### Include pp for unranked mods
@@ -827,7 +830,8 @@ is left exactly as it is.
 **Options -> Profiles** manages several playstyles side by side -- "left hand", "mouse
 only", "tablet again" -- each with its own scores, pp, level and start date. Only the
 selected one records plays. A new profile starts empty and tracks from the moment you
-create it, never from earlier plays.
+create it, never from earlier plays. The same dialog edits the profile being tracked, imports
+from an osu! account, and holds **Keep Favorite Beatmaps the same on every profile**.
 
 Deleting a profile takes its tracked scores with it and needs an explicit confirmation.
 The last remaining profile cannot be deleted; reset it instead.
@@ -947,7 +951,7 @@ node scripts/reingest.mjs
 This rebuilds every tracked score from its replay file.
 
 To fill in values on existing scores *without* replacing them -- keeping their ids, which
-is what you want in normal use -- the page's **Options -> Settings** offers a recalculation
+is what you want in normal use -- the page's **Options -> Other settings** offers a recalculation
 instead, and the app can stay running.
 
 ## Licence
