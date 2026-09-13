@@ -82,6 +82,11 @@ by keyword, mode, star rating, mods, category, length and the dates a beatmap wa
 submitted and ranked. Off by default, and every criterion starts wide open, so switching it on
 changes nothing until you narrow something.
 
+**v1.14.0** counts the quits, fails and retries osu! could not submit -- offline or signed
+out -- from osu!lazer's own log, and **Import past plays** can bring past ones in. Unfinished
+plays are tracked without osu!lazer's online beatmap database, and an update now brings the app
+back somewhere it can be stopped.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.14.0
 
 - **Plays osu! could not submit can count** (Settings -> Count plays osu! could not submit).
   Quits, fails and retries while osu! is offline or signed out used to leave no trace, because
@@ -25,6 +25,12 @@
   instead -- or, on Linux with no desktop or no terminal program it can find, leaves the app
   closed and says in `data/update.log` to start it again. On Windows, the window the app came
   back in stayed open at a prompt after the app stopped; it now closes with it.
+- **Unfinished plays are tracked without osu!lazer's online beatmap database**, which is
+  commonly missing on Linux: the beatmap is found from its own file instead. A play also stays
+  open when osu!lazer logs leaving gameplay before its submission completes. Contributed in #1.
+- **A pass whose submission finishes after the results screen stays a pass.** Leaving results
+  used to mark it unfinished and count it a second time beside its own replay.
+- **Hidden tabs let go of the live feed**, so several open tabs no longer stall the page.
 
 ## 1.13.2
 

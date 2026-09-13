@@ -2116,7 +2116,7 @@ replays.
 
 ## 5.45 - Plays osu! could not submit
 
-**Status:** done -- unreleased.
+**Status:** done -- released as 1.14.0 (2026-09-12).
 
 Offline or signed out, osu! submits nothing and counts nothing, so the unfinished plays read from
 `Score submission completed!` went silent with it. The user asked for them anyway, as an estimate
@@ -2193,7 +2193,7 @@ offline sequence from log 1788778412 and a regression test for a bracket inside 
 
 ## 5.46 - An update brings the app back where it can be stopped
 
-**Status:** done, not yet released (2026-09-12).
+**Status:** done -- released as 1.14.0 (2026-09-12).
 
 Reported by a friend of the user: after pressing **Update**, Node "is kept open and running and
 never actually closes".
