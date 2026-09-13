@@ -428,9 +428,12 @@ and the banner falls back to the cover art of the profile's best play.
 | me! | yes -- it replaces this profile's me! |
 | Favorite beatmaps | no -- they are added to the list |
 
-Importing also links the profile to that account. It is never automatic, and never asked
-at start-up: nothing is sent to `osu.ppy.sh` until you press a button -- one request to find
-the account, one per picture, and one per hundred favorites. No login and no API key. If
+Importing also links the profile to that account. It is never automatic. A brand-new install
+offers this dialog once, as a welcome marked optional; Skip, the close button, Escape or
+clicking outside it dismisses it for good, and an install updated from an earlier version is
+never asked. Either way nothing is sent to `osu.ppy.sh` until you press a button -- one
+request to find the account, one per picture, and one per hundred favorites. No login and no
+API key. If
 osu! is signed in on this machine, its username is offered, read from the client's own config
 file with no network at all.
 

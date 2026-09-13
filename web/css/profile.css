@@ -2607,6 +2607,66 @@
   margin: 12px 0 4px;
 }
 
+/*
+ * The import dialog doubling as the one-time welcome on a brand-new install. It is optional
+ * and has to look it: a close button in the corner as well as Skip, and a plain statement that
+ * nothing is lost by leaving.
+ */
+.modal--import {
+  position: relative;
+}
+
+.modal--import h3 {
+  padding-right: 32px;
+}
+
+.modal__dismiss {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-base);
+  padding: 2px 8px 4px;
+  line-height: 1;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-title-small-3);
+  cursor: pointer;
+}
+
+.modal__dismiss:hover {
+  color: hsl(var(--hsl-c1));
+  background-color: hsl(var(--hsl-b3));
+}
+
+.welcome-intro {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  font-size: var(--fs-normal-2);
+}
+
+.modal .welcome-intro p {
+  margin: 0 0 6px;
+}
+
+.modal .welcome-intro p:last-child {
+  margin-bottom: 0;
+}
+
+.welcome-intro__badge {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-size: var(--fs-small-2);
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
 .counting-note__dismiss:hover,
 .counting-note__close:hover {
   color: hsl(var(--hsl-c1));

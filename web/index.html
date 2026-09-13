@@ -402,12 +402,25 @@
 </div>
 
 <!--
-  Options -> Import from osu!. One dialog for everything an osu! account can lend a profile,
-  and never a prompt: nothing is asked of osu.ppy.sh until a button here is pressed.
+  Options -> Import from osu!. One dialog for everything an osu! account can lend a profile.
+  A brand-new install opens it once by itself, as the welcome (src/welcome.ts); otherwise it
+  is never a prompt. Either way nothing is asked of osu.ppy.sh until a button here is pressed.
 -->
 <div class="backdrop" id="importModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+  <div class="modal modal--import" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+    <button type="button" class="modal__dismiss" id="importDismiss" aria-label="Skip" title="Skip" hidden>&times;</button>
     <h3 id="importTitle">Import from osu!</h3>
+    <div class="welcome-intro" id="importWelcome" hidden>
+      <p>
+        <span class="welcome-intro__badge">Optional</span>
+        Have an osu! account? You can bring its avatar, banner, flag, me! and favorite beatmaps
+        into this profile.
+      </p>
+      <p>
+        <b>You don't need to.</b> Your plays are tracked either way. Press Skip and this won't
+        show again - it stays under Options &rarr; Import from osu! if you change your mind.
+      </p>
+    </div>
     <p>
       Copies what you choose from an osu! account's public profile into
       <b id="importProfileName">this profile</b>, and links the two. Nothing is ever written

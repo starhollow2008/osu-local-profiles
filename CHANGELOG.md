@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **A welcome on first launch offers to bring in an osu! account.** A brand-new install opens
+  the Import from osu! dialog once, marked optional, with the account osu! is signed in as
+  already suggested and the same choice of avatar, banner, flag, me! and favorite beatmaps.
+  Skip, the close button, Escape or clicking outside it all dismiss it for good, and it stays
+  under Options -> Import from osu!. An install updated from an earlier version never sees it.
 - **Which mods are ranked now comes from osu! itself.** A hand-kept list was missing lazer's
   newer ranked mods -- Alternate, Single Tap, Traceable, Blinds, No Scope, Accuracy Challenge,
   Muted, Swap, Cover, Fade In and 4K-9K -- so those plays counted only with **Include pp for

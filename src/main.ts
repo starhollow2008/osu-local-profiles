@@ -1,5 +1,7 @@
 import { syncFavoriteSharing } from './favorites.ts';
+import fs from 'node:fs';
 import path from 'node:path';
+import { offerWelcome } from './welcome.ts';
 import { loadConfig, saveConfig, dataDir } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { detectInstalls } from './clients/detect.ts';
@@ -76,12 +78,18 @@ async function main(): Promise<void> {
     console.log(`  found ${i.kind.padEnd(6)} ${i.root}${i.onlineDb ? '  (+ online.db)' : ''}`);
   }
 
-  const db = openDb(path.join(dataDir(), 'profiles.db'));
+  const dbFile = path.join(dataDir(), 'profiles.db');
+  // Decided before openDb creates the file: only a brand-new install is welcomed, never one
+  // upgraded from a version that had no welcome. `npm run package` deletes the data/ its own
+  // --check-only run makes, so a download still starts new.
+  const firstRun = !fs.existsSync(dbFile);
+  const db = openDb(dbFile);
 
   // config.profileName only seeds the very first profile. After that the set of profiles
   // lives in the database and which one is live is chosen from the page, so that renaming
   // or switching never has to round-trip through a config file.
   seedFirstProfile(db, config.profileName);
+  if (firstRun) offerWelcome(db);
   const active = getProfile(db, activeProfileId(db))!;
   const profileId = active.id;
   const profileName = active.name;

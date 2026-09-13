@@ -1820,7 +1820,9 @@ reverses the plain-text decision of 5.6, at the user's request.
 
 **Status:** done -- released as 1.11.0 (2026-09-11).
 
-One dialog, from Options, never a prompt at start-up (the user's call). Look up an account;
+One dialog, from Options. Originally never a prompt at start-up (the user's call); later, also
+at the user's request, a brand-new install opens it once as an optional welcome that any
+dismissal ends for good (`src/welcome.ts`; installs upgraded from before never see it). Look up an account;
 choose what to copy: avatar, banner, flag and me! (checked by default) and favourite beatmaps
 (unchecked). Importing links the profile to that account. Every request is made because the
 button was pressed. The me! text comes from `user.page.raw` in the same payload the lookup

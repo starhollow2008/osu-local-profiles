@@ -218,6 +218,8 @@ let stats = null;
 let settings = {};
 let counting = null;
 let staleScores = 0;
+/** A brand-new install's one-time offer to import from an osu! account (src/welcome.ts). */
+let welcomeOffered = false;
 /** Which osu! release prices scores, and how many of this profile's another one priced. */
 let ppCalculator = { version: null, outdated: 0 };
 let hiddenScoreCount = 0;
@@ -602,6 +604,7 @@ async function loadState() {
   unsubmittedAttempts = s.unsubmittedAttempts ?? 0;
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
+  welcomeOffered = Boolean(s.welcome);
 
   app = s.app ?? app;
   renderOpenBrowser();
@@ -1483,8 +1486,10 @@ $('identityImport').onclick = () => {
 };
 
 /*
- * Options -> Import from osu!: look an account up, then copy what was chosen from it. Never a
- * prompt at start-up, at the user's request -- nothing happens until a button is pressed.
+ * Options -> Import from osu!: look an account up, then copy what was chosen from it. Nothing
+ * happens until a button is pressed. It was once never a prompt at start-up, at the user's
+ * request; later, at the user's request, a brand-new install opens it once by itself as the
+ * welcome (src/welcome.ts), and closing that in any way ends it for good.
  * Avatar, banner, flag and me! are ticked by default; favorites are not, because they add
  * to a list rather than replacing one thing.
  */
@@ -1522,8 +1527,16 @@ function renderImportNote() {
 const joinList = (items) =>
   items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
 
-async function openImport({ favoritesOnly = false } = {}) {
+/** True while the dialog is the one-time welcome, so leaving it ends the welcome for good. */
+let welcoming = false;
+
+async function openImport({ favoritesOnly = false, welcome = false } = {}) {
   setMenuOpen(false);
+  welcoming = welcome;
+  $('importWelcome').hidden = !welcome;
+  $('importDismiss').hidden = !welcome;
+  $('importTitle').textContent = welcome ? 'Welcome to osu! local profiles' : 'Import from osu!';
+  $('importClose').textContent = welcome ? 'Skip' : 'Close';
   const choices = favoritesOnly ? IMPORT_FAVORITES_ONLY : IMPORT_DEFAULTS;
   for (const box of $('importModal').querySelectorAll('[data-import]')) box.checked = choices[box.dataset.import];
   $('importProfileName').textContent = profile?.name ?? 'this profile';
@@ -1555,10 +1568,16 @@ async function openImport({ favoritesOnly = false } = {}) {
 
 const closeImport = () => {
   $('importModal').hidden = true;
+  if (!welcoming) return;
+  welcoming = false;
+  // However it was left -- Skip, the x, Escape, the backdrop, or an import -- it is not
+  // offered again. A save that fails only means it is offered once more next time.
+  postJson('/api/welcome', {}).catch(() => {});
 };
 
 $('optImport').onclick = () => void openImport();
 $('importClose').onclick = closeImport;
+$('importDismiss').onclick = closeImport;
 $('importModal').onclick = (e) => {
   if (e.target === $('importModal')) closeImport();
 };
@@ -2768,6 +2787,12 @@ applySectionOrder();
 await loadProfile();
 // Tells the screenshot renderer the page has finished drawing itself.
 document.body.dataset.rendered = 'true';
+
+// A brand-new install is offered the account import once. Never on a shared copy, and never
+// under ?export=1, which is what the Share image is rendered from.
+if (welcomeOffered && !isStatic && !document.body.classList.contains('export-mode')) {
+  void openImport({ welcome: true });
+}
 
 openEvents();
 

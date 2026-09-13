@@ -7,6 +7,7 @@ import type { Db } from '../db/index.ts';
 import type { Tracker } from '../tracker/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
 import type { Ruleset } from '../osr.ts';
+import { dismissWelcome, welcomePending } from '../welcome.ts';
 import {
   unsubmittedAttemptCount,
   computeStats,
@@ -357,12 +358,23 @@ export function startServer(opts: ServerOptions): http.Server {
           current(),
           eligibilityOf(settings, opts.tracker.beatmaps.knowsStatus),
         ),
+        // A brand-new install's one-time offer to import from an osu! account.
+        welcome: welcomePending(opts.db),
         installs: opts.installs.map((i) => ({
           kind: i.kind,
           root: i.root,
           hasOnlineDb: i.onlineDb !== null,
         })),
       });
+    }
+
+    /*
+     * The welcome, left. Skip, the close button, Escape, the backdrop and an import all end
+     * it for good, so there is nothing to send but that it happened.
+     */
+    if (url.pathname === '/api/welcome' && req.method === 'POST') {
+      dismissWelcome(opts.db);
+      return json(res, { ok: true });
     }
 
     if (url.pathname === '/api/profile') {
