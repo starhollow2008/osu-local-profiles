@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **macOS asks for one approval instead of many.** A download's files are quarantined, and
+  macOS refused the pp calculator and each of its libraries separately, one trip to Privacy &
+  Security at a time. Now only the launcher needs **Open Anyway**: it lifts the quarantine from
+  the rest of its own folder before starting the app. The instructions are updated for macOS
+  15, where right-click -> Open no longer gets past the block. Allowing apps from anywhere is
+  not needed.
 - **A welcome on first launch offers to bring in an osu! account.** A brand-new install opens
   the Import from osu! dialog once, marked optional, with the account osu! is signed in as
   already suggested and the same choice of avatar, banner, flag, me! and favorite beatmaps.

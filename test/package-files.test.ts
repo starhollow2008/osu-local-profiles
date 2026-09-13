@@ -139,7 +139,11 @@ test('the macOS README explains Gatekeeper, because it will happen', () => {
   const readme = readmeFor('osx');
   assert.match(readme, /macOS will refuse to open it/);
   assert.match(readme, /xattr -dr com\.apple\.quarantine \./);
+  // macOS 15 removed right-click -> Open as a way past the block; Open Anyway is what works.
+  assert.match(readme, /Privacy & Security, scroll down, press Open Anyway/);
   assert.match(readme, /right-click the file and choose Open/);
+  // The launcher frees the rest, which is what makes "apps from anywhere" unnecessary.
+  assert.match(readme, /There is no need to allow apps from anywhere/);
 });
 
 test('the Linux README says how to restore a lost executable bit', () => {

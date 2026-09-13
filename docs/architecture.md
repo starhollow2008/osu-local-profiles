@@ -180,6 +180,8 @@ macOS and Linux written, CI-covered, never run against real osu! install. Since 
 
 **`cmd` spawns need `windowsVerbatimArguments`.** Node quotes by C runtime rules; `cmd` doesn't unescape. `start` title `""` must arrive as `"\"\""`. `src/browser.ts` builds line as pure function. Updater relaunch = same trap.
 
+**macOS: one approval, then the launcher lifts quarantine.** Browsers and Archive Utility quarantine every unpacked file, and Gatekeeper refuses each unsigned one as it loads: `node` is Node.js Foundation-notarized, but `osu-pp` and its native libraries are ad-hoc signed (16 files in 1.14.0). The `.command` itself must be approved (macOS 15: Privacy & Security -> Open Anyway); it then runs `xattr -dr com.apple.quarantine .` on its own folder when `node` or `osu-pp` still carries the attribute. No password needed for the user's own files. Updates never carry quarantine: the app downloads them with `fetch`. Real fix is Developer ID signing + notarization ($99/yr), not done.
+
 `config.installRoots`: escape hatch for unanticipated layouts (macOS/Linux stable via Wine wrappers). Was documented + printed but read by nothing at all.
 
 ## Updater: rewrites app's own directory

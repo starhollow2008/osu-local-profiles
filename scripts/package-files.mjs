@@ -118,6 +118,28 @@ export function launcherFor(hostOs, nodeBinary) {
       'fi',
       '',
       /*
+       * macOS quarantines everything unpacked from a browser download, and refuses each
+       * unsigned file separately as it loads: the pp helper, then its native libraries one by
+       * one. 1.14.0 shipped sixteen ad-hoc-signed .NET files, and only `node` is notarized, so
+       * a first start could mean a trip to Privacy & Security for each -- enough that people
+       * gave up and allowed apps from anywhere.
+       *
+       * Approving this launcher is the user deciding to trust this folder, so that is the one
+       * approval asked for: the launcher lifts the quarantine from the rest of its own folder
+       * before anything else loads. Removing it from files the user owns needs no password.
+       * Nothing happens once it is gone, and updates never carry it -- the app downloads them
+       * itself, and only browsers and the like set the attribute.
+       */
+      ...(hostOs === 'osx'
+        ? [
+            `if xattr -p com.apple.quarantine ./${nodeBinary} >/dev/null 2>&1 || xattr -p com.apple.quarantine tools/pp/osu-pp >/dev/null 2>&1; then`,
+            '  xattr -dr com.apple.quarantine . 2>/dev/null',
+            '  echo "  Allowed the rest of this folder to run: macOS had quarantined the download."',
+            'fi',
+            '',
+          ]
+        : []),
+      /*
        * Run, not `exec`ed, so this shell is still here when the app exits for an update. It
        * then waits for the swap and runs the new launcher, and the app comes back in this
        * terminal. Anything else -- including a swapper starting the app itself -- brings it
@@ -166,10 +188,20 @@ function howToStart(hostOs) {
     return [
       'Double-click "Start osu! local profiles.command".',
       '',
-      'The first time, macOS will refuse to open it. This app is not signed by an Apple',
-      'developer account, and macOS quarantines downloaded programs that are not. To allow',
-      'it, either right-click the file and choose Open (then Open again in the dialog), or',
-      'run this once in Terminal, from this folder:',
+      'The first time, macOS will refuse to open it. This app is not signed by a paid Apple',
+      'developer account, and macOS blocks downloaded programs that are not. It takes one',
+      'approval:',
+      '',
+      '  1. Double-click "Start osu! local profiles.command" and close the message.',
+      '  2. Open System Settings -> Privacy & Security, scroll down, press Open Anyway',
+      '     beside it, and confirm with your password or Touch ID.',
+      '',
+      'On macOS 14 or earlier you can instead right-click the file and choose Open.',
+      '',
+      'The launcher then allows the rest of this folder itself, so nothing else is refused.',
+      'There is no need to allow apps from anywhere, and it is safer not to.',
+      '',
+      'Or run this once in Terminal, from this folder, and skip the approval entirely:',
       '',
       '    xattr -dr com.apple.quarantine .',
       '',

@@ -142,9 +142,14 @@ at. Anything else needs `installRoots`.
 | Linux | run `./start.sh` |
 
 On macOS the first launch is refused, because the build is not signed by a paid Apple
-developer account and macOS quarantines downloaded programs that are not. Right-click the
-file and choose Open, or run `xattr -dr com.apple.quarantine .` in the folder once. The
-packaged `README.txt` says so too.
+developer account and macOS blocks downloaded programs that are not. It takes one approval:
+double-click `Start osu! local profiles.command`, close the message, then in **System
+Settings -> Privacy & Security** press **Open Anyway** beside it and confirm. (On macOS 14 and
+earlier, right-clicking the file and choosing Open does the same.) The launcher then lifts
+the quarantine from the rest of its own folder, so the pp calculator and its libraries are not
+refused one at a time -- there is no need to allow apps from anywhere, and it is better not
+to. Running `xattr -dr com.apple.quarantine .` in the folder from Terminal does the same
+without any approval. The packaged `README.txt` says so too.
 
 **From source:**
 
