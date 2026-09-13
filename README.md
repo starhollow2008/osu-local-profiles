@@ -87,6 +87,13 @@ out -- from osu!lazer's own log, and **Import past plays** can bring past ones i
 plays are tracked without osu!lazer's online beatmap database, and an update now brings the app
 back somewhere it can be stopped.
 
+**v1.15.0** gathers everything about a profile into **Options -> Profiles** -- the profile
+list, Edit profile with country and playstyle, Import from osu! and shared favorites -- and
+renames Settings **Other settings**. Which mods are ranked now comes from osu! itself, so
+Alternate, Single Tap, Traceable and lazer's other newer ranked mods count. A brand-new install
+is offered an osu! account import once, macOS asks for one approval instead of one per file,
+and a score's menu stays beside its score as the page scrolls.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.15.0
 
 - **Options is shorter, and Profiles holds everything about a profile.** Edit profile, Import
   from osu! and Keep Favorite Beatmaps the same on every profile are now parts of **Profiles**,
