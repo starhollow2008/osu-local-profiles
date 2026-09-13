@@ -2082,12 +2082,12 @@
 /* ======================================================================== */
 
 /*
- * One popover shared by every score row, positioned in viewport coordinates. It lives at
+ * One popover shared by every score row, positioned in page coordinates. It lives at
  * the end of <body> rather than inside a row because `.page-extra` would clip it, and
  * because a hundred rows would otherwise mean a hundred hidden dialogs.
  */
 .play-menu {
-  position: fixed;
+  position: absolute;
   min-width: 190px;
   background-color: hsl(var(--hsl-b4));
   border-radius: var(--radius-large);

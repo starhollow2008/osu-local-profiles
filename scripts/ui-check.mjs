@@ -1471,10 +1471,36 @@ check(
     button.click();
     const menu = document.getElementById('playMenu');
     if (getComputedStyle(menu).display === 'none') return 'stayed hidden';
-    // Positioned in viewport coordinates, so it must be on screen and near the button.
+    // Beside its button, and on screen.
     const m = menu.getBoundingClientRect();
     const b = button.getBoundingClientRect();
     return m.left >= 0 && m.right <= window.innerWidth && Math.abs(m.top - b.bottom) < 20;
+  })()`),
+  true,
+);
+/*
+ * It used to be placed in window coordinates, so it stayed on the same pixels while the page
+ * scrolled away under it. It has to travel with its row.
+ */
+check(
+  'and stays beside it as the page scrolls',
+  await evaluate(`(async () => {
+    const button = document.querySelector(
+      '#recentPlays [data-play-menu][data-kind="score"][data-pinned="0"]',
+    );
+    const menu = document.getElementById('playMenu');
+    // Nothing to follow when the checks above found no score to open a menu on.
+    if (!button || getComputedStyle(menu).display === 'none') return 'skipped';
+    const gap = () => menu.getBoundingClientRect().top - button.getBoundingClientRect().bottom;
+    const before = gap();
+    const from = window.scrollY;
+    window.scrollBy(0, 150);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const moved = window.scrollY !== from;
+    const after = gap();
+    window.scrollTo(0, from);
+    if (!moved) return 'the page could not scroll';
+    return Math.abs(after - before) < 1;
   })()`),
   true,
 );

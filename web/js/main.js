@@ -2022,8 +2022,9 @@ const menuKey = (button) => `${button.dataset.kind ?? 'score'}:${button.dataset.
 /**
  * Open the shared popover beside the button that asked for it.
  *
- * Positioned in viewport coordinates and clamped to the right edge, because the row it
- * belongs to is inside a panel that would otherwise clip it.
+ * Positioned in page coordinates, so it scrolls with the row it belongs to -- in window
+ * coordinates it stayed put on screen while the page scrolled away under it. Clamped to the
+ * right edge, because the row is inside a panel that would otherwise clip it.
  *
  * A score row gets everything; an unfinished play has no score, so it offers only the
  * beatmap. Favouriting is offered wherever there is a beatmapset -- a never-submitted map has
@@ -2068,8 +2069,9 @@ function openPlayMenu(button) {
   menu.hidden = false;
   const box = button.getBoundingClientRect();
   const width = menu.offsetWidth;
-  menu.style.left = `${Math.max(8, Math.min(box.right - width, window.innerWidth - width - 8))}px`;
-  menu.style.top = `${box.bottom + 4}px`;
+  const left = Math.max(8, Math.min(box.right - width, window.innerWidth - width - 8));
+  menu.style.left = `${left + window.scrollX}px`;
+  menu.style.top = `${box.bottom + 4 + window.scrollY}px`;
 }
 
 document.addEventListener('click', (e) => {
@@ -2083,6 +2085,9 @@ document.addEventListener('click', (e) => {
   }
   if (!e.target.closest('#playMenu')) closePlayMenu();
 });
+
+// Its left edge is clamped to the window, which a resize moves.
+window.addEventListener('resize', closePlayMenu);
 
 $('playMenu').onclick = async (e) => {
   const button = e.target.closest('[data-act]');
@@ -2185,7 +2190,7 @@ $('scoreClose').onclick = closeScoreCard;
 $('scoreModal').onclick = (e) => {
   if (e.target === $('scoreModal')) closeScoreCard();
 };
-// The menu is placed in window coordinates, so it cannot follow the card as it scrolls.
+// The menu is placed in page coordinates, so it cannot follow the card, which scrolls by itself.
 $('scoreModal').querySelector('.score-modal').addEventListener('scroll', () => {
   if (!$('playMenu').hidden) closePlayMenu();
 });

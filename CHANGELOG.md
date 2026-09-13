@@ -6,6 +6,8 @@
   from osu! and Keep Favorite Beatmaps the same on every profile are now parts of **Profiles**,
   below the profile list, and a profile's country and playstyle are edited there instead of in
   Settings. Settings is now **Other settings**, and no option ends in "..." any more.
+- **A score's menu stays with its score.** The menu from a score's **...** button stayed on the
+  same spot on screen while the page scrolled; it now moves with the row it belongs to.
 - **macOS asks for one approval instead of many.** A download's files are quarantined, and
   macOS refused the pp calculator and each of its libraries separately, one trip to Privacy &
   Security at a time. Now only the launcher needs **Open Anyway**: it lifts the quarantine from
