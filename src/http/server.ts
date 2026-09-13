@@ -1264,7 +1264,8 @@ export function startServer(opts: ServerOptions): http.Server {
           });
           // Long enough for the response to reach the browser, short enough that the
           // updater is not left waiting on a process with nothing left to do.
-          setTimeout(() => process.exit(0), 750);
+          // The exit code tells a launcher that restarts the app to wait for the swap.
+          setTimeout(() => process.exit(result.exitCode), 750);
         },
         (e: Error) => json(res, { error: e.message }, 400),
       );

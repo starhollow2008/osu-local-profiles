@@ -33,8 +33,9 @@ Each has its reasoning in `docs/architecture.md`.
   groups without asking.
 - **No play counter from osu!stable's `osu!.db` last-played time** without asking: it cannot
   count retries or tell a fail from a pass.
-- **The updater never touches `data/`**, swaps nothing until the new build is verified, and
-  refuses in a source checkout.
+- **The updater never touches `data/`**, swaps nothing until the new build is verified,
+  refuses in a source checkout, and never relaunches the app without a console to stop it
+  from. Unix launchers restart it themselves (`test/relaunch.test.ts`).
 - **`fs.watch` only gets paths through `watchablePath`.** On Windows a non-canonical path
   aborts the process. Watcher tests `await sleep(SETTLED_MS)` after `start()`.
 - **Recompute's UPDATE is generated from `UPDATE_COLUMNS`.** Never hand-align placeholders.

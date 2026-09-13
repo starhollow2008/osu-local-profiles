@@ -2190,3 +2190,59 @@ offline sequence from log 1788778412 and a regression test for a bracket inside 
 - **What it costs.** The app code grew by 22 KB, 6.9 KB compressed, against an 87 MB download. The
   database grew by 1.65 MB on this machine (17.07 MB to 18.72 MB compacted): 734 KB of beatmap
   names for 12,811 beatmaps and the index on them, about 128 bytes a beatmap.
+
+## 5.46 - An update brings the app back where it can be stopped
+
+**Status:** done, not yet released (2026-09-12).
+
+Reported by a friend of the user: after pressing **Update**, Node "is kept open and running and
+never actually closes".
+
+**Real, on macOS and Linux, with a smaller cousin on Windows.** Reproduced on a real update of the
+published 1.13.2 linux-x64 build in WSL, started with `./start.sh` inside a pseudo-terminal. Before
+the update the app was on `pts/2`. Afterwards the terminal session had ended, and the relaunched
+`./node src/main.ts` had no TTY, a session of its own, stdin, stdout and stderr on `/dev/null`, and
+it kept running after the terminal was hung up -- tracking, holding the port, and stoppable only
+from a process list. The cause: the swapper ran the launcher through `sh` from a detached process
+with its output ignored, and the launcher `exec`ed the runtime. macOS took the same path. On
+Windows the swap was clean and no Node was left over, but `start` runs a `.bat` as `cmd /K`, so
+the window the app came back in stayed open at a prompt after the app stopped.
+
+**The fix** (the Updater section of `docs/architecture.md` has the detail):
+
+- **The macOS and Linux launchers restart the app themselves.** They run it rather than `exec` it,
+  with `OSU_LOCAL_PROFILES_LAUNCHER=restarts`. The app passes `--launcher-restarts` to the
+  swapper, writes the swapper's pid to `data/update/swapper.pid` and exits 75; the launcher waits
+  for that pid and runs itself again, in the same terminal.
+- **Otherwise the swapper relaunches, and only somewhere visible** (`relaunchPlan`, a pure function
+  in `scripts/apply-update.mjs`): Windows `cmd /d /c` through `start`, as a double-click runs it;
+  macOS `open` on the `.command`; Linux a terminal program when there is a desktop and one is on
+  PATH. With neither, it does not relaunch and says so in `data/update.log`. It never starts the
+  runtime directly.
+- **Windows cannot use the launcher's way:** `cmd` re-reads a running `.bat` by byte offset, and
+  the swap replaces the file.
+- **The first update to this build is carried out by the old launcher**, which has already
+  `exec`ed, so it always takes the swapper's path.
+
+**Verified end to end** with local release zips, served through a preload that answers GitHub's
+release API; the app, the swapper and the launchers ran unmodified.
+
+- **Linux, fixed build to fixed build, from `./start.sh`:** afterwards the same terminal session
+  and the same launcher shell were running, with the new app a child of it on `pts/2`. The swapper
+  logged that it left the relaunch to the launcher, the new app cleared `data/update` (245MB), and
+  Ctrl+C stopped everything and ended the session.
+- **Linux, published 1.13.2 to the fix, no desktop:** installed, not relaunched, no app left
+  running.
+- **Linux, published 1.13.2 to the fix, with a desktop and a stand-in `x-terminal-emulator`:** the
+  app came back inside that terminal, under the new launcher. Killing the terminal stopped the app
+  and the launcher. (A SIGHUP sent to util-linux `script` does not close its pty, which at first
+  looked like a survivor; `node`'s ignored-signal mask does not include SIGHUP.)
+- **Windows, two updates in a row from a double-clicked launcher:** the relaunched window was
+  `cmd /d /c ""...\Start osu! local profiles.bat""`, and on the second update that window closed
+  with its app. One `cmd`, one `node` and one `osu-pp` were left, with no `data\update` or
+  `.rollback-` folder.
+- **397 tests**, including `test/relaunch.test.ts`, which runs the real launcher under `sh` against
+  a stand-in runtime.
+
+Not tested on real hardware: macOS's `open`, and real Linux desktop terminals, whose arguments come
+from each program's documentation.

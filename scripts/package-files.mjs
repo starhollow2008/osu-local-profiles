@@ -117,7 +117,31 @@ export function launcherFor(hostOs, nodeBinary) {
       '  exit 1',
       'fi',
       '',
-      `exec ./${nodeBinary} src/main.ts`,
+      /*
+       * Run, not `exec`ed, so this shell is still here when the app exits for an update. It
+       * then waits for the swap and runs the new launcher, and the app comes back in this
+       * terminal. Anything else -- including a swapper starting the app itself -- brings it
+       * back with no terminal, which is what 1.13.2 and earlier did: running, invisible,
+       * and impossible to stop. The variable, the code and the pid file are
+       * src/update/index.ts's LAUNCHER_ENV, RESTART_EXIT_CODE and SWAPPER_PID_FILE.
+       *
+       * The swap replaces this file while it runs. The shell reads on from the file it
+       * opened, which the swap has moved aside, not from the new one.
+       */
+      `OSU_LOCAL_PROFILES_LAUNCHER=restarts ./${nodeBinary} src/main.ts`,
+      'status=$?',
+      '[ "$status" -eq 75 ] || exit "$status"',
+      '',
+      'echo ""',
+      'echo "  Installing the update. The app starts again here when it is done."',
+      'echo ""',
+      'pid=$(cat data/update/swapper.pid 2>/dev/null)',
+      'waited=0',
+      'while [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 600 ]; do',
+      '  sleep 1',
+      '  waited=$((waited + 1))',
+      'done',
+      'exec sh "./$(basename "$0")"',
       '',
     ].join('\n'),
     // Without this the archive carries a launcher nobody can run, and `chmod +x` is not an

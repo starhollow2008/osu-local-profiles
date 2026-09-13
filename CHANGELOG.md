@@ -17,6 +17,14 @@
   `cRyo[iceeicee]`, a title tagged `[CV. ...]` or an audio file named `[HD] ...` used to cut a
   beatmap's details short. On one real library that lost 327 beatmap names and put 23 beatmaps
   -- and any unfinished plays on them -- under the wrong game mode.
+- **Updating no longer leaves the app running where it cannot be stopped.** On macOS and
+  Linux the app came back from **Update** with no terminal: it kept tracking and holding its
+  port, and closing the terminal did not stop it. It now comes back in the terminal it was
+  started from, where Ctrl+C and closing the window stop it as before. The first update to this
+  version is carried out by the old launcher, so that once it opens a new terminal window
+  instead -- or, on Linux with no desktop or no terminal program it can find, leaves the app
+  closed and says in `data/update.log` to start it again. On Windows, the window the app came
+  back in stayed open at a prompt after the app stopped; it now closes with it.
 
 ## 1.13.2
 

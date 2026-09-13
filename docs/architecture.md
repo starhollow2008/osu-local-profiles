@@ -193,7 +193,12 @@ macOS and Linux written, CI-covered, never run against real osu! install. Since 
 
 **Swap runs from staged build using its own runtime.** On Windows, running `node.exe` locked by the process. `scripts/apply-update.mjs` copied into every package.
 
-**Relaunch through `cmd`'s `start`.** `detached` = `DETACHED_PROCESS` on Windows → app running, tracking, no console. Launcher is `Start osu! local profiles.bat` — unquoted path runs a program called `Start`.
+**Relaunch: in a console the user can stop it from, or not at all.** A console app's only off switch is its console. `detached` = `DETACHED_PROCESS` on Windows (no console); on macOS/Linux a process the swapper starts has no terminal. Up to 1.13.2 the app came back exactly so on macOS/Linux: no TTY, output to `/dev/null`, outliving its terminal.
+
+- **Unix launchers restart the app themselves.** They run it (no `exec`) with `OSU_LOCAL_PROFILES_LAUNCHER=restarts`; the app passes `--launcher-restarts` to the swapper, writes its pid to `data/update/swapper.pid` and exits 75 (`RESTART_EXIT_CODE`); the launcher waits for that pid and re-runs itself in the same terminal. `test/relaunch.test.ts` runs the real launcher under `sh`.
+- **Otherwise the swapper relaunches, per `relaunchPlan`** (pure, in `scripts/apply-update.mjs`): Windows `cmd /d /s /c "start "" cmd /d /c ""<bat>"""` — a `.bat` handed straight to `start` runs as `cmd /K`, leaving the window open after the app stops; macOS `open` on the `.command`; Linux a terminal program from `LINUX_TERMINALS` when `DISPLAY`/`WAYLAND_DISPLAY` is set, else no relaunch, said in `data/update.log`. Never the runtime directly.
+- **Windows cannot restart in the launcher:** `cmd` re-reads a running `.bat` from disk by byte offset, and the swap replaces it.
+- **The swapper is the new release's; the launcher is the old one's.** The first update from 1.13.2 or earlier always takes the swapper's path.
 
 **Zip reader** is ours (`src/update/zip.ts`): no dependency overhead, avoids `tar.exe` (Windows-only). Refuses zip64, refuses path traversal. Handles backslash separators from own packager.
 

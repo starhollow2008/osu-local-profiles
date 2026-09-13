@@ -41,7 +41,7 @@ test('every launcher moves to its own folder before starting the app', () => {
 test('the launchers run the Node beside them, not one from PATH', () => {
   // `./` matters: a machine with its own node on PATH must still use the bundled runtime,
   // which is the version this app is actually tested against.
-  assert.match(launcherFor('linux', 'node').content, /exec \.\/node src\/main\.ts/);
+  assert.match(launcherFor('linux', 'node').content, /^OSU_LOCAL_PROFILES_LAUNCHER=restarts \.\/node src\/main\.ts$/m);
   // The same on Windows, and it was not: a bare `node.exe` only finds the bundled one while
   // NoDefaultCurrentDirectoryInExePath is unset. Found when an update relaunched on the
   // system Node from a shell that had it set.

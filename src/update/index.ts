@@ -25,6 +25,28 @@ import { extractZip } from './zip.ts';
  * release zip.
  */
 
+/**
+ * How the macOS and Linux launchers start the app again after an update.
+ *
+ * They run the app as a child instead of `exec`-ing it, with `LAUNCHER_ENV` set. The app then
+ * exits with `RESTART_EXIT_CODE` once the swap is handed off, and the launcher waits for the
+ * swapper -- its pid is in `data/update/<SWAPPER_PID_FILE>` -- and runs itself again, in the
+ * same terminal, where Ctrl+C and closing the window still stop the app.
+ *
+ * Before this the swapper started the app itself, and on those platforms a process it starts
+ * has no terminal: the app came back running, invisible, and with nothing to stop it. The
+ * other half is written in `scripts/package-files.mjs`; `test/relaunch.test.ts` pins that
+ * the two agree.
+ */
+export const LAUNCHER_ENV = 'OSU_LOCAL_PROFILES_LAUNCHER';
+export const RESTART_EXIT_CODE = 75;
+export const SWAPPER_PID_FILE = 'swapper.pid';
+
+/** Whether this process was started by a launcher that will start it again after an update. */
+export function launcherRestarts(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[LAUNCHER_ENV] === 'restarts';
+}
+
 export interface UpdateState {
   currentVersion: string | null;
   latestVersion: string | null;
@@ -162,6 +184,8 @@ function verifyStaged(dir: string, expectedVersion: string, platform: string): v
 export interface ApplyResult {
   version: string;
   stagedDir: string;
+  /** What this process should exit with so the swap can begin: see `RESTART_EXIT_CODE`. */
+  exitCode: number;
 }
 
 /**
@@ -225,6 +249,7 @@ export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
       throw new Error(`${release.version} does not know how to install itself (no updater script)`);
     }
 
+    const restarts = launcherRestarts();
     const child = spawn(
       runtime,
       [
@@ -233,12 +258,20 @@ export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
         '--staged', stagedDir,
         '--pid', String(process.pid),
         '--archive', archive,
+        // The swapper then leaves the relaunch to the launcher instead of starting a copy
+        // of its own. Only a swapper newer than this one ever reads it.
+        ...(restarts ? ['--launcher-restarts'] : []),
       ],
       { detached: true, stdio: 'ignore', windowsHide: true },
     );
     child.unref();
 
-    return { version: release.version, stagedDir };
+    // What the launcher waits on. data/ is the one place the swap does not move.
+    if (child.pid !== undefined) {
+      fs.writeFileSync(path.join(work, SWAPPER_PID_FILE), `${child.pid}\n`);
+    }
+
+    return { version: release.version, stagedDir, exitCode: restarts ? RESTART_EXIT_CODE : 0 };
   } finally {
     state.applying = false;
   }
