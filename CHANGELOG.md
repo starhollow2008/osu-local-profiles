@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.17.0
+
+- **No more console window.** The app now lives in the system tray on Windows and Linux, and in
+  the menu bar on macOS, with no Dock icon. Open it with **osu! local profiles.exe** on Windows,
+  **osu! local profiles** on macOS, or **./osu-local-profiles** on Linux.
+  - The icon's menu has **Open profile**, **Open log** and **Quit**. On Windows and Linux,
+    clicking it opens the page.
+  - What the app prints is now in `data/logs/app.log`.
+  - Windows 11 puts a new tray icon behind the **^** arrow; drag it onto the taskbar to keep it
+    in view.
+  - On Linux, a desktop with no tray (GNOME without the AppIndicator extension) runs it with no
+    icon. With no desktop, `./start.sh` runs it in the terminal as before.
+- **Quit from the page.** **Quit** at the top right stops the app, after asking once.
+- **Starting it again opens the page.** Starting the app while it runs no longer fails on the
+  port: it opens the running copy's page. That is how to get back to the page if you lose it.
+  When the page loses the app, it says so and picks up again once the app is back.
+- **Remove an unfinished play.** Didn't finish and Not submitted rows in Recent Plays have
+  **Remove from profile**, which takes them out of the play count too. A collapsed row removes
+  every attempt in it. They are listed in Other settings -> Removed scores, where they can be put
+  back or deleted for good.
+- **Updating from 1.16.0 or earlier.** Update from the app as usual; it comes back in the tray.
+  On Windows, `Start osu! local profiles.bat` is replaced by `osu! local profiles.exe`, so move
+  any shortcut you made. Windows may ask once whether to run the unrecognised app: press **More
+  info**, then **Run anyway**.
+
 ## 1.16.0
 
 - **The Options menu is down to six entries.** Import past plays and Play tracking filter sit

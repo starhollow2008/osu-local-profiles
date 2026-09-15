@@ -99,6 +99,11 @@ filter sit under a **Tracking** heading, **Share & back up** holds saving the pa
 the JSON export and the database backup, **Reset** is at the end of Edit profile in Profiles, and
 **Open in browser on start** is in Other settings.
 
+**v1.17.0** moves the app out of the console window and into the system tray (the menu bar on
+macOS), with Open profile, Open log and Quit on its icon. The page gets **Quit** too, starting the
+app while it runs opens its page, and unfinished plays can be removed from Recent Plays and the
+play count.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
