@@ -37,6 +37,10 @@
           <div class="note" id="optInfo">&nbsp;</div>
         </div>
       </div>
+      <!-- Stops the app. Asks once first: the page cannot bring it back. -->
+      <button class="quit-pill" id="quitBtn" type="button" title="Quit osu! local profiles">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Quit</span>
+      </button>
     </div>
   </div>
 
@@ -236,6 +240,15 @@
   One popover shared by every score row. Rendering a menu inside each row would put a
   hundred hidden dialogs on the page, each of them clipped by the row that contains it.
 -->
+<!--
+  The app is not running: stopped with Quit, or from its tray icon, or on its way back from an
+  update. Nothing on the page can work meanwhile, so it says so rather than failing quietly.
+-->
+<div class="stopped-notice" id="stoppedNotice" role="status" hidden>
+  <strong id="stoppedTitle">osu! local profiles is not running.</strong>
+  <span id="stoppedText">This page picks up again when it starts.</span>
+</div>
+
 <div class="play-menu" id="playMenu" role="menu" hidden>
   <button type="button" data-act="pin" role="menuitem">Pin to profile</button>
   <button type="button" data-act="unpin" role="menuitem">Unpin</button>

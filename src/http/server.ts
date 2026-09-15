@@ -55,6 +55,7 @@ import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
+import { APP_ID, isOwnPage } from '../instance.ts';
 import { downloadImage, fetchBeatmapset, fetchFavouriteBeatmapsets, lookupUser } from '../clients/osu-web.ts';
 import {
   addFavorite,
@@ -141,6 +142,13 @@ export interface ServerOptions {
     get(): AppConfig;
     set(patch: Partial<AppConfig>): void;
   };
+  /**
+   * Stop the app: the page's Quit. Absent, the page cannot stop it -- the tests never pass
+   * one, so no test can end the process running them.
+   */
+  onQuit?: () => void;
+  /** What started the app, so the page can say where else it can be stopped from. */
+  launcher?: 'tray' | 'terminal';
 }
 
 /** What of config.json the page is allowed to see and change. Deliberately small. */
@@ -302,6 +310,34 @@ export function startServer(opts: ServerOptions): http.Server {
       return;
     }
 
+    /*
+     * Which app this is. Cheap and constant, because it is asked often: by a second start
+     * deciding whether to open this copy's page instead (src/instance.ts), and by the tray
+     * launcher waiting for the app to come up and showing whether it is tracking.
+     */
+    if (url.pathname === '/api/app') {
+      return json(res, {
+        app: APP_ID,
+        version: appVersion(),
+        pid: process.pid,
+        tracking: opts.tracker.isTracking,
+      });
+    }
+
+    /*
+     * Quit, from the page. Answered first and stopped after, so the page hears that it
+     * worked. Refused for another website's page: see `isOwnPage`.
+     */
+    if (url.pathname === '/api/quit' && req.method === 'POST') {
+      if (!isOwnPage(req.headers.origin, req.socket.localPort)) {
+        return json(res, { error: "only this app's own page can stop it" }, 403);
+      }
+      const quit = opts.onQuit;
+      if (!quit) return json(res, { error: 'this copy cannot be stopped from the page' }, 400);
+      res.once('finish', () => setTimeout(quit, 250));
+      return json(res, { ok: true });
+    }
+
     if (url.pathname === '/api/state') {
       const profile = getProfile(opts.db, current())!;
       const settings = settingsFor(profile.id);
@@ -310,7 +346,13 @@ export function startServer(opts: ServerOptions): http.Server {
         // What is running, so the page can print it and the update check has something to
         // compare against. Null when package.json could not be read, which the page shows
         // as an unknown version rather than inventing one.
-        app: { version: appVersion(), update: updateState(), config: opts.appConfig.get() },
+        app: {
+          version: appVersion(),
+          update: updateState(),
+          config: opts.appConfig.get(),
+          launcher: opts.launcher ?? null,
+          platform: process.platform,
+        },
         profile: {
           id: profile.id,
           name: profile.name,

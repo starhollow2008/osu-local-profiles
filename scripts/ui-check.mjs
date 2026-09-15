@@ -555,6 +555,31 @@ check(
   true,
 );
 
+/*
+ * Quit. Only ever armed here, never confirmed: the second press would stop the app this
+ * check is driving.
+ */
+console.log('\nquit');
+check(
+  'the header offers Quit',
+  await evaluate("getComputedStyle(document.getElementById('quitBtn')).display !== 'none'"),
+  true,
+);
+check(
+  'the first press only asks',
+  await evaluate(`(() => {
+    const button = document.getElementById('quitBtn');
+    button.click();
+    const asked = button.dataset.armed === '1' && /quit the app/i.test(button.textContent);
+    button.dataset.armed = '0';
+    button.classList.remove('is-armed');
+    button.innerHTML = button.dataset.label;
+    return asked;
+  })()`),
+  true,
+);
+check('the not-running notice is hidden while the app runs', await shown('stoppedNotice'), 'none');
+
 console.log('\nopen in browser on start');
 /*
  * In Other settings, under This install. Read, flip and save, read back from the server, then

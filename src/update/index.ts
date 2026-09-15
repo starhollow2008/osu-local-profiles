@@ -42,9 +42,20 @@ export const LAUNCHER_ENV = 'OSU_LOCAL_PROFILES_LAUNCHER';
 export const RESTART_EXIT_CODE = 75;
 export const SWAPPER_PID_FILE = 'swapper.pid';
 
-/** Whether this process was started by a launcher that will start it again after an update. */
+/**
+ * Whether this process was started by a launcher that will start it again after an update:
+ * the tray launcher (`tray`), or the terminal loop `start.sh` falls back to (`restarts`).
+ */
 export function launcherRestarts(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env[LAUNCHER_ENV] === 'restarts';
+  return env[LAUNCHER_ENV] === 'restarts' || env[LAUNCHER_ENV] === 'tray';
+}
+
+/**
+ * Whether the tray launcher started this process (tools/launcher). It then has no console:
+ * its output goes to `data/logs/app.log`, and it stops when the launcher closes its stdin.
+ */
+export function launchedFromTray(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env[LAUNCHER_ENV] === 'tray';
 }
 
 export interface UpdateState {

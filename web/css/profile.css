@@ -254,6 +254,50 @@
   box-shadow: 0 0 8px var(--green-light);
 }
 
+/* Quit, at the end of the header's actions. Quiet until it is armed and asks. */
+.quit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 10000px;
+  background-color: hsla(var(--hsl-b6), 0.75);
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  padding: 5px 14px 5px 11px;
+}
+
+.quit-pill svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+
+.quit-pill:hover,
+.quit-pill.is-armed {
+  background-color: var(--red);
+  color: #fff;
+}
+
+/* The app has stopped, or cannot be reached. Pinned to the top, over everything. */
+.stopped-notice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  max-width: calc(100vw - 24px);
+  padding: 10px 16px;
+  border-radius: 10px;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
+  font-size: var(--fs-normal);
+}
+
 /*
  * The update button, beside the tracking pill.
  *
@@ -1485,6 +1529,8 @@
  */
 .export-mode .menu-wrap,
 .export-mode .tracking-pill,
+.export-mode .quit-pill,
+.export-mode .stopped-notice,
 .export-mode .section-order,
 .export-mode .play-detail__menu,
 .export-mode .play-detail__grip,
@@ -4761,7 +4807,7 @@ s.bbcode-editor__glyph {
 /* change the profile is gone; whatever only shows it still works.           */
 /* ======================================================================== */
 
-.static-copy :is(#optionsBtn, .menu-wrap, #toggle, #updateBtn, #indexNotice, #favoritesNote,
+.static-copy :is(#optionsBtn, .menu-wrap, #toggle, #updateBtn, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
   #aboutEdit, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;

@@ -11,7 +11,8 @@ import { activeProfileId, getProfile, seedFirstProfile } from './profiles.ts';
 import { Tracker, type IndexState } from './tracker/index.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
-import { checkForUpdate, pruneUpdateLeftovers } from './update/index.ts';
+import { checkForUpdate, launchedFromTray, pruneUpdateLeftovers } from './update/index.ts';
+import { runningInstance, stopWhenLauncherCloses } from './instance.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
@@ -46,12 +47,31 @@ function lazerSearchHint(): string {
   return '~/.local/share/osu';
 }
 
+/** Started by the tray launcher: no console, and it stops when the launcher does. */
+const fromTray = launchedFromTray();
+
 async function main(): Promise<void> {
   console.log('\n  osu! local profiles');
   console.log('  -------------------');
 
   const config = loadConfig();
   saveConfig(config);
+
+  /*
+   * Already running: open that copy's page rather than starting a second one, which would
+   * only fail on the port. Starting the app again is how to find it again -- see
+   * src/instance.ts. `--check-only` never serves, so it has nothing to collide with.
+   */
+  if (!checkOnly) {
+    const running = await runningInstance(config.port);
+    if (running) {
+      const url = `http://localhost:${config.port}`;
+      banner(`Already running${running.version ? ` (${running.version})` : ''} -> ${url}`);
+      console.log('  Opened its page instead of starting a second copy.\n');
+      openBrowser(url);
+      return;
+    }
+  }
 
   // config.installRoots is tried before anything auto-detected. On macOS and Linux there is
   // no official osu!stable build to detect, only community Wine wrappers, so this is the
@@ -234,6 +254,8 @@ async function main(): Promise<void> {
     tagline: config.tagline,
     dataDir: dataDir(),
     port: config.port,
+    onQuit: () => shutdown(),
+    launcher: fromTray ? 'tray' : 'terminal',
     /*
      * The page's "Open in browser on start" toggle. It is install-level, not per profile --
      * it decides what happens before any profile is on screen -- so it lives in config.json
@@ -289,7 +311,11 @@ async function main(): Promise<void> {
   if (tracker.filterNarrowing) {
     console.log('  A play tracking filter is on -- plays it declines are not recorded at all.');
   }
-  console.log('  Close this window or press Ctrl+C to stop tracking.\n');
+  console.log(
+    fromTray
+      ? '  Quit from the tray icon, or with Quit on the page.\n'
+      : '  Close this window, press Ctrl+C, or press Quit on the page to stop tracking.\n',
+  );
 
   if (config.openBrowser) openBrowser(url);
 
@@ -317,7 +343,12 @@ async function main(): Promise<void> {
     });
   }
 
+  // Reachable four ways now -- Ctrl+C, a signal, the page's Quit and the tray -- and two can
+  // arrive together, so only the first one stops anything.
+  let stopping = false;
   const shutdown = () => {
+    if (stopping) return;
+    stopping = true;
     console.log('\n  stopping...');
     tracker.stop();
     official?.dispose();
@@ -327,6 +358,7 @@ async function main(): Promise<void> {
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);
+  if (fromTray) stopWhenLauncherCloses(process.stdin, shutdown);
 }
 
 await main();

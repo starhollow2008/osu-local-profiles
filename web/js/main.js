@@ -814,6 +814,51 @@ $('updateConfirm').onclick = async () => {
   }
 };
 
+/* ------------------------------------------------------------------- quit */
+
+/** Set once this page has stopped the app, so nothing reconnects to a port nobody holds. */
+let quitHere = false;
+
+/**
+ * Say the app is not running: `byThisPage` after Quit here, otherwise because the stream
+ * dropped -- quit from its tray icon, or on its way back from an update.
+ */
+function showStopped(byThisPage) {
+  $('stoppedTitle').textContent = byThisPage
+    ? 'osu! local profiles has stopped.'
+    : 'osu! local profiles is not running.';
+  $('stoppedText').textContent = byThisPage
+    ? 'Tracking is off. Start the app again to pick up where you left off.'
+    : 'This page picks up again when it starts.';
+  $('stoppedNotice').hidden = false;
+}
+
+/** Where else the app can be stopped from, so Quit's tooltip is also how to find it. */
+function quitTitle() {
+  if (app.launcher !== 'tray') return 'Quit osu! local profiles. Tracking stops until you start it again.';
+  const where = app.platform === 'darwin' ? 'the menu bar' : 'the system tray';
+  return `Quit osu! local profiles. While it runs it also has an icon in ${where}.`;
+}
+
+$('quitBtn').onmouseenter = () => {
+  $('quitBtn').title = quitTitle();
+};
+
+$('quitBtn').onclick = async () => {
+  const button = $('quitBtn');
+  if (!armed(button, 'Quit the app?')) return;
+  button.disabled = true;
+  try {
+    await postJson('/api/quit', {}, 'the app did not stop');
+    quitHere = true;
+    closeEvents();
+    showStopped(true);
+  } catch (err) {
+    toast(err.message);
+    button.disabled = false;
+  }
+};
+
 /* ------------------------------------------------------------------ share */
 
 /*
@@ -2787,9 +2832,23 @@ const on = (type, fn) => {
 let es = null;
 
 function openEvents() {
-  if (es) return;
+  if (es || quitHere) return;
   es = new EventSource('/api/events');
   for (const [type, fn] of Object.entries(handlers)) es.addEventListener(type, fn);
+  /*
+   * The stream is the first thing to notice the app going -- quit from its tray icon, or
+   * restarting for an update. EventSource retries on its own, so the notice goes as soon as a
+   * retry connects, and the page re-reads whatever changed while it was away.
+   */
+  es.addEventListener('error', () => {
+    if (!document.hidden) showStopped(false);
+  });
+  es.addEventListener('open', () => {
+    if ($('stoppedNotice').hidden) return;
+    $('stoppedNotice').hidden = true;
+    loadState();
+    loadProfile();
+  });
 }
 
 function closeEvents() {
