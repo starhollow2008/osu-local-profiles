@@ -267,6 +267,8 @@ test('a clean install has nothing to clear and says so', () => {
 
 test('a missing install directory is not a startup failure', () => {
   // This runs before anything else at startup; it must never be the reason the app dies.
-  const result = pruneUpdateLeftovers(path.join(tmp(), 'gone'), path.join(tmp(), 'gone'));
+  const dir = tmp();
+  const result = pruneUpdateLeftovers(path.join(dir, 'gone'), path.join(dir, 'gone', 'data'));
   assert.deepEqual(result.removed, []);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

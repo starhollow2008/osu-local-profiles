@@ -26,6 +26,9 @@ if (!binary) {
   process.exit(1);
 }
 
+// A profile of its own, so nothing from a real browser leaks in. Removed when the run ends.
+const profileDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ui-check-'));
+
 const chrome = spawn(
   binary,
   [
@@ -34,7 +37,7 @@ const chrome = spawn(
     '--no-first-run',
     '--no-default-browser-check',
     `--remote-debugging-port=${PORT}`,
-    `--user-data-dir=${fs.mkdtempSync(path.join(os.tmpdir(), 'ui-check-'))}`,
+    `--user-data-dir=${profileDir}`,
     '--window-size=1280,900',
     // The preview check presses play from script, which is not a user gesture.
     '--autoplay-policy=no-user-gesture-required',
@@ -2278,4 +2281,12 @@ console.log(`\n${checks.length - failed}/${checks.length} checks passed`);
 
 ws.close();
 chrome.kill();
+// Chrome holds its profile open until it has exited, and for a moment after on Windows.
+if (chrome.exitCode === null && chrome.signalCode === null) await new Promise((resolve) => chrome.once('exit', resolve));
+try {
+  fs.rmSync(profileDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 });
+} catch {
+  console.log(`
+(could not remove ${profileDir})`);
+}
 process.exit(failed === 0 ? 0 : 1);

@@ -239,6 +239,7 @@ test('a watched path is resolved to its canonical form before being watched', ()
     assert.notEqual(watchablePath(link), link);
   } finally {
     fs.rmSync(link, { recursive: true, force: true });
+    fs.rmSync(path.dirname(link), { recursive: true, force: true });
     fs.rmSync(real, { recursive: true, force: true });
   }
 });
@@ -258,6 +259,7 @@ test('a directory reached through a junction is still watched', async () => {
     fs.symlinkSync(real, link, process.platform === 'win32' ? 'junction' : 'dir');
   } catch {
     fs.rmSync(real, { recursive: true, force: true });
+    fs.rmSync(path.dirname(link), { recursive: true, force: true });
     return;
   }
 
@@ -284,6 +286,7 @@ test('a directory reached through a junction is still watched', async () => {
   } finally {
     watcher.stop();
     fs.rmSync(link, { recursive: true, force: true });
+    fs.rmSync(path.dirname(link), { recursive: true, force: true });
     fs.rmSync(real, { recursive: true, force: true });
   }
 });
