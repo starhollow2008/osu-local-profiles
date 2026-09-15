@@ -540,9 +540,9 @@ check(
   true,
 );
 
-// An unfinished play has no score to pin or remove: its menu is the beatmap's alone.
+// An unfinished play has no score to pin or view: its menu is its beatmap's, and removing it.
 check(
-  "an unfinished play's menu offers only its beatmap",
+  "an unfinished play's menu offers its beatmap and removing it",
   await evaluate(`(() => {
     const button = document.querySelector('#recentPlays [data-play-menu][data-kind="incomplete"]');
     if (!button) return ${JSON.stringify('skipped')};
@@ -550,7 +550,7 @@ check(
     const visible = [...document.querySelectorAll('#playMenu [data-act]')]
       .filter((b) => !b.hidden).map((b) => b.dataset.act).join(',');
     document.body.click();
-    return visible === 'favorite' || visible === 'unfavorite';
+    return ['hide', 'favorite,hide', 'unfavorite,hide'].includes(visible);
   })()`),
   true,
 );

@@ -8,6 +8,7 @@ import {
   type SessionAttempt,
 } from '../clients/lazer-log.ts';
 import { attemptKey } from './incomplete.ts';
+import { deletedIncompleteKey, wasDeleted } from '../scores.ts';
 
 /**
  * Past unfinished plays, read back out of osu!lazer's session logs for Import past plays.
@@ -51,7 +52,9 @@ export function scanLogsForPlays(
   const recorded = db.prepare(
     'SELECT 1 AS hit FROM incomplete_plays WHERE profile_id = ? AND dedupe_key = ?',
   );
-  const isRecorded = (key: string) => recorded.get(profileId, key) !== undefined;
+  // A play deleted for good counts as known: Import past plays must not bring it back.
+  const isRecorded = (key: string) =>
+    recorded.get(profileId, key) !== undefined || wasDeleted(db, profileId, deletedIncompleteKey(key));
 
   const unfinished: ResolvedLoggedPlay[] = [];
   const attempts: SessionAttempt[] = [];

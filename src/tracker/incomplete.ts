@@ -2,6 +2,7 @@ import type { Db } from '../db/index.ts';
 import type { Ruleset } from '../osr.ts';
 import { beatmapMode, type BeatmapResolver } from '../clients/beatmaps.ts';
 import type { ResolvedLoggedPlay, SessionAttempt } from '../clients/lazer-log.ts';
+import { deletedIncompleteKey, wasDeleted } from '../scores.ts';
 import {
   beatmapFilterFacts,
   defaultTrackingFilter,
@@ -102,10 +103,11 @@ function findBeatmap(play: ResolvedLoggedPlay, ctx: IncompleteContext): string |
   return play.beatmapName ? ctx.resolver.md5ForBeatmapName(play.beatmapName) : null;
 }
 
+/** Already stored, or deleted for good from Settings -- the log still names it, and it must stay out. */
 const isRecorded = (ctx: IncompleteContext, key: string): boolean =>
   ctx.db
     .prepare('SELECT 1 AS hit FROM incomplete_plays WHERE profile_id = ? AND dedupe_key = ?')
-    .get(ctx.profileId, key) !== undefined;
+    .get(ctx.profileId, key) !== undefined || wasDeleted(ctx.db, ctx.profileId, deletedIncompleteKey(key));
 
 /**
  * File and filter a play whose beatmap is known: the same rules for both kinds, so an attempt

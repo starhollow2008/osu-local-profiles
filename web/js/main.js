@@ -1792,24 +1792,30 @@ async function renderRemovedScores() {
   try {
     const d = await scoreAction({ action: 'list-hidden' });
     $('removedList').innerHTML = d.hidden
-      .map(
-        (h) => `<div class="removed-row">
+      .map((h) => {
+        // A removed unfinished play has no grade, accuracy or pp to describe, only what it was.
+        const incomplete = h.kind === 'incomplete';
+        const ids = incomplete ? h.ids.join(',') : String(h.id);
+        const meta = incomplete
+          ? `${h.unsubmitted ? 'Not submitted' : 'Didn&rsquo;t finish'}${
+              h.attempts > 1 ? ` &middot; ${fmt(h.attempts)} attempts` : ''
+            }`
+          : `${escapeHtml(h.grade)} &middot; ${pct(h.accuracy)} &middot;
+              ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmt(h.pp, 0)}pp` : ''}`;
+        return `<div class="removed-row">
           <div class="removed-row__detail">
             <div class="u-ellipsis">${escapeHtml(h.title)}${
               h.version ? ` <span class="removed-row__version">[${escapeHtml(h.version)}]</span>` : ''
             }</div>
-            <div class="removed-row__meta">
-              ${escapeHtml(h.grade)} &middot; ${pct(h.accuracy)} &middot;
-              ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmt(h.pp, 0)}pp` : ''}
-            </div>
+            <div class="removed-row__meta">${meta}</div>
           </div>
-          <button type="button" data-restore="${h.id}">Put back</button>
-          <button type="button" class="removed-row__delete" data-delete="${h.id}"
+          <button type="button" data-restore="${ids}" data-kind="${incomplete ? 'incomplete' : 'score'}">Put back</button>
+          <button type="button" class="removed-row__delete" data-delete="${ids}" data-kind="${incomplete ? 'incomplete' : 'score'}"
                   title="Delete permanently" aria-label="Delete permanently">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="2" rx="1" fill="currentColor"/></svg>
           </button>
-        </div>`,
-      )
+        </div>`;
+      })
       .join('');
   } catch (err) {
     $('removedList').innerHTML = `<div class="setting__hint">${escapeHtml(err.message)}</div>`;
@@ -1840,7 +1846,8 @@ async function deleteRemoved(payload, button) {
   button.disabled = true;
   try {
     const d = await scoreAction(payload);
-    toast(d.deleted === 1 ? 'Score deleted permanently' : `${fmt(d.deleted)} scores deleted permanently`);
+    const noun = payload.kind === 'incomplete' ? 'play' : 'score';
+    toast(d.deleted === 1 ? `${noun[0].toUpperCase()}${noun.slice(1)} deleted permanently` : `${fmt(d.deleted)} ${noun}s deleted permanently`);
     await Promise.all([loadState(), loadProfile()]);
     await renderRemovedScores();
   } catch (err) {
@@ -1855,18 +1862,26 @@ $('removedDeleteAll').onclick = () => {
   void deleteRemoved({ action: 'delete-all-removed' }, button);
 };
 
+/** A removed row's button, as the request it makes: a score by id, an unfinished play by its attempts. */
+const removedTarget = (button, ids) => {
+  const list = ids.split(',').map(Number);
+  return button.dataset.kind === 'incomplete' ? { kind: 'incomplete', ids: list } : { id: list[0] };
+};
+
 $('removedList').onclick = async (e) => {
   const doomed = e.target.closest('[data-delete]');
   if (doomed) {
-    if (armed(doomed, 'Delete?')) void deleteRemoved({ action: 'delete', id: Number(doomed.dataset.delete) }, doomed);
+    if (armed(doomed, 'Delete?')) {
+      void deleteRemoved({ action: 'delete', ...removedTarget(doomed, doomed.dataset.delete) }, doomed);
+    }
     return;
   }
   const button = e.target.closest('[data-restore]');
   if (!button) return;
   button.disabled = true;
   try {
-    await scoreAction({ action: 'restore', id: Number(button.dataset.restore) });
-    toast('Score put back');
+    await scoreAction({ action: 'restore', ...removedTarget(button, button.dataset.restore) });
+    toast(button.dataset.kind === 'incomplete' ? 'Play put back' : 'Score put back');
     await Promise.all([loadState(), loadProfile()]);
     await renderRemovedScores();
   } catch (err) {
@@ -1995,6 +2010,7 @@ const scoreAction = (payload) => postJson('/api/scores', payload);
 function closePlayMenu() {
   $('playMenu').hidden = true;
   $('playMenu').dataset.id = '';
+  $('playMenu').dataset.ids = '';
   $('playMenu').dataset.key = '';
 }
 
@@ -2008,9 +2024,9 @@ const menuKey = (button) => `${button.dataset.kind ?? 'score'}:${button.dataset.
  * coordinates it stayed put on screen while the page scrolled away under it. Clamped to the
  * right edge, because the row is inside a panel that would otherwise clip it.
  *
- * A score row gets everything; an unfinished play has no score, so it offers only the
- * beatmap. Favouriting is offered wherever there is a beatmapset -- a never-submitted map has
- * none, and nothing to show a card for.
+ * A score row gets everything; an unfinished play has no score, so it offers the beatmap and
+ * removing the play. Favouriting is offered wherever there is a beatmapset -- a
+ * never-submitted map has none, and nothing to show a card for.
  */
 function openPlayMenu(button) {
   // A shared copy offers only View Details, which an unfinished play does not have.
@@ -2026,6 +2042,8 @@ function openPlayMenu(button) {
   const inCard = button.dataset.context === 'card';
 
   menu.dataset.id = String(id);
+  menu.dataset.kind = isScore ? 'score' : 'incomplete';
+  menu.dataset.ids = button.dataset.ids ?? String(id);
   menu.dataset.key = menuKey(button);
   menu.dataset.set = setId === null ? '' : String(setId);
   menu.dataset.context = inCard ? 'card' : 'row';
@@ -2045,8 +2063,9 @@ function openPlayMenu(button) {
     !isScore || inCard || !pinned || index < 0 || index >= pinnedIds.length - 1;
   menu.querySelector('[data-act="favorite"]').hidden = setId === null || favourite;
   menu.querySelector('[data-act="unfavorite"]').hidden = setId === null || !favourite;
-  menu.querySelector('[data-act="hide"]').hidden = !isScore;
-  menu.querySelector('[data-sep="hide"]').hidden = !isScore;
+  // Removable from a row, either kind; the card's own score is removed from its row too.
+  menu.querySelector('[data-act="hide"]').hidden = false;
+  menu.querySelector('[data-sep="hide"]').hidden = setId === null && !isScore;
 
   menu.hidden = false;
   const box = button.getBoundingClientRect();
@@ -2077,8 +2096,26 @@ $('playMenu').onclick = async (e) => {
   const id = Number($('playMenu').dataset.id);
   const setId = Number($('playMenu').dataset.set);
   const fromCard = $('playMenu').dataset.context === 'card';
+  const kind = $('playMenu').dataset.kind;
+  const ids = ($('playMenu').dataset.ids ?? '').split(',').map(Number).filter(Number.isInteger);
   const act = button.dataset.act;
   closePlayMenu();
+
+  // An unfinished play: every attempt the row stands for leaves the list and the play count.
+  if (act === 'hide' && kind === 'incomplete') {
+    try {
+      await scoreAction({ action: 'hide', kind, ids });
+      toast(
+        ids.length === 1
+          ? 'Removed from this profile - undo it in Other settings'
+          : `${fmt(ids.length)} attempts removed from this profile - undo it in Other settings`,
+      );
+      await Promise.all([loadProfile(), loadState()]);
+    } catch (err) {
+      toast(err.message);
+    }
+    return;
+  }
 
   if (act === 'details') {
     void openScoreCard(id);
@@ -2115,7 +2152,7 @@ $('playMenu').onclick = async (e) => {
       await scoreAction({ action: 'reorder', ids: next });
     } else {
       await scoreAction({ action: act, id });
-      if (act === 'hide') toast('Removed from this profile - undo it in Settings');
+      if (act === 'hide') toast('Removed from this profile - undo it in Other settings');
       if (act === 'pin') toast('Pinned');
     }
     // A removed score has no details left to show; a pinned one's card has to say so.

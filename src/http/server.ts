@@ -90,6 +90,8 @@ import {
   replayFileName,
   scoreDetail,
   scoreOwner,
+  setIncompleteHidden,
+  type RowKind,
   type ScoreAction,
 } from '../scores.ts';
 
@@ -834,8 +836,13 @@ export function startServer(opts: ServerOptions): http.Server {
     if (url.pathname === '/api/scores' && req.method === 'POST') {
       return readBody(req, res, (body) => {
         const action = String(body['action'] ?? '');
+        // An unfinished play is a row of incomplete_plays, and a collapsed one is several.
+        const kind: RowKind = body['kind'] === 'incomplete' ? 'incomplete' : 'score';
+        const ids = Array.isArray(body['ids']) ? (body['ids'] as unknown[]).map(Number) : [Number(body['id'])];
         try {
-          if (action === 'reorder') {
+          if (kind === 'incomplete' && (action === 'hide' || action === 'restore')) {
+            setIncompleteHidden(opts.db, current(), ids, action === 'hide');
+          } else if (action === 'reorder') {
             const ids = Array.isArray(body['ids']) ? (body['ids'] as unknown[]).map(Number) : [];
             reorderPins(opts.db, current(), ids);
           } else if (action === 'list-hidden') {
@@ -845,7 +852,9 @@ export function startServer(opts: ServerOptions): http.Server {
             const deleted = deleteRemovedScores(
               opts.db,
               current(),
-              action === 'delete' ? [Number(body['id'])] : 'all',
+              action === 'delete' ? ids : 'all',
+              Date.now(),
+              kind,
             );
             broadcast('scores', { action });
             return json(res, { ok: true, deleted, hiddenScores: hiddenCount(opts.db, current()) });

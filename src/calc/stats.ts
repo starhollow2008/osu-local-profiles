@@ -350,6 +350,8 @@ export type IncompleteDisplay = 'yes' | 'collapse' | 'no';
 export interface IncompletePlay {
   kind: 'incomplete';
   id: number;
+  /** Every attempt this row stands for, `id` included: what removing the row removes. */
+  ids: number[];
   beatmapMd5: string | null;
   beatmapId: number | null;
   beatmapsetId: number | null;
@@ -431,6 +433,7 @@ function toIncomplete(r: Row): IncompletePlay {
   return {
     kind: 'incomplete',
     id: r['id'] as number,
+    ids: [r['id'] as number],
     beatmapMd5: (r['beatmap_md5'] as string | null) ?? null,
     beatmapId: (r['beatmap_id'] as number | null) ?? null,
     beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
@@ -467,9 +470,10 @@ function collapseRuns(entries: RecentEntry[]): RecentEntry[] {
       previous.unsubmitted === entry.unsubmitted
     ) {
       previous.attempts++;
+      previous.ids.push(entry.id);
       continue;
     }
-    out.push(entry.kind === 'incomplete' ? { ...entry } : entry);
+    out.push(entry.kind === 'incomplete' ? { ...entry, ids: [...entry.ids] } : entry);
   }
   return out;
 }

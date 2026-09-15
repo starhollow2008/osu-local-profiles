@@ -17,6 +17,14 @@ import {
 } from '../src/calc/stats.ts';
 import { buildHistory } from '../src/calc/history.ts';
 import { VANILLA } from '../src/calc/eligibility.ts';
+import { createProfile } from '../src/profiles.ts';
+import {
+  deleteRemovedScores,
+  hiddenCount,
+  hiddenScores,
+  setIncompleteHidden,
+  wasDeleted,
+} from '../src/scores.ts';
 
 /*
  * Plays osu! counted that produced no score. See src/clients/lazer-log.ts for why they
@@ -352,6 +360,100 @@ test('collapsing folds a run of attempts on one map, but not across a finished p
 
     assert.equal(recent[2]!.kind === 'incomplete' && recent[2]!.attempts, 3);
     assert.equal(recent[2]!.playedAt, T0 + 3000);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/* ---------------------------------------------------------------- removing */
+
+/*
+ * A collapsed row is several plays. Removing it has to remove every one of them, or the row
+ * would come back one attempt shorter and the play count would fall by one instead of all.
+ */
+test('removing a collapsed row removes every attempt in it, and takes them off the play count', () => {
+  const h = recentHarness();
+  try {
+    assert.equal(computeStats(h.db, h.profileId, 0, VANILLA).playcount, 6);
+    const row = recentPlays(h.db, h.profileId, 0, 25, VANILLA, 'collapse')[0]!;
+    assert.ok(row.kind === 'incomplete');
+    assert.equal(row.ids.length, 2);
+
+    assert.equal(setIncompleteHidden(h.db, h.profileId, row.ids, true), 2);
+
+    assert.equal(computeStats(h.db, h.profileId, 0, VANILLA).playcount, 4);
+    assert.deepEqual(
+      recentPlays(h.db, h.profileId, 0, 25, VANILLA, 'collapse').map((p) => p.kind),
+      ['score', 'incomplete'],
+    );
+    assert.equal(recentPlays(h.db, h.profileId, 0, 25, VANILLA, 'yes').length, 4);
+
+    // One entry in Removed scores, as it was one row, and each attempt in the count.
+    assert.equal(hiddenCount(h.db, h.profileId), 2);
+    const listed = hiddenScores(h.db, h.profileId);
+    assert.equal(listed.length, 1);
+    assert.ok(listed[0]!.kind === 'incomplete');
+    assert.equal(listed[0]!.attempts, 2);
+    assert.equal(listed[0]!.title, 'Artist - Grind');
+    assert.deepEqual([...listed[0]!.ids].sort((a, b) => a - b), [...row.ids].sort((a, b) => a - b));
+
+    setIncompleteHidden(h.db, h.profileId, listed[0]!.ids, false);
+    assert.equal(computeStats(h.db, h.profileId, 0, VANILLA).playcount, 6);
+    assert.equal(hiddenCount(h.db, h.profileId), 0);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('an unfinished play deleted for good is not recorded again when its log is read again', () => {
+  const h = harness();
+  try {
+    h.addBeatmap('grind', 111, 'Grind');
+    h.quit({ token: 'kept-out', beatmapId: 111 });
+    const { id } = h.db.prepare('SELECT id FROM incomplete_plays').get() as { id: number };
+
+    // Deleting is the second step after a removal, as it is for a score.
+    assert.throws(
+      () => deleteRemovedScores(h.db, h.profileId, [id], Date.now(), 'incomplete'),
+      /only a removed play/,
+    );
+    setIncompleteHidden(h.db, h.profileId, [id], true);
+    assert.equal(deleteRemovedScores(h.db, h.profileId, [id], Date.now(), 'incomplete'), 1);
+
+    const count = () => (h.db.prepare('SELECT COUNT(*) AS n FROM incomplete_plays').get() as { n: number }).n;
+    assert.equal(count(), 0);
+    assert.equal(h.quit({ token: 'kept-out', beatmapId: 111 }).status, 'skipped');
+    assert.equal(count(), 0);
+    // Remembered under its own prefix, so a replay whose key happened to match is unaffected.
+    assert.equal(wasDeleted(h.db, h.profileId, 'kept-out'), false);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("delete all takes removed unfinished plays too, and another profile cannot touch them", () => {
+  const h = harness();
+  try {
+    h.addBeatmap('grind', 111, 'Grind');
+    h.quit({ beatmapId: 111, countedAt: T0 + 1000 });
+    h.quit({ beatmapId: 111, countedAt: T0 + 2000 });
+    const [a, b] = (h.db.prepare('SELECT id FROM incomplete_plays ORDER BY id').all() as { id: number }[]).map(
+      (r) => r.id,
+    );
+
+    const other = createProfile(h.db, 'Second');
+    assert.throws(() => setIncompleteHidden(h.db, other.id, [a!], true), /no such play/);
+    // All or nothing: one id that is not this profile's refuses the rest with it.
+    assert.throws(() => setIncompleteHidden(h.db, h.profileId, [a!, 999], true), /no such play/);
+    assert.equal(hiddenCount(h.db, h.profileId), 0);
+
+    setIncompleteHidden(h.db, h.profileId, [a!], true);
+    assert.equal(deleteRemovedScores(h.db, other.id, 'all'), 0);
+    assert.equal(deleteRemovedScores(h.db, h.profileId, 'all'), 1);
+    assert.deepEqual(
+      (h.db.prepare('SELECT id FROM incomplete_plays').all() as { id: number }[]).map((r) => r.id),
+      [b],
+    );
   } finally {
     h.cleanup();
   }

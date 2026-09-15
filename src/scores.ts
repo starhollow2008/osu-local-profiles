@@ -22,9 +22,47 @@ import type { PpPart } from './calc/official.ts';
  *
  * Pins are per mode, as on osu!, and a pinned score does not have to be in the top 100 --
  * pinning is how you show a play you are proud of that pp does not reward.
+ *
+ * A play osu! counted with no score -- Didn't finish, or Not submitted -- can be removed the
+ * same way, and on the same terms: a hide on `incomplete_plays.hidden_at`, put back or deleted
+ * for good from the same list. Its log is still on disk, so a deleted one is remembered too.
  */
 
 export type ScoreAction = 'pin' | 'unpin' | 'hide' | 'restore';
+
+/** Which table a row the user acts on lives in: a score, or a play osu! counted with no score. */
+export type RowKind = 'score' | 'incomplete';
+
+/**
+ * How an unfinished play's key is remembered in `deleted_scores`. Prefixed, so it can never be
+ * mistaken for a replay's key, and a replay's check can never match an unfinished play.
+ */
+export const deletedIncompleteKey = (dedupeKey: string): string => `incomplete:${dedupeKey}`;
+
+/**
+ * Remove unfinished plays from the profile, or put them back.
+ *
+ * Takes every id a Recent Plays row stands for, because a collapsed row is several attempts:
+ * removing the row removes all of them, and the play count falls by as many. All or nothing --
+ * an id this profile does not own refuses the whole request, rather than half-applying it.
+ */
+export function setIncompleteHidden(db: Db, profileId: number, ids: number[], hidden: boolean): number {
+  const wanted = [...new Set(ids.map(Number).filter(Number.isInteger))];
+  if (wanted.length === 0) throw new Error('no play named');
+
+  const marks = wanted.map(() => '?').join(',');
+  const owned = db
+    .prepare(`SELECT COUNT(*) AS n FROM incomplete_plays WHERE profile_id = ? AND id IN (${marks})`)
+    .get(profileId, ...wanted) as { n: number };
+  if (owned.n !== wanted.length) throw new Error('no such play on this profile');
+
+  db.prepare(`UPDATE incomplete_plays SET hidden_at = ? WHERE profile_id = ? AND id IN (${marks})`).run(
+    hidden ? Date.now() : null,
+    profileId,
+    ...wanted,
+  );
+  return wanted.length;
+}
 
 /** Confirm the score belongs to this profile before touching it. */
 function ownedScore(db: Db, profileId: number, id: number): { id: number; mode: number } {
@@ -106,6 +144,7 @@ export function reorderPins(db: Db, profileId: number, ids: number[]): void {
 }
 
 export interface HiddenScore {
+  kind: 'score';
   id: number;
   mode: number;
   title: string;
@@ -118,13 +157,69 @@ export interface HiddenScore {
   hiddenAt: number;
 }
 
+/** Unfinished plays removed together -- one Recent Plays row, which may be several attempts. */
+export interface HiddenIncomplete {
+  kind: 'incomplete';
+  ids: number[];
+  mode: number;
+  title: string;
+  version: string | null;
+  unsubmitted: boolean;
+  attempts: number;
+  playedAt: number;
+  hiddenAt: number;
+}
+
+export type HiddenRow = HiddenScore | HiddenIncomplete;
+
 /**
- * Scores removed from the profile, newest removal first, so they can be put back.
+ * Everything removed from the profile, newest removal first, so it can be put back.
  *
- * Without this a removal is indistinguishable from data loss: the score is gone from every
+ * Without this a removal is indistinguishable from data loss: the play is gone from every
  * section, and nothing on the page would ever mention it again.
  */
-export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenScore[] {
+export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenRow[] {
+  const rows: HiddenRow[] = [...hiddenScoreRows(db, profileId, limit), ...hiddenIncompleteRows(db, profileId, limit)];
+  return rows.sort((a, b) => b.hiddenAt - a.hiddenAt).slice(0, limit);
+}
+
+/**
+ * Removed unfinished plays, one entry per removal. A collapsed row's attempts are hidden in one
+ * statement and so share `hidden_at`, which is what folds them back into the row they were.
+ */
+function hiddenIncompleteRows(db: Db, profileId: number, limit: number): HiddenIncomplete[] {
+  const rows = db
+    .prepare(
+      `SELECT GROUP_CONCAT(s.id) AS ids, COUNT(*) AS attempts, MIN(s.mode) AS mode,
+              MAX(s.played_at) AS played_at, s.hidden_at, s.unsubmitted,
+              MAX(s.beatmap_name) AS beatmap_name, MAX(b.artist) AS artist, MAX(b.title) AS title,
+              MAX(b.version) AS version
+         FROM incomplete_plays s
+         LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE s.profile_id = ? AND s.hidden_at IS NOT NULL
+        GROUP BY s.hidden_at, COALESCE(s.beatmap_md5, s.beatmap_name, s.id), s.unsubmitted
+        ORDER BY s.hidden_at DESC
+        LIMIT ?`,
+    )
+    .all(profileId, limit) as Record<string, string | number | null>[];
+
+  return rows.map((r) => ({
+    kind: 'incomplete',
+    ids: String(r['ids']).split(',').map(Number),
+    mode: r['mode'] as number,
+    // What the log called the map stands in when the beatmap itself is not resolvable.
+    title:
+      [r['artist'], r['title']].filter(Boolean).join(' - ') ||
+      ((r['beatmap_name'] as string | null) ?? 'an unknown beatmap'),
+    version: (r['version'] as string | null) ?? null,
+    unsubmitted: r['unsubmitted'] === 1,
+    attempts: r['attempts'] as number,
+    playedAt: r['played_at'] as number,
+    hiddenAt: r['hidden_at'] as number,
+  }));
+}
+
+function hiddenScoreRows(db: Db, profileId: number, limit: number): HiddenScore[] {
   const rows = db
     .prepare(
       `SELECT s.id, s.mode, s.mods_label, s.client, s.accuracy, s.grade, s.pp, s.played_at, s.hidden_at,
@@ -138,6 +233,7 @@ export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenScor
     .all(profileId, limit) as Record<string, string | number | null>[];
 
   return rows.map((r) => ({
+    kind: 'score',
     id: r['id'] as number,
     mode: r['mode'] as number,
     title:
@@ -158,39 +254,59 @@ export function hiddenScores(db: Db, profileId: number, limit = 200): HiddenScor
  *
  * Only a score that has already been removed can go: deleting is the second, deliberate step
  * after a removal, never a shortcut past it. Returns how many were deleted.
+ *
+ * `kind` says which table the listed ids are in. 'all' empties both: Delete all permanently
+ * means everything in the removed list, unfinished plays included.
  */
-export function deleteRemovedScores(db: Db, profileId: number, ids: number[] | 'all', now = Date.now()): number {
+export function deleteRemovedScores(
+  db: Db,
+  profileId: number,
+  ids: number[] | 'all',
+  now = Date.now(),
+  kind: RowKind = 'score',
+): number {
   const wanted = ids === 'all' ? null : [...new Set(ids.map(Number).filter(Number.isInteger))];
   if (wanted !== null && wanted.length === 0) return 0;
 
-  const rows = db
-    .prepare(
-      `SELECT id, dedupe_key, hidden_at FROM scores
-        WHERE profile_id = ? ${wanted === null ? 'AND hidden_at IS NOT NULL' : `AND id IN (${wanted.map(() => '?').join(',')})`}`,
-    )
-    .all(profileId, ...(wanted ?? [])) as { id: number; dedupe_key: string; hidden_at: number | null }[];
+  const tables: { table: string; key: (k: string) => string }[] = [];
+  if (ids === 'all' || kind === 'score') tables.push({ table: 'scores', key: (k) => k });
+  if (ids === 'all' || kind === 'incomplete') tables.push({ table: 'incomplete_plays', key: deletedIncompleteKey });
 
-  if (wanted !== null) {
-    if (rows.length !== wanted.length) throw new Error('no such score on this profile');
-    if (rows.some((r) => r.hidden_at === null)) throw new Error('only a removed score can be deleted');
-  }
+  const doomed = tables.map(({ table, key }) => {
+    const rows = db
+      .prepare(
+        `SELECT id, dedupe_key, hidden_at FROM ${table}
+          WHERE profile_id = ? ${wanted === null ? 'AND hidden_at IS NOT NULL' : `AND id IN (${wanted.map(() => '?').join(',')})`}`,
+      )
+      .all(profileId, ...(wanted ?? [])) as { id: number; dedupe_key: string; hidden_at: number | null }[];
+
+    if (wanted !== null) {
+      if (rows.length !== wanted.length) throw new Error(`no such ${kind === 'score' ? 'score' : 'play'} on this profile`);
+      if (rows.some((r) => r.hidden_at === null)) {
+        throw new Error(`only a removed ${kind === 'score' ? 'score' : 'play'} can be deleted`);
+      }
+    }
+    return { table, key, rows };
+  });
 
   db.exec('BEGIN');
   try {
     const remember = db.prepare(
       'INSERT OR IGNORE INTO deleted_scores (profile_id, dedupe_key, deleted_at) VALUES (?, ?, ?)',
     );
-    const drop = db.prepare('DELETE FROM scores WHERE id = ?');
-    for (const r of rows) {
-      remember.run(profileId, r.dedupe_key, now);
-      drop.run(r.id);
+    for (const { table, key, rows } of doomed) {
+      const drop = db.prepare(`DELETE FROM ${table} WHERE id = ?`);
+      for (const r of rows) {
+        remember.run(profileId, key(r.dedupe_key), now);
+        drop.run(r.id);
+      }
     }
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');
     throw e;
   }
-  return rows.length;
+  return doomed.reduce((n, d) => n + d.rows.length, 0);
 }
 
 /** Whether a replay with this key was deleted from the profile, and must not come back. */
@@ -204,10 +320,14 @@ function classicLabel(label: string, stable: boolean): string {
   return label === 'None' ? 'CL' : `${label}CL`;
 }
 
+/** How many plays are removed: scores, and each attempt of a removed unfinished play. */
 export function hiddenCount(db: Db, profileId: number): number {
   const row = db
-    .prepare('SELECT COUNT(*) AS n FROM scores WHERE profile_id = ? AND hidden_at IS NOT NULL')
-    .get(profileId) as { n: number };
+    .prepare(
+      `SELECT (SELECT COUNT(*) FROM scores WHERE profile_id = ? AND hidden_at IS NOT NULL)
+            + (SELECT COUNT(*) FROM incomplete_plays WHERE profile_id = ? AND hidden_at IS NOT NULL) AS n`,
+    )
+    .get(profileId, profileId) as { n: number };
   return row.n;
 }
 

@@ -283,12 +283,13 @@ export function incompleteRow(play, { actions = false } = {}) {
     </div>
     <div class="play-detail__mods-pp">${attempts}</div>
     ${
-      // Only the beatmap can be acted on here -- there is no score to pin or remove -- so
-      // the menu is offered only when there is a beatmapset to favourite.
-      actions && play.beatmapsetId
+      // No score to pin or view, but the play can be removed -- every attempt the row stands
+      // for -- and its beatmap favourited when there is a beatmapset.
+      actions
         ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="incomplete"
-             data-id="${play.id}" data-set="${play.beatmapsetId}"
-             aria-haspopup="true" aria-label="Options for this beatmap" title="Options">&#8943;</button>`
+             data-id="${play.id}" data-ids="${(play.ids ?? [play.id]).join(',')}"
+             data-set="${play.beatmapsetId ?? ''}"
+             aria-haspopup="true" aria-label="Options for this play" title="Options">&#8943;</button>`
         : ''
     }
   </div>

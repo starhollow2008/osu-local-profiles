@@ -151,6 +151,7 @@ test('the removed list describes what was removed, newest first', () => {
 
     const listed = hiddenScores(h.db, h.profileId);
     assert.equal(listed.length, 2);
+    assert.ok(listed[0]!.kind === 'score');
     assert.equal(listed[0]!.id, second);
     assert.equal(listed[0]!.grade, 'S');
     assert.ok(listed[0]!.hiddenAt >= listed[1]!.hiddenAt);
