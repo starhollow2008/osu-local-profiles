@@ -27,59 +27,39 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-/** The launcher each platform's package carries, as `scripts/package-files.mjs` names it. */
-export function launcherName(platform) {
-  if (platform === 'win32') return 'Start osu! local profiles.bat';
-  if (platform === 'darwin') return 'Start osu! local profiles.command';
-  return 'start.sh';
-}
-
 /**
- * Terminal programs that can be told to run a script, and how, most general first.
- * `x-terminal-emulator` is Debian's pointer to whichever one the desktop set as default.
+ * The tray launcher each platform's package carries, as `scripts/package-files.mjs` names it
+ * (`trayLauncherFor`). On macOS it is the bundle, which is what `open` is handed.
  */
-export const LINUX_TERMINALS = [
-  ['x-terminal-emulator', ['-e']],
-  ['gnome-terminal', ['--']],
-  ['konsole', ['-e']],
-  ['xfce4-terminal', ['-x']],
-  ['kitty', []],
-  ['alacritty', ['-e']],
-  ['foot', []],
-  ['xterm', ['-e']],
-];
+export function launcherName(platform) {
+  if (platform === 'win32') return 'osu! local profiles.exe';
+  if (platform === 'darwin') return 'osu! local profiles.app';
+  return 'osu-local-profiles';
+}
 
 /**
  * How to start the app again once the swap is done -- or why this process should not.
  *
- * The rule: **the app comes back in a window the user can see and close, or not at all.**
- * The app is a console program; its console is the only way to stop it. A copy started
- * with no console keeps tracking, keeps the port, and can only be found in a process list.
- * That is what every release up to 1.13.2 did on macOS and Linux: the launcher ran there
- * through `sh` from this detached process, so it came back with no terminal and nothing to
- * stop it, while the terminal the user had started it from returned to its prompt.
+ * The rule: **the app comes back somewhere it can be stopped from, or not at all.** A copy
+ * started with nothing to stop it keeps tracking, keeps the port, and can only be found in a
+ * process list -- what every release up to 1.13.2 did on macOS and Linux. The tray launcher is
+ * such a place: its icon quits the app, and so does the page, which starting the launcher again
+ * opens. So it is the launcher that is started here, and never the runtime directly.
  *
- * - **A launcher that restarts the app itself** (macOS and Linux, from the release after
- *   1.13.2) waits for this process and runs again in its own terminal. Starting a second
- *   copy here would race it for the port.
- * - **Windows** goes through `cmd`'s `start`, which gives the app a new console window.
- *   Handed a `.bat`, `start` runs it with `cmd /K`, which leaves that window open at a
- *   prompt after the app stops; `cmd /d /c` is what a double-click runs, and closes with it.
- *   The path has spaces in it and may have parentheses (`Program Files (x86)`), so the
- *   inner `cmd` gets it inside a second pair of quotes, which its `/c` strips. None of this
- *   survives Node's argument quoting, hence `windowsVerbatimArguments`, as in
- *   `src/browser.ts`.
- * - **macOS, from a launcher that does not restart** (1.13.2 and earlier are what start
- *   the first update to this build): `open`, which is what double-clicking the `.command`
- *   does -- a new Terminal window.
- * - **Linux, from such a launcher**: a terminal program, if there is a desktop to put one
- *   on and one can be found. Otherwise nothing. The update itself has finished, and "start
- *   it again yourself" is an honest outcome where an invisible copy is not.
+ * - **A launcher that restarts the app itself** -- the tray launcher, on every platform, and
+ *   the terminal loop in `start.sh` and the 1.14-1.16 unix launchers -- waits for this process
+ *   and starts the app again. Starting a second copy here would race it for the port.
+ * - **Windows**: the launcher executable. It has no console to lose.
+ * - **macOS**: `open -n` on the bundle, as a double-click does. `-n` because the launcher that
+ *   ran the app may not have finished exiting, and `open` would otherwise just bring it forward.
+ * - **Linux**: the launcher, when there is a desktop for its icon. With none, nothing: the
+ *   update has finished, and "start it again yourself" is an honest outcome where an invisible
+ *   copy is not.
  *
- * `detached` on Windows maps to DETACHED_PROCESS, which is also why the runtime is never
- * spawned directly: the app would come back with no console at all.
+ * Reached only from a launcher that does not restart: releases up to 1.13.2 on macOS and
+ * Linux, up to 1.16 on Windows, and the runtime started by hand from a packaged folder.
  */
-export function relaunchPlan({ platform, installDir, launcherRestarts, exists, findOnPath, env }) {
+export function relaunchPlan({ platform, installDir, launcherRestarts, exists, env }) {
   if (launcherRestarts) {
     return { skip: 'the launcher that started the app is waiting to start it again' };
   }
@@ -92,39 +72,14 @@ export function relaunchPlan({ platform, installDir, launcherRestarts, exists, f
 
   const options = { cwd: installDir, detached: true, stdio: 'ignore' };
 
-  if (platform === 'win32') {
-    return {
-      command: 'cmd.exe',
-      args: ['/d', '/s', '/c', `"start "" cmd /d /c ""${launcher}"""`],
-      options: { ...options, windowsVerbatimArguments: true },
-    };
-  }
+  if (platform === 'win32') return { command: launcher, args: [], options };
 
-  if (platform === 'darwin') return { command: 'open', args: [launcher], options };
+  if (platform === 'darwin') return { command: 'open', args: ['-n', launcher], options };
 
   if (!env.DISPLAY && !env.WAYLAND_DISPLAY) {
-    return { skip: `there is no desktop to open a terminal on; run ./${name} again` };
+    return { skip: 'there is no desktop to show its icon on; run ./start.sh again' };
   }
-  for (const [program, prefix] of LINUX_TERMINALS) {
-    const found = findOnPath(program);
-    if (found !== null) return { command: found, args: [...prefix, launcher], options };
-  }
-  return { skip: `no terminal program was found to run it in; run ./${name} again` };
-}
-
-/** The first executable called `name` on PATH, or null. */
-function findOnPath(name) {
-  for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
-    if (dir === '') continue;
-    const file = path.join(dir, name);
-    try {
-      fs.accessSync(file, fs.constants.X_OK);
-      if (fs.statSync(file).isFile()) return file;
-    } catch {
-      /* not here */
-    }
-  }
-  return null;
+  return { command: launcher, args: [], options };
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -211,7 +166,6 @@ async function run() {
       installDir,
       launcherRestarts,
       exists: fs.existsSync,
-      findOnPath,
       env: process.env,
     });
     if ('skip' in plan) {

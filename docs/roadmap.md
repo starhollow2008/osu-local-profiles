@@ -2248,3 +2248,81 @@ release API; the app, the swapper and the launchers ran unmodified.
 
 Not tested on real hardware: macOS's `open`, and real Linux desktop terminals, whose arguments come
 from each program's documentation.
+
+## 5.47 - Remove an unfinished play from the profile
+
+**Status:** done -- after 1.16.0 (2026-09-15).
+
+Didn't finish and Not submitted rows in Recent Plays get **Remove from profile**, as a score has.
+
+### Decisions
+
+- **The same terms as a score.** A hide on `incomplete_plays.hidden_at`, which `incompleteSql`
+  already excluded, so the play leaves the play count, monthly counts, Most Played, Recent Plays
+  and play time at once. Put back or deleted for good from the same Removed scores list.
+- **A collapsed row is all of its attempts.** `IncompletePlay.ids` carries every attempt a row
+  stands for, and removing the row removes them all. Removed scores folds them back into one
+  entry by their shared `hidden_at`, and counts each attempt.
+- **Deleted for good stays out.** The key goes to `deleted_scores` as `incomplete:<key>`, so it
+  can never match a replay, and both the live log watcher and Import past plays treat it as
+  already recorded.
+
+### Verified
+
+3 new tests in `test/incomplete.test.ts`; `npm run ui` against the running app, including the
+menu offering Remove on an unfinished row.
+
+## 5.48 - Quit from the page, and a tray launcher on every platform
+
+**Status:** done -- after 1.16.0 (2026-09-15).
+
+The user found the console window a cost: a taskbar slot held for as long as the app runs, by
+something they would rather forget about. A hidden console alone could not be found or stopped
+again, so the app needed an off switch and a way back first.
+
+### Decisions
+
+- **The page's Quit, and a second start opens the running copy.** Quit asks once, then stops the
+  app. A second start of the app finds the first on its port through `/api/app` and opens its
+  page, so whatever started the app is also how to find it. `/api/quit` refuses any `Origin` but
+  the app's own page (`isOwnPage`): a script on any website open in the browser could otherwise
+  stop it. When the page loses the app it says so, and picks up when it is back.
+- **A tray launcher, not a GUI window.** A cross-platform window means Electron, Tauri or Avalonia:
+  tens of MB, and on macOS an unsigned `.app` meets stricter refusal than the `.command`. Go and
+  `fyne.io/systray` give a 7MB native launcher from one codebase. It keeps an icon in the tray (menu
+  bar on macOS) with Open profile, Open log and Quit, and no window. The Node process still loads
+  no native modules.
+- **Equally out of the way on all three, by each platform's convention.** Windows: the
+  notification area, no console (GUI subsystem, app under `CREATE_NO_WINDOW`), click to open the
+  page. macOS: a menu bar item with a template icon, no Dock icon (`LSUIElement`). Linux: a
+  StatusNotifierItem; a desktop with no tray host runs it without an icon, says so, and
+  `start.sh` with no desktop keeps the terminal.
+- **The app never outlives the launcher.** Its stdin is the launcher's pipe; Quit closes it, and
+  so does the launcher dying any other way.
+- **The update relaunch is the launcher's, on every platform.** `OSU_LOCAL_PROFILES_LAUNCHER=tray`
+  implies restarts. The launcher waits for the swapper's pid, then starts the new release's
+  launcher at its own path. A running `.exe` can be renamed but not deleted on Windows (measured),
+  and the swap renames. The swapper still relaunches releases that do not restart, by starting the
+  launcher (`open -n` on macOS), never the runtime.
+- **`start.sh` and `Start osu! local profiles.command` keep their names.** 1.14-1.16 unix launchers
+  restart by running `./<own name>` again, so the first update to this build ends in them, and they
+  start the tray launcher. Windows needs no `.bat`: its old app lets the new swapper relaunch.
+- **macOS translocation.** A quarantined bundle opened where it was unpacked runs from a random
+  read-only copy with no `data/` beside it. The launcher finds the real path
+  (`SecTranslocateCreateOriginalPathForURL`), lifts the quarantine there and reopens it from there.
+
+### Verified
+
+- `npm run check`: 424 tests. `test/launcher.test.ts` builds the real launcher and runs it against
+  a stand-in app: an update relaunch through a busy swapper, the app stopping when the launcher is
+  killed, a failing app's status and log reaching stderr, a folder missing its runtime.
+- `npm run ui`, including Quit arming without stopping; against the live app, Quit from another
+  origin refused (403) and from the page's own origin stopping it; a second `node src/main.ts`
+  opening the page and exiting.
+- **The real win-x64 package, its launcher started with `Start-Process` as a double-click would:** launcher -> `node.exe` ->
+  `osu-pp.exe`, no window from any of them, the page told `launcher: tray`, output in
+  `data/logs/app.log`. A second start exited 0 with one app still running. Quit on the page left no
+  process. Killing the launcher outright stopped the app within seconds.
+
+Not run on real hardware: the macOS and Linux builds (CI compiles and runs them headless), the
+tray menu clicked by hand, Gatekeeper and translocation, and a real update between two releases.

@@ -9,11 +9,14 @@ declare module '*/package-files.mjs' {
   /** `win` | `osx` | `linux` -- the first half of a .NET runtime identifier. */
   export type HostOs = 'win' | 'osx' | 'linux';
 
-  /** The launcher for a platform: what to call it, what is in it, and its file mode. */
+  /** The tray launcher a package carries: what the user opens, and its executable inside that. */
+  export function trayLauncherFor(hostOs: HostOs): { name: string; executable: string };
+
+  /** The script beside the tray launcher on macOS and Linux; null on Windows. */
   export function launcherFor(
     hostOs: HostOs,
     nodeBinary: string,
-  ): { name: string; content: string; mode: number | null };
+  ): { name: string; content: string; mode: number } | null;
 
   /** The README.txt that ships beside it. */
   export function readmeFor(hostOs: HostOs): string;

@@ -178,11 +178,11 @@ macOS and Linux written, CI-covered, never run against real osu! install. Since 
 1. Platform-varying behavior behind pure function taking platform. `src/clients/detect.ts` takes `DetectEnvironment`, never reads `process` directly.
 2. Platform-specific list must fail loudly on empty match. pp helper pruning matches by base name across `.dll`/`.dylib`/`.so`, warns when nothing pruned.
 
-**Windows launcher**: `.\node.exe`, never bare `node.exe`. `cmd` searches PATH when `NoDefaultCurrentDirectoryInExePath` is set (Claude Code's shell sets it). `test/package-files.test.ts` pins the `.\`. Test a `.bat` as `.\x.bat`.
+**The runtime is the one beside the launcher**, by absolute path (`tools/launcher/launcher.go`). The old `.bat` needed `.\node.exe`, because `cmd` searches PATH for a bare name when `NoDefaultCurrentDirectoryInExePath` is set (Claude Code's shell sets it). The root `start.bat` is for development only. Test a `.bat` as `.\x.bat`.
 
 **`cmd` spawns need `windowsVerbatimArguments`.** Node quotes by C runtime rules; `cmd` doesn't unescape. `start` title `""` must arrive as `"\"\""`. `src/browser.ts` builds line as pure function. Updater relaunch = same trap.
 
-**macOS: one approval, then the launcher lifts quarantine.** Browsers and Archive Utility quarantine every unpacked file, and Gatekeeper refuses each unsigned one as it loads: `node` is Node.js Foundation-notarized, but `osu-pp` and its native libraries are ad-hoc signed (16 files in 1.14.0). The `.command` itself must be approved (macOS 15: Privacy & Security -> Open Anyway); it then runs `xattr -dr com.apple.quarantine .` on its own folder when `node` or `osu-pp` still carries the attribute. No password needed for the user's own files. Updates never carry quarantine: the app downloads them with `fetch`. Real fix is Developer ID signing + notarization ($99/yr), not done.
+**macOS: one approval, then the launcher lifts quarantine.** Browsers and Archive Utility quarantine every unpacked file, and Gatekeeper refuses each unsigned one as it loads: `node` is Node.js Foundation-notarized, but `osu-pp` and its native libraries are ad-hoc signed (16 files in 1.14.0). The `.app` (or the `.command`) must be approved once (macOS 15: Privacy & Security -> Open Anyway); it then runs `xattr -dr com.apple.quarantine <folder>` when `node` or `osu-pp` still carries the attribute. No password needed for the user's own files. Updates never carry quarantine: the app downloads them with `fetch`. Real fix is Developer ID signing + notarization ($99/yr), not done.
 
 `config.installRoots`: escape hatch for unanticipated layouts (macOS/Linux stable via Wine wrappers). Was documented + printed but read by nothing at all.
 
@@ -199,18 +199,48 @@ macOS and Linux written, CI-covered, never run against real osu! install. Since 
 
 **Swap runs from staged build using its own runtime.** On Windows, running `node.exe` locked by the process. `scripts/apply-update.mjs` copied into every package.
 
-**Relaunch: in a console the user can stop it from, or not at all.** A console app's only off switch is its console. `detached` = `DETACHED_PROCESS` on Windows (no console); on macOS/Linux a process the swapper starts has no terminal. Up to 1.13.2 the app came back exactly so on macOS/Linux: no TTY, output to `/dev/null`, outliving its terminal.
+**Relaunch: somewhere the app can be stopped from, or not at all.** A copy started with nothing to stop it keeps tracking and the port, findable only in a process list. Up to 1.13.2 the app came back exactly so on macOS/Linux: no TTY, output to `/dev/null`, outliving its terminal.
 
-- **Unix launchers restart the app themselves.** They run it (no `exec`) with `OSU_LOCAL_PROFILES_LAUNCHER=restarts`; the app passes `--launcher-restarts` to the swapper, writes its pid to `data/update/swapper.pid` and exits 75 (`RESTART_EXIT_CODE`); the launcher waits for that pid and re-runs itself in the same terminal. `test/relaunch.test.ts` runs the real launcher under `sh`.
-- **Otherwise the swapper relaunches, per `relaunchPlan`** (pure, in `scripts/apply-update.mjs`): Windows `cmd /d /s /c "start "" cmd /d /c ""<bat>"""` — a `.bat` handed straight to `start` runs as `cmd /K`, leaving the window open after the app stops; macOS `open` on the `.command`; Linux a terminal program from `LINUX_TERMINALS` when `DISPLAY`/`WAYLAND_DISPLAY` is set, else no relaunch, said in `data/update.log`. Never the runtime directly.
-- **Windows cannot restart in the launcher:** `cmd` re-reads a running `.bat` from disk by byte offset, and the swap replaces it.
-- **The swapper is the new release's; the launcher is the old one's.** The first update from 1.13.2 or earlier always takes the swapper's path.
+- **The tray launcher restarts the app itself, on every platform.** It runs the app with `OSU_LOCAL_PROFILES_LAUNCHER=tray`; the app passes `--launcher-restarts` to the swapper, writes its pid to `data/update/swapper.pid` and exits 75 (`RESTART_EXIT_CODE`). The launcher waits for that pid, releases its instance lock, starts the launcher now at its own path (the new release's) and exits. `test/launcher.test.ts` runs the real launcher through this.
+- **A running launcher can be swapped on Windows.** Renaming a running `.exe` works; deleting one fails with `EPERM` (measured). The swap renames first, so it succeeds; a rollback copy left holding the old exe is swept by `pruneUpdateLeftovers`. A running `.bat` could not be restarted from, which is why 1.14-1.16 Windows let the swapper relaunch.
+- **`start.sh` with no desktop** keeps the terminal loop: `OSU_LOCAL_PROFILES_LAUNCHER=restarts`, wait for the pid, re-run itself.
+- **Otherwise the swapper relaunches, per `relaunchPlan`** (pure, in `scripts/apply-update.mjs`). Windows: the launcher exe. macOS: `open -n` on the bundle (`-n`, or a launcher still exiting is only brought forward). Linux: the launcher when `DISPLAY`/`WAYLAND_DISPLAY` is set, else no relaunch, said in `data/update.log`. Never the runtime directly. Reached only from releases that do not restart the app: up to 1.13.2 on unix, 1.16 on Windows.
+- **The swapper is the new release's; the launcher is the old one's.** 1.14-1.16 unix launchers restart by running `./<own name>` again, so the new `start.sh` and `Start osu! local profiles.command` exist under those names and start the tray launcher.
+- `verifyStaged` requires the tray launcher in a downloaded build, since the relaunch depends on it.
 
 **Zip reader** is ours (`src/update/zip.ts`): no dependency overhead, avoids `tar.exe` (Windows-only). Refuses zip64, refuses path traversal. Handles backslash separators from own packager.
 
 **Update leaves two ~200MB copies.** Rollback is visible one; other is staged tree in `data/update/`. Swap deletes its own rollback but cannot delete staged tree (running from it; `node.exe` locked). `pruneUpdateLeftovers` at startup clears both. Keeps `data/update.log`.
 
 **One request at startup, never a timer.** `checkForUpdates: false` turns off the app's only outgoing request. Failed check shows nothing.
+
+## Launcher: a tray icon
+
+`tools/launcher/` (Go, `fyne.io/systray`). It is what a package opens: `osu! local profiles.exe`, `osu! local profiles.app`, or `osu-local-profiles`. Built by `scripts/build-launcher.mjs`, so a package needs Go to build.
+
+**Why Go:** one codebase gives a small native binary for all three systems. The Node process stays free of native modules, and no GUI toolkit or webview ships. Windows and Linux need no cgo. macOS does (Cocoa), so like the rest of a package it builds only on a Mac.
+
+**It is the app's off switch, so it must never lose the app:**
+
+- The app's stdin is a pipe whose write end only the launcher holds. Tray Quit closes it; so does the system when the launcher dies however it dies. The app's `stopWhenLauncherCloses` then shuts down.
+- Quit escalates to a kill after 15s.
+- Exit 0 (any deliberate stop) ends the launcher. Exit 75 is an update (see Updater). Anything else keeps the icon with **Start again** and the log, and shows the log's last lines in a dialog.
+
+**Finding it again:** the page's Quit, and starting the launcher again. A second start finds the instance lock taken (a named mutex per folder on Windows, `flock` on `data/launcher.lock` elsewhere, both released by the system however the process ends) and opens the first copy's page once `/api/app` answers. A start that finds `/api/app` answering on the port (another folder, or `npm run dev`) opens that page. `node src/main.ts` makes the same check itself (`runningInstance`).
+
+**No console:** output goes to `data/logs/app.log`, and the previous run's to `app.previous.log`.
+
+**Per platform:**
+
+- **Windows:** GUI subsystem (`-H windowsgui`), and the app runs with `CREATE_NO_WINDOW`. Its children (pp helper, `cmd` for the browser) share that windowless console. go-winres embeds the icon, version and a DPI-aware manifest. Click the icon opens the page; right-click shows the menu. Unsigned, so SmartScreen asks once.
+- **macOS:** a bundle with `LSUIElement` (no Dock icon or app menu), plus `setActivationPolicy:Accessory` for a bare binary. Template icon, tinted by the bar. Signed ad hoc as a bundle: an unsigned one downloaded on Apple silicon reads as damaged. A quarantined bundle opened in place is App Translocated (run from a random read-only copy, where no `data/` is beside it). The launcher finds the real path (`SecTranslocateCreateOriginalPathForURL`), lifts the quarantine there, `open -n`s it and exits.
+- **Linux:** StatusNotifierItem over D-Bus. With no `org.kde.StatusNotifierWatcher` (plain GNOME without the AppIndicator extension) the icon would never show, so it runs without one and says so with `notify-send`. `start.sh` with no desktop runs the app in its terminal instead.
+
+**`OSU_LOCAL_PROFILES_NO_TRAY`** runs it with no icon and no dialogs, messages to stderr. This is how the tests drive it; no runner has a tray.
+
+**Icons** are committed in `tools/launcher/icon/`, rendered from `web/favicon.svg` by `npm run build:icons` with the Chromium Share already finds.
+
+**Not run on real hardware:** the macOS and Linux builds. CI compiles and runs them headless. The tray itself, Gatekeeper and translocation need a real desktop.
 
 ## me! (BBCode): never trusted
 

@@ -51,6 +51,12 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # Builds the tray launcher each package opens with (scripts/build-launcher.mjs).
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/launcher/go.mod
+          cache-dependency-path: tools/launcher/go.sum
+
       - run: npm ci
 
       - name: The tag names the version being built

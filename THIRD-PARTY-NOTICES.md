@@ -12,6 +12,10 @@ commercially — verify each component's terms yourself against the actual conte
 | component | why it is there | licence |
 |---|---|---|
 | [Node.js](https://nodejs.org) (`node.exe`) | runs the app | MIT, plus its own third-party notices |
+| [Go](https://go.dev) runtime and standard library | compiled into the tray launcher | BSD-3-Clause |
+| [fyne.io/systray](https://github.com/fyne-io/systray) | the launcher's tray / menu bar icon | Apache-2.0 |
+| [godbus/dbus](https://github.com/godbus/dbus) | the tray icon on Linux | BSD-2-Clause |
+| [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) | the launcher's Windows system calls | BSD-3-Clause |
 | [ppy/osu](https://github.com/ppy/osu) — `osu.Game*`, `osu.Framework`, `osuTK` | the real difficulty and pp code; the entire reason this project can be accurate | MIT |
 | [.NET 8 runtime](https://github.com/dotnet/runtime) | runs the pp helper self-contained | MIT |
 | [Realm](https://github.com/realm/realm-dotnet) | osu!'s model types are Realm objects, so it cannot be removed | Apache-2.0 |

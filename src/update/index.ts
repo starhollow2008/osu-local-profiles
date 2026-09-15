@@ -184,6 +184,13 @@ function verifyStaged(dir: string, expectedVersion: string, platform: string): v
     throw new Error(`the downloaded build has no ${runtime}`);
   }
 
+  // What starts the app again once the swap is done (scripts/apply-update.mjs, launcherName).
+  const launcher =
+    platform === 'win32' ? 'osu! local profiles.exe' : platform === 'darwin' ? 'osu! local profiles.app' : 'osu-local-profiles';
+  if (!fs.existsSync(path.join(dir, launcher))) {
+    throw new Error(`the downloaded build has no ${launcher}`);
+  }
+
   const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) as {
     version?: unknown;
   };

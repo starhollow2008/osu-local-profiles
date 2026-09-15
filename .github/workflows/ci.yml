@@ -29,6 +29,13 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      # The tray launcher is Go. test/launcher.test.ts builds it and runs it against a stand-in
+      # app, which is the only place its macOS and Linux builds are compiled before a release.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/launcher/go.mod
+          cache-dependency-path: tools/launcher/go.sum
+
       - run: npm ci
 
       # pp comes from osu!'s own code, so the calculator has to exist before the tests

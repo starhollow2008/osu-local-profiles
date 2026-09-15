@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { launcherName, relaunchPlan } from '../scripts/apply-update.mjs';
-import { launcherFor } from '../scripts/package-files.mjs';
+import { launcherFor, trayLauncherFor } from '../scripts/package-files.mjs';
 import {
   LAUNCHER_ENV,
   RESTART_EXIT_CODE,
@@ -18,14 +18,14 @@ import {
  *
  * Up to 1.13.2 the swapper started it again itself, through the launcher. On macOS and Linux
  * a process the swapper starts has no terminal, so the app came back running, tracking and
- * holding the port with no window to stop it in -- while the terminal it had been started
- * from went back to its prompt. Found on a real update in WSL: the relaunched `node` had no
- * TTY, its output went to /dev/null, and it outlived the terminal being closed. On Windows
- * `start` ran the new launcher with `cmd /K`, which left its window open after the app stopped.
+ * holding the port with nothing to stop it -- found on a real update in WSL. 1.14 had the unix
+ * launchers restart the app in their own terminal. The tray launcher (roadmap 5.48) does the
+ * same on every platform: it waits for the swap and starts the new launcher, whose icon and the
+ * page's Quit are how it is stopped. The swapper starts a launcher only for releases that do not
+ * restart the app, and never the runtime. test/launcher.test.ts runs the real tray launcher.
  */
 
 const exists = (...present: string[]) => (file: string) => present.includes(file);
-const noTerminals = () => null;
 
 /* ------------------------------------------------------------ the swapper */
 
@@ -36,73 +36,63 @@ test('a launcher that restarts the app is left to do it', () => {
       installDir: '/opt/olp',
       launcherRestarts: true,
       exists: () => true,
-      findOnPath: () => '/usr/bin/xterm',
       env: { DISPLAY: ':0' },
     });
     assert.ok('skip' in plan, `${platform}: a second copy would race the launcher's for the port`);
   }
 });
 
-test('Windows starts the launcher the way a double-click does, so its window closes with the app', () => {
-  const bat = 'C:\\Program Files (x86)\\olp\\Start osu! local profiles.bat';
+test('Windows starts the tray launcher itself, which has no console to lose', () => {
+  const exe = 'C:\\Program Files (x86)\\olp\\osu! local profiles.exe';
   const plan = relaunchPlan({
     platform: 'win32',
     installDir: 'C:\\Program Files (x86)\\olp',
     launcherRestarts: false,
-    exists: exists(bat),
-    findOnPath: noTerminals,
+    exists: exists(exe),
     env: {},
   });
   assert.ok(!('skip' in plan));
-  assert.equal(plan.command, 'cmd.exe');
-  // `/s /c` strips the outer quotes, leaving `start "" cmd /d /c ""<bat>""`; the inner `/c`
-  // strips one pair again, so the path reaches cmd quoted, parentheses and all.
-  assert.equal(plan.args.join(' '), `/d /s /c "start "" cmd /d /c ""${bat}"""`);
-  assert.equal(plan.options.windowsVerbatimArguments, true);
-  assert.doesNotMatch(plan.args.join(' '), /\/k/i);
+  assert.deepEqual([plan.command, plan.args], [exe, []]);
+  assert.equal(plan.options.detached, true);
 });
 
-test('macOS opens the .command, which is a new Terminal window', () => {
-  const launcher = '/Applications/olp/Start osu! local profiles.command';
+test('macOS opens a new copy of the bundle, as a double-click does', () => {
+  const bundle = '/Applications/olp/osu! local profiles.app';
   const plan = relaunchPlan({
     platform: 'darwin',
     installDir: '/Applications/olp',
     launcherRestarts: false,
-    exists: exists(launcher),
-    findOnPath: noTerminals,
+    exists: exists(bundle),
     env: {},
   });
   assert.ok(!('skip' in plan));
-  assert.deepEqual([plan.command, plan.args], ['open', [launcher]]);
+  // -n: the launcher that ran the app may not be gone yet, and open would only bring it forward.
+  assert.deepEqual([plan.command, plan.args], ['open', ['-n', bundle]]);
 });
 
-test('Linux runs the launcher in a terminal program when there is a desktop to show one', () => {
+test('Linux starts the tray launcher when there is a desktop for its icon', () => {
   const plan = relaunchPlan({
     platform: 'linux',
     installDir: '/home/me/olp',
     launcherRestarts: false,
-    exists: exists('/home/me/olp/start.sh'),
-    findOnPath: (program) => (program === 'gnome-terminal' ? '/usr/bin/gnome-terminal' : null),
+    exists: exists('/home/me/olp/osu-local-profiles'),
     env: { WAYLAND_DISPLAY: 'wayland-0' },
   });
   assert.ok(!('skip' in plan));
-  assert.deepEqual([plan.command, plan.args], ['/usr/bin/gnome-terminal', ['--', '/home/me/olp/start.sh']]);
+  assert.deepEqual([plan.command, plan.args], ['/home/me/olp/osu-local-profiles', []]);
 });
 
 /* The old behaviour was exactly the fallback: run the launcher anyway, with nowhere to show it. */
-test('Linux does not start an invisible copy when it has nowhere to show one', () => {
-  const base = {
+test('Linux does not start an invisible copy when it has no desktop', () => {
+  const plan = relaunchPlan({
     platform: 'linux',
     installDir: '/home/me/olp',
     launcherRestarts: false,
-    exists: exists('/home/me/olp/start.sh'),
-  };
-  const noDesktop = relaunchPlan({ ...base, findOnPath: () => '/usr/bin/xterm', env: {} });
-  assert.ok('skip' in noDesktop);
-  assert.match(noDesktop.skip, /\.\/start\.sh/);
-
-  const noTerminal = relaunchPlan({ ...base, findOnPath: noTerminals, env: { DISPLAY: ':0' } });
-  assert.ok('skip' in noTerminal);
+    exists: exists('/home/me/olp/osu-local-profiles'),
+    env: {},
+  });
+  assert.ok('skip' in plan);
+  assert.match(plan.skip, /\.\/start\.sh/);
 });
 
 test('with no launcher the runtime is never started directly', () => {
@@ -112,42 +102,34 @@ test('with no launcher the runtime is never started directly', () => {
       installDir: '/opt/olp',
       launcherRestarts: false,
       exists: () => false,
-      findOnPath: () => '/usr/bin/xterm',
       env: { DISPLAY: ':0' },
     });
-    assert.ok('skip' in plan, `${platform}: a runtime started detached has no console`);
+    assert.ok('skip' in plan, `${platform}: a runtime started detached has nothing to stop it`);
   }
 });
 
 test('the swapper looks for the launcher each package actually ships', () => {
-  assert.equal(launcherName('win32'), launcherFor('win', 'node.exe').name);
-  assert.equal(launcherName('darwin'), launcherFor('osx', 'node').name);
-  assert.equal(launcherName('linux'), launcherFor('linux', 'node').name);
+  assert.equal(launcherName('win32'), trayLauncherFor('win').name);
+  assert.equal(launcherName('darwin'), trayLauncherFor('osx').name);
+  assert.equal(launcherName('linux'), trayLauncherFor('linux').name);
 });
 
-/* ------------------------------------------------------------ the launcher */
+/* ----------------------------------------------- start.sh, with no desktop */
 
-test('the app and the unix launchers agree on the variable, the exit code and the pid file', () => {
-  for (const os of ['osx', 'linux'] as const) {
-    const { content } = launcherFor(os, 'node');
-    assert.match(content, new RegExp(`^${LAUNCHER_ENV}=restarts \\./node src/main\\.ts$`, 'm'));
-    assert.match(content, new RegExp(`-eq ${RESTART_EXIT_CODE} \\]`));
-    assert.ok(content.includes(`data/update/${SWAPPER_PID_FILE}`));
-    assert.doesNotMatch(content, /exec \.\/node/, 'an exec leaves no shell to start the app again');
-  }
+test('start.sh and the app agree on the variable, the exit code and the pid file', () => {
+  const { content } = launcherFor('linux', 'node')!;
+  assert.match(content, new RegExp(`^${LAUNCHER_ENV}=restarts \\./node src/main\\.ts$`, 'm'));
+  assert.match(content, new RegExp(`-eq ${RESTART_EXIT_CODE} \\]`));
+  assert.ok(content.includes(`data/update/${SWAPPER_PID_FILE}`));
+  assert.doesNotMatch(content, /exec \.\/node/, 'an exec leaves no shell to start the app again');
   assert.equal(launcherRestarts({ [LAUNCHER_ENV]: 'restarts' }), true);
+  assert.equal(launcherRestarts({ [LAUNCHER_ENV]: 'tray' }), true);
   assert.equal(launcherRestarts({}), false);
 });
 
-/* The Windows launcher cannot do this: cmd re-reads a running .bat from disk by offset, and
- * the swap replaces it. So Windows keeps the swapper's relaunch, and never sees the code. */
-test('the Windows launcher does not restart the app', () => {
-  assert.doesNotMatch(launcherFor('win', 'node.exe').content, new RegExp(LAUNCHER_ENV));
-});
-
 /*
- * The launcher itself, run by `sh` against a stand-in runtime: exit for an update with a swap
- * still busy, then come back. Git Bash provides `sh` on Windows, and CI runs macOS and Linux.
+ * The script itself, run by `sh` against a stand-in runtime and a stand-in tray launcher. Git
+ * Bash provides `sh` on Windows, and CI runs macOS and Linux.
  */
 const hasSh = spawnSync('sh', ['-c', 'exit 0']).status === 0;
 
@@ -156,11 +138,24 @@ function launcherFolder(runtime: string): string {
   fs.mkdirSync(path.join(dir, 'src'));
   fs.writeFileSync(path.join(dir, 'src', 'main.ts'), '');
   fs.writeFileSync(path.join(dir, 'node'), runtime, { mode: 0o755 });
-  fs.writeFileSync(path.join(dir, 'start.sh'), launcherFor('linux', 'node').content, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, 'osu-local-profiles'), '#!/bin/sh\necho "tray launcher started" >> events.log\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, 'start.sh'), launcherFor('linux', 'node')!.content, { mode: 0o755 });
   return dir;
 }
 
-test('after an update the launcher waits for the swap, then starts the app again itself', { skip: !hasSh }, () => {
+const events = (dir: string) =>
+  fs.existsSync(path.join(dir, 'events.log'))
+    ? fs.readFileSync(path.join(dir, 'events.log'), 'utf8').trim().split('\n')
+    : [];
+
+function withoutDesktop(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  delete env['DISPLAY'];
+  delete env['WAYLAND_DISPLAY'];
+  return env;
+}
+
+test('with no desktop, after an update start.sh waits for the swap, then starts the app again', { skip: !hasSh }, () => {
   // The first run hands off to a "swapper" that is still busy for a second, and exits 75.
   const dir = launcherFolder(
     [
@@ -178,26 +173,41 @@ test('after an update the launcher waits for the swap, then starts the app again
     ].join('\n'),
   );
   try {
-    const result = spawnSync('sh', ['start.sh'], { cwd: dir, encoding: 'utf8', timeout: 30_000 });
+    const result = spawnSync('sh', ['start.sh'], { cwd: dir, env: withoutDesktop(), encoding: 'utf8', timeout: 30_000 });
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Installing the update/);
-    assert.deepEqual(fs.readFileSync(path.join(dir, 'events.log'), 'utf8').trim().split('\n'), [
-      'app started (restarts)',
-      'swap finished',
-      'app started (restarts)',
-    ]);
+    assert.deepEqual(events(dir), ['app started (restarts)', 'swap finished', 'app started (restarts)']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test('any other exit ends the launcher with the app\'s own status', { skip: !hasSh }, () => {
+test("with no desktop, any other exit ends start.sh with the app's own status", { skip: !hasSh }, () => {
   const dir = launcherFolder('#!/bin/sh\necho started >> events.log\nexit 3\n');
   try {
-    const result = spawnSync('sh', ['start.sh'], { cwd: dir, encoding: 'utf8', timeout: 30_000 });
+    const result = spawnSync('sh', ['start.sh'], { cwd: dir, env: withoutDesktop(), encoding: 'utf8', timeout: 30_000 });
     assert.equal(result.status, 3);
-    assert.equal(fs.readFileSync(path.join(dir, 'events.log'), 'utf8'), 'started\n');
+    assert.deepEqual(events(dir), ['started']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('with a desktop, start.sh hands the app to the tray launcher and returns', { skip: !hasSh }, async () => {
+  const dir = launcherFolder('#!/bin/sh\necho "runtime ran" >> events.log\n');
+  try {
+    const result = spawnSync('sh', ['start.sh'], {
+      cwd: dir,
+      env: { ...process.env, DISPLAY: ':0' },
+      encoding: 'utf8',
+      timeout: 30_000,
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /icon in your system tray/);
+    for (let i = 0; i < 50 && events(dir).length === 0; i++) await new Promise((r) => setTimeout(r, 100));
+    assert.deepEqual(events(dir), ['tray launcher started']);
+  } finally {
+    await new Promise((r) => setTimeout(r, 200));
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 });

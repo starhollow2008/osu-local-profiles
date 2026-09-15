@@ -147,21 +147,33 @@ at. Anything else needs `installRoots`.
 
 **If you have a packaged build**, unzip it anywhere and start it. Nothing needs installing.
 
-| Platform | Start it with |
-| -------- | ------------- |
-| Windows | double-click `Start osu! local profiles.bat` |
-| macOS | double-click `Start osu! local profiles.command` |
-| Linux | run `./start.sh` |
+| Platform | Start it with | Where it lives while it runs |
+| -------- | ------------- | ---------------------------- |
+| Windows | double-click `osu! local profiles.exe` | the system tray |
+| macOS | double-click `osu! local profiles` | the menu bar |
+| Linux | run `./osu-local-profiles` (or `./start.sh`) | the system tray |
+
+There is no console window. The icon's menu has **Open profile**, **Open log** and **Quit**. On
+Windows and Linux, clicking the icon opens the page. The page has **Quit** too, at the top right.
+Starting the app again while it runs opens the page, so the launcher is also how to find it.
+What it prints goes to `data/logs/app.log`.
+
+On Linux, a desktop without a tray (GNOME without the AppIndicator extension) gets no icon, and
+the app runs anyway; start it again for the page. With no desktop at all, `./start.sh` runs it
+in the terminal.
+
+Windows may say it protected your PC from an unrecognised app, because the build is not signed:
+press **More info**, then **Run anyway**. It asks once.
 
 On macOS the first launch is refused, because the build is not signed by a paid Apple
 developer account and macOS blocks downloaded programs that are not. It takes one approval:
-double-click `Start osu! local profiles.command`, close the message, then in **System
-Settings -> Privacy & Security** press **Open Anyway** beside it and confirm. (On macOS 14 and
-earlier, right-clicking the file and choosing Open does the same.) The launcher then lifts
-the quarantine from the rest of its own folder, so the pp calculator and its libraries are not
-refused one at a time -- there is no need to allow apps from anywhere, and it is better not
-to. Running `xattr -dr com.apple.quarantine .` in the folder from Terminal does the same
-without any approval. The packaged `README.txt` says so too.
+double-click `osu! local profiles`, close the message, then in **System Settings -> Privacy &
+Security** press **Open Anyway** beside it and confirm. (On macOS 14 and earlier,
+right-clicking it and choosing Open does the same.) The launcher then lifts the quarantine from
+the rest of its own folder, so the pp calculator and its libraries are not refused one at a time
+-- there is no need to allow apps from anywhere, and it is better not to. Running
+`xattr -dr com.apple.quarantine .` in the folder from Terminal does the same without any
+approval. The packaged `README.txt` says so too.
 
 **From source:**
 
@@ -177,8 +189,8 @@ star rating rather than guessing -- see below.
 
 Then open <http://localhost:7272>. Play osu! and scores appear as you set them.
 
-Closing the window stops tracking. The page also has a pause button if you want to keep it
-open without recording.
+Ctrl+C in that terminal, or **Quit** on the page, stops tracking. The page also has a pause
+button if you want to keep it open without recording.
 
 **The page opens straight away, even on the first run.** The first time, the app reads your
 osu! folder once to match each score to its beatmap -- seconds on some machines, longer on a

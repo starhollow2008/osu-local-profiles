@@ -12,9 +12,8 @@ declare module '*/apply-update.mjs' {
     | { command: string; args: string[]; options: SpawnOptions }
     | { skip: string };
 
+  /** The tray launcher a package carries: the executable on Windows and Linux, the bundle on macOS. */
   export function launcherName(platform: string): string;
-
-  export const LINUX_TERMINALS: ReadonlyArray<readonly [string, readonly string[]]>;
 
   export function relaunchPlan(input: {
     platform: string;
@@ -22,7 +21,6 @@ declare module '*/apply-update.mjs' {
     /** The app was started by a launcher that will start it again after the swap. */
     launcherRestarts: boolean;
     exists: (file: string) => boolean;
-    findOnPath: (program: string) => string | null;
     env: Record<string, string | undefined>;
   }): RelaunchPlan;
 }

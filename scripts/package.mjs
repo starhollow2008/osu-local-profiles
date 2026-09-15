@@ -17,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildPpHelper, defaultRid } from './build-pp-helper.mjs';
 import { launcherFor, readmeFor } from './package-files.mjs';
+import { buildLauncher } from './build-launcher.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -145,10 +146,15 @@ fs.writeFileSync(
  * exactly the position this project is trying not to be in.
  */
 const nodeBinary = path.basename(process.execPath);
-const launcher = launcherFor(hostOs, nodeBinary);
 
-fs.writeFileSync(path.join(out, launcher.name), launcher.content);
-if (launcher.mode !== null) {
+// The tray launcher: what the user opens. See tools/launcher and scripts/build-launcher.mjs.
+console.log('  building the tray launcher...');
+const trayExecutable = buildLauncher(out, target, pkg.version);
+
+// On macOS and Linux, the script earlier releases' launchers run again after an update.
+const launcher = launcherFor(hostOs, nodeBinary);
+if (launcher !== null) {
+  fs.writeFileSync(path.join(out, launcher.name), launcher.content);
   fs.chmodSync(path.join(out, launcher.name), launcher.mode);
   // copyFileSync keeps the mode of the Node binary it copied, but say so explicitly rather
   // than depend on it: an archive whose runtime is not executable starts on nothing.
@@ -185,6 +191,15 @@ if (!output.includes("pp: osu!'s official calculator")) {
   );
 }
 console.log('    starts from any directory, and finds its pp calculator');
+
+// The launcher is a separate program, built for this package: check it runs and is this release.
+const launcherVersion = spawnSync(trayExecutable, ['--version'], { encoding: 'utf8', timeout: 30_000 });
+if (launcherVersion.stdout?.trim() !== pkg.version) {
+  throw new Error(
+    `the tray launcher did not report ${pkg.version}: ${launcherVersion.stdout ?? ''}${launcherVersion.stderr ?? launcherVersion.error ?? ''}`,
+  );
+}
+console.log(`    the tray launcher runs, and is ${pkg.version}`);
 
 // The check created a config and an empty database. Ship a clean folder: the first real
 // run should build `data/` itself, so the user starts genuinely fresh.

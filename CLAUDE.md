@@ -34,8 +34,14 @@ Each has its reasoning in `docs/architecture.md`.
 - **No play counter from osu!stable's `osu!.db` last-played time** without asking: it cannot
   count retries or tell a fail from a pass.
 - **The updater never touches `data/`**, swaps nothing until the new build is verified,
-  refuses in a source checkout, and never relaunches the app without a console to stop it
-  from. Unix launchers restart it themselves (`test/relaunch.test.ts`).
+  refuses in a source checkout, and never relaunches the app anywhere it cannot be stopped
+  from. The tray launcher restarts it itself (`test/launcher.test.ts`); the swapper only ever
+  starts a launcher, never the runtime (`test/relaunch.test.ts`).
+- **The app never outlives its tray launcher.** It stops when the launcher closes its stdin
+  (`stopWhenLauncherCloses`). `start.sh` and the `.command` keep their names: 1.14-1.16
+  launchers run them again after an update.
+- **`/api/quit` refuses any `Origin` but the app's own page** (`isOwnPage`), or any website
+  open in the browser could stop the app.
 - **`fs.watch` only gets paths through `watchablePath`.** On Windows a non-canonical path
   aborts the process. Watcher tests `await sleep(SETTLED_MS)` after `start()`.
 - **Recompute's UPDATE is generated from `UPDATE_COLUMNS`.** Never hand-align placeholders.
@@ -45,8 +51,19 @@ Each has its reasoning in `docs/architecture.md`.
   `export let`), and every served image goes through `assetUrl()`.
 - **me! BBCode is hostile:** escaped first, only tags written in `web/js/bbcode.js`, every
   attribute validated. Add a case to `test/bbcode.test.ts` with any new tag.
-- **Windows launcher runs `.\node.exe`**; anything spawned through `cmd` needs
-  `windowsVerbatimArguments`.
+- **The launcher runs the runtime beside it**, by absolute path, never one from PATH; anything
+  spawned through `cmd` needs `windowsVerbatimArguments`.
+
+## Tray launcher: Go, in `tools/launcher/`
+
+What a package opens: `osu! local profiles.exe`, `.app`, or `osu-local-profiles`. It runs the
+app with no console and keeps a tray (menu bar) icon. A separate process, so Node still loads
+no native modules.
+
+- `npm run check` builds and runs it, so it needs Go on PATH; without Go those tests skip.
+- Decisions go in `plan.go`, pure and tested for every OS from any machine.
+- Icons are committed; `npm run build:icons` remakes them from `web/favicon.svg`.
+- The macOS build (cgo) cannot be compiled on Windows; CI's macOS runner is its only check.
 
 ## Before roadmap work
 
@@ -104,6 +121,7 @@ History is linear — rebase onto `main`, do not merge it into a branch.
 ## Key entry points
 
 - `src/main.ts`: application startup
+- `tools/launcher/main.go`: the tray launcher (`launcher.go` runs the app, `tray.go` the icon)
 - `src/osr.ts`: legacy and lazer replay parser
 - `src/tracker/index.ts`: serialized replay ingestion
 - `src/calc/official.ts`: JSON-lines bridge to `tools/PpCalculator/`
