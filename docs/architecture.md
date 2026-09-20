@@ -80,6 +80,18 @@ An attempt has no beatmap id (no submission request), so it is matched by the lo
 
 `renderStableNote` in main.js, `showStableNote` per profile. Do not build a play counter on that timestamp. `ingestIncompletePlay` stays client-agnostic.
 
+## Live tracking starts at the launch, never earlier
+
+**A play set while the app was closed is never tracked when it opens.** Closing the app is how tracking is stopped — a different playstyle, a warm-up, an account that is not this profile — so catching up at the next launch overrules that, and irreversibly: the scores are in, and the profile has to be picked through by hand.
+
+`Tracker.liveCutoff` = `max(profile.trackingSince, liveSince)`, where `liveSince` is set by `start()`. All three live paths ingest against it (`handleReplay`, `handleLoggedPlays`, `handleUnsubmittedAttempts`); a play below it is `skipped: 'too-old'`. Toggling tracking off and on re-arms it, because that is the same decision as closing the app.
+
+Each watcher already begins at *now* on its own — `ReplayWatcher` never scans the store, `LogWatcher` tails from the current end of the session — but those are two promises in two files, either weakenable by a change that looks unrelated (a directory listing added for warm-up, a session re-read after the game restarts). The cutoff is the same promise made once, where every live play passes, at one comparison.
+
+**Import past plays is unaffected.** It supplies its own `since` and is the way to bring in an evening played with the app closed: chosen, previewed, confirmed. `TrackerOptions.liveSince` overrides the cutoff and exists only so tests can replay a historical replay through the watcher; nothing in the app passes it.
+
+The start-up banner says so every launch — it is the one tracking rule decided by when the app is open rather than by anything on the page.
+
 ## Play tracking filter
 
 Decides whether a play is **written**. Declined play leaves no row anywhere.

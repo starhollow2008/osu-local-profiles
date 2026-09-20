@@ -36,6 +36,15 @@ export interface TrackerOptions {
   trackingSince: number;
   /** osu!'s own pp calculator. When null, scores are stored with no pp rather than a guess. */
   official: OfficialCalculator | null;
+  /**
+   * Overrides the instant live tracking starts accepting plays from, which is otherwise the
+   * moment `start()` is called -- see `liveCutoff`.
+   *
+   * For tests that replay a historical replay through the watcher. Nothing in the app passes
+   * it: an app that could be told to accept the past live would be the very behaviour
+   * `liveCutoff` exists to prevent.
+   */
+  liveSince?: number;
 }
 
 export interface TrackerEvents {
@@ -144,6 +153,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   private watcher: ReplayWatcher | null = null;
   private logWatcher: LogWatcher | null = null;
   private enabled = false;
+  /** When this run started watching. Zero until `start()` -- see `liveCutoff`. */
+  private liveSince = 0;
   /** Serialises ingestion so two replays landing together cannot interleave writes. */
   private queue: Promise<void> = Promise.resolve();
   private added = 0;
@@ -173,6 +184,32 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   get isTracking(): boolean {
     return this.enabled;
+  }
+
+  /**
+   * The earliest a play may have happened and still be tracked live: the later of the
+   * profile's own start and the moment this run began watching.
+   *
+   * The second half is the point. Closing the app is how someone stops tracking -- they are
+   * switching to a playstyle, a smurf routine or a warm-up they do not want in the profile --
+   * so a play set while it was closed was, by their own action, not being tracked. Catching
+   * up on those at the next launch would silently overrule that decision, and there is no
+   * undoing it: the scores are in, and the profile has to be picked through by hand.
+   *
+   * Each watcher already starts from *now* on its own -- the replay watcher never scans the
+   * store, and the log watcher tails from the current end of the session (`LogWatcher`) --
+   * but those are two separate promises made in two separate files, and either could be
+   * weakened by a change that looks unrelated: a directory listing added for warm-up, a
+   * session re-read after the game restarts. This is the same promise made once, at the only
+   * place every live play passes through, where it costs one comparison and cannot be
+   * sidestepped.
+   *
+   * Import past plays is unaffected. It supplies its own cutoff and is the way to bring in
+   * an evening played with the app closed -- chosen, previewed and confirmed, which is
+   * exactly the difference.
+   */
+  get liveCutoff(): number {
+    return Math.max(this.opts.trackingSince, this.liveSince);
   }
 
   get scoresAdded(): number {
@@ -288,6 +325,12 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   start(): void {
     if (this.watcher) return;
+    /*
+     * Live tracking covers from here on, and nothing before it. Set on each start rather
+     * than once in the constructor, so that turning tracking off and on again leaves the
+     * same gap that closing and reopening the app does -- it is the same decision.
+     */
+    this.liveSince = this.opts.liveSince ?? Date.now();
     const dirs = this.opts.installs.map((i) => i.replayDir);
     this.watcher = new ReplayWatcher({
       dirs,
@@ -576,7 +619,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             db: this.opts.db,
             resolver: this.opts.resolver,
             profileId: this.opts.profileId,
-            trackingSince: this.opts.trackingSince,
+            trackingSince: this.liveCutoff,
             filter: this.currentFilter(),
           });
           if (result.status === 'added') this.emit('incomplete', result.play);
@@ -605,7 +648,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             db: this.opts.db,
             resolver: this.opts.resolver,
             profileId: this.opts.profileId,
-            trackingSince: this.opts.trackingSince,
+            trackingSince: this.liveCutoff,
             filter: this.currentFilter(),
           });
           if (result.status === 'added') this.emit('incomplete', result.play);
@@ -640,7 +683,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           db: this.opts.db,
           resolver: this.opts.resolver,
           profileId: this.opts.profileId,
-          trackingSince: this.opts.trackingSince,
+          trackingSince: this.liveCutoff,
           official: this.opts.official,
           filter: this.currentFilter(),
         });

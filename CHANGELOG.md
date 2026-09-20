@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Plays set while the app is closed are no longer tracked.** Closing the app is how tracking
+  is stopped, so plays made after that stay out of the profile -- the app picks up from the
+  moment it opens, not from where it left off. Turning tracking off and on again works the same
+  way. To bring those plays in anyway, use **Options -> Import past plays**, which asks for a
+  cutoff and shows what it would add before anything is written.
+
 ## 1.17.0
 
 - **No more console window.** The app now lives in the system tray on Windows and Linux, and in

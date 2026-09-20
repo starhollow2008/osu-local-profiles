@@ -296,6 +296,14 @@ async function main(): Promise<void> {
       `, level ${standing.level.current}`,
   );
   console.log('  Play osu! (online or offline) and scores will appear below.');
+  /*
+   * Said every launch, because it is the one thing about tracking that is decided by when the
+   * app is open rather than by anything on the page: plays set while it was closed are not
+   * picked up when it opens again (see `Tracker.liveCutoff`). Anyone who did want them has one
+   * answer, and it should be on screen rather than found by hunting through the menu.
+   */
+  console.log('  Plays set while this app is closed are not tracked.');
+  console.log('  Options -> Import past plays brings them in if you want them.');
   if (installs.some((i) => i.kind === 'lazer')) {
     // Worth saying plainly, because the difference is invisible otherwise. Signed in, an
     // unfinished play counts when osu! counted it; offline or signed out, osu! submits

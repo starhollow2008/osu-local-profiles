@@ -2326,3 +2326,40 @@ again, so the app needed an off switch and a way back first.
 
 Not run on real hardware: the macOS and Linux builds (CI compiles and runs them headless), the
 tray menu clicked by hand, Gatekeeper and translocation, and a real update between two releases.
+
+## 5.49 - Live tracking starts at the launch
+
+**Status:** done -- unreleased.
+
+The app used to have no opinion about the time it spent closed: each watcher happened to begin
+at *now*, so nothing from the gap came in, but nothing said it had to. Closing the app is how
+people stop tracking -- switching playstyle, warming up, handing the keyboard over -- and a
+launch that caught up on the gap would overrule that silently and unrepairably, since the only
+way back out is picking through the profile by hand.
+
+- **One cutoff, at the one place every live play passes.** `Tracker.liveCutoff` is
+  `max(profile.trackingSince, liveSince)`, `liveSince` set by `start()`; replays, counted
+  unfinished plays and unsubmitted attempts all ingest against it, and a play below it is
+  `skipped: 'too-old'`. The alternative -- trusting `ReplayWatcher` never to scan and
+  `LogWatcher` always to tail from the end -- is the same promise made twice, in two files,
+  where an unrelated change can weaken either.
+- **Tracking off and on again is the same gap**, so `start()` re-arms it rather than the
+  constructor setting it once.
+- **Import past plays is untouched.** It brings its own `since`, and is the answer for anyone
+  who did want the gap: chosen, previewed, confirmed. The start-up banner names it, because
+  this is the one tracking rule decided by when the app is open rather than on the page.
+- `TrackerOptions.liveSince` overrides the cutoff and exists only for tests replaying a
+  historical replay through the watcher. Nothing in the app passes it.
+
+### Verified
+
+- `npm run check`: `test/tracker.test.ts` drives a play dated before the launch through the
+  live log watcher end to end -- refused as `too-old`, no `scores` row, no `incomplete_plays`
+  row, play count 0 -- and checks the launch moves the cutoff forward and that a later
+  `trackingSince` still wins.
+- **The replay half, on a real replay off this machine**, in the same file: a tracker opened
+  after it was played refuses it as `too-old` and leaves no `scores` row, so no pp, stars,
+  accuracy, grade or ranked score -- not a play count short of a score. That is the half that
+  matters, since those are the figures that cannot be put back by hand.
+- The same fixture with `liveSince: 0` records the play (play count 1), so the cutoff is what
+  does the work rather than the watchers happening not to see it.

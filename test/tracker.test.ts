@@ -105,6 +105,9 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
     installs: [{ ...installs[0]!, replayDir: watchDir }],
     profileId,
     trackingSince: 0, // accept the historical replay we are about to drop in
+    // Live tracking otherwise ignores anything played before start(); these replays are real
+    // ones off this machine, set long before the test ran.
+    liveSince: 0,
     official,
   });
   t.after(() => tracker.stop());
@@ -146,6 +149,52 @@ test('watcher ingests a new replay and computes pp offline', { timeout: 120_000 
   tracker.stop();
 
   assert.equal(computeStats(db, profileId, 0).playcount, 1);
+
+  /*
+   * And the same replay through a tracker that was *not* told to accept the past: nothing at
+   * all, not a play count short of a score. This is the replay half of the launch cutoff, and
+   * it is the half that matters, because a replay is the only thing carrying pp, accuracy,
+   * grade and total score -- the parts of a profile that cannot be put back by hand.
+   */
+  const laterProfile = getOrCreateProfile(db, 'Opened Later');
+  const laterDir = path.join(tmp, 'watch-later');
+  fs.mkdirSync(laterDir);
+  const later = new Tracker({
+    db,
+    resolver,
+    installs: [{ ...installs[0]!, replayDir: laterDir }],
+    profileId: laterProfile,
+    trackingSince: 0,
+    official,
+  });
+  const refused = new Promise<string>((resolve, reject) => {
+    later.on('skip', (sk) => resolve(sk.reason));
+    later.on('score', () => reject(new Error('a replay from before the launch was tracked')));
+    later.on('error', reject);
+    setTimeout(() => reject(new Error('nothing reported within 30s')), 30_000).unref();
+  });
+  later.start();
+  await new Promise((r) => setTimeout(r, 300));
+  fs.copyFileSync(source, path.join(laterDir, 'incoming-replay'));
+
+  try {
+    assert.equal(await refused, 'too-old');
+
+    // No row, so no pp, no stars, no accuracy, no grade and no ranked score either.
+    assert.equal(
+      (db.prepare('SELECT COUNT(*) AS n FROM scores WHERE profile_id = ?').get(laterProfile) as
+        { n: number }).n,
+      0,
+      'a play from before the launch must leave no score row',
+    );
+    const missed = computeStats(db, laterProfile, 0);
+    assert.equal(missed.playcount, 0);
+    assert.equal(missed.totalPp, 0);
+    assert.equal(missed.totalScore, 0);
+    assert.equal(missed.accuracy, 0);
+  } finally {
+    later.stop();
+  }
 
   official?.dispose();
   db.close();
@@ -189,6 +238,7 @@ test('a play the filter declines is not recorded at all', { timeout: 120_000 }, 
     installs: [{ ...installs[0]!, replayDir: watchDir }],
     profileId,
     trackingSince: 0,
+    liveSince: 0, // the play below is dated in the past; see the note on the first fixture
     official: null,
   });
 
@@ -268,6 +318,7 @@ test('the tracker counts a play that finished without a score', { timeout: 30_00
     ],
     profileId,
     trackingSince: 0,
+    liveSince: 0, // the play below is dated in the past; see the note on the first fixture
     official: null,
   });
 
@@ -312,6 +363,99 @@ test('the tracker counts a play that finished without a score', { timeout: 30_00
   } finally {
     // The watchers hold the event loop open, so a failed assertion would hang the run
     // rather than reporting itself.
+    tracker.stop();
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/*
+ * Plays set while the app was closed stay out of the profile.
+ *
+ * Closing the app is how tracking is stopped -- a different playstyle, a warm-up, an account
+ * that is not this profile -- so catching up at the next launch would overrule that silently
+ * and irreversibly. Each watcher already begins at *now* on its own, so this drives the case
+ * from the other end: a play reaches live ingestion carrying a timestamp from before the
+ * launch, and the cutoff has to be what refuses it.
+ */
+test('a play set while the app was closed is not tracked at launch', { timeout: 30_000 }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-gap-e2e-'));
+  const logs = path.join(tmp, 'logs');
+  const watchDir = path.join(tmp, 'files');
+  fs.mkdirSync(logs);
+  fs.mkdirSync(watchDir);
+
+  const db = openDb(path.join(tmp, 'test.db'));
+  const profileId = getOrCreateProfile(db, 'Test Profile');
+  fs.writeFileSync(
+    path.join(watchDir, 'map'),
+    'osu file format v14\n\n[Metadata]\nArtist:Artist\nTitle:Title\nCreator:C\nVersion:Insane\nBeatmapID:5438074\n',
+  );
+
+  const tracker = new Tracker({
+    db,
+    resolver: new BeatmapResolver(db, []),
+    installs: [
+      { kind: 'lazer', root: tmp, replayDir: watchDir, beatmapRoots: [], onlineDb: null },
+    ],
+    profileId,
+    // The profile has been tracking for a year; only the launch decides this one.
+    trackingSince: 0,
+    official: null,
+  });
+
+  await tracker.indexBeatmaps([{ path: watchDir, byExtension: false }]);
+
+  const token = '1775729216';
+  const runtime = path.join(logs, '1000.runtime.log');
+  fs.writeFileSync(runtime, '');
+  fs.writeFileSync(
+    path.join(logs, '1000.network.log'),
+    `2026-09-10 01:12:59 [verbose]: Request to https://osu.ppy.sh/api/v2/beatmaps/5438074/solo/scores/${token} successfully completed!\n`,
+  );
+
+  const before = Date.now();
+  tracker.start();
+  assert.ok(
+    tracker.liveCutoff >= before,
+    `the launch has to move the cutoff forward: ${tracker.liveCutoff} < ${before}`,
+  );
+
+  const refused = new Promise<string>((resolve, reject) => {
+    tracker.on('skip', (s) => resolve(s.reason));
+    tracker.on('incomplete', () => reject(new Error('a play from before the launch was tracked')));
+    tracker.on('error', reject);
+    setTimeout(() => reject(new Error('nothing reported within 15s')), 15_000).unref();
+  });
+
+  await new Promise((r) => setTimeout(r, 300));
+  // Dated well before this run started: a play from the gap, however it reaches ingestion.
+  fs.appendFileSync(
+    runtime,
+    `2026-09-10 01:11:55 [verbose]: Game-wide working beatmap updated to Artist - Title (C) [Insane]
+2026-09-10 01:11:56 [verbose]: Score submission token retrieved (${token})
+2026-09-10 01:11:56 [verbose]: OsuScreenStack#658(depth:6) entered SoloPlayer#414
+2026-09-10 01:12:59 [verbose]: Score submission completed! (token:${token} id:7446699999)
+2026-09-10 01:12:59 [verbose]: OsuScreenStack#658(depth:5) exit from SoloPlayer#414
+`,
+  );
+
+  try {
+    assert.equal(await refused, 'too-old');
+
+    // Nothing written anywhere: not a score, not an incomplete play, not a playcount.
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n, 0);
+    assert.equal(
+      (db.prepare('SELECT COUNT(*) AS n FROM incomplete_plays').get() as { n: number }).n,
+      0,
+    );
+    assert.equal(computeStats(db, profileId, 0).playcount, 0);
+
+    // A profile that started tracking later still wins: the cutoff is the later of the two.
+    const later = Date.now() + 3_600_000;
+    tracker.setTrackingSince(later);
+    assert.equal(tracker.liveCutoff, later);
+  } finally {
     tracker.stop();
     db.close();
     fs.rmSync(tmp, { recursive: true, force: true });
