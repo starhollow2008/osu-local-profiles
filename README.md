@@ -104,6 +104,13 @@ macOS), with Open profile, Open log and Quit on its icon. The page gets **Quit**
 app while it runs opens its page, and unfinished plays can be removed from Recent Plays and the
 play count.
 
+**v1.18.0** can copy your **best performances and pinned scores** from an osu! account, so a
+profile's pp and accuracy match the website even for plays set on another PC. Two rules about
+what counts as your play changed with it: plays set while the app was closed are no longer
+tracked when it opens, and replays you *watched* are no longer counted as your own -- osu! keeps
+them in the same folders, and any already tracked are removed to Removed scores, where they can
+be put back. Import past plays can now be told to ignore your play tracking filter.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

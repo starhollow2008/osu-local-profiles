@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.18.0
 
 - **Import past plays can ignore your play tracking filter.** A new tick box, on by default, so
   an import is judged exactly as live tracking would judge it. Untick it and every play found
