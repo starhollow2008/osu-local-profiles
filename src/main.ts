@@ -2,9 +2,10 @@ import { syncFavoriteSharing } from './favorites.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { offerWelcome } from './welcome.ts';
-import { loadConfig, saveConfig, dataDir } from './config.ts';
+import { loadConfig, saveConfig, dataDir, type Config } from './config.ts';
 import { openBrowser } from './browser.ts';
-import { detectInstalls } from './clients/detect.ts';
+import { discoverInstalls, type DiscoveryResult } from './clients/discover.ts';
+import { osuFolderService } from './clients/folders.ts';
 import { BeatmapResolver } from './clients/beatmaps.ts';
 import { openDb } from './db/index.ts';
 import { activeProfileId, getProfile, seedFirstProfile } from './profiles.ts';
@@ -49,6 +50,33 @@ function lazerSearchHint(): string {
   return '~/.local/share/osu';
 }
 
+/**
+ * Write down what the search found, so the next launch does not have to search again.
+ *
+ * Only the roots the app worked out are stored; `installRoots` is the user's and is never
+ * written to from here. `searchedForInstalls` latches on, including when the search found
+ * nothing at all -- that is the case worth remembering, because it is the one that would
+ * otherwise walk every drive on every launch forever.
+ *
+ * Saved only when something changed, so a normal start still writes the config file exactly
+ * once, at the top of `main`.
+ */
+function rememberDiscovery(config: Config, discovery: DiscoveryResult): void {
+  const discovered = discovery.candidates
+    .filter((c) => c.source !== 'configured')
+    .map((c) => c.root);
+  const searched = config.searchedForInstalls || discovery.searched;
+  const same =
+    searched === config.searchedForInstalls &&
+    discovered.length === config.discoveredRoots.length &&
+    discovered.every((root, i) => root === config.discoveredRoots[i]);
+  if (same) return;
+
+  config.discoveredRoots = discovered;
+  config.searchedForInstalls = searched;
+  saveConfig(config);
+}
+
 /** Started by the tray launcher: no console, and it stops when the launcher does. */
 const fromTray = launchedFromTray();
 
@@ -75,29 +103,71 @@ async function main(): Promise<void> {
     }
   }
 
-  // config.installRoots is tried before anything auto-detected. On macOS and Linux there is
-  // no official osu!stable build to detect, only community Wine wrappers, so this is the
-  // answer for a layout nobody anticipated.
-  const installs = detectInstalls(config.installRoots);
+  /*
+   * Where osu! is.
+   *
+   * `config.installRoots` -- what the user pointed at from the page -- is tried first and is
+   * never overruled. After that it is `discoverInstalls`, which asks the machine what it
+   * already knows before it goes looking, and only walks the drives when a client is still
+   * unaccounted for. See `src/clients/discover.ts` for why the search runs when *either*
+   * client is missing rather than only when both are.
+   */
+  const discovery = await discoverInstalls({
+    configured: config.installRoots,
+    remembered: config.discoveredRoots,
+    // A search that has already happened is not repeated on every launch. The cheap tiers
+    // still run, so a stable installed since then is still found; only the walk is skipped.
+    noSearch: config.searchedForInstalls,
+    onProgress: (p) => process.stdout.write(`\r  searching for osu!... ${p.dirs} folders`),
+  });
+  const installs = discovery.installs;
+  rememberDiscovery(config, discovery);
+
   if (installs.length === 0) {
     banner('No osu! installation found.');
     console.log(`  Looked for osu!lazer (${lazerSearchHint()})`);
-    console.log('  and osu!stable (a folder containing osu!.exe).');
-    console.log(`  Set "installRoots" in ${path.join(dataDir(), 'config.json')} and restart:`);
-    console.log('    "installRoots": ["/path/to/osu!"]');
-    process.exitCode = 1;
+    console.log('  and osu!stable (a folder containing osu!.exe),');
+    console.log(
+      discovery.searched
+        ? '  in the registry, in your shortcuts, and through every drive on this machine.'
+        : '  everywhere they are normally installed.',
+    );
+    console.log('  The page opens anyway: use Options -> osu! folders to point at it.');
+
     /*
      * A diagnostic that stops at the first problem makes you run it twice. "osu! is not
      * where I looked" and "the pp helper will not start" are separate faults with separate
      * fixes, so `--check-only` reports both from one run -- which also lets CI, where there
      * is never an osu! install, still check that the helper works on that platform.
      */
-    if (checkOnly) await reportPpCalculator();
-    return;
+    if (checkOnly) {
+      process.exitCode = 1;
+      await reportPpCalculator();
+      return;
+    }
+    /*
+     * ...but a normal run carries on, with nothing to watch.
+     *
+     * It used to stop here, and stopping was the worst possible answer: the one thing that
+     * fixes a missed install is telling the app where osu! is, and the place to tell it is
+     * the page -- which an app that has exited is not serving. So the whole of it starts,
+     * the tracker watches nothing, and Options -> osu! folders is there to be used.
+     *
+     * A folder added there takes effect on the next start, not immediately: the watchers and
+     * the beatmap resolver are built from the install list once, and the resolver holds open
+     * handles on lazer's `online.db`. Rebuilding both at runtime is a bigger change than the
+     * problem deserves, so the page says to restart and means it.
+     */
   }
 
   for (const i of installs) {
     console.log(`  found ${i.kind.padEnd(6)} ${i.root}${i.onlineDb ? '  (+ online.db)' : ''}`);
+  }
+  // More than one of a kind means a choice was made on the user's behalf. Say so, once,
+  // rather than leaving them to wonder why it is tracking the practice copy.
+  const extra = discovery.candidates.length - installs.length;
+  if (extra > 0) {
+    console.log(`  (${extra} other osu! folder(s) found -- Options -> osu! folders to switch)`);
   }
 
   const dbFile = path.join(dataDir(), 'profiles.db');
@@ -275,10 +345,15 @@ async function main(): Promise<void> {
      * the app runs is not overwritten.
      */
     appConfig: {
-      get: () => ({ openBrowser: config.openBrowser, sharedFavorites: config.sharedFavorites }),
+      get: () => ({
+        openBrowser: config.openBrowser,
+        sharedFavorites: config.sharedFavorites,
+        language: config.language,
+      }),
       set: (patch) => {
         const current = loadConfig();
         if (patch.openBrowser !== undefined) current.openBrowser = config.openBrowser = patch.openBrowser;
+        if (patch.language !== undefined) current.language = config.language = patch.language;
         if (patch.sharedFavorites !== undefined) {
           current.sharedFavorites = config.sharedFavorites = patch.sharedFavorites;
           // Merge or copy the lists now, so the next request already reads the right one.
@@ -287,6 +362,24 @@ async function main(): Promise<void> {
         saveConfig(current);
       },
     },
+    /*
+     * Options -> osu! folders. The one repair for an install the app did not find, and it
+     * has to live on the page: whoever needs it is whoever the app has already failed, and
+     * they should not have to edit JSON to be heard. Writes `config.json` through the same
+     * re-read-then-save as above, so a hand edit made while the app runs survives.
+     */
+    osuFolders: osuFolderService({
+      config,
+      save: (next) => {
+        const current = loadConfig();
+        current.installRoots = next.installRoots;
+        current.discoveredRoots = next.discoveredRoots;
+        current.searchedForInstalls = next.searchedForInstalls;
+        saveConfig(current);
+      },
+      tracking: installs,
+      initial: discovery,
+    }),
   });
 
   // Before any request is answered: the lists must agree with the setting as it stands.

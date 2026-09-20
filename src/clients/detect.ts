@@ -42,6 +42,27 @@ function exists(p: string): boolean {
   }
 }
 
+/**
+ * The drive letters this machine actually has, `C:\` upwards.
+ *
+ * One `stat` each, and it cannot be wrong about a drive that is mounted -- unlike asking
+ * PowerShell, which is right too but costs a second of process startup to say so. A: and B:
+ * are skipped: they are floppy letters, and probing one on a machine that still has the
+ * controller spins it up.
+ */
+export function windowsDrives(): string[] {
+  const out: string[] = [];
+  for (let code = 'C'.charCodeAt(0); code <= 'Z'.charCodeAt(0); code++) {
+    const root = `${String.fromCharCode(code)}:\\`;
+    try {
+      if (fs.statSync(root).isDirectory()) out.push(root);
+    } catch {
+      /* no such drive */
+    }
+  }
+  return out;
+}
+
 /** `$XDG_DATA_HOME`, or the `~/.local/share` the spec says to assume when it is unset. */
 function xdgDataHome(e: DetectEnvironment): string {
   const configured = e.env['XDG_DATA_HOME'];
@@ -66,14 +87,53 @@ export function lazerCandidates(e: DetectEnvironment): string[] {
   return out;
 }
 
-/** Where a native Windows osu!stable install lives. */
-function windowsStableCandidates(e: DetectEnvironment): string[] {
+/**
+ * Folders people put games in, below a drive root.
+ *
+ * `''` is the drive root itself, which is where osu!'s own installer offers to go. The rest
+ * are the conventions: a `Games` folder on the big disk is the single most common place a
+ * player who moved osu! off C: put it, and it is nested -- `D:\Games\osu!\osu!` -- because
+ * the installer makes its own folder inside whatever you pick.
+ */
+const WINDOWS_GAME_DIRS = [
+  '',
+  'Games',
+  'Game',
+  'games',
+  'Program Files',
+  'Program Files (x86)',
+  'Apps',
+  'Programs',
+  'SteamLibrary',
+];
+
+/** The names an osu!stable folder is given, under one of those. */
+const STABLE_FOLDERS = ['osu!', 'osu', 'osu!stable', 'osustable', 'osu!/osu!', 'osu!/osu'];
+
+/**
+ * Where a native Windows osu!stable install lives.
+ *
+ * Every drive that exists rather than C, D and E: a player with four disks puts games on the
+ * one with room, and `F:` is not exotic. Each entry is still one `access()`, and the whole
+ * list is a few hundred of them -- microseconds, once, at startup.
+ *
+ * `drives` is injected so the list stays a pure function of the environment and can be
+ * pinned by a test on a machine that has no D: drive.
+ */
+export function windowsStableCandidates(
+  e: DetectEnvironment,
+  drives: readonly string[] = ['C:\\', 'D:\\', 'E:\\'],
+): string[] {
   const out: string[] = [];
   if (e.env['LOCALAPPDATA']) out.push(path.join(e.env['LOCALAPPDATA'], 'osu!'));
-  for (const drive of ['C:/', 'D:/', 'E:/']) {
-    out.push(path.join(drive, 'osu!'));
-    out.push(path.join(drive, 'Program Files', 'osu!'));
-    out.push(path.join(drive, 'Program Files (x86)', 'osu!'));
+  if (e.env['PROGRAMFILES']) out.push(path.join(e.env['PROGRAMFILES'], 'osu!'));
+  out.push(path.join(e.home, 'osu!'));
+  for (const drive of drives) {
+    for (const parent of WINDOWS_GAME_DIRS) {
+      for (const folder of STABLE_FOLDERS) {
+        out.push(path.join(drive, parent, ...folder.split('/')));
+      }
+    }
   }
   return out;
 }
@@ -240,9 +300,41 @@ function stableSongs(root: string): string {
   return fallback;
 }
 
-/** A stable install, if that is what is at `root`. */
+/**
+ * A stable install, if that is what is at `root`.
+ *
+ * `osu!.exe` alone is not enough, because **lazer's executable is also called `osu!.exe`**.
+ * That never mattered while detection only looked in places lazer's program files are not,
+ * and it matters a great deal now that a search can walk into `%LOCALAPPDATA%\osulazer\app-*`
+ * -- which would be classified as a stable install with no beatmaps, no replays and no
+ * scores, and would then be the answer, because the first hit of each kind wins.
+ *
+ * Two shapes have to be turned away, and both are real on this machine:
+ *
+ * - `osulazer\current\` -- the actual lazer program files, where the .NET runtime files
+ *   beside the executable are the tell. stable is one self-contained Windows binary and
+ *   ships none of them.
+ * - `osulazer\` itself -- lazer's updater keeps a *stub* `osu!.exe` next to `Update.exe`,
+ *   which is nothing but a launcher for the real one. `Update.exe` names it exactly.
+ *
+ * Neither could be reached while detection only looked in a fixed list of places lazer's
+ * program files are not. Both are reached the moment a search walks `%LOCALAPPDATA%`, and
+ * either would have been accepted as a stable install with no beatmaps, no replays and no
+ * scores -- and then *been* the answer, because the first hit of each kind wins.
+ */
+const NOT_STABLE = [
+  'osu.Game.dll',
+  'osu!.deps.json',
+  'osu!.runtimeconfig.json',
+  'Update.exe',
+  'sq.version',
+];
+
 export function stableInstall(root: string): OsuInstall | null {
   if (!exists(path.join(root, 'osu!.exe'))) return null;
+  for (const marker of NOT_STABLE) {
+    if (exists(path.join(root, marker))) return null;
+  }
   const songs = stableSongs(root);
   return {
     kind: 'stable',
@@ -266,30 +358,52 @@ export function detectInstalls(
   configured: readonly string[] = [],
   e: DetectEnvironment = currentEnvironment(),
 ): OsuInstall[] {
-  const found: OsuInstall[] = [];
+  return installsFrom(candidateRoots(configured, e), e);
+}
 
-  const lazerRoots = [...configured, ...lazerCandidates(e)];
-  for (const root of lazerRoots) {
-    const install = lazerInstall(root);
-    if (install) {
-      found.push(install);
-      break;
-    }
-  }
-
-  const stableRoots = [
+/**
+ * Every place worth one `access()`, in the order to try it.
+ *
+ * Exported so the search can be told what has already been looked at, and so a test can
+ * assert the *order*, which is the part that carries meaning: a configured root beats a
+ * guessed one, and on Windows the whole list is checked before any of it is walked.
+ */
+export function candidateRoots(
+  configured: readonly string[] = [],
+  e: DetectEnvironment = currentEnvironment(),
+): string[] {
+  const drives = e.platform === 'win32' ? windowsDrives() : [];
+  return [
     ...configured,
-    ...windowsStableCandidates(e),
+    ...lazerCandidates(e),
+    ...windowsStableCandidates(e, drives.length > 0 ? drives : undefined),
     ...wineStableCandidates(e),
     ...wineStableRoots(e),
   ];
-  for (const root of stableRoots) {
-    const install = stableInstall(root);
-    if (install) {
-      found.push(install);
-      break;
-    }
-  }
+}
 
+/**
+ * Classify a list of directories and keep the first of each kind.
+ *
+ * First rather than best, because the caller has already put them in order -- and because
+ * ranking them would mean stat-ing every candidate on the list instead of stopping at the
+ * one that matched. Where a *ranking* is wanted, as after a search of the whole disk, that
+ * is `installScore` in `discover.ts`, applied to the handful the search actually found.
+ */
+export function installsFrom(
+  roots: readonly string[],
+  _e: DetectEnvironment = currentEnvironment(),
+): OsuInstall[] {
+  const found: OsuInstall[] = [];
+  let lazer: OsuInstall | null = null;
+  let stable: OsuInstall | null = null;
+
+  for (const root of roots) {
+    if (!lazer) lazer = lazerInstall(root);
+    if (!stable) stable = stableInstall(root);
+    if (lazer && stable) break;
+  }
+  if (lazer) found.push(lazer);
+  if (stable) found.push(stable);
   return found;
 }

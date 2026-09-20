@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import type { Db } from '../db/index.ts';
 import type { Tracker } from '../tracker/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
+import { isLocale } from '../i18n.ts';
 import type { Ruleset } from '../osr.ts';
 import { dismissWelcome, welcomePending } from '../welcome.ts';
 import {
@@ -137,6 +138,8 @@ const MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.ico': 'image/x-icon',
   '.woff2': 'font/woff2',
+  // The translations in web/i18n/, fetched by the page one language at a time.
+  '.json': 'application/json; charset=utf-8',
 };
 
 export interface ServerOptions {
@@ -156,6 +159,24 @@ export interface ServerOptions {
     set(patch: Partial<AppConfig>): void;
   };
   /**
+   * Where osu! is, and how to change the answer.
+   *
+   * The page needs this because auto-detection can still miss: osu! goes wherever the player
+   * put it, and the only certain fix is being told. Implemented by the caller rather than
+   * here, because every part of it writes `config.json` -- which the tests must never touch,
+   * and which the app re-reads on start.
+   *
+   * Absent, the page shows the folders being tracked and no way to change them.
+   */
+  osuFolders?: {
+    list(): OsuFolders;
+    /** Add a folder by hand. Rejected if it holds no osu! install. */
+    add(root: string): Promise<OsuFolders>;
+    remove(root: string): OsuFolders;
+    /** Search the machine again, from scratch, including every drive. */
+    rescan(): Promise<OsuFolders>;
+  };
+  /**
    * Stop the app: the page's Quit. Absent, the page cannot stop it -- the tests never pass
    * one, so no test can end the process running them.
    */
@@ -164,12 +185,36 @@ export interface ServerOptions {
   launcher?: 'tray' | 'terminal';
 }
 
+/** The osu! folders on this machine, as the page sees them. */
+export interface OsuFolders {
+  /** Every osu! folder found, best first. */
+  candidates: {
+    root: string;
+    kind: 'lazer' | 'stable';
+    /** Set by the user, rather than found. Shown differently, and removable. */
+    configured: boolean;
+    /** Whether this is the one being tracked for its client. */
+    active: boolean;
+  }[];
+  /** The roots in use right now, which change only on a restart. */
+  tracking: { root: string; kind: 'lazer' | 'stable' }[];
+  /** Whether the app has ever walked the drives, so the page can offer to. */
+  searched: boolean;
+  /** True once the list no longer matches what is being tracked. */
+  needsRestart: boolean;
+}
+
 /** What of config.json the page is allowed to see and change. Deliberately small. */
 export interface AppConfig {
   /** Open the page in the default browser when the app starts. */
   openBrowser: boolean;
   /** One Favorite Beatmaps list for every profile (the default), or one each. */
   sharedFavorites?: boolean;
+  /**
+   * The page's language, as one of osu!'s locale codes. Empty means never chosen, which is
+   * what makes the first launch able to ask.
+   */
+  language?: string;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -574,6 +619,17 @@ export function startServer(opts: ServerOptions): http.Server {
           if (typeof body[key] !== 'boolean') return json(res, { error: `${key} must be true or false` }, 400);
           patch[key] = body[key];
         }
+        /*
+         * Checked against the list rather than stored as sent: this ends up in config.json
+         * and is read back on every start, and a language that does not exist would leave
+         * the page falling back on every string forever with nothing to say why.
+         */
+        if ('language' in body) {
+          if (!isLocale(body['language'])) {
+            return json(res, { error: `${String(body['language'])} is not a language this app has` }, 400);
+          }
+          patch.language = body['language'];
+        }
         if (Object.keys(patch).length === 0) {
           return json(res, { error: 'openBrowser must be true or false' }, 400);
         }
@@ -581,6 +637,39 @@ export function startServer(opts: ServerOptions): http.Server {
         const config = opts.appConfig.get();
         broadcast('app-config', config);
         return json(res, { ok: true, config });
+      });
+    }
+
+    /*
+     * Where osu! is.
+     *
+     * Read by anyone; changed only through the three verbs, one at a time, so a page that
+     * sends something unexpected gets an error rather than a half-applied change. Adding a
+     * folder that holds no osu! install is refused *with the reason*: "that is not an osu!
+     * folder" is the whole value of the endpoint over editing config.json by hand.
+     */
+    if (url.pathname === '/api/installs') {
+      const folders = opts.osuFolders;
+      if (!folders) return json(res, { error: 'this copy cannot change its osu! folders' }, 400);
+      if (req.method !== 'POST') return json(res, folders.list());
+
+      return readBody(req, res, async (body) => {
+        if (body['rescan'] === true) return json(res, await folders.rescan());
+
+        const add = body['add'];
+        if (typeof add === 'string') {
+          if (add.trim().length === 0) return json(res, { error: 'give a folder to add' }, 400);
+          try {
+            return json(res, await folders.add(add.trim()));
+          } catch (e) {
+            return json(res, { error: (e as Error).message }, 400);
+          }
+        }
+
+        const remove = body['remove'];
+        if (typeof remove === 'string') return json(res, folders.remove(remove));
+
+        return json(res, { error: 'expected add, remove or rescan' }, 400);
       });
     }
 
