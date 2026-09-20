@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import './english.ts';
 import { countingNoteText, reconcileSectionOrder } from '../web/js/sections.js';
 
 const DEFAULT = ['me', 'recent', 'top_ranks', 'historical', 'beatmaps', 'medals'];

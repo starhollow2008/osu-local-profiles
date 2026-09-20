@@ -24,6 +24,10 @@ export function storedLocale(): string | null;
 export function t(key: string, vars?: Record<string, unknown>): string;
 export function formatMessage(text: string, vars?: Record<string, unknown>): string;
 export function hasTranslation(key: string): boolean;
+export function installMessages(
+  active: Record<string, string>,
+  english?: Record<string, string>,
+): void;
 export function useLocale(code: string, root?: Document): Promise<string>;
 export function englishFromPage(root?: Document): Record<string, string>;
 export function applyTranslations(root?: Document): void;

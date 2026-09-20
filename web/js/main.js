@@ -73,16 +73,16 @@ const $ = (id) => document.getElementById(id);
  * levels -- sits under Historical. Both orders at the user's request.
  */
 const SECTIONS = [
-  ['me', 'me!'],
-  ['recent_plays', 'Recent Plays'],
+  ['me', () => t('section.me')],
+  ['recent_plays', () => t('section.recentPlays')],
   // The id is kept from when osu! called this Top Ranks: saved section orders refer to it.
-  ['top_ranks', 'Scores'],
-  ['historical', 'Historical'],
+  ['top_ranks', () => t('section.scores')],
+  ['historical', () => t('section.historical')],
   // The id is kept from when this was called Recent: saved section orders refer to it.
-  ['recent', 'Milestones'],
-  ['beatmaps', 'Beatmaps'],
+  ['recent', () => t('section.milestones')],
+  ['beatmaps', () => t('section.beatmaps')],
   // Last by default, at the user's request.
-  ['medals', 'Medals'],
+  ['medals', () => t('section.medals')],
 ];
 
 /* The five grades osu! counts on a profile. XH/X and SH/S are the silver variants. */
@@ -98,83 +98,67 @@ const SETTINGS_FIELDS = [
   {
     key: 'includeUnrankedMods',
     type: 'toggle',
-    label: 'Include pp for unranked mods',
-    hint:
-      'Count plays osu! refuses to rank because of their mods - Relax, Autopilot, or a ' +
-      'customised rate such as DT at 1.45x. Off by default: with this on, the profile is ' +
-      'no longer comparable with a real osu! account.',
+    label: () => t('setting.unrankedMods'),
+    hint: () =>
+      t('setting.unrankedModsHint'),
   },
   {
     key: 'showCountingNote',
     type: 'toggle',
-    label: 'Warn when scoring is not comparable',
-    hint:
-      'Shows a line in Scores when a setting has made this profile’s pp incomparable ' +
-      'with a real osu! account. Turning it off hides that sentence only - the affected ' +
-      'scores keep their *. This is also what the note’s "Don’t show again" sets.',
+    label: () => t('setting.warnIncomparable'),
+    hint: () =>
+      t('setting.warnIncomparableHint'),
   },
   {
     key: 'unrankedModPp',
     type: 'choice',
-    label: 'Price relax plays',
+    label: () => t('setting.priceRelax'),
     dependsOn: 'includeUnrankedMods',
     options: [
-      ['without-the-mod', 'as if the mod were off'],
-      ['as-played', 'as osu! scores them'],
+      ['without-the-mod', () => t('setting.asIfModOff')],
+      ['as-played', () => t('setting.asOsuScores')],
     ],
-    hint:
-      'Relax and Autopilot only. "As if the mod were off" makes relax count as nomod and ' +
-      'relax + DT count as DT, which is usually what people mean - but it flatters the ' +
-      'score, because a relax run reaches accuracy and combo the player could not by hand. ' +
-      'Both numbers come from osu! itself and both are stored, so switching is instant.',
+    hint: () =>
+      t('setting.priceRelaxHint'),
   },
   {
     key: 'showIncompleteInRecent',
     type: 'choice',
-    label: 'Unfinished plays in Recent Plays',
+    label: () => t('setting.unfinishedPlays'),
     options: [
-      ['collapse', 'group retries on one map'],
-      ['yes', 'show every attempt'],
-      ['no', 'hide them'],
+      ['collapse', () => t('setting.groupRetries')],
+      ['yes', () => t('setting.showEveryAttempt')],
+      ['no', () => t('setting.hideThem')],
     ],
-    hint:
-      'Plays that were started but never finished - quit, retried, or failed. The ones osu! ' +
-      'counted always count toward your play count, monthly play counts and Most Played, ' +
-      'because osu! counts them too; this only decides whether they are listed here. There is ' +
-      'no score to show for them: osu!lazer saves a replay only for a map played to the end.',
+    hint: () =>
+      t('setting.unfinishedPlaysHint'),
   },
   {
     key: 'countUnsubmittedAttempts',
     type: 'toggle',
-    label: 'Count plays osu! could not submit',
+    label: () => t('setting.countUnsubmitted'),
     // A function, so it can say how many have been recorded before anyone decides to count them.
     hint: () =>
-      'Quits, fails and retries while osu! was offline or signed out, read from osu!lazer’s ' +
-      'own log. osu! never received these, so they count here by default - toward your play ' +
-      'count, monthly play counts, Most Played, Recent Plays and Total Play Time. Turn this ' +
-      'off to match exactly what your osu! profile shows. They are recorded either way' +
+      t('setting.countUnsubmittedHint') +
       (unsubmittedAttempts > 0
-        ? ` - ${fmt(unsubmittedAttempts)} so far.`
-        : '. None have been recorded yet.'),
+        ? t('setting.countUnsubmittedSoFar', { n: fmt(unsubmittedAttempts) })
+        : t('setting.countUnsubmittedNone')),
   },
   {
     key: 'includeUnrankedMaps',
     type: 'checkboxes',
-    label: 'Include pp for unranked beatmaps',
+    label: () => t('setting.unrankedMaps'),
     // Roughly osu!'s own ordering, most-established first.
     options: [
-      ['loved', 'Loved'],
-      ['qualified', 'Qualified'],
-      ['pending', 'Pending'],
-      ['wip', 'Work in progress'],
-      ['graveyard', 'Graveyarded'],
-      ['unsubmitted', 'Never submitted'],
+      ['loved', () => t('status.loved')],
+      ['qualified', () => t('status.qualified')],
+      ['pending', () => t('status.pending')],
+      ['wip', () => t('filter.workInProgress')],
+      ['graveyard', () => t('filter.graveyarded')],
+      ['unsubmitted', () => t('filter.neverSubmitted')],
     ],
-    hint:
-      'None by default. These are separate choices because they are not the same thing: a ' +
-      'Loved map is played competitively, a graveyarded one may be a draft nobody finished, ' +
-      'and a never-submitted one exists only on your machine. pp still comes from osu!, ' +
-      'which will happily price any beatmap it is given.',
+    hint: () =>
+      t('setting.unrankedMapsHint'),
   },
 ];
 
@@ -308,12 +292,29 @@ function renderStats(next, medalTotal, imported) {
    * imported best performances borrows osu!'s figure rather than showing the bonus for the
    * two hundred maps it happens to hold. A borrowed number has to admit it.
    */
+  const maps = { n: fmt(stats.distinctRankedBeatmaps) };
   const bonus = stats.bonusPpBorrowed
-    ? `plus ${fmt(stats.bonusPp, 0)} bonus pp from your osu! profile` +
-      (imported?.osuTotalPp ? ` (${fmt(imported.osuTotalPp, 0)}pp there when it was imported)` : '')
-    : `plus ${fmt(stats.bonusPp, 0)} bonus pp for ` +
-      `${fmt(stats.distinctRankedBeatmaps)} beatmap${stats.distinctRankedBeatmaps === 1 ? '' : 's'}`;
-  $('totalPp').title = `${fmt(stats.weightedPp, 0)}pp from the top plays, ${bonus}`;
+    ? t('stats.bonusBorrowed', {
+        pp: fmt(stats.bonusPp, 0),
+      }) +
+      (imported?.osuTotalPp
+        ? t('stats.bonusBorrowedThere', {
+            pp: fmt(imported.osuTotalPp, 0),
+          })
+        : '')
+    : stats.distinctRankedBeatmaps === 1
+      ? t('stats.bonusOneMap', {
+          pp: fmt(stats.bonusPp, 0),
+          ...maps,
+        })
+      : t('stats.bonusMaps', {
+          pp: fmt(stats.bonusPp, 0),
+          ...maps,
+        });
+  $('totalPp').title = t('stats.ppTitle', {
+    pp: fmt(stats.weightedPp, 0),
+    bonus,
+  });
 
   const playTime = playTimeStrings(stats.playTime);
   $('playTime').textContent = playTime.value;
@@ -329,13 +330,13 @@ function renderStats(next, medalTotal, imported) {
   // osu-web's v1 stats box, minus play time (which it also omits) and replays watched
   // (which does not apply to a local profile).
   const entries = [
-    ['Ranked Score', fmt(stats.rankedScore)],
-    ['Hit Accuracy', pct(stats.accuracy)],
-    ['Play Count', fmt(stats.playcount)],
-    ['Total Score', fmt(stats.totalScore)],
-    ['Total Hits', fmt(stats.totalHits)],
-    ['Hits per Play', fmt(stats.hitsPerPlay)],
-    ['Maximum Combo', `${fmt(stats.maxCombo)}x`],
+    [t('stats.rankedScore'), fmt(stats.rankedScore)],
+    [t('stats.hitAccuracy'), pct(stats.accuracy)],
+    [t('stats.playCount'), fmt(stats.playcount)],
+    [t('stats.totalScore'), fmt(stats.totalScore)],
+    [t('stats.totalHits'), fmt(stats.totalHits)],
+    [t('stats.hitsPerPlay'), fmt(stats.hitsPerPlay)],
+    [t('stats.maximumCombo'), `${fmt(stats.maxCombo)}x`],
   ];
   $('profileStats').innerHTML = entries
     .map(
@@ -363,14 +364,17 @@ function renderRank(data) {
   if (data.rank) {
     el.textContent = `#${fmt(data.rank.rank)}`;
     el.title =
-      `Estimated from osu!'s ${data.rankSource?.dump ?? data.rank.dump} player sample` +
-      `${data.rankSource ? ` (${fmt(data.rankSource.sampled)} users)` : ''}. ` +
-      'Approximate, and drifts as the playerbase grows.';
+      t('rank.estimatedFrom', { dump: data.rankSource?.dump ?? data.rank.dump }) +
+      (data.rankSource
+        ? t('rank.sampleSize', { n: fmt(data.rankSource.sampled) })
+        : '') +
+      '. ' +
+      t('rank.approximate');
   } else {
     el.textContent = '-';
     el.title = stats?.totalPp > 0
-      ? 'No rank curve has been built for this mode yet - see scripts/build-rank-table.mjs'
-      : 'A profile with no pp is not on the ladder yet';
+      ? t('rank.noCurve')
+      : t('rank.noPp');
   }
 }
 
@@ -481,16 +485,13 @@ function renderStableNote() {
       note.innerHTML = '';
       continue;
     }
-    note.innerHTML = `<div class="counting-note__text">
-        <b>Playing on osu!stable?</b> A score reaches this page when you leave the results
-        screen and go back to song select -- that is when stable writes the replay. Plays you
-        quit, failed or retried are not counted at all: stable keeps no record of them.
-        osu!lazer has neither limitation.
-      </div>
+    note.innerHTML = `<div class="counting-note__text">${t('stableNote.text')}</div>
       <div class="counting-note__actions">
-        <button type="button" class="counting-note__dismiss" data-dismiss-stable>Don't show again</button>
+        <button type="button" class="counting-note__dismiss" data-dismiss-stable>${escapeHtml(
+          t('common.dontShowAgain'),
+        )}</button>
         <button type="button" class="counting-note__close" data-dismiss-stable
-                aria-label="Don't show this again">&times;</button>
+                aria-label="${escapeHtml(t('common.dontShowThisAgain'))}">&times;</button>
       </div>`;
   }
 }
@@ -529,7 +530,10 @@ async function loadProfile() {
   const rankPoints = (data.rankHistory ?? []).filter((p) => p.rank != null);
   $('ppChart').innerHTML = rankPoints.length
     ? rankChart(rankPoints)
-    : ppChart(data.ppHistory, data.stats.playcount > 0 ? 'no ranked plays yet' : 'unranked');
+    : ppChart(
+        data.ppHistory,
+        data.stats.playcount > 0 ? t('chart.noRankedPlays') : t('chart.unranked'),
+      );
 
   $('recentActivity').innerHTML =
     activityList(data.events) +
@@ -557,8 +561,8 @@ async function loadProfile() {
       actions: true,
       empty:
         settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
-          ? 'No plays with a pp value tracked yet.'
-          : 'No ranked plays tracked yet.',
+          ? t('empty.noPpPlays')
+          : t('empty.noRankedPlays'),
     }) + showMore('top', data.top.length, shown.top, topTotal);
 
   const chart = playHistoryChart(data.monthlyPlaycounts);
@@ -576,7 +580,7 @@ async function loadProfile() {
   $('recentPlays').innerHTML =
     playList(data.recent, {
       actions: true,
-      empty: 'Nothing yet - go set a play.',
+      empty: t('empty.goSetAPlay'),
     }) + showMore('recent', data.recent.length, shown.recent, recentTotal);
 
   // Favorite Beatmaps. An empty list is just the heading and its 0, as on osu!.
@@ -620,20 +624,27 @@ async function loadState() {
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
-  if (isStatic) $('footerVersion').textContent += ` - a copy, as of ${shortDate(Date.parse(snapshot.exportedAt))}`;
+  if (isStatic) {
+    $('footerVersion').textContent += t('footer.copyAsOf', {
+      date: shortDate(Date.parse(snapshot.exportedAt)),
+    });
+  }
   renderUpdate();
 
   renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
   renderStableNote();
-  const kinds = installKinds.join(' + ') || 'no client found';
+  const kinds = installKinds.join(' + ') || t('menu.noClientFound');
+  const session = { name: s.profile.name, kinds, n: s.scoresThisSession };
   $('optInfo').textContent =
-    `${s.profile.name} - watching ${kinds} - ${s.scoresThisSession} score${
-      s.scoresThisSession === 1 ? '' : 's'
-    } this session` +
+    (s.scoresThisSession === 1
+      ? t('menu.watchingOne', session)
+      : t('menu.watchingMany', session)) +
     // Only when there are any: a filter that is declining plays is the explanation for a score
     // that never appeared, and it should not have to be gone looking for.
-    (playsFiltered > 0 ? ` - ${playsFiltered} filtered out` : '');
+    (playsFiltered > 0
+      ? t('menu.filteredOut', { n: playsFiltered })
+      : '');
 
   filterNarrowing = Boolean(s.filterNarrowing);
   playsFiltered = s.playsFiltered ?? 0;
@@ -691,22 +702,37 @@ function renderIndexing(state) {
 
   if (show) {
     indexShown = true;
-    $('indexTitle').textContent = state.firstRun ? 'Finding your beatmaps' : 'Updating the beatmap index';
+    $('indexTitle').textContent = state.firstRun
+      ? t('index.finding')
+      : t('index.updating');
     const done = state.total > 0 ? Math.min(1, state.scanned / state.total) : 0;
     $('indexDetail').textContent =
       state.phase === 'counting'
-        ? `Looking through osu!'s files... ${fmt(state.total)} so far`
-        : `${Math.floor(done * 100)}% - ${fmt(state.scanned)} of ${fmt(state.total)} files`;
+        ? t('index.counting', {
+            n: fmt(state.total),
+          })
+        : t('index.progress', {
+            percent: Math.floor(done * 100),
+            done: fmt(state.scanned),
+            total: fmt(state.total),
+          });
     $('indexFill').style.setProperty('--fill', state.phase === 'counting' ? '30%' : `${done * 100}%`);
-    const waiting = state.waiting > 0
-      ? ` ${fmt(state.waiting)} play${state.waiting === 1 ? ' is' : 's are'} waiting to be added.`
-      : '';
+    const waitingCount = { n: fmt(state.waiting) };
+    const waiting =
+      state.waiting > 0
+        ? ` ${
+            state.waiting === 1
+              ? t('index.waitingOne', waitingCount)
+              : t('index.waitingMany', waitingCount)
+          }`
+        : '';
     $('indexNote').textContent =
       (state.firstRun
-        ? "This happens once: the app reads your osu! folder to match each score to its beatmap. "
-        : 'New beatmaps were found in your osu! folder. ') +
-      'The page works meanwhile. Scores you set now are held and added, with pp, as soon as ' +
-      `it finishes.${waiting}`;
+        ? t('index.firstRun')
+        : t('index.newBeatmaps')) +
+      ' ' +
+      t('index.meanwhile') +
+      waiting;
     return;
   }
 
@@ -715,8 +741,9 @@ function renderIndexing(state) {
     indexShown = false;
     toast(
       state.error
-        ? `The beatmap index stopped: ${state.error}`
-        : `Beatmaps ready${state.indexed ? ` - ${fmt(state.indexed)} indexed` : ''}`,
+        ? t('index.stopped', { error: state.error })
+        : t('index.ready') +
+          (state.indexed ? t('index.indexedCount', { n: fmt(state.indexed) }) : ''),
     );
     void loadProfile();
   }
@@ -777,7 +804,7 @@ $('optLazerScoring').onclick = async () => {
     settings = d.settings;
     renderLazerScoring();
     await loadProfile();
-    toast(next === 'classic' ? 'Classic scoring' : 'Lazer scoring');
+    toast(next === 'classic' ? t('scoring.classic') : t('scoring.lazer'));
   } catch (err) {
     settings = { ...settings, scoring: next === 'classic' ? 'lazer' : 'classic' };
     renderLazerScoring();
@@ -808,7 +835,9 @@ function openUpdate() {
   $('updateVersions').innerHTML =
     `<b>${escapeHtml(u.currentVersion ?? '?')}</b> &rarr; <b>${escapeHtml(u.latestVersion ?? '?')}</b>`;
   $('updateNotes').innerHTML = u.releaseUrl
-    ? `<a href="${escapeHtml(u.releaseUrl)}" target="_blank" rel="noreferrer noopener">Release notes on GitHub</a>`
+    ? `<a href="${escapeHtml(u.releaseUrl)}" target="_blank" rel="noreferrer noopener">${escapeHtml(
+        t('update.releaseNotes'),
+      )}</a>`
     : '';
   $('updateHint').innerHTML = '&nbsp;';
   $('updateConfirm').disabled = false;
@@ -830,10 +859,10 @@ $('updateModal').onclick = (e) => {
  */
 $('updateConfirm').onclick = async () => {
   $('updateConfirm').disabled = true;
-  $('updateHint').textContent = 'Downloading...';
+  $('updateHint').textContent = t('update.downloading');
   try {
     const d = await postJson('/api/update/apply', {}, 'the update failed');
-    $('updateHint').textContent = `${d.message} If it does not come back, start it yourself.`;
+    $('updateHint').textContent = `${d.message} ${t('update.startYourself')}`;
   } catch (err) {
     $('updateHint').textContent = err.message;
     $('updateConfirm').disabled = false;
@@ -851,19 +880,24 @@ let quitHere = false;
  */
 function showStopped(byThisPage) {
   $('stoppedTitle').textContent = byThisPage
-    ? 'osu! local profiles has stopped.'
-    : 'osu! local profiles is not running.';
+    ? t('quit.stopped')
+    : t('quit.notRunning');
   $('stoppedText').textContent = byThisPage
-    ? 'Tracking is off. Start the app again to pick up where you left off.'
-    : 'This page picks up again when it starts.';
+    ? t('quit.trackingOff')
+    : t('quit.picksUp');
   $('stoppedNotice').hidden = false;
 }
 
 /** Where else the app can be stopped from, so Quit's tooltip is also how to find it. */
 function quitTitle() {
-  if (app.launcher !== 'tray') return 'Quit osu! local profiles. Tracking stops until you start it again.';
-  const where = app.platform === 'darwin' ? 'the menu bar' : 'the system tray';
-  return `Quit osu! local profiles. While it runs it also has an icon in ${where}.`;
+  if (app.launcher !== 'tray') {
+    return t('quit.titleNoTray');
+  }
+  const where =
+    app.platform === 'darwin'
+      ? t('quit.menuBar')
+      : t('quit.systemTray');
+  return t('quit.titleTray', { where });
 }
 
 $('quitBtn').onmouseenter = () => {
@@ -872,7 +906,7 @@ $('quitBtn').onmouseenter = () => {
 
 $('quitBtn').onclick = async () => {
   const button = $('quitBtn');
-  if (!armed(button, 'Quit the app?')) return;
+  if (!armed(button, t('quit.confirm'))) return;
   button.disabled = true;
   try {
     await postJson('/api/quit', {}, 'the app did not stop');
@@ -919,8 +953,8 @@ function openShare() {
 
   $('shareScreenshot').disabled = !sharing.canScreenshot;
   $('shareScreenshotNote').textContent = sharing.canScreenshot
-    ? 'Rendered by the Chrome or Edge already on this machine.'
-    : 'Needs Chrome, Edge or Chromium installed. The web page above needs nothing.';
+    ? t('share.canRender')
+    : t('share.needsBrowser');
 
   $('shareModal').hidden = false;
   $('shareClose').focus();
@@ -936,11 +970,11 @@ $('shareModal').onclick = (e) => {
 
 $('shareHtml').onclick = async () => {
   $('shareHtml').disabled = true;
-  shareHint('Building the page...');
+  shareHint(t('share.building'));
   try {
     const html = await buildInteractiveHtml((message) => shareHint(message));
     downloadBlob(new Blob([html], { type: 'text/html;charset=utf-8' }), `${safeName()}.html`);
-    shareHint(`Saved (${fmt(Math.ceil(html.length / 1024))}KB). It works like this page, without this app.`);
+    shareHint(t('share.savedHtml', { size: fmt(Math.ceil(html.length / 1024)) }));
   } catch (err) {
     shareHint(err.message, true);
   } finally {
@@ -950,12 +984,12 @@ $('shareHtml').onclick = async () => {
 
 $('shareScreenshot').onclick = async () => {
   $('shareScreenshot').disabled = true;
-  shareHint('Rendering the image...');
+  shareHint(t('share.rendering'));
   try {
     const r = await fetch('/api/screenshot');
-    if (!r.ok) throw new Error(((await r.json()).error) ?? 'rendering failed');
+    if (!r.ok) throw new Error(((await r.json()).error) ?? t('share.renderFailed'));
     downloadBlob(await r.blob(), `${safeName()}.png`);
-    shareHint('Saved.');
+    shareHint(t('common.saved'));
   } catch (err) {
     shareHint(err.message, true);
   } finally {
@@ -990,7 +1024,9 @@ function currentOrder() {
 }
 
 function sectionLabel(id) {
-  return SECTIONS.find(([sectionId]) => sectionId === id)?.[1] ?? id;
+  // A function rather than a string: the label is fetched when it is drawn, so switching
+  // language redraws it rather than leaving the section nav in the old one.
+  return SECTIONS.find(([sectionId]) => sectionId === id)?.[1]() ?? id;
 }
 
 /**
@@ -1246,10 +1282,10 @@ async function uploadAboutImages(files) {
     try {
       const r = await fetch('/api/about-image', { method: 'PUT', body: file });
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error ?? 'upload failed');
+      if (!r.ok) throw new Error(d.error ?? t('common.uploadFailed'));
       insertBbcode(`[img]${d.url}[/img]`);
     } catch (err) {
-      toast(`${file.name || 'That image'}: ${err.message}`);
+      toast(`${file.name || t('me.thatImage')}: ${err.message}`);
     }
   }
   return true;
@@ -1318,7 +1354,7 @@ $('aboutSave').onclick = async () => {
     const d = await postJson('/api/settings', { aboutMe: $('aboutText').value }, 'saving failed');
     settings = d.settings;
     closeAboutEditor();
-    toast('Saved');
+    toast(t('common.savedShort'));
   } catch (err) {
     toast(err.message);
   } finally {
@@ -1372,9 +1408,11 @@ function renderIdentitySuggestions() {
   if (identitySuggestions.linked) {
     bits.push(
       `<div class="identity-linked">
-         Linked to <b>${escapeHtml(identitySuggestions.linked.username)}</b>
-         (#${fmt(identitySuggestions.linked.id)})
-         <button type="button" id="identityUnlink">Unlink</button>
+         ${t('identity.linkedTo', {
+           name: escapeHtml(identitySuggestions.linked.username),
+           id: fmt(identitySuggestions.linked.id),
+         })}
+         <button type="button" id="identityUnlink">${escapeHtml(t('identity.unlink'))}</button>
        </div>`,
     );
   }
@@ -1445,7 +1483,7 @@ $('pname').onkeydown = (e) => {
 $('identitySave').onclick = async () => {
   const name = $('identityName').value.trim();
   if (!name) {
-    identityHint('Give the profile a name.', true);
+    identityHint(t('identity.needName'), true);
     return;
   }
   const country = $('identityCountry').value.trim();
@@ -1459,11 +1497,14 @@ $('identitySave').onclick = async () => {
     await Promise.all([loadState(), loadProfile()]);
     renderProfileEdit();
     if (country !== '' && !d.settings.country) {
-      identityHint('Saved - the country was not a two-letter code, so it was cleared.', true);
+      identityHint(
+        t('identity.badCountry'),
+        true,
+      );
     } else {
-      identityHint('Saved.');
+      identityHint(t('common.saved'));
     }
-    toast('Profile saved');
+    toast(t('identity.profileSaved'));
   } catch (err) {
     identityHint(err.message, true);
   } finally {
@@ -1495,7 +1536,7 @@ $('profileEdit').addEventListener('click', async (e) => {
       await loadState();
       renderIdentityPreviews();
       await loadProfile();
-      identityHint('Removed.');
+      identityHint(t('identity.removed'));
     } catch (err) {
       identityHint(err.message, true);
     }
@@ -1507,7 +1548,7 @@ $('profileEdit').addEventListener('click', async (e) => {
       await identityAction({ action: 'unlink' });
       identitySuggestions.linked = null;
       renderIdentitySuggestions();
-      identityHint('Unlinked. The picture and banner already copied here are kept.');
+      identityHint(t('identity.unlinked'));
     } catch (err) {
       identityHint(err.message, true);
     }
@@ -1524,15 +1565,15 @@ $('identityFile').onchange = async () => {
   const kind = uploadKind;
   if (!file || !kind) return;
 
-  identityHint(`Uploading ${file.name}...`);
+  identityHint(t('identity.uploading', { file: file.name }));
   try {
     const r = await fetch(`/api/image/${kind}`, { method: 'PUT', body: file });
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'upload failed');
+    if (!r.ok) throw new Error(d.error ?? t('common.uploadFailed'));
     await loadState();
     renderIdentityPreviews();
     await loadProfile();
-    identityHint('Saved.');
+    identityHint(t('common.saved'));
   } catch (err) {
     identityHint(err.message, true);
   }
@@ -1578,31 +1619,34 @@ function renderImportNote() {
   const choices = importChoices();
   const notes = [];
   if (choices.aboutMe && (settings.aboutMe ?? '').trim()) {
-    notes.push("me! replaces what this profile's me! says now.");
+    notes.push(t('import.meReplaces'));
   }
   if (choices.favorites) {
     notes.push(
       app.config?.sharedFavorites === false
         ? "Favorites are added to this profile's list."
-        : 'Favorites are added to the list every profile shares.',
+        : t('import.favoritesShared'),
     );
   }
   if (choices.bestPerformances) {
     notes.push(
-      'Best performances brings in up to 200 scores per game mode from osu!, with osu!' +
-        "'s own pp. They count toward this profile's pp and accuracy.",
+      t('import.bestPerformances'),
     );
   }
-  if (choices.pinnedScores) notes.push('Pinned scores are pinned here in the same order.');
+  if (choices.pinnedScores) {
+    notes.push(t('import.pinnedScores'));
+  }
   if (choices.bestPerformances || choices.pinnedScores) {
-    notes.push('Importing past plays later will not add them a second time.');
+    notes.push(t('import.noDuplicates'));
   }
   $('importNote').textContent = notes.join(' ');
   $('importGo').disabled = !Object.values(choices).some(Boolean);
 }
 
 const joinList = (items) =>
-  items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+  items.length < 2
+    ? items.join('')
+    : t('filter.joinLast', { list: items.slice(0, -1).join(', '), last: items.at(-1) });
 
 /** Nothing looked up, and the default ticks -- or favorites alone, from the favorites reminder. */
 function resetImport({ favoritesOnly = false } = {}) {
@@ -1652,12 +1696,12 @@ $('importQuery').oninput = () => {
 $('importLookup').onclick = async () => {
   const query = $('importQuery').value.trim();
   if (!query) {
-    importHint('Type a username, a user id, or a link to a profile.', true);
+    importHint(t('import.needQuery'), true);
     return;
   }
 
   $('importLookup').disabled = true;
-  importHint(`Looking up "${query}" on osu.ppy.sh...`);
+  importHint(t('import.lookingUp', { query }));
   try {
     const { user } = await identityAction({ action: 'lookup', query });
     importUser = user;
@@ -1667,10 +1711,14 @@ $('importLookup').onclick = async () => {
       <div class="identity-candidate__detail">
         <b>${escapeHtml(user.username)}</b>
         <span>#${fmt(user.id)}${user.countryCode ? ` &middot; ${escapeHtml(countryName(user.countryCode))}` : ''}
-          &middot; ${user.pageRaw ? 'has a me! page' : 'no me! page'}</span>
+          &middot; ${escapeHtml(
+            user.pageRaw
+              ? t('import.hasMePage')
+              : t('import.noMePage'),
+          )}</span>
       </div>
     </div>`;
-    importHint('Found. Choose what to copy, then Import.');
+    importHint(t('import.found'));
   } catch (err) {
     importUser = null;
     $('importFound').innerHTML = '';
@@ -1683,14 +1731,18 @@ $('importLookup').onclick = async () => {
 $('importGo').onclick = async () => {
   const query = importUser ? String(importUser.id) : $('importQuery').value.trim();
   if (!query) {
-    importHint('Type the account to import from first.', true);
+    importHint(t('import.needAccount'), true);
     return;
   }
   const choices = importChoices();
 
   $('importGo').disabled = true;
   const slow = choices.favorites || choices.bestPerformances || choices.pinnedScores;
-  importHint(slow ? 'Importing - this can take a few seconds...' : 'Importing...');
+  importHint(
+    slow
+      ? t('import.slow')
+      : t('import.running'),
+  );
   try {
     const d = await identityAction({ action: 'import', query, ...choices });
     settings = d.settings;
@@ -1794,8 +1846,8 @@ $('sharedFavorites').onchange = async () => {
     await loadProfile();
     toast(
       shareFavorites
-        ? 'Favorite beatmaps are shared by every profile'
-        : 'Each profile keeps its own favorite beatmaps',
+        ? t('favorites.shared')
+        : t('favorites.perProfile'),
     );
   } catch (err) {
     $('sharedFavorites').checked = !shareFavorites;
@@ -1820,7 +1872,7 @@ function settingControl(f) {
         ([value, label]) =>
           `<label class="checkgroup__item">
             <input type="checkbox" value="${escapeHtml(value)}"${chosen.has(value) ? ' checked' : ''}>
-            <span>${escapeHtml(label)}</span>
+            <span>${escapeHtml(label())}</span>
           </label>`,
       )
       .join('')}</div>`;
@@ -1831,7 +1883,7 @@ function settingControl(f) {
         ([value, label]) =>
           `<option value="${escapeHtml(value)}"${
             settings[f.key] === value ? ' selected' : ''
-          }>${escapeHtml(label)}</option>`,
+          }>${escapeHtml(label())}</option>`,
       )
       .join('')}</select>`;
   }
@@ -1872,10 +1924,8 @@ function applySettingDependencies() {
     const setting = field.closest('.setting');
     setting.classList.add('setting--inactive');
     const hint = setting.querySelector('.setting__hint');
-    const note =
-      ' No osu!lazer installation was found, and osu!stable does not record a beatmap\u2019s ' +
-      'status, so every beatmap already counts and these have no effect.';
-    if (!hint.textContent.includes('no effect')) hint.textContent += note;
+    const note = ` ${t('setting.noStatusSource')}`;
+    if (!hint.textContent.includes(note.trim())) hint.textContent += note;
   }
 }
 
@@ -1883,10 +1933,10 @@ function renderSettingsFields() {
   $('settingsFields').innerHTML = SETTINGS_FIELDS.map(
     (f) => `<div class="setting">
       <label class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
-        <span>${escapeHtml(f.label)}</span>
+        <span>${escapeHtml(f.label())}</span>
         ${settingControl(f)}
       </label>
-      <div class="setting__hint">${escapeHtml((typeof f.hint === 'function' ? f.hint() : f.hint) ?? '')}</div>
+      <div class="setting__hint">${escapeHtml(f.hint?.() ?? '')}</div>
     </div>`,
   ).join('');
 
@@ -1906,7 +1956,9 @@ async function renderRemovedScores() {
   if (panel.hidden) return;
 
   $('removedCount').textContent = fmt(hiddenScoreCount);
-  $('removedList').innerHTML = '<div class="setting__hint">Loading...</div>';
+  $('removedList').innerHTML = `<div class="setting__hint">${escapeHtml(
+    t('common.loading'),
+  )}</div>`;
 
   try {
     const d = await scoreAction({ action: 'list-hidden' });
@@ -1916,8 +1968,16 @@ async function renderRemovedScores() {
         const incomplete = h.kind === 'incomplete';
         const ids = incomplete ? h.ids.join(',') : String(h.id);
         const meta = incomplete
-          ? `${h.unsubmitted ? 'Not submitted' : 'Didn&rsquo;t finish'}${
-              h.attempts > 1 ? ` &middot; ${fmt(h.attempts)} attempts` : ''
+          ? `${escapeHtml(
+              h.unsubmitted
+                ? t('play.notSubmitted')
+                : t('play.didntFinish'),
+            )}${
+              h.attempts > 1
+                ? ` &middot; ${escapeHtml(t('play.attempts', {
+                    n: fmt(h.attempts),
+                  }))}`
+                : ''
             }`
           : `${escapeHtml(h.grade)} &middot; ${pct(h.accuracy)} &middot;
               ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmt(h.pp, 0)}pp` : ''}`;
@@ -1928,9 +1988,9 @@ async function renderRemovedScores() {
             }</div>
             <div class="removed-row__meta">${meta}</div>
           </div>
-          <button type="button" data-restore="${ids}" data-kind="${incomplete ? 'incomplete' : 'score'}">Put back</button>
+          <button type="button" data-restore="${ids}" data-kind="${incomplete ? 'incomplete' : 'score'}">${escapeHtml(t('removed.putBack'))}</button>
           <button type="button" class="removed-row__delete" data-delete="${ids}" data-kind="${incomplete ? 'incomplete' : 'score'}"
-                  title="Delete permanently" aria-label="Delete permanently">
+                  title="${escapeHtml(t('removed.deletePermanently'))}" aria-label="${escapeHtml(t('removed.deletePermanently'))}">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="2" rx="1" fill="currentColor"/></svg>
           </button>
         </div>`;
@@ -1965,8 +2025,23 @@ async function deleteRemoved(payload, button) {
   button.disabled = true;
   try {
     const d = await scoreAction(payload);
-    const noun = payload.kind === 'incomplete' ? 'play' : 'score';
-    toast(d.deleted === 1 ? `${noun[0].toUpperCase()}${noun.slice(1)} deleted permanently` : `${fmt(d.deleted)} ${noun}s deleted permanently`);
+    /*
+     * Four whole sentences rather than a noun and a plural suffix stitched together. English
+     * gets away with "1 score"/"2 scores"; most languages do not, and a capital letter
+     * applied to the first character of a translated word is a guess at somebody else's
+     * orthography.
+     */
+    const incomplete = payload.kind === 'incomplete';
+    const count = { n: fmt(d.deleted) };
+    toast(
+      d.deleted === 1
+        ? incomplete
+          ? t('removed.deletedOnePlay')
+          : t('removed.deletedOneScore')
+        : incomplete
+          ? t('removed.deletedPlays', count)
+          : t('removed.deletedScores', count),
+    );
     await Promise.all([loadState(), loadProfile()]);
     await renderRemovedScores();
   } catch (err) {
@@ -1977,7 +2052,11 @@ async function deleteRemoved(payload, button) {
 
 $('removedDeleteAll').onclick = () => {
   const button = $('removedDeleteAll');
-  if (!armed(button, `Delete all ${fmt(hiddenScoreCount)} for good?`)) return;
+  if (!armed(button, t('removed.deleteAllConfirm', {
+    n: fmt(hiddenScoreCount),
+  }))) {
+    return;
+  }
   void deleteRemoved({ action: 'delete-all-removed' }, button);
 };
 
@@ -1990,7 +2069,7 @@ const removedTarget = (button, ids) => {
 $('removedList').onclick = async (e) => {
   const doomed = e.target.closest('[data-delete]');
   if (doomed) {
-    if (armed(doomed, 'Delete?')) {
+    if (armed(doomed, t('removed.deleteConfirm'))) {
       void deleteRemoved({ action: 'delete', ...removedTarget(doomed, doomed.dataset.delete) }, doomed);
     }
     return;
@@ -2068,8 +2147,10 @@ $('settingsSave').onclick = async () => {
     await Promise.all([loadState(), loadProfile()]);
     toast(
       rejected.length
-        ? `Saved - ${rejected.map((f) => f.label.toLowerCase()).join(' and ')} was not valid and was cleared`
-        : 'Settings saved',
+        ? t('setting.savedRejected', {
+            fields: rejected.map((f) => f.label().toLowerCase()).join(' and '),
+          })
+        : t('setting.saved'),
     );
     offerRecompute();
   } catch (err) {
@@ -2109,10 +2190,10 @@ async function favoriteAction(action, beatmapsetId) {
     favoriteSetIds = new Set(d.favorites);
     toast(
       action === 'remove'
-        ? 'Removed from Favorite Beatmaps'
+        ? t('favorites.removed')
         : d.detailsError
-          ? `Added to Favorite Beatmaps - ${d.detailsError}, so it shows what is on this machine for now`
-          : 'Added to Favorite Beatmaps',
+          ? t('favorites.addedOffline', { error: d.detailsError })
+          : t('favorites.added'),
     );
     await loadProfile();
   } catch (err) {
@@ -2230,8 +2311,8 @@ $('playMenu').onclick = async (e) => {
       await scoreAction({ action: 'hide', kind, ids });
       toast(
         ids.length === 1
-          ? 'Removed from this profile - undo it in Other settings'
-          : `${fmt(ids.length)} attempts removed from this profile - undo it in Other settings`,
+          ? t('play.removed')
+          : t('play.removedAttempts', { n: fmt(ids.length) }),
       );
       await Promise.all([loadProfile(), loadState()]);
     } catch (err) {
@@ -2275,8 +2356,8 @@ $('playMenu').onclick = async (e) => {
       await scoreAction({ action: 'reorder', ids: next });
     } else {
       await scoreAction({ action: act, id });
-      if (act === 'hide') toast('Removed from this profile - undo it in Other settings');
-      if (act === 'pin') toast('Pinned');
+      if (act === 'hide') toast(t('play.removed'));
+      if (act === 'pin') toast(t('play.pinned'));
     }
     // A removed score has no details left to show; a pinned one's card has to say so.
     if (fromCard) {
@@ -2309,7 +2390,7 @@ async function openScoreCard(id) {
   try {
     const r = await fetch(`/api/scores/${id}`);
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
+    if (!r.ok) throw new Error(d.error ?? t('play.notLoaded'));
     // Closed, or another score opened, while this one was on its way.
     if (scoreCardId !== id) return;
     $('scoreCard').innerHTML = scoreCard(d.score, cardOwner(d.owner), d.calculator);
@@ -2412,15 +2493,15 @@ function offerRecompute() {
   if (recomputing || staleScores === 0) return;
   if (!settings.includeUnrankedMods) return;
 
-  const n = fmt(staleScores);
+  const count = { n: fmt(staleScores) };
   const ok = confirm(
-    `${n} tracked play${staleScores === 1 ? '' : 's'} ${
-      staleScores === 1 ? 'was' : 'were'
-    } recorded before this setting existed, so ${
-      staleScores === 1 ? 'it has' : 'they have'
-    } no pp for unranked mods yet.\n\n` +
-      'Recalculate them from their replay files now?\n\n' +
-      'Nothing is deleted. Plays whose replay is no longer on disk are left as they are.',
+    `${
+      staleScores === 1
+        ? t('recompute.staleOne', count)
+        : t('recompute.staleMany', count)
+    }\n\n` +
+      `${t('recompute.ask')}\n\n` +
+      t('recompute.nothingDeleted'),
   );
   if (!ok) return;
   void runRecompute();
@@ -2437,14 +2518,17 @@ function renderPpCalculator() {
   $('footerPp').hidden = $('footerPpSep').hidden = v === null;
   $('footerPp').textContent = v ? `pp: osu! ${v}` : '';
   $('ppCalculatorVersion').textContent = v
-    ? `pp is calculated by osu!'s own calculator, from osu! ${v}.`
-    : 'The pp calculator is not available, so new scores are tracked with no pp.';
+    ? t('recompute.calculatorVersion', { version: v })
+    : t('recompute.noCalculator');
   const n = ppCalculator.outdated;
   $('ppCalculatorOutdated').hidden = !v || n === 0;
+  const outdated = { n: fmt(n) };
   $('ppCalculatorOutdatedText').textContent =
-    `${fmt(n)} score${n === 1 ? ' was' : 's were'} priced by a different version of it, or before ` +
-    'the version was recorded. Recalculating them from their replays puts every score on the ' +
-    'same algorithm; scores whose replay is gone are left as they are.';
+    (n === 1
+      ? t('recompute.outdatedOne', outdated)
+      : t('recompute.outdatedMany', outdated)) +
+    ' ' +
+    t('recompute.outdatedFix');
 }
 
 $('ppRecalculate').onclick = () => {
@@ -2454,16 +2538,23 @@ $('ppRecalculate').onclick = () => {
 
 async function runRecompute(all = false) {
   recomputing = true;
-  toast('Recalculating stored scores from their replays...');
+  toast(t('recompute.running'));
   try {
     const d = await postJson('/api/recompute', { confirm: true, all }, 'recompute failed');
+    const updated = { n: fmt(d.updated) };
     toast(
-      `Recalculated ${fmt(d.updated)} play${d.updated === 1 ? '' : 's'}` +
-        (d.gainedPp > 0 ? ` - ${fmt(d.gainedPp)} gained a pp value` : '') +
-        (d.skipped > 0 ? ` (${fmt(d.skipped)} skipped, no replay or beatmap on disk)` : ''),
+      (d.updated === 1
+        ? t('recompute.doneOne', updated)
+        : t('recompute.doneMany', updated)) +
+        (d.gainedPp > 0
+          ? t('recompute.gained', { n: fmt(d.gainedPp) })
+          : '') +
+        (d.skipped > 0
+          ? t('recompute.skipped', { n: fmt(d.skipped) })
+          : ''),
     );
   } catch (err) {
-    toast(`Recalculating failed: ${err.message}`);
+    toast(t('recompute.failed', { error: err.message }));
   } finally {
     recomputing = false;
     await Promise.all([loadState(), loadProfile()]);
@@ -2479,20 +2570,32 @@ const profileHint = (message, isError) => hint('profileHint', message, isError);
 function renderProfiles() {
   $('profileList').innerHTML = profiles
     .map((p) => {
-      const plays = `${fmt(p.scoreCount)} play${p.scoreCount === 1 ? '' : 's'}`;
-      const since = new Date(p.trackingSince).toLocaleDateString();
+      const count = { n: fmt(p.scoreCount) };
+      const plays =
+        p.scoreCount === 1
+          ? t('profiles.onePlay', count)
+          : t('profiles.plays', count);
+      const since = new Date(p.trackingSince).toLocaleDateString(currentLocale());
       // The only profile cannot be deleted: the app must always have somewhere to write.
       const canDelete = profiles.length > 1;
       return `<div class="profile-row${p.active ? ' profile-row--active' : ''}">
         <div class="profile-row__name">
           ${escapeHtml(p.name)}
-          <div class="profile-row__meta">${plays} &middot; since ${escapeHtml(since)}</div>
+          <div class="profile-row__meta">${plays} &middot; ${escapeHtml(
+            t('profiles.since', { date: since }),
+          )}</div>
         </div>
         <div class="profile-row__actions">
-          ${p.active ? '' : `<button type="button" data-act="switch" data-id="${p.id}">Switch to</button>`}
-          <button type="button" data-act="rename" data-id="${p.id}">Rename</button>
+          ${
+            p.active
+              ? ''
+              : `<button type="button" data-act="switch" data-id="${p.id}">${escapeHtml(
+                  t('profiles.switchTo'),
+                )}</button>`
+          }
+          <button type="button" data-act="rename" data-id="${p.id}">${escapeHtml(t('profiles.rename'))}</button>
           <button type="button" class="danger" data-act="delete" data-id="${p.id}"
-                  ${canDelete ? '' : 'disabled title="This is the only profile"'}>Delete</button>
+                  ${canDelete ? '' : `disabled title="${escapeHtml(t('profiles.onlyProfile'))}"`}>${escapeHtml(t('profiles.delete'))}</button>
         </div>
       </div>`;
     })
@@ -2518,7 +2621,7 @@ function openProfiles({ section = null, favoritesOnly = false } = {}) {
   if (isStatic) return;
   setMenuOpen(false);
   $('newProfileName').value = '';
-  profileHint('A new profile starts empty and tracks from the moment you create it.');
+  profileHint(t('profiles.newStartsEmpty'));
   renderProfiles();
   renderProfileEdit();
   resetImport({ favoritesOnly });
@@ -2548,33 +2651,39 @@ $('profileList').onclick = async (e) => {
   try {
     if (button.dataset.act === 'switch') {
       await profileAction({ action: 'switch', id });
-      toast(`Now tracking "${profile.name}"`);
+      toast(t('profiles.nowTracking', { name: profile.name }));
       await Promise.all([loadState(), loadProfile()]);
-      profileHint(`Switched to "${profile.name}".`);
+      profileHint(t('profiles.switched', { name: profile.name }));
       return;
     }
 
     if (button.dataset.act === 'rename') {
-      const name = prompt('Rename this profile to:', profile.name);
+      const name = prompt(t('profiles.renamePrompt'), profile.name);
       if (name === null || name.trim() === profile.name) return;
       await profileAction({ action: 'rename', id, name });
       await loadState();
-      profileHint(`Renamed to "${name.trim()}".`);
+      profileHint(t('profiles.renamed', { name: name.trim() }));
       return;
     }
 
     if (button.dataset.act === 'delete') {
+      const doomed = { name: profile.name, n: profile.scoreCount };
       const warning =
         profile.scoreCount > 0
-          ? `Delete "${profile.name}" and its ${profile.scoreCount} tracked play${
-              profile.scoreCount === 1 ? '' : 's'
-            }?\n\nThis cannot be undone. Your replay files are not touched.`
-          : `Delete "${profile.name}"? It has no tracked plays.`;
+          ? `${
+              profile.scoreCount === 1
+                ? t('profiles.deleteOneAsk', doomed)
+                : t('profiles.deleteManyAsk', doomed)
+            }\n\n${t('profiles.deleteWarning')}`
+          : t('profiles.deleteEmptyAsk', doomed);
       if (!confirm(warning)) return;
       const data = await profileAction({ action: 'delete', id, confirm: true });
-      toast(`Deleted "${profile.name}" (${fmt(data.deletedScores)} erased)`);
+      toast(t('profiles.deletedToast', {
+        name: profile.name,
+        n: fmt(data.deletedScores),
+      }));
       await Promise.all([loadState(), loadProfile()]);
-      profileHint(`Deleted "${profile.name}".`);
+      profileHint(t('profiles.deleted', { name: profile.name }));
     }
   } catch (err) {
     profileHint(err.message, true);
@@ -2584,16 +2693,16 @@ $('profileList').onclick = async (e) => {
 $('profileCreate').onclick = async () => {
   const name = $('newProfileName').value.trim();
   if (!name) {
-    profileHint('Give the new profile a name first.', true);
+    profileHint(t('profiles.needName'), true);
     $('newProfileName').focus();
     return;
   }
   try {
     await profileAction({ action: 'create', name });
     $('newProfileName').value = '';
-    toast(`Created "${name}" and switched to it`);
+    toast(t('profiles.createdToast', { name }));
     await Promise.all([loadState(), loadProfile()]);
-    profileHint(`Created "${name}". It is now the profile being tracked.`);
+    profileHint(t('profiles.created', { name }));
   } catch (err) {
     profileHint(err.message, true);
   }
@@ -2612,12 +2721,12 @@ $('newProfileName').onkeydown = (e) => {
  */
 $('shareExport').onclick = () => {
   window.location.href = '/api/export';
-  toast('Exporting this profile as JSON');
+  toast(t('backup.exporting'));
 };
 
 $('shareBackup').onclick = () => {
   window.location.href = '/api/backup';
-  toast('Backing up every profile');
+  toast(t('backup.backingUp'));
 };
 
 /* ------------------------------------------------------ import past plays */
@@ -2646,9 +2755,9 @@ function resetBackfillPreview(message) {
  */
 function renderBackfillSources(counts) {
   const kinds = [
-    ['replays', 'Finished plays, from replays', counts.replays],
-    ['unfinished', 'Unfinished plays osu! counted', counts.unfinished],
-    ['attempts', 'Plays osu! could not submit', counts.attempts],
+    ['replays', t('backfill.finishedPlays'), counts.replays],
+    ['unfinished', t('backfill.unfinishedPlays'), counts.unfinished],
+    ['attempts', t('backfill.unsubmittedPlays'), counts.attempts],
   ].filter(([, , n]) => n > 0);
   $('backfillSources').innerHTML = kinds
     .map(
@@ -2665,7 +2774,10 @@ function updateBackfillConfirm() {
   const ticked = [...$('backfillSources').querySelectorAll('input[data-source]:checked')];
   const total = ticked.reduce((sum, box) => sum + Number(box.dataset.count), 0);
   $('backfillConfirm').disabled = total === 0;
-  $('backfillConfirm').textContent = total > 0 ? `Import ${fmt(total)}` : 'Import';
+  $('backfillConfirm').textContent =
+    total > 0
+      ? t('backfill.importN', { n: fmt(total) })
+      : t('backfill.import');
 }
 
 $('backfillSources').onchange = updateBackfillConfirm;
@@ -2685,23 +2797,18 @@ function renderBackfillFilterHint() {
   const hint = $('backfillFilterHint');
   const on = backfillApplyFilter();
   if (!filterNarrowing) {
-    hint.innerHTML =
-      'No play tracking filter is set, so this changes nothing. ' +
-      '<button type="button" class="hint-link" id="backfillOpenFilter">Set one up</button> ' +
-      'to choose which plays are recorded at all.';
+    hint.innerHTML = t('backfill.noFilter');
     return;
   }
   hint.innerHTML = on
-    ? 'Plays your filter turns away will not be imported. ' +
-      '<button type="button" class="hint-link" id="backfillOpenFilter">Change the filter</button>'
-    : 'Every play found will be imported, filter or not &mdash; useful for an evening played ' +
-      'before this filter existed.';
+    ? t('backfill.filterOn')
+    : t('backfill.filterOff');
 }
 
 $('backfillFiltered').onchange = () => {
   renderBackfillFilterHint();
   // The counts came from the other answer, so they are no longer the ones this would import.
-  resetBackfillPreview('Filtering changed - check again to see what would be imported.');
+  resetBackfillPreview(t('backfill.filterChanged'));
 };
 
 /* The prompt to the filter itself. One dialog at a time, so this closes on the way. */
@@ -2719,7 +2826,7 @@ function openBackfill() {
   // decision to bypass the filter should be made for the import in front of you.
   $('backfillFiltered').checked = true;
   renderBackfillFilterHint();
-  resetBackfillPreview('Pick a time, then check what would be imported.');
+  resetBackfillPreview(t('backfill.pickATime'));
   $('backfillModal').hidden = false;
   $('backfillCancel').focus();
 }
@@ -2746,23 +2853,23 @@ $('backfillPresets').onclick = (e) => {
   const hours = Number(b.dataset.hours);
   markPreset(hours);
   $('backfillSince').value = toLocalInput(Date.now() - hours * 3600_000);
-  resetBackfillPreview('Cutoff changed - check again to see what would be imported.');
+  resetBackfillPreview(t('backfill.cutoffChanged'));
 };
 
 $('backfillSince').onchange = () => {
   markPreset(null);
-  resetBackfillPreview('Cutoff changed - check again to see what would be imported.');
+  resetBackfillPreview(t('backfill.cutoffChanged'));
 };
 
 $('backfillCheck').onclick = async () => {
   const since = sinceValue();
   if (!Number.isFinite(since)) {
-    resetBackfillPreview('That is not a valid date and time.');
+    resetBackfillPreview(t('backfill.badDate'));
     return;
   }
 
   $('backfillCheck').disabled = true;
-  $('backfillSummary').textContent = 'Scanning your osu! folders...';
+  $('backfillSummary').textContent = t('backfill.scanning');
   try {
     const d = await postJson(
       '/api/backfill/preview',
@@ -2778,7 +2885,7 @@ $('backfillCheck').onclick = async () => {
     // The star rating is the one criterion the preview does not check -- it costs a call to
     // osu!'s calculator per play -- so when it is set, the count is an upper bound and says so.
     const unchecked = d.starsUnchecked
-      ? ' The filter’s star rating is checked as each play is imported, so a few more may be left out.'
+      ? ` ${t('backfill.starsUnchecked')}`
       : '';
 
     // lazer's logs: the unfinished plays osu! counted and the attempts it could not submit.
@@ -2786,13 +2893,30 @@ $('backfillCheck').onclick = async () => {
     const found = d.importable + log.unfinished + log.attempts;
     const tracked = d.duplicates + log.alreadyTracked;
     const declined = d.filtered + log.filtered;
-    const plural = (n, word) => `${fmt(n)} ${word}${n === 1 ? '' : 's'}`;
+    /*
+     * A count and its noun, as one translated sentence per noun and number. Gluing an "s"
+     * onto a translated word is an English habit that produces nonsense everywhere else.
+     *
+     * Written out at each site rather than behind a helper taking key names: a key that is
+     * not a literal argument to `t()` is one scripts/build-i18n.mjs cannot see, and a key
+     * nothing can see is a key nobody notices has gone missing.
+     */
+    const replays = (n) =>
+      n === 1 ? t('backfill.oneReplay', { n: fmt(n) }) : t('backfill.manyReplays', { n: fmt(n) });
+    const plays = (n) =>
+      n === 1 ? t('backfill.onePlay', { n: fmt(n) }) : t('backfill.manyPlays', { n: fmt(n) });
+    const unfinishedPlays = (n) =>
+      n === 1
+        ? t('backfill.oneUnfinished', { n: fmt(n) })
+        : t('backfill.manyUnfinished', { n: fmt(n) });
     /*
      * The tracking filter applies to an import too, so the preview says what it would decline:
      * the answer to "why only three of forty" is the filter, and switching it off imports them.
      */
     const filtered =
-      declined > 0 ? ` ${fmt(declined)} would be left out by the play tracking filter.` : '';
+      declined > 0
+        ? ` ${t('backfill.wouldBeFiltered', { n: fmt(declined) })}`
+        : '';
     /*
      * Replays somebody else set. osu! caches the ones you watch in the same folders as the
      * ones you play, so a scan finds both -- and an import that brings in fewer plays than
@@ -2807,37 +2931,66 @@ $('backfillCheck').onclick = async () => {
       .join(', ');
     const watched =
       otherTotal > 0
-        ? ` ${plural(otherTotal, 'replay')} in these folders were set by someone else` +
-          `${otherNames ? ` (${otherNames}${others.length > 3 ? `, and ${others.length - 3} more` : ''})` : ''}` +
-          ' -- replays you watched, not plays. They are never imported.'
+        ? ` ${t('backfill.othersFound', {
+          replays: replays(otherTotal),
+        })}` +
+          `${
+            otherNames
+              ? ` (${otherNames}${
+                  others.length > 3
+                    ? t('backfill.andMore', { n: others.length - 3 })
+                    : ''
+                })`
+              : ''
+          }` +
+          ` ${t('backfill.othersExplained')}`
         : '';
 
     if (found === 0) {
       resetBackfillPreview(
         tracked > 0 || declined > 0
-          ? `Nothing to import.${escapeHtml(
-              tracked > 0 ? ` ${plural(tracked, 'play')} found since then are already tracked.` : '',
+          ? `${escapeHtml(t('backfill.nothingToImport'))}${escapeHtml(
+              tracked > 0
+                ? ` ${t('backfill.alreadyTracked', {
+                  plays: plays(tracked),
+                })}`
+                : '',
             )}${escapeHtml(filtered)}${escapeHtml(watched)}`
-          : `No plays found since then (${fmt(d.scanned)} files checked).${escapeHtml(watched)}`,
+          : `${escapeHtml(t('backfill.nonePlaysFound', { n: fmt(d.scanned) }))}${escapeHtml(watched)}`,
       );
       return;
     }
 
     const span =
       d.earliest && d.latest
-        ? ` Finished plays run from ${new Date(d.earliest).toLocaleString()} to ${new Date(d.latest).toLocaleString()}.`
+        ? ` ${t('backfill.span', {
+          from: new Date(d.earliest).toLocaleString(currentLocale()),
+          to: new Date(d.latest).toLocaleString(currentLocale()),
+        })}`
         : '';
-    const dupes = tracked > 0 ? ` ${fmt(tracked)} already tracked and will be left alone.` : '';
+    const dupes =
+      tracked > 0
+        ? ` ${t('backfill.leftAlone', { n: fmt(tracked) })}`
+        : '';
     // A logged play on a beatmap no longer installed has no mode to be filed under.
     const unresolved =
       log.unresolved > 0
-        ? ` ${plural(log.unresolved, 'unfinished play')} on beatmaps that are not installed will be skipped.`
+        ? ` ${t('backfill.unresolved', {
+          plays: unfinishedPlays(log.unresolved),
+        })}`
         : '';
     $('backfillSummary').innerHTML =
-      `<b>${plural(found, 'play')}</b> found.${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(watched)}${escapeHtml(unresolved)}${escapeHtml(unchecked)} Untick anything you do not want.`;
+      t('backfill.foundHeadline', {
+        plays: escapeHtml(plays(found)),
+      }) +
+      `${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(watched)}${escapeHtml(
+        unresolved,
+      )}${escapeHtml(unchecked)} ${escapeHtml(t('backfill.untick'))}`;
     renderBackfillSources({ replays: d.importable, unfinished: log.unfinished, attempts: log.attempts });
   } catch (err) {
-    resetBackfillPreview(`Check failed: ${escapeHtml(err.message)}`);
+    resetBackfillPreview(t('backfill.checkFailed', {
+      error: escapeHtml(err.message),
+    }));
   } finally {
     $('backfillCheck').disabled = false;
   }
@@ -2859,13 +3012,21 @@ $('backfillConfirm').onclick = async () => {
     );
     const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
     toast(
-      `Imported ${fmt(total)} past play${total === 1 ? '' : 's'}` +
-        (d.filtered > 0 ? ` - ${fmt(d.filtered)} left out by the filter` : ''),
+      (total === 1
+        ? t('backfill.importedOne', { n: fmt(total) })
+        : t('backfill.importedMany', { n: fmt(total) })) +
+        (d.filtered > 0
+          ? t('backfill.importedFiltered', {
+              n: fmt(d.filtered),
+            })
+          : ''),
     );
     closeBackfill();
     await Promise.all([loadProfile(), loadState()]);
   } catch (err) {
-    resetBackfillPreview(`Import failed: ${escapeHtml(err.message)}`);
+    resetBackfillPreview(t('backfill.importFailed', {
+      error: escapeHtml(err.message),
+    }));
   } finally {
     $('backfillCheck').disabled = false;
   }
@@ -2886,8 +3047,8 @@ function renderFilterMenu() {
   const button = $('optFilter');
   button.classList.toggle('menu__marked', Boolean(filterNarrowing));
   button.title = filterNarrowing
-    ? 'A filter is on: some plays are not being recorded'
-    : 'Choose which plays are recorded at all';
+    ? t('filter.menuOn')
+    : t('filter.menuOff');
 }
 
 $('optFilter').onclick = () => {
@@ -2920,8 +3081,10 @@ function openReset() {
   const plays = stats?.playcount ?? 0;
   $('resetSummary').textContent =
     plays > 0
-      ? `${plays} tracked play${plays === 1 ? '' : 's'} will be erased and this profile will start from zero.`
-      : 'Nothing has been tracked yet, so this only restarts tracking from now.';
+      ? plays === 1
+        ? t('reset.oneWarning', { n: fmt(plays) })
+        : t('reset.manyWarning', { n: fmt(plays) })
+      : t('reset.nothingWarning');
   $('resetModal').hidden = false;
   $('resetCancel').focus();
 }
@@ -2951,9 +3114,13 @@ $('resetConfirm').onclick = async () => {
   $('resetConfirm').textContent = 'Erasing...';
   try {
     const data = await postJson('/api/profile/reset', { confirm: true }, 'reset failed');
-    toast(`Profile reset - ${data.deleted} play${data.deleted === 1 ? '' : 's'} erased`);
+    toast(
+      data.deleted === 1
+        ? t('reset.doneOne', { n: fmt(data.deleted) })
+        : t('reset.doneMany', { n: fmt(data.deleted) }),
+    );
   } catch (err) {
-    toast(`Reset failed: ${err.message}`);
+    toast(t('reset.failed', { error: err.message }));
   } finally {
     resetting = false;
     $('resetConfirm').disabled = false;
@@ -3010,7 +3177,10 @@ on('score', (e) => {
   // toast from reading as "+120pp" when the total underneath it has not moved.
   const counted = s.ranked || (settings.includeUnrankedMods && s.mapRanked);
   const shownPp = counting?.preferStrippedPp && s.ppNomod != null ? s.ppNomod : s.pp;
-  const pp = shownPp == null ? '' : `${fmt(shownPp, 0)}pp${counted ? '' : ' (not counted)'}`;
+  const pp =
+    shownPp == null
+      ? ''
+      : `${fmt(shownPp, 0)}pp${counted ? '' : ` ${t('live.notCounted')}`}`;
   toast(`${s.grade} ${pct(s.accuracy)} ${pp} - ${s.title}`.replace(/\s+/g, ' '));
   if (s.mode === mode) loadProfile();
   loadState();
@@ -3024,7 +3194,11 @@ on('incomplete', (e) => {
   const play = JSON.parse(e.data);
   // An attempt osu! could not submit may not count at all, depending on the setting, so the
   // toast says which kind it was rather than reading like a counted play.
-  toast(play.unsubmitted ? `Not submitted to osu! - ${play.title}` : `Didn't finish - ${play.title}`);
+  toast(
+    play.unsubmitted
+      ? t('live.notSubmitted', { title: play.title })
+      : t('live.didntFinish', { title: play.title }),
+  );
   if (play.mode === mode) loadProfile();
   loadState();
 });
@@ -3035,7 +3209,10 @@ on('incomplete', (e) => {
  */
 on('filtered', (e) => {
   const play = JSON.parse(e.data);
-  toast(`Not tracked (${play.criterion}) - ${play.title}`);
+  toast(t('live.notTracked', {
+    criterion: play.criterion,
+    title: play.title,
+  }));
   loadState();
 });
 on('tracking', (e) => setTracking(JSON.parse(e.data).tracking));
@@ -3073,7 +3250,11 @@ on('scores', () => {
 // frozen. The final `recompute` event is handled by whoever started it.
 on('recompute-progress', (e) => {
   const p = JSON.parse(e.data);
-  if (p.percent < 100) toast(`Recalculating stored scores... ${p.percent}%`);
+  if (p.percent < 100) {
+    toast(t('recompute.progress', {
+      percent: p.percent,
+    }));
+  }
 });
 
 /* --- language ------------------------------------------------------------ */

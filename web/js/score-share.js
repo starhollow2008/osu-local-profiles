@@ -9,6 +9,7 @@ import { assetUrl } from './static-mode.js';
 import { generatedAvatar } from './badges.js';
 import { countryName } from './format.js';
 import { downloadBlob, toast } from './ui.js';
+import { t } from './i18n.js';
 
 /** This app's `osu.ppy.sh/scores/<id>`: the score's own page, on this machine. */
 export const scoreLink = (id) => `${location.origin}/scores/${id}`;
@@ -47,16 +48,16 @@ async function writeText(text) {
   area.select();
   const ok = document.execCommand('copy');
   area.remove();
-  if (!ok) throw new Error('the browser would not copy it');
+  if (!ok) throw new Error(t('share.copyRefused'));
 }
 
 export async function copyScoreLink(id) {
   const link = scoreLink(id);
   try {
     await writeText(link);
-    toast(`Link copied - ${link}`);
+    toast(t('share.linkCopied', { link }));
   } catch {
-    toast(`Could not copy the link. It is ${link}`);
+    toast(t('share.linkNotCopied', { link }));
   }
 }
 
@@ -67,7 +68,7 @@ async function fetchScreenshot(id) {
   const r = await fetch(screenshotUrl(id));
   if (!r.ok) {
     const d = await r.json().catch(() => ({}));
-    throw new Error(d.error ?? 'the screenshot could not be made');
+    throw new Error(d.error ?? t('share.screenshotFailed'));
   }
   return r;
 }
@@ -97,7 +98,7 @@ export async function saveScoreImage(id) {
   try {
     const r = await fetchScreenshot(id);
     downloadBlob(await r.blob(), fileNameOf(r, `score-${id}.png`));
-    toast('Screenshot saved to your downloads');
+    toast(t('share.screenshotSaved'));
   } catch (err) {
     toast(err.message);
   }
@@ -105,7 +106,7 @@ export async function saveScoreImage(id) {
 
 export async function copyScoreImage(id) {
   if (typeof ClipboardItem === 'undefined' || !navigator.clipboard?.write) {
-    toast('This browser cannot copy images - use Save screenshot instead');
+    toast(t('share.cannotCopyImages'));
     return;
   }
   toast('Making the screenshot...');

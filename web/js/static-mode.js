@@ -51,7 +51,9 @@ function answer(path, method, params) {
   const score = /^scores\/(\d+)$/.exec(path);
   if (score) {
     const detail = snapshot.scores?.[score[1]];
-    return detail ? reply(detail) : reply({ error: 'This copy of the profile does not include that score.' }, 404);
+    return detail
+      ? reply(detail)
+      : reply({ error: 'This copy of the profile does not include that score.' }, 404);
   }
   if (path === 'update') return reply({ available: false, blocked: null });
   return reply({ error: READ_ONLY }, 404);

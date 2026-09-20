@@ -1,10 +1,13 @@
 /** Markup builders for the repeated rows on the profile page. */
 import { escapeHtml, fmt, pct, timeAgo, fullDate } from './format.js';
 import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './badges.js';
+import { t } from './i18n.js';
 
 function titleOf(item) {
   const name = [item.artist, item.title].filter(Boolean).join(' - ');
-  return name || `unknown beatmap (${(item.beatmapMd5 ?? '').slice(0, 12)})`;
+  return name || t('beatmap.unknown', {
+    md5: (item.beatmapMd5 ?? '').slice(0, 12),
+  });
 }
 
 /** Links back to osu.ppy.sh when we know the id, and is inert when we do not. */
@@ -33,8 +36,7 @@ export function countingNoteText(counting) {
   // every profile, whether or not it had ever played offline.
   const plays =
     counting?.countUnsubmitted && counting.unsubmittedAttempts > 0
-      ? 'Plays osu! could not submit - quit, failed or retried while offline or signed out - ' +
-        'count here too, so the play count runs ahead of osu!’s.'
+      ? t('note.unsubmittedCount')
       : '';
 
   /*
@@ -45,27 +47,24 @@ export function countingNoteText(counting) {
    */
   if (counting?.countUnresolved) {
     return (
-      'No osu!lazer installation was found, and osu!stable does not record whether a beatmap ' +
-      'is ranked. Every beatmap therefore counts toward pp here -- loved, graveyarded and ' +
-      'never-submitted ones included -- and the beatmap options in Settings cannot change ' +
-      'that. The pp and rank here are not comparable with a real osu! account.' +
-      (plays ? ` ${plays}` : '')
+      t('note.stableOnly') + (plays ? ` ${plays}` : '')
     );
   }
 
   const included = [];
-  if (counting?.includeUnrankedMods) included.push('mods');
-  if (counting?.extraMapStatuses?.length) included.push('beatmaps');
+  if (counting?.includeUnrankedMods) included.push(t('note.mods'));
+  if (counting?.extraMapStatuses?.length) included.push(t('note.beatmaps'));
   if (included.length === 0) return plays;
 
-  let text = `This profile counts plays on ${included.join(' and ')} osu! does not rank. `;
+  // "mods", "beatmaps", or both joined. The joining word is translated too: a language that
+  // does not put "and" between two nouns the way English does still reads correctly.
+  let text = `${t('note.countsUnranked', { what: included.join(t('note.and')) })} `;
   if (counting.includeUnrankedMods) {
     text += counting.preferStrippedPp
-      ? 'Relax and Autopilot plays are priced as if the mod had been off, which osu! never ' +
-        'awards - those are marked with *. '
-      : 'Relax and Autopilot plays use osu!’s own pp for the mods as played. ';
+      ? `${t('note.strippedPp')} `
+      : `${t('note.officialPp')} `;
   }
-  return `${text}The pp and rank here are not comparable with a real osu! account.${plays ? ` ${plays}` : ''}`;
+  return `${text}${t('note.notComparable')}${plays ? ` ${plays}` : ''}`;
 }
 
 /**
@@ -109,7 +108,9 @@ export function ppNotes(play) {
     // No pp at all: an unranked map or mod combination before the settings allowed it, or a
     // beatmap that was never downloaded so there is no local .osu to calculate from.
     return {
-      none: play.ranked ? 'no pp -- the beatmap file was not found locally' : 'unranked',
+      none: play.ranked
+        ? t('pp.noBeatmapFile')
+        : t('pp.unranked'),
       uncounted: false,
       unofficial: false,
       notes: [],
@@ -122,14 +123,13 @@ export function ppNotes(play) {
   if (uncounted) {
     notes.push(
       play.passed === false
-        ? 'A failed play never counts toward pp.'
-        : 'This does not count toward the profile: osu! would not rank it, and the settings do not include it.',
+        ? t('pp.failedNeverCounts')
+        : t('pp.notCounted'),
     );
   }
   if (unofficial) {
     notes.push(
-      'Priced with Relax or Autopilot removed, as if the mod had not been on. ' +
-        'osu! never awards this, and it flatters the score.',
+      t('pp.strippedBasis'),
     );
   }
   return { none: null, uncounted, unofficial, notes };
@@ -334,7 +334,7 @@ export function playList(plays, options = {}) {
   if (!plays || plays.length === 0) {
     // An empty string asks for nothing at all, not an empty placeholder box.
     if (options.empty === '') return '';
-    return `<div class="u-empty">${escapeHtml(options.empty ?? 'Nothing here yet.')}</div>`;
+    return `<div class="u-empty">${escapeHtml(options.empty ?? t('section.empty'))}</div>`;
   }
   return `<div class="play-detail-list">${plays
     .map((p) => (p.kind === 'incomplete' ? incompleteRow(p, options) : playRow(p, options)))
@@ -383,20 +383,20 @@ export function activityRow(event) {
   switch (event.type) {
     case 'medal':
       // osu!'s own wording (`events.achievement`), with the profile standing in for the user.
-      text = `Unlocked the "<strong>${escapeHtml(event.name)}</strong>" medal!`;
+      text = t('activity.medal', { name: escapeHtml(event.name) });
       icon = medalBadge({ ...event, achievedAt: event.at }, 'recent-activity');
       break;
     case 'best':
-      text = `New best performance: <span class="activity__highlight">${fmt(event.pp, 0)}pp</span> on
-              <span class="activity__map">${escapeHtml(event.title)}${
-                event.version ? ` [${escapeHtml(event.version)}]` : ''
-              }</span>`;
+      text = t('activity.best', {
+        pp: fmt(event.pp, 0),
+        map: escapeHtml(event.title) + (event.version ? ` [${escapeHtml(event.version)}]` : ''),
+      });
       break;
     case 'level':
-      text = `Reached <span class="activity__highlight">level ${fmt(event.level)}</span>`;
+      text = t('activity.level', { level: fmt(event.level) });
       break;
     case 'first':
-      text = 'Started tracking this profile';
+      text = t('activity.first');
       break;
     default:
       return '';

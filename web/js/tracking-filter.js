@@ -20,6 +20,7 @@ import { escapeHtml, MODE_NAMES } from './format.js';
 import { modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { hint, postJson, toast } from './ui.js';
+import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -37,33 +38,45 @@ const MAX_LENGTH_SECONDS = 3600;
  */
 const HIDDEN_MODS = new Set(['AT', 'CN', 'SV2']);
 
-/** osu!'s own mod groups, in lazer's own order, with the wording lazer uses for each. */
+/**
+ * osu!'s own mod groups, in lazer's own order, with the wording lazer uses for each.
+ *
+ * The heading is fetched when the grid is drawn rather than stored here, so it follows the
+ * language the page is in now -- and by a literal `t()` per group, so scripts/build-i18n.mjs
+ * can see every key.
+ */
 const MOD_GROUPS = [
-  ['DifficultyReduction', 'Difficulty reduction'],
-  ['DifficultyIncrease', 'Difficulty increase'],
-  ['Conversion', 'Conversion'],
-  ['Automation', 'Automation'],
-  ['Fun', 'Fun'],
-  ['System', 'System'],
+  ['DifficultyReduction', () => t('mods.difficultyReduction')],
+  ['DifficultyIncrease', () => t('mods.difficultyIncrease')],
+  ['Conversion', () => t('mods.conversion')],
+  ['Automation', () => t('mods.automation')],
+  ['Fun', () => t('mods.fun')],
+  ['System', () => t('mods.system')],
 ];
 
 const CATEGORY_LABELS = [
-  ['ranked', 'Ranked'],
-  ['qualified', 'Qualified'],
-  ['loved', 'Loved'],
-  ['pending', 'Pending'],
-  ['wip', 'Work in progress'],
-  ['graveyard', 'Graveyarded'],
-  ['unsubmitted', 'Never submitted'],
+  ['ranked', () => t('status.ranked')],
+  ['qualified', () => t('status.qualified')],
+  ['loved', () => t('status.loved')],
+  ['pending', () => t('status.pending')],
+  ['wip', () => t('filter.workInProgress')],
+  ['graveyard', () => t('filter.graveyarded')],
+  ['unsubmitted', () => t('filter.neverSubmitted')],
 ];
 
 /** The states a mod chip cycles through, in the order a click moves through them. */
 const MOD_CYCLE = ['allowed', 'required', 'excluded'];
 
 const MOD_STATE_WORDS = {
-  allowed: 'may be used',
-  required: 'must be used',
-  excluded: 'must not be used',
+  get allowed() {
+    return t('filter.mayBeUsed');
+  },
+  get required() {
+    return t('filter.mustBeUsed');
+  },
+  get excluded() {
+    return t('filter.mustNotBeUsed');
+  },
 };
 
 /* The filter being edited, and the machine facts that decide what the dialog can offer. */
@@ -190,12 +203,10 @@ function paintRange(id) {
 
 function keywordsSection() {
   return section(
-    'Keywords',
+    t('filter.keywords'),
     `<input type="text" id="tf-keywords" class="tfilter__text"
-            placeholder="e.g. Sotarks, Blue Zenith, Insane">`,
-    'Matched against the song title, the artist, the difficulty name and the mapper. Separate ' +
-      'several with commas -- a play counts if any one of them appears anywhere in those four. ' +
-      'Leave it empty to accept every beatmap.',
+            placeholder="${escapeHtml(t('filter.keywordsPlaceholder'))}">`,
+    t('filter.keywordsHelp'),
   );
 }
 
@@ -207,47 +218,41 @@ function modesSection() {
       )}</label>`,
   ).join('');
   return section(
-    'Mode',
+    t('filter.mode'),
     `<div class="checkgroup">${boxes}</div>`,
-    'The mode the play was set in. A play on a converted beatmap counts as the mode it was ' +
-      'played in -- except an unfinished one, which osu! only records the beatmap for, so it ' +
-      "counts as the beatmap's own mode.",
+    t('filter.modeHelp'),
   );
 }
 
 function starsSection() {
   return section(
-    'Difficulty',
+    t('filter.difficulty'),
     rangeControl('tf-stars', MAX_STARS * 10 + 1, {
       type: 'text',
       attrs: 'inputmode="decimal" maxlength="5"',
-      minLabel: 'minimum star rating',
-      maxLabel: 'maximum star rating',
+      minLabel: t('filter.minStars'),
+      maxLabel: t('filter.maxStars'),
       minPlaceholder: '0.00',
-      maxPlaceholder: 'no limit',
-      unit: 'stars',
+      maxPlaceholder: t('filter.noLimit'),
+      unit: t('filter.starsUnit'),
     }),
-    'The star rating of the play as it happened, mods included -- so a 5.50★ beatmap ' +
-      'played with Double Time is judged at its Double Time rating. osu!’s own calculator ' +
-      'produces it. Drag the right handle in from the end to set a ceiling; the far end is no ' +
-      'ceiling at all.',
+    t('filter.difficultyHelp'),
   );
 }
 
 function lengthSection() {
   return section(
-    'Length',
+    t('filter.length'),
     rangeControl('tf-length', MAX_LENGTH_SECONDS + 1, {
       type: 'text',
       attrs: 'inputmode="numeric" maxlength="7"',
-      minLabel: 'minimum length',
-      maxLabel: 'maximum length',
+      minLabel: t('filter.minLength'),
+      maxLabel: t('filter.maxLength'),
       minPlaceholder: '0:00',
-      maxPlaceholder: 'no limit',
+      maxPlaceholder: t('filter.noLimit'),
       unit: 'm:ss',
     }),
-    'How long the beatmap runs at the speed it was played, so Double Time shortens it. Type ' +
-      'either <code>3:30</code> or a number of seconds.',
+    t('filter.lengthHelp'),
     { html: true },
   );
 }
@@ -256,14 +261,13 @@ function categoriesSection(suffix) {
   const boxes = CATEGORY_LABELS.map(
     ([name, label]) =>
       `<label class="checkgroup__item"><input type="checkbox" data-category="${name}"> ${escapeHtml(
-        label,
+        label(),
       )}</label>`,
   ).join('');
   return section(
-    'Categories',
+    t('filter.categories'),
     `<div class="checkgroup">${boxes}</div>`,
-    'The beatmap’s state on osu!. <b>Ranked</b> covers both ranked and approved, as osu! ' +
-      'does. <b>Never submitted</b> is a beatmap that exists only on this machine.' + suffix,
+    t('filter.categoriesHelp') + suffix,
     { html: true, id: 'tf-categories' },
   );
 }
@@ -274,8 +278,8 @@ function datesSection(key, title, help, { unknown } = {}) {
     title,
     rangeControl(`tf-${key}`, steps, {
       type: 'date',
-      minLabel: `earliest ${title.toLowerCase()}`,
-      maxLabel: `latest ${title.toLowerCase()}`,
+      minLabel: t('filter.earliest', { what: title.toLowerCase() }),
+      maxLabel: t('filter.latest', { what: title.toLowerCase() }),
     }) +
       (unknown
         ? `<label class="checkgroup__item tfilter__unknown">
@@ -299,39 +303,35 @@ function datesSection(key, title, help, { unknown } = {}) {
 function modsSection() {
   const acronyms = Object.keys(MOD_DEFINITIONS).filter((a) => !HIDDEN_MODS.has(a));
   const groups = MOD_GROUPS.map(([type, label]) => {
+    const heading = label();
     const inGroup = acronyms.filter((a) => MOD_DEFINITIONS[a].type === type).sort();
     if (inGroup.length === 0) return '';
     return `<div class="mod-grid__group">
-      <div class="mod-grid__label">${escapeHtml(label)}</div>
+      <div class="mod-grid__label">${escapeHtml(heading)}</div>
       <div class="mod-grid__row">${inGroup.map(modChip).join('')}</div>
     </div>`;
   }).join('');
 
   return section(
-    'Mods',
+    t('filter.mods'),
     `<div class="mod-grid__legend">
-       <span class="mod-grid__key mod-grid__key--allowed">may be used</span>
-       <span class="mod-grid__key mod-grid__key--required">must be used</span>
-       <span class="mod-grid__key mod-grid__key--excluded">must not be used</span>
+       <span class="mod-grid__key mod-grid__key--allowed">${escapeHtml(t('filter.mayBeUsed'))}</span>
+       <span class="mod-grid__key mod-grid__key--required">${escapeHtml(t('filter.mustBeUsed'))}</span>
+       <span class="mod-grid__key mod-grid__key--excluded">${escapeHtml(t('filter.mustNotBeUsed'))}</span>
        <span class="mod-grid__actions">
-         <button type="button" id="tf-mods-all">Allow every mod</button>
-         <button type="button" id="tf-mods-none">Allow none</button>
+         <button type="button" id="tf-mods-all">${escapeHtml(t('filter.allowEveryMod'))}</button>
+         <button type="button" id="tf-mods-none">${escapeHtml(t('filter.allowNone'))}</button>
        </span>
      </div>
      <div class="mod-grid" id="tf-mods">
        <div class="mod-grid__group">
-         <div class="mod-grid__label">No mods</div>
+         <div class="mod-grid__label">${escapeHtml(t('filter.noMods'))}</div>
          <div class="mod-grid__row">${modChip('NM')}</div>
        </div>
        ${groups}
      </div>
      <div class="tfilter__readout" id="tf-mods-readout"></div>`,
-    'Click a mod to cycle it: <b>may be used</b>, then <b>must be used</b>, then <b>must not ' +
-      'be used</b>. Everything starts at "may be used", so no mod combination is excluded ' +
-      'until you say so. Only which mods were on is compared, never how they were configured, ' +
-      'and osu!stable plays are matched on what the player actually chose -- osu! adds Classic ' +
-      'to them afterwards, which is not a choice anyone made. Autoplay and Cinema are not ' +
-      'listed: nothing in this app can ever count them.',
+    t('filter.modsHelp'),
     { html: true },
   );
 }
@@ -341,9 +341,14 @@ function modChip(acronym) {
   const definition = MOD_DEFINITIONS[acronym];
   const modes =
     definition && definition.modes.length < 4
-      ? ` (${definition.modes.map((m) => MODE_NAMES[m]).join(', ')} only)`
+      ? ` ${t('filter.modesOnly', {
+          modes: definition.modes.map((m) => MODE_NAMES[m]).join(', '),
+        })}`
       : '';
-  const name = acronym === 'NM' ? 'No mods at all' : `${definition?.name ?? acronym}${modes}`;
+  const name =
+    acronym === 'NM'
+      ? t('filter.noModsAtAll')
+      : `${definition?.name ?? acronym}${modes}`;
   return `<button type="button" class="mod-chip" data-mod="${escapeHtml(acronym)}"
     data-name="${escapeHtml(name)}" aria-pressed="false">${
       acronym === 'NM' ? noModIcon() : modPill(acronym)
@@ -379,8 +384,7 @@ function section(title, control, help, { html = false, id = null } = {}) {
 function renderBody() {
   const stable = !context.hasLazer;
   const needsLazer = stable
-    ? ' <b>Not available here:</b> this needs osu!lazer’s beatmap database, and only ' +
-      'osu!stable was found, so this criterion is left wide open.'
+    ? ` ${t('filter.needsLazer')}`
     : '';
 
   $('filterBody').innerHTML =
@@ -392,23 +396,20 @@ function renderBody() {
     lengthSection() +
     datesSection(
       'added',
-      'Date added',
-      'When the beatmap arrived on this machine, taken from when osu! created the file. A ' +
-        'beatmap imported from osu!stable is dated when it was imported, not when it was made.',
+      t('filter.dateAdded'),
+      t('filter.dateAddedHelp'),
     ) +
     datesSection(
       'submitted',
-      'Date submitted',
-      'When the beatmap was first uploaded to osu!. osu! only records this for beatmaps it has ' +
-        'ranked, approved or loved; the box above covers every other beatmap.' + needsLazer,
-      { unknown: 'Include beatmaps with no submission date on record' },
+      t('filter.dateSubmitted'),
+      t('filter.dateSubmittedHelp') + needsLazer,
+      { unknown: t('filter.includeNoSubmitDate') },
     ) +
     datesSection(
       'ranked',
-      'Date ranked',
-      'When the beatmap was ranked, approved or loved. Only those three ever have a date; ' +
-        'everything else is covered by the box above.' + needsLazer,
-      { unknown: 'Include beatmaps that were never ranked, qualified or loved' },
+      t('filter.dateRanked'),
+      t('filter.dateRankedHelp') + needsLazer,
+      { unknown: t('filter.includeNeverRanked') },
     );
 
   bindBody();
@@ -518,29 +519,38 @@ function modsReadout() {
 
   if (draft.noMod === 'required') {
     return required.length > 0
-      ? `<b>Nothing can match.</b> "No mods at all" and ${list(required)} cannot both be true.`
-      : 'Tracks plays with <b>no mods at all</b>.';
+      ? t('filter.readoutContradiction', { mods: list(required) })
+      : t('filter.readoutNoMods');
   }
 
   const parts = [];
-  if (required.length > 0) parts.push(`use ${list(required)}`);
+  if (required.length > 0) parts.push(t('filter.partUse', { mods: list(required) }));
   // Only worth saying while nothing is required: a required mod already rules out a nomod play,
   // and a sentence that says the same thing twice reads as two separate rules.
-  if (draft.noMod === 'excluded' && required.length === 0) parts.push('use at least one mod');
+  if (draft.noMod === 'excluded' && required.length === 0) {
+    parts.push(t('filter.partAtLeastOne'));
+  }
   if (excluded.length > 0) {
     // Named while the list is short enough to read, counted once it is not.
     parts.push(
       excluded.length <= 3
-        ? `never use ${list(excluded)}`
-        : `use none of the ${excluded.length} mods marked out`,
+        ? t('filter.partNeverUse', { mods: list(excluded) })
+        : t('filter.partNoneOf', { n: excluded.length }),
     );
   }
-  if (parts.length === 0) return 'Every mod combination counts.';
-  return `Tracks plays that ${joinWords(parts)}.`;
+  if (parts.length === 0) return t('filter.readoutAny');
+  return t('filter.readoutTracks', { what: joinWords(parts) });
 }
 
+// "a, b and c". The last joiner is translated on its own: not every language puts a word
+// there, and the ones that do do not all put the same one.
 const joinWords = (items) =>
-  items.length <= 1 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+  items.length <= 1
+    ? items.join('')
+    : t('filter.joinLast', {
+        list: items.slice(0, -1).join(', '),
+        last: items[items.length - 1],
+      });
 
 const list = (items) => joinWords(items.map((item) => `<b>${escapeHtml(item)}</b>`));
 
@@ -553,12 +563,14 @@ const list = (items) => joinWords(items.map((item) => `<b>${escapeHtml(item)}</b
  */
 function impossibleReason() {
   if (!draft.enabled) return null;
-  if (draft.modes.length === 0) return 'No mode is ticked, so no play can be tracked.';
+  if (draft.modes.length === 0) {
+    return t('filter.noModeTicked');
+  }
   if (draft.categories.length === 0) {
-    return 'No category is ticked, so no play can be tracked.';
+    return t('filter.noCategoryTicked');
   }
   if (draft.noMod === 'required' && Object.values(draft.mods).includes('required')) {
-    return 'A mod is required alongside "no mods at all", so no play can be tracked.';
+    return t('filter.modAndNoMods');
   }
   return null;
 }
@@ -801,10 +813,14 @@ export function openTrackingFilter(options) {
   draft = copyFilter(options.filter);
 
   $('filterProfileName').textContent = context.profileName;
+  // One or several, as whole sentences: a plural suffix glued onto a number does not
+  // survive translation.
+  const filtered = { n: context.playsFiltered };
   $('filterSessionCount').textContent =
     context.playsFiltered > 0
-      ? `${context.playsFiltered} play${context.playsFiltered === 1 ? '' : 's'} ` +
-        'have not been recorded since the app started because of this filter.'
+      ? context.playsFiltered === 1
+        ? t('filter.sessionCountOne', filtered)
+        : t('filter.sessionCountMany', filtered)
       : '';
   filterHint(' ');
   renderBody();
@@ -833,7 +849,7 @@ export function resetTrackingFilter() {
   draft = copyFilter(null);
   draft.enabled = enabled;
   fillFromDraft();
-  filterHint('Every criterion is wide open again. Save to keep it that way.');
+  filterHint(t('filter.resetDone'));
 }
 
 export async function saveTrackingFilter() {
@@ -844,8 +860,8 @@ export async function saveTrackingFilter() {
     closeTrackingFilter();
     toast(
       draft.enabled
-        ? 'Play tracking filter saved - it applies to plays from now on'
-        : 'Play tracking filter off - every play is tracked',
+        ? t('filter.savedOn')
+        : t('filter.savedOff'),
     );
     context.onSaved?.(data.settings);
   } catch (err) {

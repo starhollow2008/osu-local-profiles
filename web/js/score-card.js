@@ -12,6 +12,7 @@ import { coverUrl, gradeBadge, modList } from './badges.js';
 import { MODE_ICON, MODE_NAME, difficultyBadge } from './beatmapsets.js';
 import { ppNotes } from './sections.js';
 import { assetUrl } from './static-mode.js';
+import { t } from './i18n.js';
 
 const RULESET = ['osu', 'taiko', 'fruits', 'mania'];
 
@@ -59,12 +60,42 @@ const STATISTICS = {
   ],
 };
 
+/**
+ * osu!'s name for a judgement, in the reader's language.
+ *
+ * A table of literal `t()` calls rather than `t(\`judgement.\${label}\`)`, so
+ * scripts/build-i18n.mjs can see every key. Rebuilt per call because the language can change
+ * while the page is open; it is fifteen lookups on a card that is opened by hand.
+ */
+function judgementLabel(label) {
+  const table = {
+    'great': t('judgement.great'),
+    'ok': t('judgement.ok'),
+    'meh': t('judgement.meh'),
+    'Miss': t('judgement.miss'),
+    'slider tick': t('judgement.sliderTick'),
+    'slider end': t('judgement.sliderEnd'),
+    'spinner bonus': t('judgement.spinnerBonus'),
+    'spinner spin': t('judgement.spinnerSpin'),
+    'bonus': t('judgement.bonus'),
+    'drum tick': t('judgement.drumTick'),
+    'large droplet': t('judgement.largeDroplet'),
+    'small droplet': t('judgement.smallDroplet'),
+    'banana': t('judgement.banana'),
+    'perfect': t('judgement.perfect'),
+    'good': t('judgement.good'),
+  };
+  return table[label] ?? label;
+}
+
 /** osu-web's `calculateStatisticsFor(score, 'single')`, split into its two rows. */
 export function statisticsFor(score) {
   const sum = (from, attributes) => attributes.reduce((n, a) => n + (from?.[a] ?? 0), 0);
   const all = (STATISTICS[RULESET[score.mode]] ?? STATISTICS.osu).map((m) => ({
     attribute: m.attributes[0],
-    label: m.label,
+    // Translated where the table is read, not in the table itself: STATISTICS is a mirror of
+    // osu-web's own mapping and stays one.
+    label: judgementLabel(m.label),
     basic: m.basic,
     value: sum(score.statistics, m.attributes),
     maximumValue: m.basic ? null : sum(score.maximumStatistics, m.attributes),
@@ -284,9 +315,9 @@ function player(score, who) {
     <div class="score-player__score">${fmt(score.totalScore)}</div>
   </div>
   <div class="score-player__row score-player__row--player">
-    <span>Played by</span><strong>${escapeHtml(who.name)}</strong>
-    <span>Submitted on</span><strong>${escapeHtml(submitted(score.playedAt))}</strong>
-    <span>Played on</span><strong>${score.client === 'stable' ? 'Stable' : 'Lazer'}</strong>
+    <span>${escapeHtml(t('score.playedBy'))}</span><strong>${escapeHtml(who.name)}</strong>
+    <span>${escapeHtml(t('score.submittedOn'))}</span><strong>${escapeHtml(submitted(score.playedAt))}</strong>
+    <span>${escapeHtml(t('score.playedOn'))}</span><strong>${score.client === 'stable' ? 'Stable' : 'Lazer'}</strong>
   </div>
 </div>`;
 }
@@ -294,14 +325,14 @@ function player(score, who) {
 function buttons(score) {
   const download = score.replayAvailable
     ? `<a class="btn-osu-big btn-osu-big--rounded" href="/api/scores/${score.id}/replay"
-         data-replay-download="${score.id}">Download Replay</a>`
+         data-replay-download="${score.id}">${escapeHtml(t('score.downloadReplay'))}</a>`
     : '';
   // The same menu as the row's, so pinning and the rest behave identically in both places.
   const menu = `<div class="score-buttons__menu">
     <button class="score-buttons__menu-button" type="button" data-play-menu data-kind="score" data-context="card"
             data-id="${score.id}" data-pinned="${score.pinned ? 1 : 0}" data-set="${score.beatmapsetId ?? ''}"
-            data-replay="${score.hasReplay ? 1 : 0}" aria-haspopup="true" aria-label="Options for this score"
-            title="Options">&#8943;</button>
+            data-replay="${score.hasReplay ? 1 : 0}" aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}"
+            title="${escapeHtml(t('score.options'))}">&#8943;</button>
   </div>`;
   return `<div class="score-buttons">${download}${menu}</div>`;
 }
@@ -335,7 +366,7 @@ function userCard(who) {
           <div class="user-card__status-icon${who.tracking ? ' user-card__status-icon--online' : ''}"></div>
         </div>
         <div class="user-card__status-messages">
-          <span class="user-card__status-message u-ellipsis">${who.tracking ? 'Tracking' : 'Not tracking'}</span>
+          <span class="user-card__status-message u-ellipsis">${escapeHtml(who.tracking ? t('score.tracking') : t('score.notTracking'))}</span>
         </div>
       </div>
     </div>
@@ -368,9 +399,9 @@ function stats(score, calculator) {
   const { basic, extra } = statisticsFor(score);
 
   const top = `<div class="score-stats__group-row">
-    ${stat('Accuracy', `<span class="${perfect(accuracy === 1).trim()}">${fmt(accuracy * 100, 2)}%</span>`)}
-    ${stat('Max Combo', `<span class="${perfect(score.perfectCombo === true).trim()}">${fmt(score.maxCombo)}x</span>`)}
-    ${stat('pp', ppValue(score))}
+    ${stat(t('score.accuracy'), `<span class="${perfect(accuracy === 1).trim()}">${fmt(accuracy * 100, 2)}%</span>`)}
+    ${stat(t('score.maxCombo'), `<span class="${perfect(score.perfectCombo === true).trim()}">${fmt(score.maxCombo)}x</span>`)}
+    ${stat(t('score.pp'), ppValue(score))}
   </div>`;
   const judgements = `<div class="score-stats__group-row">${basic
     .map((s) => stat(s.label, fmt(s.value), ` score-stats__stat-row--hit-${s.attribute}`))
@@ -400,14 +431,14 @@ function breakdown(score, calculator) {
   if (!parts || parts.length === 0 || score.pp == null) return '';
   const value = (pp) => (pp < 0.05 ? '0' : fmt(pp, pp < 10 ? 1 : 0));
   const older = calculator && score.ppVersion && score.ppVersion !== calculator
-    ? ` title="The calculator running now is osu! ${escapeHtml(calculator)}. Recalculate from Settings to update this score."`
+    ? ` title="${escapeHtml(t('score.olderCalculator', { version: calculator }))}"`
     : '';
   return `<div class="score-stats__caption">
-    <span>pp breakdown</span>
-    ${score.ppVersion ? `<span class="score-stats__caption-version"${older}>osu! ${escapeHtml(score.ppVersion)}${older ? ' (older)' : ''}</span>` : ''}
+    <span>${escapeHtml(t('score.ppBreakdown'))}</span>
+    ${score.ppVersion ? `<span class="score-stats__caption-version"${older}>osu! ${escapeHtml(score.ppVersion)}${older ? ` ${t('score.older')}` : ''}</span>` : ''}
   </div>
   <div class="score-stats__group-row score-stats__group-row--breakdown"
-       title="The parts osu! calculates this score's pp from. The total is not a plain sum: osu! combines them its own way.">
+       title="${escapeHtml(t('score.breakdownNote'))}">
     ${parts.map((p) => stat(p.name, `${value(p.pp)}<span class="score-stats__stat-row--maximum">pp</span>`)).join('')}
   </div>`;
 }

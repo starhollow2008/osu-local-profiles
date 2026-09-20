@@ -8,6 +8,7 @@
  */
 import { escapeHtml, fmt, shortDate } from './format.js';
 import { coverUrl } from './badges.js';
+import { currentLocale, t } from './i18n.js';
 
 /* ------------------------------------------------------------------------ */
 /* Difficulty colour                                                         */
@@ -172,7 +173,7 @@ export function beatmapsetCard(card) {
   const status = card.status
     ? `<div class="beatmapset-panel__extra-item">
         <div class="beatmapset-status beatmapset-status--panel beatmapset-status--${escapeHtml(card.status)}">${
-          escapeHtml(STATUS_LABEL[card.status] ?? card.status)
+          escapeHtml(statusLabel(card.status))
         }</div>
       </div>`
     : '';
@@ -218,18 +219,18 @@ export function beatmapsetCard(card) {
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--title">
         ${external(url, 'beatmapset-panel__main-link u-ellipsis', escapeHtml(card.title))}
         <div class="beatmapset-panel__badge-container">
-          ${card.nsfw ? badge('nsfw', 'Explicit') : ''}
-          ${card.spotlight ? badge('spotlight', 'Spotlight', 'https://osu.ppy.sh/wiki/Beatmap_Spotlights') : ''}
+          ${card.nsfw ? badge('nsfw', t('beatmap.explicit')) : ''}
+          ${card.spotlight ? badge('spotlight', t('beatmap.spotlight'), 'https://osu.ppy.sh/wiki/Beatmap_Spotlights') : ''}
         </div>
       </div>
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--artist">
-        ${external(url, 'beatmapset-panel__main-link u-ellipsis', `by ${escapeHtml(card.artist)}`)}
+        ${external(url, 'beatmapset-panel__main-link u-ellipsis', t('beatmap.by', { artist: escapeHtml(card.artist) }))}
         <div class="beatmapset-panel__badge-container">
-          ${card.featuredArtist ? badge('featured_artist', 'Featured Artist') : ''}
+          ${card.featuredArtist ? badge('featured_artist', t('beatmap.featuredArtist')) : ''}
         </div>
       </div>
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--mapper">
-        <div class="u-ellipsis">${mapper ? `mapped by ${mapper}` : '&nbsp;'}</div>
+        <div class="u-ellipsis">${mapper ? t('beatmap.mappedBy', { mapper }) : '&nbsp;'}</div>
       </div>
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--stats">${stats}</div>
       <a class="beatmapset-panel__info-row beatmapset-panel__info-row--extra" href="${url}"
@@ -240,7 +241,7 @@ export function beatmapsetCard(card) {
     <div class="beatmapset-panel__menu-container">
       <div class="beatmapset-panel__menu">
         <button type="button" class="beatmapset-panel__menu-item beatmapset-panel__menu-item--favourite"
-                data-unfavorite="${card.id}" title="Unfavorite this beatmap" aria-label="Unfavorite this beatmap">${ICON.heart}</button>
+                data-unfavorite="${card.id}" title="${escapeHtml(t('beatmap.unfavorite'))}" aria-label="${escapeHtml(t('beatmap.unfavorite'))}">${ICON.heart}</button>
         ${external(`${url}/download`, 'beatmapset-panel__menu-item', ICON.download, 'download')}
       </div>
     </div>
@@ -250,19 +251,27 @@ export function beatmapsetCard(card) {
 
 /** osu-web's `formatNumberSuffixed`: 22,968 -> 23K. */
 function suffixed(n) {
-  return Number(n).toLocaleString(undefined, { notation: 'compact', maximumFractionDigits: 1 });
+  return Number(n).toLocaleString(currentLocale(), { notation: 'compact', maximumFractionDigits: 1 });
 }
 
-/** osu-web's `beatmapsets.show.status.*`; drawn uppercase by the pill. */
-const STATUS_LABEL = {
-  ranked: 'Ranked',
-  approved: 'Approved',
-  qualified: 'Qualified',
-  loved: 'Loved',
-  pending: 'Pending',
-  wip: 'WIP',
-  graveyard: 'Graveyard',
-};
+/**
+ * osu-web's `beatmapsets.show.status.*`; drawn uppercase by the pill.
+ *
+ * A table of literal `t()` calls rather than a key built from the status, so
+ * scripts/build-i18n.mjs can see every one of them.
+ */
+function statusLabel(status) {
+  const table = {
+    ranked: t('status.ranked'),
+    approved: t('status.approved'),
+    qualified: t('status.qualified'),
+    loved: t('status.loved'),
+    pending: t('status.pending'),
+    wip: t('status.wip'),
+    graveyard: t('status.graveyard'),
+  };
+  return table[status] ?? status;
+}
 
 /* ------------------------------------------------------------------------ */
 /* The difficulty popup                                                      */

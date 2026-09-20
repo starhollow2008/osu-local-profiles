@@ -14,6 +14,7 @@
  */
 import { escapeHtml } from './format.js';
 import { bundleModules } from './bundle.js';
+import { t } from './i18n.js';
 
 /** How much of each list the copy carries: every row the page could ask for, within reason. */
 const LENGTHS = { events: 500, top: 100, recent: 500, mostPlayed: 500, favorites: 500 };
@@ -61,7 +62,7 @@ function listedScores(profiles) {
  * moment: most of the time goes on View Details, one request per score.
  */
 export async function buildInteractiveHtml(progress = () => {}) {
-  progress('Reading the profile...');
+  progress(t('copy.readingProfile'));
   const state = await fetchJson('/api/state');
 
   const profiles = {};
@@ -74,7 +75,10 @@ export async function buildInteractiveHtml(progress = () => {}) {
   const ids = listedScores(profiles);
   const scores = {};
   for (const [index, id] of ids.entries()) {
-    progress(`Reading score ${index + 1} of ${ids.length}...`);
+    progress(t('copy.readingScore', {
+      n: index + 1,
+      total: ids.length,
+    }));
     try {
       scores[id] = await fetchJson(`/api/scores/${id}`);
     } catch {
@@ -83,7 +87,7 @@ export async function buildInteractiveHtml(progress = () => {}) {
   }
 
   // Pictures the app serves travel inside the file, keyed by the address the page asks for.
-  progress('Packing the pictures...');
+  progress(t('copy.packingPictures'));
   const assets = {};
   const carry = async (url) => {
     if (typeof url !== 'string' || !url.startsWith('/')) return url;
@@ -142,7 +146,7 @@ export async function buildInteractiveHtml(progress = () => {}) {
     assets,
   };
 
-  progress('Packing the page...');
+  progress(t('copy.packingPage'));
   const code = await bundleModules('main.js', (name) => fetchText(`/js/${name}`));
   let html = await fetchText('/');
 

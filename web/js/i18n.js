@@ -156,6 +156,18 @@ export function hasTranslation(key) {
   return key in messages || key in fallback;
 }
 
+/**
+ * Put a language's strings in place.
+ *
+ * The seam between *how strings arrive* and *how they are used*. `useLocale` calls it after
+ * fetching; a test calls it with `en.json` read off disk, which is how a module that builds
+ * a sentence out of several keys can be checked without a browser.
+ */
+export function installMessages(active, english = active) {
+  messages = active;
+  fallback = english;
+}
+
 async function fetchFile(code) {
   const r = await fetch(`/i18n/${code}.json`);
   if (!r.ok) throw new Error(`no translation for ${code}`);
@@ -182,15 +194,17 @@ export async function useLocale(code, root = document) {
    * switch to, which is correct: a copy is a copy of what was on screen.
    */
   if (snapshot?.strings) {
-    messages = snapshot.strings;
-    fallback = snapshot.strings;
+    installMessages(snapshot.strings);
   } else {
     if (Object.keys(fallback).length === 0) {
       // englishFromPage is the last resort: the page's own text, keyed the same way, so a
       // missing or unserved en.json still leaves every key resolvable.
       fallback = await fetchFile(DEFAULT_LOCALE).catch(() => englishFromPage(root));
     }
-    messages = target === DEFAULT_LOCALE ? fallback : await fetchFile(target).catch(() => ({}));
+    installMessages(
+      target === DEFAULT_LOCALE ? fallback : await fetchFile(target).catch(() => ({})),
+      fallback,
+    );
   }
   active = target;
 

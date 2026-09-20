@@ -1,7 +1,25 @@
-/** Number, percentage and time formatting, matching how osu! presents each value. */
+/**
+ * Number, percentage and time formatting, matching how osu! presents each value.
+ *
+ * Every `Intl` call takes the page's language rather than the browser's default. They are
+ * not the same thing once the language can be chosen: somebody reading the page in German on
+ * an English-locale machine would otherwise get German words around `1,234.56` and
+ * "3 hours ago", which is worse than either language on its own.
+ */
+import { currentLocale, t } from './i18n.js';
+
+/**
+ * The language to format in, as `Intl` wants it.
+ *
+ * Read on each call rather than captured, because the language can change while the page is
+ * open and every formatter built from it would otherwise be stale. These are cheap, and the
+ * page formats a few hundred values, not a few million.
+ */
+const intlLocale = () => currentLocale();
+
 
 export function fmt(n, digits = 0) {
-  return Number(n ?? 0).toLocaleString(undefined, {
+  return Number(n ?? 0).toLocaleString(intlLocale(), {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -32,22 +50,24 @@ const UNITS = [
 export function timeAgo(ms) {
   const diff = Date.now() - ms;
   if (!Number.isFinite(diff)) return '';
-  if (Math.abs(diff) < 45_000) return 'just now';
+  if (Math.abs(diff) < 45_000) return t('time.justNow');
 
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+  // The unit names come from the browser's own data, so "vor 3 Stunden" needs no string here
+  // -- only the language to say it in.
+  const rtf = new Intl.RelativeTimeFormat(intlLocale(), { numeric: 'auto' });
   for (const [unit, size] of UNITS) {
     if (Math.abs(diff) >= size) return rtf.format(-Math.round(diff / size), unit);
   }
-  return 'just now';
+  return t('time.justNow');
 }
 
 export function fullDate(ms) {
-  return new Date(ms).toLocaleString();
+  return new Date(ms).toLocaleString(intlLocale());
 }
 
 /** "9 Sep 2026" -- a date with no time, for somewhere too narrow to carry one. */
 export function shortDate(ms) {
-  return new Date(ms).toLocaleDateString(undefined, {
+  return new Date(ms).toLocaleDateString(intlLocale(), {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
@@ -56,7 +76,7 @@ export function shortDate(ms) {
 
 /** "Sep 2026" -- the x-axis label on the play history chart. osu-web's `MMM YYYY`. */
 export function monthLabel(ms) {
-  return new Date(ms).toLocaleDateString(undefined, {
+  return new Date(ms).toLocaleDateString(intlLocale(), {
     month: 'short',
     year: 'numeric',
     timeZone: 'UTC',
@@ -65,7 +85,7 @@ export function monthLabel(ms) {
 
 /** "September 2026" -- the month in a chart tooltip. osu-web's `MMMM YYYY`. */
 export function monthTitle(ms) {
-  return new Date(ms).toLocaleDateString(undefined, {
+  return new Date(ms).toLocaleDateString(intlLocale(), {
     month: 'long',
     year: 'numeric',
     timeZone: 'UTC',
@@ -84,12 +104,27 @@ export function playTimeStrings(seconds) {
   const minutes = totalMinutes % 60;
 
   const roundedHours = Math.round((seconds ?? 0) / 3600);
+  /*
+   * Two keys per unit rather than one with a number in it, because "1 minute" and
+   * "2 minutes" differ in more languages than English, and in ways a suffix cannot express.
+   * Languages with more than two plural forms are served by whichever of these fits best;
+   * this is a hover title on one figure, not a sentence that has to parse.
+   */
+  const minuteCount = { n: fmt(totalMinutes) };
   const title =
     roundedHours < 2
-      ? `${fmt(totalMinutes)} minute${totalMinutes === 1 ? '' : 's'}`
-      : `${fmt(roundedHours)} hours`;
+      ? totalMinutes === 1
+        ? t('time.minute', minuteCount)
+        : t('time.minutes', minuteCount)
+      : t('time.hours', { n: fmt(roundedHours) });
 
-  return { title, value: `${days > 0 ? `${fmt(days)}d ` : ''}${hours}h ${minutes}m` };
+  // `2d 5h 13m`: the letters are units, and a language that abbreviates them differently
+  // says so here.
+  const value =
+    (days > 0 ? `${t('time.dShort', { n: fmt(days) })} ` : '') +
+    `${t('time.hShort', { n: hours })} ${t('time.mShort', { n: minutes })}`;
+
+  return { title, value };
 }
 
 const DAY_MS = 86_400_000;
@@ -103,19 +138,32 @@ const DAY_MS = 86_400_000;
  */
 export function daysAgoLabel(ms) {
   const days = Math.round((Date.now() - ms) / DAY_MS);
-  if (days <= 0) return 'now';
-  return `${fmt(days)} day${days === 1 ? '' : 's'} ago`;
+  if (days <= 0) return t('time.now');
+  const count = { n: fmt(days) };
+  return days === 1 ? t('time.dayAgo', count) : t('time.daysAgo', count);
 }
 
 export const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
 
-const REGION_NAMES = (() => {
+/**
+ * Country names, in the page's language, built once per language rather than per call.
+ *
+ * `Intl.DisplayNames` is not free to construct, and a profile page asks for the same handful
+ * of countries over and over -- so it is cached, and thrown away when the language changes.
+ */
+let regionNames = null;
+let regionLocale = null;
+
+const REGION_NAMES = () => {
+  if (regionNames && regionLocale === currentLocale()) return regionNames;
   try {
-    return new Intl.DisplayNames(undefined, { type: 'region' });
+    regionLocale = currentLocale();
+    regionNames = new Intl.DisplayNames([regionLocale], { type: 'region' });
+    return regionNames;
   } catch {
     return null;
   }
-})();
+};
 
 /**
  * `US` -> `United States`. osu! writes the country's name beside the flag rather than its
@@ -125,7 +173,7 @@ const REGION_NAMES = (() => {
  */
 export function countryName(code) {
   try {
-    return REGION_NAMES?.of(code) ?? code;
+    return REGION_NAMES()?.of(code) ?? code;
   } catch {
     return code;
   }

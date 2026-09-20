@@ -4,6 +4,7 @@
 import { escapeHtml, fmt, shortDate } from './format.js';
 import { medalBadge } from './badges.js';
 import { toast } from './ui.js';
+import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -28,6 +29,17 @@ const MEDAL_GROUPS = [
   ['Skill & Dedication', ['combo', 'plays', 'rank', 'hits', 'pass', 'fc']],
 ];
 
+/**
+ * A medal group's heading, in the reader's language.
+ *
+ * The group names above stay in English because they are also what the server sends in
+ * `medal.grouping`, and the two have to match. Only the heading is translated, and by a
+ * literal lookup rather than a key built from the name -- see this file's imports.
+ */
+function groupTitle(grouping) {
+  return grouping === 'Mod Introduction' ? t('medals.modIntroduction') : t('medals.skillDedication');
+}
+
 /** Every medal currently on the page, by slug, for the hover card to read from. */
 let medalsBySlug = new Map();
 
@@ -47,15 +59,15 @@ let lastEarned = { mode: null, slugs: new Set() };
 function medalCard(medal) {
   let achieved;
   if (medal.achievedAt === null) {
-    achieved = 'Locked';
+    achieved = t('medals.locked');
   } else if (!medal.dated) {
-    achieved = 'Achieved &middot; from the estimated rank';
+    achieved = t('medals.fromEstimatedRank');
   } else {
-    achieved = `Achieved on <time datetime="${new Date(medal.achievedAt).toISOString()}"
+    achieved = `${t('medals.achievedOn')} <time datetime="${new Date(medal.achievedAt).toISOString()}"
       title="${escapeHtml(new Date(medal.achievedAt).toLocaleString())}">${escapeHtml(shortDate(medal.achievedAt))}</time>`;
   }
 
-  return `<div class="medal-tooltip__grouping">${escapeHtml(medal.grouping ?? 'Skill & Dedication')}</div>
+  return `<div class="medal-tooltip__grouping">${escapeHtml(groupTitle(medal.grouping ?? 'Skill & Dedication'))}</div>
     <div class="medal-tooltip__middle">
       <div class="medal-tooltip__badge">${medalBadge(medal, 'tooltip')}</div>
       <div class="medal-tooltip__name">${escapeHtml(medal.name)}</div>
@@ -80,11 +92,14 @@ export function renderMedals(summary, mode) {
   const note = $('medalsNote');
   if (summary.fcUnknown > 0) {
     note.hidden = false;
+    // One play or several: two whole sentences rather than one with a plural suffix glued
+    // on, because "1 play was" and "2 plays were" differ in more than an "s" in most
+    // languages, and in ways a suffix cannot express.
+    const count = { n: fmt(summary.fcUnknown) };
     note.textContent =
-      `${fmt(summary.fcUnknown)} play${summary.fcUnknown === 1 ? '' : 's'} ` +
-      `${summary.fcUnknown === 1 ? 'was' : 'were'} tracked before this app recorded each ` +
-      "beatmap's maximum combo, so a full combo cannot be told apart from a near-miss on " +
-      'them. Settings can recalculate those from their replay files.';
+      summary.fcUnknown === 1
+        ? t('medals.fcUnknownOne', count)
+        : t('medals.fcUnknownMany', count);
   } else {
     note.hidden = true;
   }
@@ -97,7 +112,7 @@ export function renderMedals(summary, mode) {
     }).join('');
     return rows
       ? `<div class="medals-group__group">
-          <h3 class="medals-group__title">${escapeHtml(grouping)}</h3>
+          <h3 class="medals-group__title">${escapeHtml(groupTitle(grouping))}</h3>
           ${rows}
         </div>`
       : '';
@@ -105,7 +120,7 @@ export function renderMedals(summary, mode) {
 
   $('medalGroups').innerHTML = groups
     ? `<div class="medals-group">${groups}</div>`
-    : '<div class="u-empty">No medals apply to this mode yet.</div>';
+    : `<div class="u-empty">${escapeHtml(t('medals.noneForMode'))}</div>`;
 }
 
 /**
@@ -121,8 +136,15 @@ function announceNewMedals(summary, mode) {
 
   if (lastEarned.mode === mode) {
     const fresh = earned.filter((m) => !lastEarned.slugs.has(m.slug));
-    if (fresh.length === 1) toast(`Medal unlocked: ${fresh[0].name}`);
-    else if (fresh.length > 1) toast(`${fresh.length} medals unlocked: ${fresh.map((m) => m.name).join(', ')}`);
+    // Medal names are osu!'s own and stay as osu! writes them; only the announcement
+    // around them is translated.
+    if (fresh.length === 1) toast(t('medals.unlockedOne', { name: fresh[0].name }));
+    else if (fresh.length > 1) {
+      toast(t('medals.unlockedMany', {
+        n: fresh.length,
+        names: fresh.map((m) => m.name).join(', '),
+      }));
+    }
   }
   lastEarned = { mode, slugs };
 }

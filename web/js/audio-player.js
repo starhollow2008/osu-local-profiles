@@ -4,6 +4,7 @@
 import { audioTime } from './format.js';
 import { previewUrl } from './beatmapsets.js';
 import { toast } from './ui.js';
+import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -94,7 +95,7 @@ function syncVolume() {
   audioPlayer.dataset.audioVolume = preview.muted
     ? 'muted'
     : preview.volume === 0 ? 'silent' : preview.volume < 0.4 ? 'quiet' : 'normal';
-  $('audioMute').title = preview.muted ? 'Unmute' : 'Mute';
+  $('audioMute').title = preview.muted ? t('audio.unmute') : t('audio.mute');
   audioPlayer.dataset.audioAutoplay = audioPrefs.autoplay ? '1' : '0';
   $('audioAutoplay').setAttribute('aria-pressed', String(audioPrefs.autoplay));
 }

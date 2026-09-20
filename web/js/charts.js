@@ -15,6 +15,7 @@
  * following it.
  */
 import { daysAgoLabel, escapeHtml, fmt, monthLabel, monthTitle } from './format.js';
+import { t } from './i18n.js';
 
 const EMPTY = (message) => `<div class="profile-detail-stats__empty-chart">${escapeHtml(message)}</div>`;
 
@@ -107,7 +108,7 @@ function dateCaption(from, to) {
  * every gain to nothing.
  */
 export function rankChart(input) {
-  if (!input || input.length === 0) return EMPTY('unranked');
+  if (!input || input.length === 0) return EMPTY(t('chart.unranked'));
 
   const points = widen(input);
   const [minX, maxX] = extent(points.map((p) => p.at));
@@ -135,7 +136,7 @@ export function rankChart(input) {
  * The baseline is anchored at zero rather than at the lowest value: a new profile starts
  * there, and letting the floor float would make a 2pp wobble look like a career.
  */
-export function ppChart(input, emptyMessage = 'no ranked plays yet') {
+export function ppChart(input, emptyMessage = t('chart.noRankedPlays')) {
   if (!input || input.length === 0) return EMPTY(emptyMessage);
 
   const points = widen(input);
