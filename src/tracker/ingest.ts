@@ -248,7 +248,13 @@ export async function ingestScore(
       countable ? 1 : 0,
       eligible ? 1 : 0,
       playedAt,
-      score.onlineScoreId === null ? null : String(score.onlineScoreId),
+      /*
+       * The id osu! gave the score, preferring lazer's own block over the legacy header --
+       * lazer writes 0 in the header and the real one inside. Reading only the header stored
+       * a 0 for every lazer play, which both hid whether the play was ever submitted and
+       * left the match against an imported osu! score leaning on its weaker fallback.
+       */
+      player.onlineId === null ? null : String(player.onlineId),
       replayPath,
       computed ? JSON.stringify(computed.breakdown) : null,
       stripped ? JSON.stringify(stripped.breakdown) : null,

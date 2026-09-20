@@ -196,6 +196,32 @@ export interface ReplayPlayer {
   name: string;
   /** lazer's numeric user id. Null on every osu!stable replay -- it records none. */
   userId: number | null;
+  /**
+   * osu!'s own id for the score, when osu! ever accepted it. Null for a play that was never
+   * submitted -- offline, signed out, or on a beatmap osu! does not rank.
+   *
+   * This is what makes a custom offline name safe. osu!stable lets anyone put
+   * `Username = Cat` in its config and play, and the replay then says `Cat` -- a name that
+   * may even belong to a real player. But a replay you *downloaded* is by definition a score
+   * osu! accepted and put on a leaderboard, so it always carries one of these. A replay with
+   * none was never on a leaderboard, so it cannot have been downloaded, so it was set on this
+   * machine. Measured across a real corpus: all 91 replays set by other players carried an
+   * id, and 258 of the owner's own -- 164 stable and 94 lazer -- did not.
+   */
+  onlineId: number | null;
+}
+
+/**
+ * The id osu! gave the score, from wherever this replay keeps it.
+ *
+ * lazer writes the legacy header field as 0 and puts the real one in its own block, so
+ * reading only the header would call every lazer play unsubmitted.
+ */
+function onlineIdOf(score: ReplayScore): number | null {
+  const lazer = score.extras?.online_id;
+  if (typeof lazer === 'number' && lazer > 0) return lazer;
+  const legacy = score.onlineScoreId === null ? 0 : Number(score.onlineScoreId);
+  return legacy > 0 ? legacy : null;
 }
 
 export function replayPlayer(score: ReplayScore): ReplayPlayer {
@@ -203,7 +229,13 @@ export function replayPlayer(score: ReplayScore): ReplayPlayer {
   return {
     name: score.username ?? '',
     userId: typeof userId === 'number' && userId > 0 ? userId : null,
+    onlineId: onlineIdOf(score),
   };
+}
+
+/** Whether osu! ever accepted this play, which is what a downloaded replay always proves. */
+export function wasSubmitted(player: ReplayPlayer): boolean {
+  return player.onlineId !== null;
 }
 
 /**
@@ -220,6 +252,18 @@ export function ownsPlay(identity: PlayerIdentity, player: ReplayPlayer): boolea
   // A play osu! recorded no name for, or one lazer set while signed out. Nobody downloads
   // either, and an offline play is exactly what this app is for.
   if (name === '' || name.toLowerCase() === GUEST_NAME) return true;
+
+  /*
+   * A play osu! never accepted cannot have been downloaded from osu!, because there was no
+   * leaderboard entry to download -- so whatever name it carries, it was set here.
+   *
+   * This is what lets osu!stable's configurable name be anything at all. Set `Username = Cat`
+   * and play offline and the replay says `Cat`, which may even be a real player's name; it is
+   * still yours, and refusing it would throw away exactly the offline plays this app exists
+   * to catch. A downloaded replay of the real Cat carries an id and is refused as it should
+   * be.
+   */
+  if (!wasSubmitted(player)) return true;
 
   // Ids settle it outright, and survive a rename where a name cannot.
   if (identity.userId !== null && player.userId !== null) {
@@ -244,6 +288,8 @@ export function certainlySomeoneElse(identity: PlayerIdentity, player: ReplayPla
   // before a rename cannot be told from a stranger's -- and this is the one path that takes
   // a play out of a profile that already has it.
   if (identity.source !== 'linked' || !identity.namesComplete) return false;
+  // Never submitted, so never downloaded, so set on this machine -- whatever it calls itself.
+  if (!wasSubmitted(player)) return false;
   // An id settles it whatever the names say, and cannot go stale across a rename.
   if (identity.userId !== null && player.userId !== null) {
     return identity.userId !== player.userId;
@@ -292,7 +338,7 @@ export async function sweepForeignScores(
 
   const rows = db
     .prepare(
-      `SELECT id, player_name, player_id, replay_path
+      `SELECT id, player_name, player_id, online_score_id, replay_path
          FROM scores
         WHERE profile_id = ? AND hidden_at IS NULL AND imported_at IS NULL`,
     )
@@ -300,6 +346,7 @@ export async function sweepForeignScores(
     id: number;
     player_name: string | null;
     player_id: number | null;
+    online_score_id: string | null;
     replay_path: string | null;
   }[];
 
@@ -313,8 +360,20 @@ export async function sweepForeignScores(
   for (const row of rows) {
     sweep.checked++;
 
+    /*
+     * A stored row carries the id osu! gave the score, so it can say on its own whether the
+     * play was ever submitted -- see `ReplayPlayer.onlineId`. A row from before these columns
+     * has no name and is read from its replay instead.
+     */
+    const storedId = Number(row.online_score_id ?? 0);
     let player: ReplayPlayer | null =
-      row.player_name === null ? null : { name: row.player_name, userId: row.player_id };
+      row.player_name === null
+        ? null
+        : {
+            name: row.player_name,
+            userId: row.player_id,
+            onlineId: Number.isFinite(storedId) && storedId > 0 ? storedId : null,
+          };
     if (player === null && row.replay_path !== null) {
       player = await parseReplayFile(row.replay_path);
       // Written back so no later pass has to open this file again.

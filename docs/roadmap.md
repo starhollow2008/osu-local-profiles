@@ -2443,6 +2443,15 @@ Classic mod when the helper decodes the replay, exactly as 5.39 describes.
 - **Who am I**: the linked account, else osu!stable's `osu!.*.cfg` `Username`, else the name
   behind at least four fifths of the profile's own tracked plays. A lazer `user_id` settles it
   outright and survives a rename.
+- **An offline name can be anything, so the name is not what decides it.** osu!stable's
+  username is a line in a config file: set `Username = Cat`, play offline, and the replay says
+  `Cat` -- which may belong to a real player. A replay you *downloaded* is by definition a
+  score osu! put on a leaderboard, so it carries a score id; one with none was never on a
+  leaderboard, so it cannot have been downloaded. Measured: all 91 replays by other players
+  carried an id, and 258 of the owner's own -- 164 stable, 94 lazer -- did not.
+- **The id is read from wherever the replay keeps it.** lazer writes the legacy header as 0 and
+  the real solo id in its own block; reading only the header called every lazer play
+  unsubmitted, and left 5.50's dedupe leaning on its weaker fallback for lazer replays.
 - **Removing ones already tracked** runs once per profile and only on a linked account whose
   name list was actually *fetched* (`linkedNamesKnown`) -- an empty list cannot be told from one
   nobody asked for. Every removal is a hide, listed under Removed scores, reversible.
@@ -2453,3 +2462,6 @@ Classic mod when the helper decodes the replay, exactly as 5.39 describes.
 - **On the real corpus.** The sweep removed 84 and kept every doubtful one: 0 of 2,327 own
   plays, 0 of 3 with no name, 0 of 1 `Guest`, 84 of 84 other players'. Nothing deleted -- 2,777
   rows before and after, 84 hidden. Total pp 16,109 -> 7,394 against osu!'s own 7,380.
+- Re-run over the whole store with the finished rules: 2,415 kept, 91 refused, every refusal a
+  submitted score. This machine happens to hold no play made under a custom offline name, so
+  that path is covered by `test/player-identity.test.ts` rather than by the corpus.

@@ -45,7 +45,22 @@ const OWNER: PlayerIdentity = {
   source: 'linked',
 };
 
-const player = (name: string, userId: number | null = null): ReplayPlayer => ({ name, userId });
+/**
+ * A play osu! accepted, by default -- which is what a downloaded replay always is, and so
+ * the only kind whose name can count against it.
+ */
+const player = (name: string, userId: number | null = null): ReplayPlayer => ({
+  name,
+  userId,
+  onlineId: 900_000_001,
+});
+
+/** The same play, never submitted: offline, signed out, or on a map osu! does not rank. */
+const offlinePlay = (name: string, userId: number | null = null): ReplayPlayer => ({
+  name,
+  userId,
+  onlineId: null,
+});
 
 test('a play under the current name is yours', () => {
   assert.equal(ownsPlay(OWNER, player('Tangy')), true);
@@ -250,7 +265,13 @@ test("a replay somebody else set is never tracked, and says whose it was", async
       identity: OWNER,
     };
 
-    const theirs = await ingestScore(replay({ username: 'mrekk' }), '/replays/mrekk.osr', ctx);
+    // A replay you watched is a score osu! accepted, so it carries an id -- which is what
+    // makes its name count against it. See the offline-name test below.
+    const theirs = await ingestScore(
+      replay({ username: 'mrekk', onlineScoreId: 900_000_001n }),
+      '/replays/mrekk.osr',
+      ctx,
+    );
     assert.deepEqual(theirs, { status: 'skipped', reason: 'another-player', player: 'mrekk' });
     assert.equal((h.db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n, 0);
 
@@ -311,19 +332,20 @@ test('the one-off sweep hides other players’ plays and spares every doubtful o
       `INSERT INTO scores (profile_id, dedupe_key, mode, beatmap_md5, client, mods_json,
         mods_label, count300, count100, count50, count_geki, count_katu, count_miss, accuracy,
         max_combo, total_score, passed, grade, ranked, played_at, player_name, player_id,
-        replay_path, imported_at)
-       VALUES (?,?,0,'x','stable','[]','None',0,0,0,0,0,0,1,0,0,1,'S',1,0,?,?,?,?)`,
+        replay_path, imported_at, online_score_id)
+       VALUES (?,?,0,'x','stable','[]','None',0,0,0,0,0,0,1,0,0,1,'S',1,0,?,?,?,?,?)`,
     );
-    insert.run(h.profileId, 'mine', 'Tangy', null, null, null);
-    insert.run(h.profileId, 'old-name', 'blizzardshiver', null, null, null);
-    insert.run(h.profileId, 'offline', '', null, null, null);
-    insert.run(h.profileId, 'guest', 'Guest', null, null, null);
-    insert.run(h.profileId, 'theirs', 'mrekk', null, null, null);
-    insert.run(h.profileId, 'theirs-2', 'gnahus', null, null, null);
+    insert.run(h.profileId, 'mine', 'Tangy', null, null, null, '900000010');
+    insert.run(h.profileId, 'old-name', 'blizzardshiver', null, null, null, '900000011');
+    insert.run(h.profileId, 'offline', '', null, null, null, null);
+    insert.run(h.profileId, 'guest', 'Guest', null, null, null, null);
+    // Downloaded replays: osu! accepted these scores, which is why they carry an id.
+    insert.run(h.profileId, 'theirs', 'mrekk', null, null, null, '900000001');
+    insert.run(h.profileId, 'theirs-2', 'gnahus', null, null, null, '900000002');
     // No recorded name and no replay left on disk: nothing can attribute it, so it stays.
-    insert.run(h.profileId, 'mystery', null, null, null, null);
+    insert.run(h.profileId, 'mystery', null, null, null, null, null);
     // An imported osu! score is not a replay at all and is never swept.
-    insert.run(h.profileId, 'imported', null, null, null, Date.now());
+    insert.run(h.profileId, 'imported', null, null, null, Date.now(), null);
 
     const sweep = await sweepForeignScores(h.db, h.profileId, OWNER, async () => null);
     assert.equal(sweep.hidden, 2);
@@ -380,15 +402,15 @@ test('the sweep does nothing at all without a linked account', async () => {
 });
 
 test('replayPlayer reads the name and, for lazer, the user id', () => {
-  assert.deepEqual(replayPlayer(replay()), { name: 'Tangy', userId: null });
+  assert.deepEqual(replayPlayer(replay()), { name: 'Tangy', userId: null, onlineId: null });
   assert.deepEqual(
     replayPlayer(replay({ client: 'lazer', extras: { user_id: 3119700, mods: [] } })),
-    { name: 'Tangy', userId: 3119700 },
+    { name: 'Tangy', userId: 3119700, onlineId: null },
   );
   // osu!stable records no id, and a zero is not one.
   assert.deepEqual(
     replayPlayer(replay({ client: 'lazer', extras: { user_id: 0, mods: [] } })),
-    { name: 'Tangy', userId: null },
+    { name: 'Tangy', userId: null, onlineId: null },
   );
 });
 
@@ -416,4 +438,72 @@ test('a link made before previous names were fetched removes nothing', () => {
 
   // And a lazer user id is conclusive whatever the names say, so it still settles those.
   assert.equal(certainlySomeoneElse({ ...stale, namesComplete: true }, player('x', 3654106)), true);
+});
+
+test('a play osu! never accepted is yours, whatever name it carries', () => {
+  /*
+   * osu!stable's username is a line in a config file. Anyone can set `Username = Cat` and
+   * play offline, and the replay then says `Cat` -- a name that may well belong to a real
+   * player. Refusing it would throw away exactly the offline plays this app exists to catch.
+   *
+   * What separates the two is not the name but the score id. A replay you downloaded is by
+   * definition one osu! accepted and put on a leaderboard, so it carries one; a play osu!
+   * never accepted was never on a leaderboard, so it cannot have been downloaded, so it was
+   * set on this machine.
+   */
+  assert.equal(ownsPlay(OWNER, offlinePlay('Cat')), true);
+  assert.equal(ownsPlay(OWNER, offlinePlay('mrekk')), true, 'even a real player\u2019s name');
+  assert.equal(certainlySomeoneElse(OWNER, offlinePlay('mrekk')), false);
+
+  // A lazer user id that is not yours does not override it either: an unsubmitted play
+  // cannot have come from anywhere but here.
+  assert.equal(certainlySomeoneElse(OWNER, offlinePlay('mrekk', 3654106)), false);
+
+  // The downloaded replay of the real player is still refused, which is the whole point.
+  assert.equal(ownsPlay(OWNER, player('mrekk')), false);
+  assert.equal(certainlySomeoneElse(OWNER, player('mrekk')), true);
+});
+
+test('the score id is read from wherever the replay keeps it', () => {
+  // osu!stable puts it in the legacy header.
+  assert.equal(replayPlayer(replay({ onlineScoreId: 4430944113n })).onlineId, 4430944113);
+  // lazer writes 0 there and the real one in its own block, so reading only the header would
+  // call every lazer play unsubmitted -- and leave an imported score nothing to match on.
+  assert.equal(
+    replayPlayer(replay({ client: 'lazer', onlineScoreId: 0n, extras: { online_id: 1716608692 } }))
+      .onlineId,
+    1716608692,
+  );
+  // Never submitted: no id in either place.
+  assert.equal(replayPlayer(replay({ onlineScoreId: 0n })).onlineId, null);
+  assert.equal(replayPlayer(replay({ onlineScoreId: null })).onlineId, null);
+});
+
+test('an offline play under someone else\u2019s name survives the sweep', async () => {
+  const h = harness();
+  try {
+    const insert = h.db.prepare(
+      `INSERT INTO scores (profile_id, dedupe_key, mode, beatmap_md5, client, mods_json,
+        mods_label, count300, count100, count50, count_geki, count_katu, count_miss, accuracy,
+        max_combo, total_score, passed, grade, ranked, played_at, player_name, player_id,
+        online_score_id)
+       VALUES (?,?,0,'x','stable','[]','None',0,0,0,0,0,0,1,0,0,1,'S',1,0,?,NULL,?)`,
+    );
+    // Played offline as "Cat" for fun: no score id, because osu! never saw it.
+    insert.run(h.profileId, 'offline-cat', 'Cat', null);
+    // And offline under a name that really does belong to somebody else.
+    insert.run(h.profileId, 'offline-mrekk', 'mrekk', null);
+    // The genuine article: mrekk's own submitted score, downloaded and watched.
+    insert.run(h.profileId, 'watched', 'mrekk', '900000001');
+
+    const sweep = await sweepForeignScores(h.db, h.profileId, OWNER, async () => null);
+    assert.equal(sweep.hidden, 1, 'only the downloaded one');
+
+    const gone = h.db
+      .prepare('SELECT dedupe_key FROM scores WHERE hidden_at IS NOT NULL')
+      .all() as { dedupe_key: string }[];
+    assert.deepEqual(gone.map((r) => r.dedupe_key), ['watched']);
+  } finally {
+    h.cleanup();
+  }
 });

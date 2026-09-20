@@ -14,6 +14,11 @@
   - That clean-up only runs for a profile linked to an osu! account, so it can check your
     previous usernames too. **A play set before you renamed is yours and is kept**, as is a
     play made signed out (osu!stable records no name) or offline in osu!lazer.
+  - **Offline plays are kept whatever name you gave yourself.** osu!stable lets you type any
+    username into its settings, so an offline play might say `Cat` -- or even a real player's
+    name. What tells the two apart is not the name: a replay you downloaded is a score osu!
+    put on a leaderboard and carries osu!'s id for it, and a play osu! never received has
+    none. Anything osu! never received was set on your machine, so it is yours.
 
 - **Import your best performances and pinned scores from osu!.** Two new boxes in
   **Options -> Import from osu!**, and in the welcome on a brand-new install. Brings in up to

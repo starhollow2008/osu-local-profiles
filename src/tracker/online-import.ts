@@ -170,10 +170,18 @@ function totalsOf(score: OsuWebScore): number[] {
  * same way, so `findExistingScore` recognises them as one.
  */
 export function replayIdentity(score: ReplayScore): PlayIdentity {
+  const lazerId = score.extras?.online_id;
   return {
-    // A replay carries whichever id its client used, and stable wrote 0 for a play it never
-    // submitted -- which `findExistingScore` discards.
-    onlineIds: score.onlineScoreId === null ? [] : [String(score.onlineScoreId)],
+    /*
+     * Every id this replay carries. lazer writes the legacy header as 0 and the real solo id
+     * in its own block, so both are read -- taking only the header left every lazer replay
+     * with nothing to match an imported score on. A 0 is not an id and `findExistingScore`
+     * discards it.
+     */
+    onlineIds: [
+      ...(score.onlineScoreId === null ? [] : [String(score.onlineScoreId)]),
+      ...(typeof lazerId === 'number' && lazerId > 0 ? [String(lazerId)] : []),
+    ],
     beatmapMD5: score.beatmapMD5,
     playedAt: score.playedAt.getTime(),
     maxCombo: score.maxCombo,

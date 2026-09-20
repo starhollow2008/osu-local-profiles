@@ -89,11 +89,14 @@ An attempt has no beatmap id (no submission request), so it is matched by the lo
 - **No name at all** — osu!stable writes an empty name for a play made signed out (3 in that corpus).
 - **lazer's `Guest`** — what lazer calls the local user when not signed in (1 in that corpus). Offline plays are what this app is *for*.
 - **A name you used to have.** osu! publishes `previous_usernames`; the test account has two. Stable replays carry no user id, only the name current when the play was set, so without that list every pre-rename play looks like a stranger's.
+- **A play osu! never accepted.** osu!stable's username is a line in a config file: anyone can set `Username = Cat` and play offline, and the replay then says `Cat` — possibly a real player's name. But a replay you *downloaded* is by definition a score osu! put on a leaderboard, so it always carries a score id. One with none was never on a leaderboard, so it cannot have been downloaded, so it was set here. Measured: **all 91 replays by other players carried an id; 258 of the owner's own — 164 stable, 94 lazer — did not.**
 - **Not knowing.** An identity nothing could establish never refuses anything.
 
 **Who am I?**, in order of certainty (`resolveIdentity`): the linked osu! account (numeric id + every previous name) → osu!stable's own `osu!.*.cfg` `Username` → the name behind ≥80% of the profile's own tracked plays, over at least 10. A lazer replay's `user_id` settles it outright and survives renames; stable records none.
 
 `scores.player_name` / `player_id` record who set each play at ingest, so nothing later has to reopen a replay file that may be gone.
+
+**The score id is read from wherever the replay keeps it.** lazer writes the legacy header field as `0` and the real solo id in its own block, so reading only the header called every lazer play unsubmitted — and left an imported osu! score with nothing to match a lazer replay on but the weaker fallback. `online_score_id` now stores whichever is real.
 
 ### Removing ones already tracked
 
