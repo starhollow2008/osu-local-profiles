@@ -18,6 +18,8 @@ import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
 import { eligibilityOf } from './calc/eligibility.ts';
 import { getSettings } from './settings.ts';
+import { replayPlayer, sweepForeignScores, type ReplayPlayer } from './player-identity.ts';
+import { parseReplay } from './osr.ts';
 
 const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
 
@@ -209,6 +211,16 @@ async function main(): Promise<void> {
     const time = new Date(play.at).toLocaleTimeString();
     console.log(`  [${time}] not tracked -- ${play.criterion.padEnd(13)} ${play.title}`);
   });
+  /*
+   * A replay somebody else set. osu! caches the replays you watch beside the ones you play,
+   * so this is a normal thing to see -- but it has to be *seen*, because a profile quietly
+   * collecting other people's plays is exactly the failure this check exists to end.
+   */
+  tracker.on('skip', (s) => {
+    if (s.reason !== 'another-player') return;
+    const time = new Date().toLocaleTimeString();
+    console.log(`  [${time}] not tracked -- set by ${s.detail || 'another player'}`);
+  });
   tracker.on('error', (e) => console.error(`  watcher error: ${explainWatchError(e)}`));
 
   /*
@@ -319,6 +331,24 @@ async function main(): Promise<void> {
   if (tracker.filterNarrowing) {
     console.log('  A play tracking filter is on -- plays it declines are not recorded at all.');
   }
+  /*
+   * Who the profile belongs to, and how it knows. Worth a line because it decides which
+   * replays are tracked at all: osu! caches the replays you watch in the same folders as the
+   * ones you set, and only the name inside them tells the two apart. A profile that cannot
+   * say who it is tracks everything, as it always did, and should say so.
+   */
+  const identity = tracker.playerIdentity;
+  if (identity.source === 'unknown') {
+    console.log('  Not sure whose plays these are, so every replay found is tracked.');
+    console.log('  Options -> Import from osu! links an account and settles it.');
+  } else {
+    const earlier = identity.names.size - 1;
+    console.log(
+      `  Tracking plays set by ${identity.displayName || `user ${identity.userId}`}` +
+        `${earlier > 0 ? ` (and ${earlier} earlier name${earlier === 1 ? '' : 's'})` : ''}` +
+        ' -- replays you watched are not counted.',
+    );
+  }
   console.log(
     fromTray
       ? '  Quit from the tray icon, or with Quit on the page.\n'
@@ -336,6 +366,49 @@ async function main(): Promise<void> {
    * The cleanup *is* worth a word, because it is hundreds of megabytes and silently
    * reclaiming that much disk should not be invisible.
    */
+  /*
+   * Once per profile: take out the plays somebody else set that were tracked before this
+   * check existed. Every one is a *hide*, so it appears under Removed scores and can be put
+   * back -- which is what makes doing it unprompted defensible.
+   *
+   * Only ever on a linked account, because only that brings osu!'s list of previous
+   * usernames, and without it a play set before a rename looks exactly like a stranger's.
+   * Queued behind ingestion like every other write, and after the banner so it never delays
+   * the app being usable.
+   */
+  const sweptKey = `foreignScoresSwept:${profileId}`;
+  const alreadySwept =
+    db.prepare('SELECT 1 AS hit FROM kv WHERE key = ?').get(sweptKey) !== undefined;
+  /*
+   * `namesComplete` as well as `linked`: an account linked by a version that never asked osu!
+   * for previous usernames has an empty list, and an empty list cannot be told from one
+   * nobody fetched. Marking such a profile swept would spend its one chance for nothing --
+   * so it is left unmarked, and the next launch after an Import from osu! does it properly.
+   */
+  if (!alreadySwept && identity.source === 'linked' && identity.namesComplete) {
+    const readPlayer = async (file: string): Promise<ReplayPlayer | null> => {
+      try {
+        return replayPlayer(await parseReplay(fs.readFileSync(file)));
+      } catch {
+        // Gone, or unreadable. Such a row cannot be attributed and is left alone.
+        return null;
+      }
+    };
+    const sweep = await sweepForeignScores(db, profileId, identity, readPlayer);
+    db.prepare('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(sweptKey, '1');
+    if (sweep.hidden > 0) {
+      const who = sweep.byPlayer
+        .slice(0, 4)
+        .map((p) => `${p.name} (${p.count})`)
+        .join(', ');
+      console.log(
+        `  Removed ${sweep.hidden} play(s) set by someone else -- replays you watched: ` +
+          `${who}${sweep.byPlayer.length > 4 ? `, and ${sweep.byPlayer.length - 4} more` : ''}`,
+      );
+      console.log('  They are in Options -> Other settings -> Removed scores if any are yours.\n');
+    }
+  }
+
   const leftovers = pruneUpdateLeftovers();
   if (leftovers.removed.length > 0) {
     console.log(

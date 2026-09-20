@@ -1,5 +1,6 @@
 import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replayIdentity } from './online-import.ts';
+import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
@@ -47,6 +48,15 @@ export interface BackfillScan {
   filtered: number;
   /** Whether the filter constrains the star rating, which is what makes that caveat worth saying. */
   starsUnchecked: boolean;
+  /**
+   * Replays found in osu!'s folders that somebody else set, counted by player.
+   *
+   * osu! caches the replays you watch beside the ones you set, so a scan of the store finds
+   * both. These are never offered: they are not this profile's plays. Counted and named
+   * because an import that quietly brought in 88 fewer than the folder holds should say why
+   * -- and because seeing mrekk in the list is how you know the check is working.
+   */
+  otherPlayers: { name: string; count: number }[];
   earliest: number | null;
   latest: number | null;
 }
@@ -55,6 +65,11 @@ export interface BackfillScan {
 export interface BackfillFilterContext {
   resolver: BeatmapResolver;
   filter: TrackingFilter;
+}
+
+/** Who the profile's plays belong to. Omitted, every replay found counts as the owner's. */
+export interface BackfillIdentityContext {
+  identity: PlayerIdentity;
 }
 
 function readHead(file: string, n: number): Buffer | null {
@@ -114,8 +129,10 @@ export async function scanForReplays(
   dirs: string[],
   since: number,
   filtering?: BackfillFilterContext,
+  owner: PlayerIdentity = UNKNOWN_IDENTITY,
 ): Promise<BackfillScan> {
   const candidates: BackfillCandidate[] = [];
+  const others = new Map<string, number>();
   let scanned = 0;
   const filter = filtering?.filter;
   const applyFilter = filter !== undefined && filter.enabled;
@@ -141,6 +158,18 @@ export async function scanForReplays(
 
       const playedAt = score.playedAt.getTime();
       if (playedAt < since) continue;
+
+      /*
+       * Somebody else's play. osu! caches a replay you watched in the same folders as the
+       * ones you set, so the walk finds both and only the name inside tells them apart.
+       * Counted by player rather than silently dropped -- see `otherPlayers`.
+       */
+      const player = replayPlayer(score);
+      if (ownsPlay(owner, player) === false) {
+        const name = player.name.trim() || '(no name)';
+        others.set(name, (others.get(name) ?? 0) + 1);
+        continue;
+      }
 
       const key = dedupeKey(score);
       // Two paths can hold the same replay (lazer keeps its own copy of an import), so
@@ -183,6 +212,9 @@ export async function scanForReplays(
     duplicates: candidates.filter((c) => c.duplicate).length,
     filtered: candidates.filter((c) => !c.duplicate && c.filtered).length,
     starsUnchecked: applyFilter && (filter.stars.min > 0 || filter.stars.max !== null),
+    otherPlayers: [...others]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
     earliest: importable[0]?.playedAt ?? null,
     latest: importable[importable.length - 1]?.playedAt ?? null,
   };

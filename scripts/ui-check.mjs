@@ -1844,7 +1844,14 @@ check(
  * bare 'none' here failed on any profile that had turned unranked scoring on.
  */
 const noteState = await evaluate(`fetch('/api/state').then((r) => r.json()).then((s) => {
-  const counting = s.settings.includeUnrankedMods || (s.settings.includeUnrankedMaps ?? []).length > 0;
+  const counting =
+    s.settings.includeUnrankedMods ||
+    (s.settings.includeUnrankedMaps ?? []).length > 0 ||
+    // The third thing the note speaks for (roadmap 5.45): attempts osu! could not submit run
+    // the play count ahead of osu!'s. Counted by default, so any profile that has some earns
+    // the note without having changed a setting -- which a check reading only the two
+    // settings above reported as a failure.
+    (s.settings.countUnsubmittedAttempts !== false && (s.unsubmittedAttempts ?? 0) > 0);
   return JSON.stringify({ expected: counting && s.settings.showCountingNote !== false });
 })`);
 check(

@@ -27,6 +27,7 @@ import { countStale, recomputeScores, type RecomputeResult } from './recompute.t
 import type { OfficialCalculator } from '../calc/official.ts';
 import { getSettings } from '../settings.ts';
 import { filterNarrows, type FilterCriterion, type TrackingFilter } from '../tracking-filter.ts';
+import { resolveIdentity, type PlayerIdentity } from '../player-identity.ts';
 
 export interface TrackerOptions {
   db: Db;
@@ -54,7 +55,7 @@ export interface TrackerEvents {
    * counted, or -- `unsubmitted` -- one it had no token for and never counted.
    */
   incomplete: [IngestedIncomplete];
-  skip: [{ reason: string }];
+  skip: [{ reason: string; detail?: string }];
   /**
    * A play the profile's tracking filter turned away, which is deliberately not a `skip`: a
    * skip means the play was already here or could not be read, while this one is the user's
@@ -108,6 +109,8 @@ export interface BackfillResult {
    * able to say so -- the way to import everything is to switch the filter off first.
    */
   filtered: number;
+  /** Replays found that somebody else set -- watched, not played. Never imported. */
+  otherPlayers: number;
   scanned: number;
   since: number;
 }
@@ -239,6 +242,20 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   /** Whether the filter can actually turn a play away, for the console's start-up line. */
   get filterNarrowing(): boolean {
     return filterNarrows(this.currentFilter());
+  }
+
+  /**
+   * Who this profile's plays belong to, read per ingest for the same reason the filter is:
+   * linking an osu! account from the page must take effect on the next play, not the next
+   * launch. It reads settings and, at most, one small config file.
+   */
+  private currentIdentity(): PlayerIdentity {
+    return resolveIdentity(this.opts.db, this.opts.profileId, this.opts.installs);
+  }
+
+  /** The profile's own identity, for the start-up line and the page. */
+  get playerIdentity(): PlayerIdentity {
+    return this.currentIdentity();
   }
 
   get indexState(): IndexState {
@@ -390,6 +407,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           // plays the same filter is about to turn away.
           filter: this.currentFilter(),
         },
+        this.currentIdentity(),
       );
       return { ...replays, log: this.previewLogs(since) };
     });
@@ -462,9 +480,13 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       let skipped = 0;
       let filtered = 0;
       let scanned = 0;
+      let otherPlayers = 0;
       // The filter applies to an import too: this is the same tracking decision made later,
       // so a profile cannot be filled with what live tracking would have declined.
       const filter = this.currentFilter();
+      // As does the owner check. An import walks osu!'s folders, which is exactly where the
+      // replays you have *watched* are cached, so this is where it matters most.
+      const owner = this.currentIdentity();
 
       if (sources.replays) {
         const scan = await scanForReplays(
@@ -472,8 +494,11 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           this.opts.profileId,
           this.replayDirs(),
           since,
+          undefined,
+          owner,
         );
         scanned = scan.scanned;
+        otherPlayers = scan.otherPlayers.reduce((n, p) => n + p.count, 0);
         for (const candidate of scan.candidates) {
           if (candidate.duplicate) {
             skipped++;
@@ -488,6 +513,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             trackingSince: since,
             official: this.opts.official,
             filter,
+            identity: owner,
           });
           if (result.status === 'added') {
             imported++;
@@ -525,7 +551,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
         }
       }
 
-      return { imported, unfinished, attempts, skipped, filtered, scanned, since };
+      return { imported, unfinished, attempts, skipped, filtered, otherPlayers, scanned, since };
     });
   }
 
@@ -686,6 +712,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           trackingSince: this.liveCutoff,
           official: this.opts.official,
           filter: this.currentFilter(),
+          identity: this.currentIdentity(),
         });
         if (result.status === 'added') {
           this.added++;
@@ -693,7 +720,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
         } else if (result.status === 'filtered') {
           this.reportFiltered(result, 'score');
         } else {
-          this.emit('skip', { reason: result.reason });
+          this.emit('skip', { reason: result.reason, detail: result.player });
         }
       })
       .catch((e: unknown) => {

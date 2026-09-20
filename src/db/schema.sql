@@ -88,6 +88,15 @@ CREATE TABLE IF NOT EXISTS scores (
   -- imported row), and a replay on disk may carry either, so both are matched when deciding
   -- whether an import and a replay are the same play. See src/tracker/online-import.ts.
   legacy_score_id TEXT,
+  -- Who set the play, as the replay itself records it. osu! keeps the replays you watch in
+  -- the same folders as the ones you set, so this is the only thing that tells them apart.
+  --   player_name  the name written in the replay; '' when osu! recorded none (a signed-out
+  --                stable play), 'Guest' for a lazer play made while not signed in.
+  --   player_id    lazer's numeric user id. NULL on every osu!stable replay -- it has none.
+  -- Both NULL on a row tracked before these existed, and on an imported score. See
+  -- src/player-identity.ts.
+  player_name     TEXT,
+  player_id       INTEGER,
   -- When this score was taken from osu.ppy.sh rather than from a replay. NULL on every
   -- tracked score, which is what tells the two apart -- and what keeps a recompute away from
   -- a row it has no replay to recompute from.

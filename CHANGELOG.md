@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- **Replays you watched are no longer counted as your own plays.** osu! saves the replays you
+  watch in the same folders as the ones you set, so Import past plays could fill a profile with
+  other people's scores -- on the machine this was found on, 88 plays by 62 players, enough to
+  read 16,109pp instead of 7,394.
+  - Plays set by someone else are not tracked, and the import dialog names them so you can see
+    what it left out.
+  - Plays already tracked that were somebody else's are removed once, automatically. They are
+    **removed, not deleted**: they sit in Options -> Other settings -> Removed scores and go
+    back with one click.
+  - That clean-up only runs for a profile linked to an osu! account, so it can check your
+    previous usernames too. **A play set before you renamed is yours and is kept**, as is a
+    play made signed out (osu!stable records no name) or offline in osu!lazer.
+
 - **Import your best performances and pinned scores from osu!.** Two new boxes in
   **Options -> Import from osu!**, and in the welcome on a brand-new install. Brings in up to
   200 best performances per game mode with osu!'s own pp, so the profile's pp and accuracy

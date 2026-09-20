@@ -72,6 +72,10 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   //                    no replay behind it, so a recompute must leave it alone.
   { table: 'scores', column: 'legacy_score_id', definition: 'TEXT' },
   { table: 'scores', column: 'imported_at', definition: 'INTEGER' },
+  // Added when replays set by other players stopped being tracked as your own. NULL on every
+  // row tracked before it, which the one-off clean-up reads from the replay file instead.
+  { table: 'scores', column: 'player_name', definition: 'TEXT' },
+  { table: 'scores', column: 'player_id', definition: 'INTEGER' },
 ];
 
 /**

@@ -80,6 +80,27 @@ An attempt has no beatmap id (no submission request), so it is matched by the lo
 
 `renderStableNote` in main.js, `showStableNote` per profile. Do not build a play counter on that timestamp. `ingestIncompletePlay` stays client-agnostic.
 
+## Whose replay is it?
+
+**osu! keeps the replays you watch in the same folders as the ones you set.** Stable caches a downloaded leaderboard replay in `Data/r`; lazer imports one into its content-addressed store. Nothing about the file says which it is — only the name written inside it. Measured on one real machine: 2,499 replays, 2,411 the owner's and **88 belonging to 62 other players**. Import past plays brought all 88 in, and the profile read 16,109pp because its top play was mrekk's 1,857pp Crystalia.
+
+**Everything fails towards yours.** A wrongly tracked play is visible and removable; a wrongly refused one is gone. So `ownsPlay` returns `false` only on positive evidence, and these are always yours:
+
+- **No name at all** — osu!stable writes an empty name for a play made signed out (3 in that corpus).
+- **lazer's `Guest`** — what lazer calls the local user when not signed in (1 in that corpus). Offline plays are what this app is *for*.
+- **A name you used to have.** osu! publishes `previous_usernames`; the test account has two. Stable replays carry no user id, only the name current when the play was set, so without that list every pre-rename play looks like a stranger's.
+- **Not knowing.** An identity nothing could establish never refuses anything.
+
+**Who am I?**, in order of certainty (`resolveIdentity`): the linked osu! account (numeric id + every previous name) → osu!stable's own `osu!.*.cfg` `Username` → the name behind ≥80% of the profile's own tracked plays, over at least 10. A lazer replay's `user_id` settles it outright and survives renames; stable records none.
+
+`scores.player_name` / `player_id` record who set each play at ingest, so nothing later has to reopen a replay file that may be gone.
+
+### Removing ones already tracked
+
+Runs once per profile (`kv` `foreignScoresSwept:<id>`), and **only on a linked account whose previous-name list was actually fetched** — `linkedNamesKnown`, because an empty list cannot be told from one nobody asked for, and an older version never asked. A profile that fails that test is left *unmarked*, so the next launch after an Import from osu! does it properly.
+
+Every removal is a **hide**, the same one the `···` menu performs: the row stays, appears under Removed scores, and goes back with one click. That is what makes doing it unprompted defensible. Measured on the test profile: 84 removed, 0 of 2,327 own plays, 0 of 3 nameless, 0 of 1 `Guest`; total pp 16,109 → 7,394.
+
 ## Importing an osu! account's own scores
 
 **Why it cannot be done locally.** A best performance may have been set years ago on another PC, on a beatmap never installed here, with a replay this machine has never held. Nothing local can find it. osu! still has it.

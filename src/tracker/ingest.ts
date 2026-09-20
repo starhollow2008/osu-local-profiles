@@ -1,5 +1,6 @@
 import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replayIdentity } from './online-import.ts';
+import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
 import type { Db } from '../db/index.ts';
 import { parseReplay, type ReplayScore, type Ruleset } from '../osr.ts';
@@ -38,6 +39,12 @@ export interface IngestContext {
    * would delete scores rather than decline new ones.
    */
   filter?: TrackingFilter;
+  /**
+   * Who this profile's plays belong to, so a replay someone else set is not tracked as one
+   * of them. Omitted means nothing is known and every replay is taken, which is both the
+   * old behaviour and the right answer for a re-ingest of rows already here.
+   */
+  identity?: PlayerIdentity;
 }
 
 export interface IngestedScore {
@@ -62,7 +69,12 @@ export interface IngestedScore {
 
 export type IngestOutcome =
   | { status: 'added'; score: IngestedScore }
-  | { status: 'skipped'; reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed' }
+  | {
+      status: 'skipped';
+      reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed' | 'another-player';
+      /** Who set it, on `another-player`, so the console can name them rather than hint. */
+      player?: string;
+    }
   /**
    * Turned away by the profile's play tracking filter, which is not the same event as a skip:
    * the others are "this is already here" or "this is not readable", while this one is a
@@ -102,6 +114,22 @@ export async function ingestScore(
 ): Promise<IngestOutcome> {
   const playedAt = score.playedAt.getTime();
   if (playedAt < ctx.trackingSince) return { status: 'skipped', reason: 'too-old' };
+
+  /*
+   * Someone else's play.
+   *
+   * osu! keeps the replays you watch in the same folders as the ones you set -- stable caches
+   * a downloaded leaderboard replay in `Data/r`, lazer imports one into its store -- and
+   * nothing about the file says which it is. Only the name inside it does. Checked before
+   * anything is read or priced, because a play that is not yours is not a play at all.
+   *
+   * `ownsPlay` answers null when the profile cannot say who it belongs to, and null is taken
+   * as yours: not knowing must never cost anybody a play. See src/player-identity.ts.
+   */
+  const player = replayPlayer(score);
+  if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player) === false) {
+    return { status: 'skipped', reason: 'another-player', player: player.name.trim() };
+  }
 
   const key = dedupeKey(score);
   const already = ctx.db
@@ -198,8 +226,8 @@ export async function ingestScore(
          accuracy, max_combo, total_score, score_standard, score_classic, passed, grade, stars, pp, pp_source,
          pp_nomod, stars_nomod, beatmap_max_combo, map_status, mods_ranked, mods_ranked_by,
          mods_countable, ranked, played_at, online_score_id, replay_path, pp_parts, pp_nomod_parts,
-         pp_version)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+         pp_version, player_name, player_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     )
     .run(
       ctx.profileId, key, mode, score.beatmapMD5, beatmap.beatmapId, score.client,
@@ -225,6 +253,10 @@ export async function ingestScore(
       computed ? JSON.stringify(computed.breakdown) : null,
       stripped ? JSON.stringify(stripped.breakdown) : null,
       computed?.version ?? null,
+      // Recorded on the row so the clean-up and the identity inference never have to go back
+      // to a replay file that may no longer be on disk.
+      player.name,
+      player.userId,
     );
 
   const id = (ctx.db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;

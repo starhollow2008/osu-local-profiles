@@ -63,6 +63,26 @@ export interface Settings {
   /** The username that id had when it was looked up, so the link reads as a name. */
   linkedUsername: string;
   /**
+   * Every username this account has been known by before, as osu! lists them.
+   *
+   * Load-bearing, not decoration. Deciding whether a replay is yours comes down to the name
+   * written inside it, and osu!stable's replays carry no user id at all -- so a play set
+   * before a rename carries a name that looks like a stranger's. osu! publishes the full
+   * list (`previous_usernames`), which turns that guess into a fact. See
+   * `src/player-identity.ts`.
+   */
+  linkedPreviousNames: string[];
+  /**
+   * Whether that list was actually fetched, as opposed to simply being empty.
+   *
+   * The two are not the same and the difference decides whether a play can be taken out of a
+   * profile. An account linked by a version that never asked osu! for previous usernames has
+   * an empty list and no renames recorded -- so a play set before a rename is
+   * indistinguishable from a stranger's, and nothing may be removed on the strength of it.
+   * Set the next time Import from osu! runs, which fills the list in.
+   */
+  linkedNamesKnown: boolean;
+  /**
    * The profile's own description -- osu!'s "me!" box.
    *
    * osu!'s BBCode, stored exactly as it was typed or imported. It is never trusted: the page
@@ -276,6 +296,27 @@ const DEFS: Defs = {
   linkedUsername: {
     default: '',
     coerce: (raw) => cleanText(raw, 32),
+  },
+  linkedNamesKnown: {
+    default: false,
+    coerce: (raw) => raw === true,
+  },
+  linkedPreviousNames: {
+    default: [] as string[],
+    coerce: (raw) => {
+      if (!Array.isArray(raw)) return [];
+      const seen = new Set<string>();
+      const out: string[] = [];
+      // Capped: this comes from osu! and is only ever compared against, but a stored list
+      // written by something else must not grow without bound.
+      for (const value of raw.slice(0, 64)) {
+        const name = cleanText(value, 32);
+        if (name === '' || seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        out.push(name);
+      }
+      return out;
+    },
   },
   includeUnrankedMaps: {
     default: [],

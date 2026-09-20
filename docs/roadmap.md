@@ -2418,3 +2418,38 @@ is nothing to scan for. osu! still has it, so it is asked.
 
 Not done: the estimated rank still comes from the sampled curve rather than the real rank the
 import now knows, and an imported score does not adopt its replay if one later turns up.
+
+## 5.51 - Replays other people set are not your plays
+
+**Status:** done -- unreleased.
+
+Found while verifying 5.50: a profile built by Import past plays read 16,109pp and rank #328,
+because its best play was mrekk's 1,857pp Crystalia. osu! caches the replays you *watch* in the
+same folders as the ones you set -- stable in `Data/r`, lazer in its own store -- and nothing
+but the name inside the file tells them apart. Measured here: 2,499 replays, 2,411 the owner's,
+88 belonging to 62 other players, every one of them imported as the owner's own play.
+
+It was never a pricing bug. Checked against osu!'s own pp for six of the owner's stable plays:
+330.6/330.6, 298.2/298.2, 282.0/282.0, 313.7/313.7, 269.1/269.1. `LegacyScoreDecoder` adds the
+Classic mod when the helper decodes the replay, exactly as 5.39 describes.
+
+- **Everything fails towards yours.** A wrongly tracked play can be seen and removed; a wrongly
+  refused one is gone. `ownsPlay` returns false only on positive evidence, and a play with no
+  name (stable, signed out), lazer's `Guest`, a name you used to have, and an identity nothing
+  could establish are all yours.
+- **Previous usernames are load-bearing.** osu! publishes them and a stable replay carries no
+  user id -- only the name current when it was set -- so without the list every pre-rename play
+  looks like a stranger's. The test account has two.
+- **Who am I**: the linked account, else osu!stable's `osu!.*.cfg` `Username`, else the name
+  behind at least four fifths of the profile's own tracked plays. A lazer `user_id` settles it
+  outright and survives a rename.
+- **Removing ones already tracked** runs once per profile and only on a linked account whose
+  name list was actually *fetched* (`linkedNamesKnown`) -- an empty list cannot be told from one
+  nobody asked for. Every removal is a hide, listed under Removed scores, reversible.
+
+### Verified
+
+- `npm run check`: 460 tests, `test/player-identity.test.ts` covering each safeguard by name.
+- **On the real corpus.** The sweep removed 84 and kept every doubtful one: 0 of 2,327 own
+  plays, 0 of 3 with no name, 0 of 1 `Guest`, 84 of 84 other players'. Nothing deleted -- 2,777
+  rows before and after, 84 hidden. Total pp 16,109 -> 7,394 against osu!'s own 7,380.

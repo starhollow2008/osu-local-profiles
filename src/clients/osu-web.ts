@@ -35,6 +35,14 @@ export interface OsuWebUser {
   countryCode: string | null;
   /** The account's me! page as BBCode, exactly as its owner wrote it; null when it is empty. */
   pageRaw: string | null;
+  /**
+   * Every username this account has had before, as osu! publishes them.
+   *
+   * Read so that a replay set before a rename is still recognised as its owner's: an
+   * osu!stable replay carries no user id, only the name that was current when it was set.
+   * See `src/player-identity.ts`.
+   */
+  previousUsernames: string[];
 }
 
 /**
@@ -122,6 +130,9 @@ function extractUser(html: string): OsuWebUser | null {
           ? country.code
           : null,
     pageRaw: typeof page?.raw === 'string' && page.raw.trim() !== '' ? page.raw : null,
+    previousUsernames: Array.isArray(user['previous_usernames'])
+      ? user['previous_usernames'].filter((n): n is string => typeof n === 'string' && n !== '')
+      : [],
   };
 }
 

@@ -798,7 +798,17 @@ export function startServer(opts: ServerOptions): http.Server {
               const done: string[] = [];
               const failures: string[] = [];
 
-              const patch: Record<string, unknown> = { linkedUserId: user.id, linkedUsername: user.username };
+              const patch: Record<string, unknown> = {
+                linkedUserId: user.id,
+                linkedUsername: user.username,
+                // Kept because deciding whether a replay is yours comes down to the name
+                // inside it, and an osu!stable replay carries no user id -- so a play set
+                // before a rename would look like a stranger's. See src/player-identity.ts.
+                linkedPreviousNames: user.previousUsernames,
+                // The list has now actually been asked for, which is what makes it safe to
+                // remove a play on the strength of it -- see `linkedNamesKnown`.
+                linkedNamesKnown: true,
+              };
               if (want('country', true)) {
                 if (user.countryCode) {
                   patch['country'] = user.countryCode;
@@ -1271,6 +1281,10 @@ export function startServer(opts: ServerOptions): http.Server {
                 duplicates: scan.duplicates,
                 filtered: scan.filtered,
                 starsUnchecked: scan.starsUnchecked,
+                // Replays found in osu!'s folders that somebody else set -- ones watched,
+                // not played. Never offered, and named so the dialog can say why the count
+                // is lower than the folder holds.
+                otherPlayers: scan.otherPlayers,
                 earliest: scan.earliest,
                 latest: scan.latest,
                 // lazer's logs: counts only, by the same checks the import will make.
@@ -1284,7 +1298,8 @@ export function startServer(opts: ServerOptions): http.Server {
               `\n  imported ${result.imported} past play(s) from ` +
                 `${new Date(since).toLocaleString()}` +
                 `${result.unfinished + result.attempts > 0 ? `, and from osu!lazer's logs ${result.unfinished} unfinished and ${result.attempts} not submitted` : ''}` +
-                `${result.filtered > 0 ? ` (${result.filtered} declined by the tracking filter)` : ''}\n`,
+                `${result.filtered > 0 ? ` (${result.filtered} declined by the tracking filter)` : ''}` +
+                `${result.otherPlayers > 0 ? ` (${result.otherPlayers} were set by other players)` : ''}\n`,
             );
             return json(res, result);
           } catch (e) {

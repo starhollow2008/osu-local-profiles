@@ -2699,14 +2699,32 @@ $('backfillCheck').onclick = async () => {
      */
     const filtered =
       declined > 0 ? ` ${fmt(declined)} would be left out by the play tracking filter.` : '';
+    /*
+     * Replays somebody else set. osu! caches the ones you watch in the same folders as the
+     * ones you play, so a scan finds both -- and an import that brings in fewer plays than
+     * the folder holds has to say why, or it just looks broken. Naming the players is the
+     * quickest way to recognise them as replays you watched.
+     */
+    const others = d.otherPlayers ?? [];
+    const otherTotal = others.reduce((n, p) => n + p.count, 0);
+    const otherNames = others
+      .slice(0, 3)
+      .map((p) => p.name)
+      .join(', ');
+    const watched =
+      otherTotal > 0
+        ? ` ${plural(otherTotal, 'replay')} in these folders were set by someone else` +
+          `${otherNames ? ` (${otherNames}${others.length > 3 ? `, and ${others.length - 3} more` : ''})` : ''}` +
+          ' -- replays you watched, not plays. They are never imported.'
+        : '';
 
     if (found === 0) {
       resetBackfillPreview(
         tracked > 0 || declined > 0
           ? `Nothing to import.${escapeHtml(
               tracked > 0 ? ` ${plural(tracked, 'play')} found since then are already tracked.` : '',
-            )}${escapeHtml(filtered)}`
-          : `No plays found since then (${fmt(d.scanned)} files checked).`,
+            )}${escapeHtml(filtered)}${escapeHtml(watched)}`
+          : `No plays found since then (${fmt(d.scanned)} files checked).${escapeHtml(watched)}`,
       );
       return;
     }
@@ -2722,7 +2740,7 @@ $('backfillCheck').onclick = async () => {
         ? ` ${plural(log.unresolved, 'unfinished play')} on beatmaps that are not installed will be skipped.`
         : '';
     $('backfillSummary').innerHTML =
-      `<b>${plural(found, 'play')}</b> found.${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(unresolved)}${escapeHtml(unchecked)} Untick anything you do not want.`;
+      `<b>${plural(found, 'play')}</b> found.${escapeHtml(span)}${escapeHtml(dupes)}${escapeHtml(filtered)}${escapeHtml(watched)}${escapeHtml(unresolved)}${escapeHtml(unchecked)} Untick anything you do not want.`;
     renderBackfillSources({ replays: d.importable, unfinished: log.unfinished, attempts: log.attempts });
   } catch (err) {
     resetBackfillPreview(`Check failed: ${escapeHtml(err.message)}`);
