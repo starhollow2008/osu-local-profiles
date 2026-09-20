@@ -83,6 +83,15 @@ CREATE TABLE IF NOT EXISTS scores (
   ranked          INTEGER NOT NULL DEFAULT 0,
   played_at       INTEGER NOT NULL,
   online_score_id TEXT,
+  -- osu!stable's own id for the play, set only on a score imported from osu.ppy.sh. It is a
+  -- different numbering scheme from online_score_id (which holds lazer's solo score id on an
+  -- imported row), and a replay on disk may carry either, so both are matched when deciding
+  -- whether an import and a replay are the same play. See src/tracker/online-import.ts.
+  legacy_score_id TEXT,
+  -- When this score was taken from osu.ppy.sh rather than from a replay. NULL on every
+  -- tracked score, which is what tells the two apart -- and what keeps a recompute away from
+  -- a row it has no replay to recompute from.
+  imported_at     INTEGER,
   replay_path     TEXT,
   -- Removed from the profile by the user. A hide rather than a DELETE: the replay is still
   -- on disk, so a deleted row would be re-ingested and dedupe would no longer suppress it.
@@ -224,6 +233,29 @@ CREATE TABLE IF NOT EXISTS deleted_scores (
   dedupe_key TEXT    NOT NULL,
   deleted_at INTEGER NOT NULL,
   PRIMARY KEY (profile_id, dedupe_key)
+);
+
+-- What osu! itself said a linked account stood at, per ruleset, when best performances were
+-- last imported for it.
+--
+-- One number is the point: bonus_pp. osu! awards it for how many distinct ranked beatmaps an
+-- account has ever played -- thousands -- while an import brings 200 scores, so a profile
+-- computing its own bonus from those would read hundreds of pp and tens of thousands of
+-- places below the real account. osu!'s total minus the weighted sum of the very scores it
+-- handed over is that bonus exactly, so it is stored rather than guessed.
+--
+-- Borrowed, and the page says so. computeStats takes whichever bonus is larger, this one or
+-- the profile's own, so importing a real play history supersedes it without anything having
+-- to be cleared.
+CREATE TABLE IF NOT EXISTS imported_standing (
+  profile_id    INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  mode          INTEGER NOT NULL,
+  bonus_pp      REAL    NOT NULL,
+  -- osu!'s own figures at import time, kept so the page can show what it is borrowing from.
+  osu_total_pp  REAL,
+  osu_global_rank INTEGER,
+  imported_at   INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, mode)
 );
 
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

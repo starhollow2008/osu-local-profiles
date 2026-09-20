@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- **Import your best performances and pinned scores from osu!.** Two new boxes in
+  **Options -> Import from osu!**, and in the welcome on a brand-new install. Brings in up to
+  200 best performances per game mode with osu!'s own pp, so the profile's pp and accuracy
+  match your osu! profile, and pins the scores you pinned there in the same order. Plays set
+  on another PC, or on beatmaps you no longer have installed, come across too -- osu! has them
+  even when this computer does not.
+  - Both start unticked: they are the only part of an import that adds plays.
+  - **Import past plays afterwards will not add any of them twice.** A score is matched to its
+    replay by osu!'s own id, and for replays too old to carry one, by the beatmap, the exact
+    score, the combo and the time.
+  - Bonus pp is taken from your osu! profile, because it is earned over every ranked map you
+    have ever played rather than over your top scores. Hovering the pp figure says so. As you
+    track or import real plays, your own bonus takes over.
+
 - **Plays set while the app is closed are no longer tracked.** Closing the app is how tracking
   is stopped, so plays made after that stay out of the profile -- the app picks up from the
   moment it opens, not from where it left off. Turning tracking off and on again works the same

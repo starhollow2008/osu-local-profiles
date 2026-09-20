@@ -28,6 +28,9 @@ import { buildHistory, medalEvents } from '../calc/history.ts';
  */
 const TOP_PLAYS = 100;
 
+/** Rulesets by `Ruleset`, for naming one in a message about an import that failed. */
+const MODE_LABELS = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'] as const;
+
 /**
  * The most rows one request may ask a section for.
  *
@@ -56,7 +59,17 @@ import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
 import { APP_ID, isOwnPage } from '../instance.ts';
-import { downloadImage, fetchBeatmapset, fetchFavouriteBeatmapsets, lookupUser } from '../clients/osu-web.ts';
+import {
+  downloadImage,
+  fetchBeatmapset,
+  fetchBestPerformances,
+  fetchFavouriteBeatmapsets,
+  fetchPinnedScores,
+  fetchStanding,
+  lookupUser,
+} from '../clients/osu-web.ts';
+import { importMode, type ModeImportResult } from '../tracker/online-import.ts';
+import { clearStanding, importedStanding } from '../standing.ts';
 import {
   addFavorite,
   detailsFor,
@@ -462,6 +475,12 @@ export function startServer(opts: ServerOptions): http.Server {
         // ~200 countries is far too thin to interpolate per country.
         rank: estimateRank(stats.totalPp, mode),
         rankSource: table === null ? null : { dump: table.dump, sampled: table.sampled },
+        /*
+         * What this profile borrowed from osu!, when it is borrowing. Sent whenever there is
+         * a record of one so the page can name where the figure came from and when -- a
+         * number standing in for a play history nobody here has seen has to say so.
+         */
+        imported: stats.bonusPpBorrowed ? importedStanding(opts.db, profileId, mode) : null,
         medals,
         // osu!'s header figure: every medal the profile holds, whichever mode is showing.
         medalTotal,
@@ -830,15 +849,53 @@ export function startServer(opts: ServerOptions): http.Server {
                 }
               }
 
+              /*
+               * Best performances and pinned scores, which are the only part of an import
+               * that writes plays rather than decoration.
+               *
+               * Both lists per ruleset in one pass, because they overlap and because the
+               * weighting depends on osu!'s order: see src/tracker/online-import.ts. All
+               * four rulesets are asked -- osu! keeps a separate 200 for each, an account
+               * that never played one answers empty, and importing mode by mode would leave
+               * a profile whose other tabs are silently blank.
+               */
+              const scores: ModeImportResult[] = [];
+              const wantBest = want('bestPerformances', false);
+              const wantPinned = want('pinnedScores', false);
+              if (wantBest || wantPinned) {
+                for (const mode of [0, 1, 2, 3] as const) {
+                  try {
+                    const best = wantBest ? await fetchBestPerformances(user.id, mode) : [];
+                    const pinned = wantPinned ? await fetchPinnedScores(user.id, mode) : [];
+                    if (best.length === 0 && pinned.length === 0) continue;
+                    // Only worth a request once there is something to correct the bonus of.
+                    const standing = wantBest && best.length > 0
+                      ? await fetchStanding(user.id, mode)
+                      : null;
+                    scores.push(
+                      importMode(opts.db, opts.tracker.beatmaps, id, mode, best, pinned, standing),
+                    );
+                  } catch (e) {
+                    failures.push(`${MODE_LABELS[mode]} scores: ${(e as Error).message}`);
+                  }
+                }
+                const added = scores.reduce((n, r) => n + r.added, 0);
+                const pins = scores.reduce((n, r) => n + r.pinned, 0);
+                if (wantBest && added > 0) done.push(`${added} score${added === 1 ? '' : 's'}`);
+                if (wantPinned && pins > 0) done.push(`${pins} pinned`);
+              }
+
               broadcast('identity', { linked: user.id });
               broadcast('settings', settingsFor(id));
               if (favouritesAdded > 0) broadcast('favorites', { action: 'import' });
+              if (scores.length > 0) broadcast('scores', { action: 'import' });
               return json(res, {
                 ok: true,
                 user,
                 done,
                 failures,
                 favorites: { found: favouritesFound, added: favouritesAdded },
+                scores,
                 settings: settingsFor(id),
                 ...imageState(opts.dataDir, id),
               });
@@ -1140,6 +1197,9 @@ export function startServer(opts: ServerOptions): http.Server {
           opts.db.prepare('DELETE FROM incomplete_plays WHERE profile_id = ?').run(current());
           // A fresh start forgets deletions too; tracking_since keeps the old replays out.
           opts.db.prepare('DELETE FROM deleted_scores WHERE profile_id = ?').run(current());
+          // And what it borrowed from osu!: a profile with no scores left must not still be
+          // priced against an account none of them came from any more.
+          clearStanding(opts.db, current());
           opts.db
             .prepare('UPDATE profiles SET tracking_since = ? WHERE id = ?')
             .run(now, current());

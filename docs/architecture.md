@@ -80,6 +80,33 @@ An attempt has no beatmap id (no submission request), so it is matched by the lo
 
 `renderStableNote` in main.js, `showStableNote` per profile. Do not build a play counter on that timestamp. `ingestIncompletePlay` stays client-agnostic.
 
+## Importing an osu! account's own scores
+
+**Why it cannot be done locally.** A best performance may have been set years ago on another PC, on a beatmap never installed here, with a replay this machine has never held. Nothing local can find it. osu! still has it.
+
+**No credentials, as with the rest of the osu! import.** `/users/{id}/scores/best` and `/users/{id}/scores/pinned` answer JSON to anyone, exactly as `/beatmapsets/favourite` does. `?mode=osu|taiko|fruits|mania&limit=100&offset=N`, paged until a page comes back empty.
+
+**osu! keeps 200 best performances per ruleset, not the 100 its page shows.** Measured: offset 100 returns a full second page, offset 200 empty. Scores 100–199 were worth 34.14pp on the test account — taken, not dropped.
+
+**pp is osu!'s own, and nothing recomputes it.** A number osu! published *is* "pp from osu!'s own code". What cannot come with it is a breakdown — the helper needs the replay file — so `pp_parts` stays NULL and `pp_source` is `osu-web`, keeping the rule that parts always belong to the pp beside them. Recompute excludes `imported_at IS NOT NULL`.
+
+**Star rating is stored only when the mods cannot have changed it** (`RATING_NEUTRAL_MODS`). osu! hands over the *unmodded* rating and there is no replay to ask the difficulty calculator about, so an HR or DT play stores none rather than one that is wrong.
+
+### Deduplication: the hard part
+
+The same play arrives twice — from osu!'s record, and from its replay when a history is imported later — and the two share no key. A replay knows its own hash; osu! knows its score id. `dedupe_key` can never match across them, so `findExistingScore` is what both sides go through, in `src/tracker/online-import.ts`:
+
+1. **An online id.** Conclusive. lazer and osu!stable number scores differently, an imported row keeps both (`online_score_id` + `legacy_score_id`), and a replay carries whichever its client used — so ids are matched as a set against both columns. Stable's `0` for an unsubmitted play is discarded, not treated as an id.
+2. **The play itself**, for a stable replay older than 2014 with no id: same beatmap MD5, same total *on some scale*, same max combo, within 5 minutes. An imported row stores `total_score` on the scale its replay would have carried — osu!'s old uncapped number for a stable play, the standardised one for a lazer play — which is what makes the exact-total match possible.
+
+A play already tracked from its replay is left alone (`tracked`): that row was priced by osu!'s calculator here and carries the breakdown. A row a previous import wrote is *updated*, because osu! reworks pp and re-ranks maps.
+
+### Borrowed bonus pp
+
+osu! awards bonus pp for how many distinct ranked beatmaps an account has ever played — thousands. A profile holding 200 imported scores earns the bonus for 200 and lands hundreds of pp adrift. So an import records osu!'s own total (`imported_standing`) and stores the shortfall: `osu! total − weighted sum over TOP_PLAY_LIMIT of the same scores`. Measured: 7,380.07 − 6,931.85 = 448.22, landing the profile's total on 7,380.07 exactly.
+
+The subtraction is against the app's own top-100 weighting, not all 200, so the tail past the hundredth is carried too rather than lost. `computeStats` takes `max(earned, borrowed)`: real plays supersede it gradually, with nothing to clear and no backwards jump. A reset clears it.
+
 ## Live tracking starts at the launch, never earlier
 
 **A play set while the app was closed is never tracked when it opens.** Closing the app is how tracking is stopped — a different playstyle, a warm-up, an account that is not this profile — so catching up at the next launch overrules that, and irreversibly: the scores are in, and the profile has to be picked through by hand.

@@ -62,6 +62,16 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   // Added when osu! itself began deciding which mods are ranked. NULL marks a mods_ranked from
   // the old hand-kept list, or one the helper could not answer, and makes the score stale.
   { table: 'scores', column: 'mods_ranked_by', definition: 'TEXT' },
+  // Added with importing best performances from osu!. Both stay NULL on every score that came
+  // from a replay, which is what tells the two apart.
+  //   legacy_score_id  osu!stable's own id for the play, when osu! recorded one. Kept beside
+  //                    online_score_id rather than in it because the two are different
+  //                    numbering schemes, and a replay may carry either -- see
+  //                    src/tracker/online-import.ts.
+  //   imported_at      when this row was taken from osu.ppy.sh. Also the marker that there is
+  //                    no replay behind it, so a recompute must leave it alone.
+  { table: 'scores', column: 'legacy_score_id', definition: 'TEXT' },
+  { table: 'scores', column: 'imported_at', definition: 'INTEGER' },
 ];
 
 /**

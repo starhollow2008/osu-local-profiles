@@ -1,3 +1,6 @@
+import { UNRESOLVED_STATUS } from './beatmaps.ts';
+import type { LazerMod, Ruleset } from '../osr.ts';
+
 /**
  * Looking up an osu! account, so a profile can borrow its name, avatar and banner.
  *
@@ -69,17 +72,11 @@ async function fetchWithTimeout(url: string, accept: string): Promise<Response> 
 }
 
 /**
- * The public user object osu-web renders the profile page from.
- *
- * The page mounts its React app with the payload in a `data-initial-data` attribute, HTML
- * escaped. That is a private detail of osu-web and may change, hence the explicit error
- * rather than a silent empty result.
+ * Undo the HTML escaping osu-web applies to the `data-initial-data` attribute it mounts its
+ * React app with. Shared by every reader of that payload.
  */
-function extractUser(html: string): OsuWebUser | null {
-  const match = /data-initial-data="([^"]*)"/.exec(html);
-  if (!match) return null;
-
-  const json = match[1]!
+function decodeInitialData(attribute: string): string {
+  return attribute
     .replaceAll('&quot;', '"')
     .replaceAll('&#039;', "'")
     .replaceAll('&apos;', "'")
@@ -87,6 +84,19 @@ function extractUser(html: string): OsuWebUser | null {
     .replaceAll('&gt;', '>')
     // & last, or it would corrupt the entities decoded above.
     .replaceAll('&amp;', '&');
+}
+
+/**
+ * The public user object osu-web renders the profile page from.
+ *
+ * The payload is a private detail of osu-web and may change, hence the explicit error rather
+ * than a silent empty result.
+ */
+function extractUser(html: string): OsuWebUser | null {
+  const match = /data-initial-data="([^"]*)"/.exec(html);
+  if (!match) return null;
+
+  const json = decodeInitialData(match[1]!);
 
   let payload: { user?: Record<string, unknown> };
   try {
@@ -383,4 +393,313 @@ export async function fetchBeatmapset(beatmapsetId: number): Promise<BeatmapsetD
     throw new Error('the beatmapset page was not in the shape expected; osu! may have changed it');
   }
   return details;
+}
+
+/* ------------------------------------------------------------------ scores */
+
+/**
+ * A score as osu! itself holds it, reduced to what a `scores` row needs.
+ *
+ * Everything here comes from osu!'s own record of the play rather than from anything on this
+ * machine, which is the point: a best performance may have been set years ago on another PC,
+ * on a beatmap that was never installed here and whose replay this machine has never held.
+ * So the beatmap's checksum, its metadata and osu!'s own pp all travel with the score, and
+ * nothing in an import needs a local file to succeed.
+ */
+export interface OsuWebScore {
+  /**
+   * lazer's solo score id. Kept as a string because these outgrow `Number.MAX_SAFE_INTEGER`
+   * and `JSON.parse` would round one before it could be read -- see `rawScoreIds`.
+   */
+  id: string;
+  /**
+   * osu!stable's own score id, set on a play made before lazer. This is the id an osu!stable
+   * replay carries, so it is what matches such a replay to this score.
+   */
+  legacyScoreId: string | null;
+  mode: Ruleset;
+  /** The beatmap's MD5: how a local replay and this score name the same map. */
+  beatmapMD5: string;
+  beatmapId: number;
+  beatmapsetId: number | null;
+  artist: string | null;
+  title: string | null;
+  version: string | null;
+  creator: string | null;
+  /** osu!'s `approved` enum, mapped from the status name on the beatmap. */
+  mapStatus: number;
+  /** The beatmap's own star rating, unmodded, as osu! currently rates it. */
+  beatmapStars: number | null;
+  mods: LazerMod[];
+  statistics: Record<string, number>;
+  maximumStatistics: Record<string, number>;
+  accuracy: number;
+  maxCombo: number;
+  /** osu!'s standardised scale, where a nomod SS is 1,000,000. */
+  totalScore: number;
+  classicTotalScore: number | null;
+  legacyTotalScore: number | null;
+  grade: string;
+  passed: boolean;
+  /** Whether osu! itself ranks this score -- its own verdict, so nothing here recomputes it. */
+  ranked: boolean;
+  /** osu!'s own pp for the play. Null on a score it awards none for. */
+  pp: number | null;
+  playedAt: number;
+  /** Set on a best performance: the percentage osu! weights it at in the list. */
+  weightPercentage: number | null;
+}
+
+/** osu-web's status names, to osu!'s `approved` enum. */
+const STATUS_FOR_NAME: Record<string, number> = {
+  graveyard: -2,
+  wip: -1,
+  pending: 0,
+  ranked: 1,
+  approved: 2,
+  qualified: 3,
+  loved: 4,
+};
+
+/** `ruleset_id` order, which is also this app's `Ruleset`. */
+const MODE_FOR_RULESET: readonly OsuWebMode[] = ['osu', 'taiko', 'fruits', 'mania'];
+
+export function osuWebMode(mode: Ruleset): OsuWebMode {
+  return MODE_FOR_RULESET[mode]!;
+}
+
+/**
+ * One score object as osu-web serialises it, reduced to `OsuWebScore`. Null if it is not one,
+ * so a shape osu! has changed is skipped rather than half-read.
+ *
+ * A score with no usable id is dropped: it could not be deduplicated against a replay, and
+ * that is the one thing an imported score has to be able to do.
+ */
+export function scoreFromJson(raw: Record<string, unknown>): OsuWebScore | null {
+  const str = (v: unknown) => (typeof v === 'string' ? v : null);
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  /*
+   * A score id, as the text this app stores it as.
+   *
+   * Guarded rather than trusted: these are the whole basis of never importing a play twice,
+   * and an id JSON.parse had to round is not that id. osu!'s are nowhere near the limit
+   * today -- a solo id is about 1.7e9 and a legacy one 4.4e9, against 9.0e15 -- so this only
+   * ever fires if osu! changes what an id is, and then refusing the score beats filing it
+   * under a number that belongs to another play.
+   */
+  const id = (v: unknown) => (typeof v === 'number' && Number.isSafeInteger(v) ? String(v) : null);
+
+  const ruleset = num(raw['ruleset_id']);
+  const beatmap = (raw['beatmap'] ?? {}) as Record<string, unknown>;
+  const set = (raw['beatmapset'] ?? {}) as Record<string, unknown>;
+  const checksum = str(beatmap['checksum']);
+  const beatmapId = num(beatmap['id']) ?? num(raw['beatmap_id']);
+  const endedAt = str(raw['ended_at']);
+  const grade = str(raw['rank']);
+  const acc = num(raw['accuracy']);
+
+  const soloId = id(raw['id']);
+  if (soloId === null) return null;
+  if (ruleset === null || ruleset < 0 || ruleset > 3) return null;
+  if (checksum === null || beatmapId === null || endedAt === null) return null;
+  if (grade === null || acc === null) return null;
+
+  const playedAt = Date.parse(endedAt);
+  if (!Number.isFinite(playedAt)) return null;
+
+  const mods = (Array.isArray(raw['mods']) ? raw['mods'] : []).flatMap((m): LazerMod[] => {
+    const mod = m as Record<string, unknown>;
+    const acronym = str(mod['acronym']);
+    if (acronym === null) return [];
+    const settings = mod['settings'];
+    return [
+      settings !== null && typeof settings === 'object'
+        ? { acronym, settings: settings as LazerMod['settings'] }
+        : { acronym },
+    ];
+  });
+
+  const counts = (v: unknown): Record<string, number> => {
+    const out: Record<string, number> = {};
+    if (v === null || typeof v !== 'object') return out;
+    for (const [key, value] of Object.entries(v as Record<string, unknown>)) {
+      if (typeof value === 'number' && Number.isFinite(value)) out[key] = value;
+    }
+    return out;
+  };
+
+  const weight = raw['weight'] as Record<string, unknown> | undefined;
+  const statusName = str(beatmap['status']);
+
+  return {
+    id: soloId,
+    legacyScoreId: id(raw['legacy_score_id']),
+    mode: ruleset as Ruleset,
+    beatmapMD5: checksum,
+    beatmapId,
+    beatmapsetId: num(beatmap['beatmapset_id']) ?? num(set['id']),
+    artist: str(set['artist']),
+    title: str(set['title']),
+    version: str(beatmap['version']),
+    creator: str(set['creator']),
+    // A status osu! has since renamed counts as unresolved rather than as ranked.
+    mapStatus:
+      statusName !== null && statusName in STATUS_FOR_NAME
+        ? STATUS_FOR_NAME[statusName]!
+        : UNRESOLVED_STATUS,
+    beatmapStars: num(beatmap['difficulty_rating']),
+    mods,
+    statistics: counts(raw['statistics']),
+    maximumStatistics: counts(raw['maximum_statistics']),
+    accuracy: acc,
+    maxCombo: num(raw['max_combo']) ?? 0,
+    totalScore: num(raw['total_score']) ?? 0,
+    classicTotalScore: num(raw['classic_total_score']),
+    legacyTotalScore: num(raw['legacy_total_score']),
+    grade,
+    passed: raw['passed'] === true,
+    ranked: raw['ranked'] === true,
+    pp: num(raw['pp']),
+    playedAt,
+    weightPercentage: weight ? num(weight['percentage']) : null,
+  };
+}
+
+/** Scores are read a hundred at a time; osu! keeps 200 best performances per ruleset. */
+const SCORES_PAGE = 100;
+const MAX_SCORE_PAGES = 20;
+
+/**
+ * One page-by-page read of a user's scores, from whichever list osu-web exposes.
+ *
+ * Both lists the profile page loads more of -- `/scores/best` and `/scores/pinned` -- answer
+ * JSON to anyone with no credentials, exactly as the favourites list does, so this keeps the
+ * project's promise that it needs no login. Pages are read until one comes back empty rather
+ * than until one comes back short, so a smaller page size on osu!'s side cannot end an
+ * import early.
+ */
+async function fetchScoreList(
+  userId: number,
+  list: 'best' | 'pinned',
+  mode: Ruleset,
+): Promise<OsuWebScore[]> {
+  if (!Number.isInteger(userId) || userId <= 0) throw new Error('not a user id');
+  const shapeError = 'the scores were not in the shape expected; osu! may have changed them';
+
+  const scores: OsuWebScore[] = [];
+  const seen = new Set<string>();
+  let offset = 0;
+  for (let page = 0; page < MAX_SCORE_PAGES; page++) {
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(
+        `https://osu.ppy.sh/users/${userId}/scores/${list}` +
+          `?mode=${osuWebMode(mode)}&limit=${SCORES_PAGE}&offset=${offset}`,
+        'application/json',
+      );
+    } catch {
+      throw new Error('could not reach osu.ppy.sh');
+    }
+    if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+
+    let page_: unknown;
+    try {
+      page_ = await response.json();
+    } catch {
+      throw new Error(shapeError);
+    }
+    if (!Array.isArray(page_)) throw new Error(shapeError);
+    if (page_.length === 0) break;
+
+    for (const raw of page_) {
+      const score =
+        raw !== null && typeof raw === 'object'
+          ? scoreFromJson(raw as Record<string, unknown>)
+          : null;
+      if (score !== null && !seen.has(score.id)) {
+        seen.add(score.id);
+        scores.push(score);
+      }
+    }
+    // Advanced by what osu! returned, not by the page size, so a short page still walks on.
+    offset += page_.length;
+  }
+  return scores;
+}
+
+/**
+ * An account's best performances for one ruleset, in osu!'s own order -- which is the order
+ * the weighting depends on, so it is never re-sorted.
+ *
+ * osu! keeps 200 of these per ruleset, not the 100 its profile page shows, and the 200th is
+ * still worth something (0.95^199, about 0.004%). All of them are taken.
+ */
+export function fetchBestPerformances(userId: number, mode: Ruleset): Promise<OsuWebScore[]> {
+  return fetchScoreList(userId, 'best', mode);
+}
+
+/** The scores an account has pinned to its profile, in the order osu! lists them. */
+export function fetchPinnedScores(userId: number, mode: Ruleset): Promise<OsuWebScore[]> {
+  return fetchScoreList(userId, 'pinned', mode);
+}
+
+/** What osu! itself says an account stands at, for one ruleset. */
+export interface OsuWebStanding {
+  totalPp: number | null;
+  globalRank: number | null;
+  countryRank: number | null;
+}
+
+/**
+ * osu!'s own total pp and global rank for one ruleset.
+ *
+ * Read for one reason: bonus pp. It comes from how many distinct ranked beatmaps an account
+ * has ever played -- thousands -- so an import of 200 best performances can only ever show
+ * the bonus for 200, leaving the profile hundreds of pp and tens of thousands of places
+ * short of the real one. osu!'s total, minus the weighted sum of the scores it just handed
+ * over, *is* that bonus exactly, so it is taken from here rather than guessed.
+ */
+export async function fetchStanding(userId: number, mode: Ruleset): Promise<OsuWebStanding> {
+  if (!Number.isInteger(userId) || userId <= 0) throw new Error('not a user id');
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      `https://osu.ppy.sh/users/${userId}/${osuWebMode(mode)}`,
+      'text/html',
+    );
+  } catch {
+    throw new Error('could not reach osu.ppy.sh');
+  }
+  if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+
+  return extractStanding(await response.text());
+}
+
+/**
+ * The `statistics` block of the profile payload, for the ruleset whose page was fetched.
+ *
+ * Pure, so it can be tested on a saved page. Every field is optional: an account that has
+ * never played a ruleset has no rank there, and that is not an error.
+ */
+export function extractStanding(html: string): OsuWebStanding {
+  const empty: OsuWebStanding = { totalPp: null, globalRank: null, countryRank: null };
+  const match = /data-initial-data="([^"]*)"/.exec(html);
+  if (!match) return empty;
+
+  let payload: { user?: { statistics?: Record<string, unknown> } };
+  try {
+    payload = JSON.parse(decodeInitialData(match[1]!)) as typeof payload;
+  } catch {
+    return empty;
+  }
+
+  const stats = payload.user?.statistics;
+  if (!stats) return empty;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+  return {
+    totalPp: num(stats['pp']),
+    globalRank: num(stats['global_rank']),
+    countryRank: num(stats['country_rank']),
+  };
 }

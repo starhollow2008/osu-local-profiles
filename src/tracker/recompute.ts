@@ -59,11 +59,19 @@ export interface RecomputeResult {
  */
 const MISSING_CLAUSE = '(map_status IS NULL OR mods_ranked_by IS NULL)';
 
+/*
+ * `imported_at IS NULL` on both queries below: a score taken from osu.ppy.sh carries osu!'s
+ * own pp for the play and no replay to recalculate it from, so it is not stale and there is
+ * nothing here to recompute. Stated rather than relied on -- `replay_path IS NOT NULL`
+ * happens to exclude them today, and would stop doing so the moment an imported score were
+ * ever given the replay that turned up for it later.
+ */
 export function countStale(db: Db, profileId: number): number {
   const row = db
     .prepare(
       `SELECT COUNT(*) AS n FROM scores
-        WHERE profile_id = ? AND replay_path IS NOT NULL AND ${MISSING_CLAUSE}`,
+        WHERE profile_id = ? AND replay_path IS NOT NULL AND imported_at IS NULL
+          AND ${MISSING_CLAUSE}`,
     )
     .get(profileId) as { n: number };
   return row.n;
@@ -115,7 +123,7 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
   const rows = opts.db
     .prepare(
       `SELECT id, replay_path, pp, mode, mods_json, map_status FROM scores
-        WHERE profile_id = ? AND replay_path IS NOT NULL
+        WHERE profile_id = ? AND replay_path IS NOT NULL AND imported_at IS NULL
           ${opts.onlyMissing ? `AND ${MISSING_CLAUSE}` : ''}
           ${opts.ids ? `AND id IN (${opts.ids.map(() => '?').join(',') || 'NULL'})` : ''}
         ORDER BY played_at ASC`,

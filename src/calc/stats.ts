@@ -1,6 +1,7 @@
 import type { Db } from '../db/index.ts';
 import type { LazerMod, Ruleset } from '../osr.ts';
-import { bonusPp, weightedAccuracy, weightedTotal, withClassicMod } from './pp.ts';
+import { bonusPp, TOP_PLAY_LIMIT, weightedAccuracy, weightedTotal, withClassicMod } from './pp.ts';
+import { importedBonusPp } from '../standing.ts';
 import { levelFromScore, type Level } from './level.ts';
 import { playTimeSeconds } from './play-time.ts';
 import type { Grade } from './grade.ts';
@@ -15,7 +16,7 @@ import { incompleteSql,
 } from './eligibility.ts';
 
 /** osu! weights only the top 100 plays. */
-const TOP_PLAY_LIMIT = 100;
+
 
 /** One score as the profile page renders it. Shared by Top Ranks and Recent Plays. */
 export interface Play {
@@ -79,6 +80,11 @@ export interface ProfileStats {
   /** The weighted top-100 portion, before the play-breadth bonus. */
   weightedPp: number;
   bonusPp: number;
+  /**
+   * Whether `bonusPp` is the figure borrowed from osu! rather than one this profile's own
+   * plays earned. The page says so where it shows it -- see `importedBonusPp`.
+   */
+  bonusPpBorrowed: boolean;
   accuracy: number;
   playcount: number;
   totalScore: number;
@@ -189,7 +195,24 @@ export function computeStats(
 
   const top = best.slice(0, TOP_PLAY_LIMIT);
   const weighted = weightedTotal(top.map((r) => r.pp));
-  const bonus = bonusPp(best.length);
+  /*
+   * Bonus pp, from this profile's own breadth of play or from osu!'s figure for the account
+   * it was imported from, whichever is larger.
+   *
+   * osu! awards bonus for every distinct ranked beatmap an account has ever played, which is
+   * a fact about a play history rather than about a top-200 list. A profile holding only
+   * imported best performances therefore earns the bonus for 200 maps where the real account
+   * has thousands -- hundreds of pp and tens of thousands of places adrift -- so an import
+   * records what osu! itself reports (`imported_standing`) and it is used while it is the
+   * better answer.
+   *
+   * `Math.max` is what makes this self-correcting rather than sticky: as real plays are
+   * tracked or imported from replays, the profile's own bonus grows, overtakes the borrowed
+   * one, and takes over with nothing to clear and no moment where the figure jumps back.
+   */
+  const earned = bonusPp(best.length);
+  const borrowed = importedBonusPp(db, profileId, mode) ?? 0;
+  const bonus = Math.max(earned, borrowed);
 
   const totals = db
     .prepare(
@@ -239,6 +262,7 @@ export function computeStats(
     totalPp: weighted + bonus,
     weightedPp: weighted,
     bonusPp: bonus,
+    bonusPpBorrowed: bonus > earned,
     accuracy: weightedAccuracy(top.map((r) => r.accuracy)),
     playcount: totals.playcount + incomplete.n,
     totalScore: totals.total_score,

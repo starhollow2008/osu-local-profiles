@@ -1292,10 +1292,20 @@ check(
   true,
 );
 check(
-  'avatar, banner, flag and me! are ticked; favorites are not',
+  'the four decorative choices are ticked; the three that write plays or lists are not',
   await evaluate(`JSON.stringify(Object.fromEntries(
     [...document.querySelectorAll('#importSection [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
-  JSON.stringify({ avatar: true, cover: true, country: true, aboutMe: true, favorites: false }),
+  // Favorites, best performances and pinned scores all start off: the first adds to a list
+  // shared across profiles, and the other two write plays that move pp and accuracy.
+  JSON.stringify({
+    avatar: true,
+    cover: true,
+    country: true,
+    aboutMe: true,
+    favorites: false,
+    bestPerformances: false,
+    pinnedScores: false,
+  }),
 );
 check(
   'nothing is asked of osu! until a button is pressed',

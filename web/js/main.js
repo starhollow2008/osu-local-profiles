@@ -285,13 +285,23 @@ $('modes').addEventListener('click', (e) => {
  * osu-web's three figures under the chart: Medals, pp, and Total Play Time. The medal count
  * is the whole profile's, as osu!'s is, so it does not move when the mode tab does.
  */
-function renderStats(next, medalTotal) {
+function renderStats(next, medalTotal, imported) {
   stats = next;
   $('medalTotal').textContent = fmt(medalTotal ?? 0);
   $('totalPp').textContent = fmt(stats.totalPp, 0);
-  $('totalPp').title =
-    `${fmt(stats.weightedPp, 0)}pp from the top plays, plus ${fmt(stats.bonusPp, 0)} bonus pp ` +
-    `for ${fmt(stats.distinctRankedBeatmaps)} beatmap${stats.distinctRankedBeatmaps === 1 ? '' : 's'}`;
+  /*
+   * The bonus half of the tooltip says where the number came from, because it may not have
+   * been earned here. Bonus pp is awarded for how many distinct ranked beatmaps an account
+   * has ever played, which is a fact about a whole play history -- so a profile holding
+   * imported best performances borrows osu!'s figure rather than showing the bonus for the
+   * two hundred maps it happens to hold. A borrowed number has to admit it.
+   */
+  const bonus = stats.bonusPpBorrowed
+    ? `plus ${fmt(stats.bonusPp, 0)} bonus pp from your osu! profile` +
+      (imported?.osuTotalPp ? ` (${fmt(imported.osuTotalPp, 0)}pp there when it was imported)` : '')
+    : `plus ${fmt(stats.bonusPp, 0)} bonus pp for ` +
+      `${fmt(stats.distinctRankedBeatmaps)} beatmap${stats.distinctRankedBeatmaps === 1 ? '' : 's'}`;
+  $('totalPp').title = `${fmt(stats.weightedPp, 0)}pp from the top plays, ${bonus}`;
 
   const playTime = playTimeStrings(stats.playTime);
   $('playTime').textContent = playTime.value;
@@ -498,7 +508,7 @@ async function loadProfile() {
   const totals = data.totals ?? {};
   const totalFor = (section, list) => totals[section] ?? list.length;
 
-  renderStats(data.stats, data.medalTotal);
+  renderStats(data.stats, data.medalTotal, data.imported);
   renderCover(data.top);
 
   renderRank(data);
@@ -1522,8 +1532,20 @@ $('identityFile').onchange = async () => {
  * Avatar, banner, flag and me! are ticked by default; favorites are not, because they add
  * to a list rather than replacing one thing.
  */
-const IMPORT_DEFAULTS = { avatar: true, cover: true, country: true, aboutMe: true, favorites: false };
-const IMPORT_FAVORITES_ONLY = { avatar: false, cover: false, country: false, aboutMe: false, favorites: true };
+/*
+ * Best performances and pinned scores start unticked, like favorites and unlike the four
+ * decorative ones. They are the only part of an import that writes *plays*: they move pp,
+ * accuracy and the play count, and a profile is meant to be a record of what was played
+ * while it was tracking. Wanting that overruled is a decision worth ticking a box for.
+ */
+const IMPORT_DEFAULTS = {
+  avatar: true, cover: true, country: true, aboutMe: true,
+  favorites: false, bestPerformances: false, pinnedScores: false,
+};
+const IMPORT_FAVORITES_ONLY = {
+  avatar: false, cover: false, country: false, aboutMe: false,
+  favorites: true, bestPerformances: false, pinnedScores: false,
+};
 
 const importHint = (message, isError) => hint('importHint', message, isError);
 /** The account the last Look up found, so Import copies from exactly that one. */
@@ -1548,6 +1570,16 @@ function renderImportNote() {
         ? "Favorites are added to this profile's list."
         : 'Favorites are added to the list every profile shares.',
     );
+  }
+  if (choices.bestPerformances) {
+    notes.push(
+      'Best performances brings in up to 200 scores per game mode from osu!, with osu!' +
+        "'s own pp. They count toward this profile's pp and accuracy.",
+    );
+  }
+  if (choices.pinnedScores) notes.push('Pinned scores are pinned here in the same order.');
+  if (choices.bestPerformances || choices.pinnedScores) {
+    notes.push('Importing past plays later will not add them a second time.');
   }
   $('importNote').textContent = notes.join(' ');
   $('importGo').disabled = !Object.values(choices).some(Boolean);
@@ -1641,7 +1673,8 @@ $('importGo').onclick = async () => {
   const choices = importChoices();
 
   $('importGo').disabled = true;
-  importHint(choices.favorites ? 'Importing - favorites can take a few seconds...' : 'Importing...');
+  const slow = choices.favorites || choices.bestPerformances || choices.pinnedScores;
+  importHint(slow ? 'Importing - this can take a few seconds...' : 'Importing...');
   try {
     const d = await identityAction({ action: 'import', query, ...choices });
     settings = d.settings;

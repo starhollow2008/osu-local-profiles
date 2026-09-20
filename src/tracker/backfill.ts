@@ -1,4 +1,5 @@
 import { wasDeleted } from '../scores.ts';
+import { findExistingScore, replayIdentity } from './online-import.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
@@ -149,7 +150,12 @@ export async function scanForReplays(
 
       // Deleted for good from Settings: not offered, and not counted as already tracked.
       if (wasDeleted(db, profileId, key)) continue;
-      const already = isStored.get(profileId, key) !== undefined;
+      // Already here -- under its own key, or as the score osu! handed over for the same
+      // play when best performances were imported. The preview has to count both, or it
+      // promises plays the import is about to recognise and decline.
+      const already =
+        isStored.get(profileId, key) !== undefined ||
+        findExistingScore(db, profileId, replayIdentity(score)) !== null;
 
       let filtered = false;
       if (applyFilter && filtering && !already) {

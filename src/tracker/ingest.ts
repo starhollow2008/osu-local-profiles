@@ -1,4 +1,5 @@
 import { wasDeleted } from '../scores.ts';
+import { findExistingScore, replayIdentity } from './online-import.ts';
 import fs from 'node:fs';
 import type { Db } from '../db/index.ts';
 import { parseReplay, type ReplayScore, type Ruleset } from '../osr.ts';
@@ -109,6 +110,18 @@ export async function ingestScore(
   if (already) return { status: 'skipped', reason: 'duplicate' };
   // Deleted for good from Settings: the replay is still on disk, and must stay out.
   if (wasDeleted(ctx.db, ctx.profileId, key)) return { status: 'skipped', reason: 'deleted' };
+  /*
+   * The same play, already here under osu!'s own record of it.
+   *
+   * `dedupe_key` cannot catch this: a replay keys on its own hash and an imported score on
+   * osu!'s id, so the two never collide however much they describe the same play. This is
+   * what stops Import past plays from doubling every best performance an import brought in.
+   * The imported row is left as it stands -- osu! priced that play itself, and matching what
+   * the website shows is the whole point of having imported it.
+   */
+  if (findExistingScore(ctx.db, ctx.profileId, replayIdentity(score)) !== null) {
+    return { status: 'skipped', reason: 'duplicate' };
+  }
 
   const mode = score.mode;
   const beatmap = ctx.resolver.resolve(score.beatmapMD5);

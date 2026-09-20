@@ -5,6 +5,15 @@ import type { OfficialCalculator, PpPart } from './official.ts';
 export const WEIGHT = 0.95;
 
 /**
+ * How many scores are weighted into pp.
+ *
+ * Here beside `WEIGHT` rather than with the profile totals, because it is half of the same
+ * rule and an import has to borrow against it: what a profile cannot compute from osu!'s own
+ * scores depends on how many of them it weighs. See `borrowedBonusPp`.
+ */
+export const TOP_PLAY_LIMIT = 100;
+
+/**
  * Mods whose removal leaves a score osu! can still be asked to price: the play's hit
  * statistics scored as if the mod had not been on. Relax at 1.5x DT becomes a DT score.
  *

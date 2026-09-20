@@ -2363,3 +2363,58 @@ way back out is picking through the profile by hand.
   matters, since those are the figures that cannot be put back by hand.
 - The same fixture with `liveSince: 0` records the play (play count 1), so the cutoff is what
   does the work rather than the watchers happening not to see it.
+
+## 5.50 - Import best performances and pinned scores from osu!
+
+**Status:** done -- unreleased.
+
+Two more boxes beside Avatar, Banner, Flag, me! and Favorite beatmaps, in the same Import from
+osu! section the one-time welcome borrows -- so they appear at first launch and in Settings
+without a second copy of anything.
+
+The case they exist for is the one nothing local can serve: a best performance set years ago on
+another PC, on a beatmap never installed here, whose replay this machine has never held. There
+is nothing to scan for. osu! still has it, so it is asked.
+
+- **No credentials, as with the rest of the import.** `/users/{id}/scores/best` and
+  `/scores/pinned` answer JSON to anyone, exactly as the favourites list does.
+- **200 best performances per ruleset, not the 100 the profile page shows.** Measured: offset
+  100 returns a full second page, offset 200 empty. On the test account, scores 100-199 were
+  worth 34.14pp; they are taken.
+- **All four rulesets.** osu! keeps a separate 200 for each, an unplayed one answers empty, and
+  importing mode by mode would leave a profile whose other tabs are silently blank.
+- **Unticked by default**, like favourites. These are the only part of an import that writes
+  *plays* -- they move pp, accuracy and the play count -- so it is a decision, not a default.
+- **osu!'s pp, kept as osu!'s.** The project's rule is that pp comes only from osu!'s own code,
+  and a figure osu! published is exactly that. No breakdown can come with it (the helper needs
+  the replay), so `pp_parts` stays NULL, `pp_source` reads `osu-web`, and a recompute skips the
+  row -- `imported_at IS NOT NULL`.
+- **No star rating unless the mods cannot have changed it.** osu! hands over the unmodded
+  rating only, and there is no replay here to price the play with, so an HR or DT score stores
+  none rather than one that is wrong.
+- **Deduplication is the substance of it.** See `docs/architecture.md`: a replay keys on its
+  own hash and an imported score on osu!'s id, so `dedupe_key` can never match across the two.
+  `findExistingScore` matches on any online id first -- both numbering schemes, both columns --
+  and falls back to beatmap, exact total, max combo and a five-minute window for a stable
+  replay too old to carry one. Both directions go through it: Import past plays afterwards adds
+  nothing twice, and an import finds what tracking already holds.
+- **Bonus pp is borrowed, and says so.** osu! awards it for a whole play history, so 200 scores
+  can only ever show a fraction of it. The import stores osu!'s total minus the weighted sum
+  this app computes from the same scores, which lands the profile on osu!'s own figure exactly.
+  `computeStats` takes whichever bonus is larger, so real plays supersede it with nothing to
+  clear; a reset drops it.
+
+### Verified
+
+- `npm run check`: 443 tests. `test/online-import.test.ts` covers the payload shape osu.ppy.sh
+  actually answers with, both dedupe directions, a replay with no id matched by the play
+  itself, a genuinely different play on the same map *not* swallowed, pinned order, the
+  borrowed bonus landing the total on osu!'s own, and its handover to earned bonus.
+- **Against the live site**, on a real account: 200 best performances parsed (166 carrying a
+  legacy id), 2 pinned, standing read; imported into a scratch profile giving total pp
+  7,380.07 against osu!'s 7,380.07, accuracy 99.2879% against 99.2867%, and a second import
+  adding nothing. Estimated rank #30,585 against osu!'s #31,049 -- that gap is the rank curve,
+  not the scores.
+
+Not done: the estimated rank still comes from the sampled curve rather than the real rank the
+import now knows, and an imported score does not adopt its replay if one later turns up.
