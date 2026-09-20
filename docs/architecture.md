@@ -153,7 +153,9 @@ Decides whether a play is **written**. Declined play leaves no row anywhere.
 - A fact the filter doesn't have never rejects a play (quit/HP fail/retry has no mod list or star rating — those two criteria don't judge it).
 - Declined play announced: console line, SSE `filtered` event, toast naming criterion, running count in `/api/state`.
 
-Nine criteria matched against replay, `.osu`, `online.db`. Same answer at live ingest and Import past plays. `scripts/reingest.mjs` must NOT pass a filter.
+Nine criteria matched against replay, `.osu`, `online.db`. Same answer at live ingest and Import past plays — **unless that import says otherwise**. Import past plays carries a checkbox, ticked by default, and unticking it runs that one import against `defaultTrackingFilter()` (permits everything) rather than the profile's. The filter is a rule about how you play *now*; an import reaches back to evenings it was never written for, and the alternative was turning the filter off, importing, and turning it back on. `applyFilter` is absent-means-true on the API, so an older page or a script keeps the old behaviour. Preview and import are given the same answer, so the counts shown are the counts imported. `scripts/reingest.mjs` must NOT pass a filter.
+
+Live tracking is never affected: the box is re-ticked every time the dialog opens, so bypassing is a decision about the import in front of you rather than a setting that persists.
 
 `online.db` has second table: `osu_beatmapsets(beatmapset_id, submit_date, approved_date, approved)` — 60k rows vs 234k in `osu_beatmaps`. `approved` values 1, 2, 4 only (ranked/approved/loved). Earliest `submit_date`: 2007-10-06 (slider floor).
 

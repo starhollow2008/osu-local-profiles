@@ -1241,11 +1241,20 @@ export function startServer(opts: ServerOptions): http.Server {
         void (async () => {
           let since: number;
           let confirmed = false;
+          let applyFilter = true;
           let sources: BackfillSources = REPLAYS_ONLY;
           try {
-            const parsed = JSON.parse(body) as { since?: number; confirm?: boolean; sources?: unknown };
+            const parsed = JSON.parse(body) as {
+              since?: number;
+              confirm?: boolean;
+              sources?: unknown;
+              applyFilter?: boolean;
+            };
             since = Number(parsed.since);
             confirmed = parsed.confirm === true;
+            // Absent means apply it, which is what an import did before it could be asked
+            // not to -- so an older page, or a script, keeps the behaviour it expects.
+            applyFilter = parsed.applyFilter !== false;
             // Which kinds of past play to bring in. Absent means replays alone, which is what an
             // import meant before it read lazer's logs; a name it does not know is ignored.
             if (Array.isArray(parsed.sources)) {
@@ -1272,7 +1281,7 @@ export function startServer(opts: ServerOptions): http.Server {
 
           try {
             if (preview) {
-              const scan = await opts.tracker.previewBackfill(since);
+              const scan = await opts.tracker.previewBackfill(since, applyFilter);
               // The candidate list carries absolute paths; the page only needs the counts.
               return json(res, {
                 since,
@@ -1292,7 +1301,7 @@ export function startServer(opts: ServerOptions): http.Server {
               });
             }
 
-            const result = await opts.tracker.backfill(since, sources);
+            const result = await opts.tracker.backfill(since, sources, applyFilter);
             broadcast('backfill', result);
             console.log(
               `\n  imported ${result.imported} past play(s) from ` +

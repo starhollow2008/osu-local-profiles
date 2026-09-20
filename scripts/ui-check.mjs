@@ -212,6 +212,69 @@ check(
 );
 // The kinds to import are offered by a preview, each with its count; before one, nothing is.
 check('the kinds of play to import are hidden until a preview has run', await shown('backfillSources'), 'none');
+
+/*
+ * The play tracking filter's say over an import.
+ *
+ * Ticked whenever the dialog opens, so an import agrees with live tracking unless this one
+ * was told otherwise -- a bypass is a decision about the import in front of you, not a
+ * setting that quietly persists. The hint beneath says what ticking it does, and when no
+ * filter exists it is the only thing on screen that says where to make one.
+ */
+check(
+  'the import is judged by the play tracking filter unless told otherwise',
+  await evaluate("document.getElementById('backfillFiltered').checked"),
+  true,
+);
+check(
+  'and the checkbox is on screen',
+  await evaluate("getComputedStyle(document.getElementById('backfillFiltered')).display !== 'none'"),
+  true,
+);
+const filterHint = await evaluate(`fetch('/api/state').then((r) => r.json()).then((s) =>
+  JSON.stringify({
+    narrowing: Boolean(s.filterNarrowing),
+    text: document.getElementById('backfillFilterHint').textContent.trim(),
+    prompt: document.getElementById('backfillOpenFilter') !== null,
+  }))`);
+const hint = JSON.parse(filterHint);
+check('the hint under it says something', hint.text.length > 0, true);
+// Only meaningful on a profile with no filter -- one that has a filter gets "Change the
+// filter" instead, which the next check covers by the hint's wording.
+check(
+  'with no filter set, it offers the menu that makes one',
+  hint.narrowing ? SKIP : hint.prompt,
+  true,
+);
+// Unticking has to change what the hint promises, and retire a preview taken under the other
+// answer -- the counts it produced are no longer the ones an import would bring in.
+await evaluate(`(() => {
+  const box = document.getElementById('backfillFiltered');
+  box.checked = false;
+  box.dispatchEvent(new Event('change'));
+})()`);
+check(
+  // With no filter set the hint stays on its own branch whatever the box says, because
+  // ticking it genuinely changes nothing -- so this is only meaningful where one is set.
+  'unticking it says every play will be imported',
+  hint.narrowing
+    ? await evaluate("document.getElementById('backfillFilterHint').textContent.includes('Every play found')")
+    : SKIP,
+  true,
+);
+check(
+  'with no filter, it says so however the box is set',
+  hint.narrowing
+    ? SKIP
+    : await evaluate("document.getElementById('backfillFilterHint').textContent.includes('No play tracking filter')"),
+  true,
+);
+check(
+  'and retires the preview taken under the other answer',
+  await evaluate("document.getElementById('backfillSummary').textContent.includes('Filtering changed')"),
+  true,
+);
+
 await evaluate("document.getElementById('backfillCancel').click()");
 check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
 

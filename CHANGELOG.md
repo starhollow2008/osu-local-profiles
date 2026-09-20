@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Import past plays can ignore your play tracking filter.** A new tick box, on by default, so
+  an import is judged exactly as live tracking would judge it. Untick it and every play found
+  is imported -- useful for an evening you played before the filter existed, or under different
+  rules. Before, the only way was to turn the filter off, import, and turn it back on.
+  - The box is re-ticked each time the dialog opens, so bypassing the filter never leaks into
+    live tracking.
+  - Underneath it, a line says what it will do -- and if you have no filter yet, it offers to
+    take you to **Options -> Play tracking filter** to make one.
+
 - **Replays you watched are no longer counted as your own plays.** osu! saves the replays you
   watch in the same folders as the ones you set, so Import past plays could fill a profile with
   other people's scores -- on the machine this was found on, 88 plays by 62 players, enough to

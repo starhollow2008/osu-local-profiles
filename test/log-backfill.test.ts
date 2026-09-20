@@ -7,6 +7,7 @@ import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
 import { BeatmapResolver, indexBeatmapFiles } from '../src/clients/beatmaps.ts';
 import { scanLogsForPlays } from '../src/tracker/log-backfill.ts';
 import { Tracker } from '../src/tracker/index.ts';
+import { updateSettings } from '../src/settings.ts';
 
 /*
  * Import past plays, reading osu!lazer's old session logs.
@@ -74,6 +75,7 @@ const osuFile = (meta: { artist: string; title: string; creator: string; version
 
 interface Harness {
   db: Db;
+  profileId: number;
   tracker: Tracker;
   runtime: string;
   scan: (since: number) => ReturnType<typeof scanLogsForPlays>;
@@ -121,6 +123,7 @@ async function harness({ installYuaru = true } = {}): Promise<Harness> {
 
   return {
     db,
+    profileId,
     tracker,
     runtime,
     scan: (since) => scanLogsForPlays(db, profileId, [logs], since),
@@ -227,6 +230,79 @@ test('an attempt on a beatmap that is not installed is reported, not imported', 
     const result = await h.tracker.backfill(SINCE, { replays: false, unfinished: false, attempts: true });
     assert.equal(result.attempts, 3);
     assert.equal(result.skipped, 1);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * Importing past plays without the play tracking filter having a say.
+ *
+ * The filter normally judges an import exactly as it judges live tracking, so the two agree
+ * and a profile cannot be filled with what tracking would have declined. But it is a rule
+ * about how you play *now*, and an import reaches back to evenings it was never written for --
+ * so the dialog can set it aside for one import. Before this, the only way was to go and turn
+ * the filter off, import, and turn it back on.
+ */
+test('an import can be told to ignore the play tracking filter', async () => {
+  const h = await harness();
+  try {
+    // A filter that turns away every play in this session.
+    updateSettings(h.db, h.profileId, {
+      trackingFilter: { enabled: true, keywords: 'zzz-matches-nothing-zzz' },
+    });
+
+    const preview = await h.tracker.previewBackfill(SINCE);
+    assert.equal(preview.log.unfinished, 0, 'the filter turns them all away');
+    assert.ok(preview.log.filtered > 0, 'and the preview says how many');
+
+    const filtered = await h.tracker.backfill(SINCE, {
+      replays: false,
+      unfinished: true,
+      attempts: true,
+    });
+    assert.equal(filtered.unfinished + filtered.attempts, 0);
+    assert.ok(filtered.filtered > 0);
+    assert.equal(h.count(), 0, 'a filtered play leaves no row at all');
+
+    // The same import, told to ignore it. The preview has to agree, or the dialog would
+    // promise one number and the import do another.
+    const unfilteredPreview = await h.tracker.previewBackfill(SINCE, false);
+    assert.equal(unfilteredPreview.log.filtered, 0);
+    assert.ok(unfilteredPreview.log.unfinished > 0);
+
+    const imported = await h.tracker.backfill(
+      SINCE,
+      { replays: false, unfinished: true, attempts: true },
+      false,
+    );
+    assert.equal(imported.filtered, 0, 'nothing was judged');
+    assert.equal(
+      imported.unfinished + imported.attempts,
+      unfilteredPreview.log.unfinished + unfilteredPreview.log.attempts,
+      'the import brings in exactly what its preview promised',
+    );
+    assert.ok(h.count() > 0);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('an import filters by default, so it still agrees with live tracking', async () => {
+  const h = await harness();
+  try {
+    updateSettings(h.db, h.profileId, {
+      trackingFilter: { enabled: true, keywords: 'zzz-matches-nothing-zzz' },
+    });
+    // Naming no answer at all must mean the old one: an older page, or a script, keeps the
+    // behaviour it was written against.
+    const result = await h.tracker.backfill(SINCE, {
+      replays: false,
+      unfinished: true,
+      attempts: true,
+    });
+    assert.ok(result.filtered > 0);
+    assert.equal(h.count(), 0);
   } finally {
     h.cleanup();
   }

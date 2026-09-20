@@ -26,7 +26,12 @@ import { scanLogsForPlays } from './log-backfill.ts';
 import { countStale, recomputeScores, type RecomputeResult } from './recompute.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { getSettings } from '../settings.ts';
-import { filterNarrows, type FilterCriterion, type TrackingFilter } from '../tracking-filter.ts';
+import {
+  defaultTrackingFilter,
+  filterNarrows,
+  type FilterCriterion,
+  type TrackingFilter,
+} from '../tracking-filter.ts';
 import { resolveIdentity, type PlayerIdentity } from '../player-identity.ts';
 
 export interface TrackerOptions {
@@ -393,9 +398,23 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     else this.stop();
   }
 
+  /**
+   * The filter this import runs under.
+   *
+   * The play tracking filter normally applies to an import exactly as it does to live
+   * tracking, so the two agree. But it is a rule about how you play *now*, and an import
+   * reaches back to evenings it was never meant to judge -- so the dialog can turn it off for
+   * one import. Off means a filter that permits everything, not a missing one, so every path
+   * below still has a filter to consult.
+   */
+  private importFilter(applyFilter: boolean): TrackingFilter {
+    return applyFilter ? this.currentFilter() : defaultTrackingFilter();
+  }
+
   /** Preview what an import would bring in, without changing anything. */
-  previewBackfill(since: number): Promise<BackfillPreview> {
+  previewBackfill(since: number, applyFilter = true): Promise<BackfillPreview> {
     return this.enqueue(async () => {
+      const filter = this.importFilter(applyFilter);
       const replays = await scanForReplays(
         this.opts.db,
         this.opts.profileId,
@@ -405,11 +424,11 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           resolver: this.opts.resolver,
           // So the preview counts what the import will actually decline, rather than promising
           // plays the same filter is about to turn away.
-          filter: this.currentFilter(),
+          filter,
         },
         this.currentIdentity(),
       );
-      return { ...replays, log: this.previewLogs(since) };
+      return { ...replays, log: this.previewLogs(since, filter) };
     });
   }
 
@@ -417,9 +436,9 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * The logs' half of a preview. Every play goes through the check its import runs before
    * writing, so each number here is one the import reproduces.
    */
-  private previewLogs(since: number): LogBackfillPreview {
+  private previewLogs(since: number, filter: TrackingFilter): LogBackfillPreview {
     const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
-    const ctx = this.importContext(since);
+    const ctx = this.importContext(since, filter);
     const preview: LogBackfillPreview = {
       unfinished: 0,
       attempts: 0,
@@ -453,13 +472,13 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   }
 
   /** An import's context: its chosen cutoff stands in for the profile's own, as for replays. */
-  private importContext(since: number): IncompleteContext {
+  private importContext(since: number, filter: TrackingFilter): IncompleteContext {
     return {
       db: this.opts.db,
       resolver: this.opts.resolver,
       profileId: this.opts.profileId,
       trackingSince: since,
-      filter: this.currentFilter(),
+      filter,
     };
   }
 
@@ -472,7 +491,11 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * add dozens at once, and a toast per play would bury the page. Naming no sources means
    * replays alone, which is what an import meant before it read logs.
    */
-  backfill(since: number, sources: BackfillSources = REPLAYS_ONLY): Promise<BackfillResult> {
+  backfill(
+    since: number,
+    sources: BackfillSources = REPLAYS_ONLY,
+    applyFilter = true,
+  ): Promise<BackfillResult> {
     return this.enqueue(async () => {
       let imported = 0;
       let unfinished = 0;
@@ -481,9 +504,9 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       let filtered = 0;
       let scanned = 0;
       let otherPlayers = 0;
-      // The filter applies to an import too: this is the same tracking decision made later,
-      // so a profile cannot be filled with what live tracking would have declined.
-      const filter = this.currentFilter();
+      // The filter applies to an import too, unless this one was told not to: see
+      // `importFilter`. The preview was given the same answer, so its counts are these.
+      const filter = this.importFilter(applyFilter);
       // As does the owner check. An import walks osu!'s folders, which is exactly where the
       // replays you have *watched* are cached, so this is where it matters most.
       const owner = this.currentIdentity();
@@ -529,7 +552,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
       if (sources.unfinished || sources.attempts) {
         const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
-        const ctx = this.importContext(since);
+        const ctx = this.importContext(since, filter);
         const tally = (status: 'added' | 'skipped' | 'filtered'): boolean => {
           if (status === 'filtered') {
             filtered++;

@@ -2545,6 +2545,25 @@
   color: hsl(var(--hsl-f1));
 }
 
+/*
+ * A button that reads as a link, inside a hint. For sending someone to the setting a hint is
+ * talking about -- it is an action, so it is a button, and it sits in a sentence, so it is
+ * not shaped like one.
+ */
+.hint-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: hsl(var(--hsl-h1));
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.hint-link:hover {
+  color: hsl(var(--hsl-l1));
+}
+
 .setting .field input[type="text"],
 .setting .field select {
   flex: 0 1 240px;

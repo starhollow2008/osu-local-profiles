@@ -709,6 +709,18 @@
       <input type="datetime-local" id="backfillSince">
     </label>
 
+    <!--
+      The play tracking filter applies to an import as well as to live tracking, which is
+      usually what you want and occasionally not: a filter set for how you play now has no
+      say over an evening you played last month. Ticked by default, so the two agree unless
+      you say otherwise, and the hint underneath names the filter or offers to set one.
+    -->
+    <label class="field">
+      <span>Only import plays that match my play tracking filter</span>
+      <input type="checkbox" id="backfillFiltered" checked>
+    </label>
+    <div class="setting__hint" id="backfillFilterHint"></div>
+
     <div class="backfill-summary" id="backfillSummary">
       Pick a time, then check what would be imported.
     </div>

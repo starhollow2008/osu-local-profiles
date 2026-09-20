@@ -2625,10 +2625,55 @@ function updateBackfillConfirm() {
 
 $('backfillSources').onchange = updateBackfillConfirm;
 
+/** Whether this import should be judged by the play tracking filter. */
+const backfillApplyFilter = () => $('backfillFiltered').checked;
+
+/**
+ * What ticking the box would actually do, said under it.
+ *
+ * Three states, because the box means something different in each: a filter that is set and
+ * narrowing something, one that exists but lets everything through, and none at all. The last
+ * is the one worth a prompt -- somebody who wants a filtered import has to be told where the
+ * filter lives, since nothing on this dialog creates one.
+ */
+function renderBackfillFilterHint() {
+  const hint = $('backfillFilterHint');
+  const on = backfillApplyFilter();
+  if (!filterNarrowing) {
+    hint.innerHTML =
+      'No play tracking filter is set, so this changes nothing. ' +
+      '<button type="button" class="hint-link" id="backfillOpenFilter">Set one up</button> ' +
+      'to choose which plays are recorded at all.';
+    return;
+  }
+  hint.innerHTML = on
+    ? 'Plays your filter turns away will not be imported. ' +
+      '<button type="button" class="hint-link" id="backfillOpenFilter">Change the filter</button>'
+    : 'Every play found will be imported, filter or not &mdash; useful for an evening played ' +
+      'before this filter existed.';
+}
+
+$('backfillFiltered').onchange = () => {
+  renderBackfillFilterHint();
+  // The counts came from the other answer, so they are no longer the ones this would import.
+  resetBackfillPreview('Filtering changed - check again to see what would be imported.');
+};
+
+/* The prompt to the filter itself. One dialog at a time, so this closes on the way. */
+$('backfillFilterHint').onclick = (e) => {
+  if (!e.target.closest('#backfillOpenFilter')) return;
+  closeBackfill();
+  $('optFilter').click();
+};
+
 function openBackfill() {
   setMenuOpen(false);
   markPreset(3);
   $('backfillSince').value = toLocalInput(Date.now() - 3 * 3600_000);
+  // Ticked every time it opens: an import agreeing with live tracking is the default, and a
+  // decision to bypass the filter should be made for the import in front of you.
+  $('backfillFiltered').checked = true;
+  renderBackfillFilterHint();
   resetBackfillPreview('Pick a time, then check what would be imported.');
   $('backfillModal').hidden = false;
   $('backfillCancel').focus();
@@ -2674,7 +2719,11 @@ $('backfillCheck').onclick = async () => {
   $('backfillCheck').disabled = true;
   $('backfillSummary').textContent = 'Scanning your osu! folders...';
   try {
-    const d = await postJson('/api/backfill/preview', { since }, 'preview failed');
+    const d = await postJson(
+      '/api/backfill/preview',
+      { since, applyFilter: backfillApplyFilter() },
+      'preview failed',
+    );
 
     /*
      * The tracking filter applies to an import too, so the preview has to account for it: the
@@ -2758,7 +2807,11 @@ $('backfillConfirm').onclick = async () => {
     const sources = [...$('backfillSources').querySelectorAll('input[data-source]:checked')].map(
       (box) => box.dataset.source,
     );
-    const d = await postJson('/api/backfill', { since, confirm: true, sources }, 'import failed');
+    const d = await postJson(
+      '/api/backfill',
+      { since, confirm: true, sources, applyFilter: backfillApplyFilter() },
+      'import failed',
+    );
     const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
     toast(
       `Imported ${fmt(total)} past play${total === 1 ? '' : 's'}` +

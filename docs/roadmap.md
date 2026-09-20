@@ -2465,3 +2465,39 @@ Classic mod when the helper decodes the replay, exactly as 5.39 describes.
 - Re-run over the whole store with the finished rules: 2,415 kept, 91 refused, every refusal a
   submitted score. This machine happens to hold no play made under a custom offline name, so
   that path is covered by `test/player-identity.test.ts` rather than by the corpus.
+
+## 5.52 - An import can be told to ignore the play tracking filter
+
+**Status:** done -- unreleased.
+
+The filter has always judged an import exactly as it judges live tracking, so the two agree and
+a profile cannot be filled with what tracking would have declined. That is right by default and
+occasionally wrong: the filter is a rule about how you play *now*, while an import reaches back
+to evenings it was never written for. The only way round it was to turn the filter off, import,
+and turn it back on -- which 5.42's own code comment admitted.
+
+- **A tick box in Import past plays, on by default**, so nothing changes unless it is asked to.
+  Unticked, that one import runs against `defaultTrackingFilter()` -- a filter that permits
+  everything, so every path still has one to consult rather than a null to guard.
+- **Re-ticked whenever the dialog opens.** Bypassing is a decision about the import in front of
+  you, never a setting that quietly persists into live tracking.
+- **`applyFilter` is absent-means-true** on `/api/backfill` and its preview, so an older page or
+  a script keeps the behaviour it was written against.
+- **Preview and import get the same answer**, or the dialog would promise one number and the
+  import bring in another. Toggling the box retires a preview taken under the other answer.
+- **The hint beneath names the filter, or offers to make one.** With no filter set, nothing else
+  on that dialog says where filters live, and somebody who wants a filtered import has to be
+  told.
+
+### Verified
+
+- `npm run check`: 465 tests. `test/log-backfill.test.ts` imports the same session both ways --
+  everything declined with the filter, everything imported without it, the import matching its
+  own preview exactly -- and checks that naming no answer still filters.
+- `npm run ui`: 321/321 against a profile with a filter set, covering the box being ticked on
+  open, the hint changing when it is unticked, and the preview being retired. 298/301 against
+  one without (the three are this machine's pre-existing failures), covering the no-filter hint
+  and its prompt to the filter menu.
+- **Against the live app**, on a fresh profile with a keyword filter that matches nothing:
+  filtered, 0 replays and 0 log plays importable with 3 and 226 declined; unfiltered, 3 replays
+  and 226 log plays importable with 0 declined.
