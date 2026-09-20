@@ -107,6 +107,8 @@ osu! awards bonus pp for how many distinct ranked beatmaps an account has ever p
 
 The subtraction is against the app's own top-100 weighting, not all 200, so the tail past the hundredth is carried too rather than lost. `computeStats` takes `max(earned, borrowed)`: real plays supersede it gradually, with nothing to clear and no backwards jump. A reset clears it.
 
+On a long-played account it may never be superseded, which is right rather than a gap: `bonusPp` tops out at 413.894 on any number of beatmaps, while the borrowed figure also carries the uncounted tail — measured at 448.22 against an account whose own 939 ranked maps earn 412.9. The larger number is what osu! actually awards there.
+
 ## Live tracking starts at the launch, never earlier
 
 **A play set while the app was closed is never tracked when it opens.** Closing the app is how tracking is stopped — a different playstyle, a warm-up, an account that is not this profile — so catching up at the next launch overrules that, and irreversibly: the scores are in, and the profile has to be picked through by hand.

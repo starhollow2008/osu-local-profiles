@@ -18,6 +18,12 @@ import type { OsuWebStanding } from './clients/osu-web.ts';
  * or importing a real play history supersedes it gradually, with nothing to clear and no
  * moment where the figure jumps backwards.
  *
+ * On a long-played account it may never be superseded, and that is correct rather than a
+ * gap. `bonusPp` tops out at 413.894 however many beatmaps a profile holds, while a borrowed
+ * figure also carries the weighted tail past `TOP_PLAY_LIMIT` that this app does not count --
+ * measured at 448.22 against an account whose own 939 distinct ranked maps earn 412.9. The
+ * larger number is the truer one there: it is what osu! actually awards that account.
+ *
  * A module of its own, beside the other things a profile owns, because both the importer
  * that writes it and the totals that read it need it, and neither should have to reach
  * through the other.
