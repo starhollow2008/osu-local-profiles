@@ -20,22 +20,22 @@
 <div class="score-show__page">
   <header class="score-show__header">
     <!-- osu-web's HeaderV4 title for this page. -->
-    <h1 class="score-show__title">performance</h1>
+    <h1 class="score-show__title" data-i18n="page.performance">performance</h1>
     <a class="score-show__back" href="/" id="scoreBack">&lsaquo; back to the profile</a>
   </header>
 
   <div class="score-modal score-modal--page" id="scoreCard">
-    <div class="score-modal__loading">Loading&hellip;</div>
+    <div class="score-modal__loading" data-i18n="scoreCard.loading">Loading&hellip;</div>
   </div>
 </div>
 
 <!-- The card's ⋯ menu, as the profile's #playMenu is: one popover, placed in window coordinates. -->
 <div class="play-menu" id="scoreMenu" role="menu" hidden>
-  <button type="button" data-act="pin" role="menuitem">Pin to profile</button>
-  <button type="button" data-act="unpin" role="menuitem">Unpin</button>
-  <button type="button" data-act="copy-link" role="menuitem">Copy link</button>
-  <button type="button" data-act="save-image" role="menuitem">Save screenshot</button>
-  <button type="button" data-act="copy-image" role="menuitem">Copy screenshot</button>
+  <button type="button" data-act="pin" role="menuitem" data-i18n="scoreMenu.pinToProfile">Pin to profile</button>
+  <button type="button" data-act="unpin" role="menuitem" data-i18n="scoreMenu.unpin">Unpin</button>
+  <button type="button" data-act="copy-link" role="menuitem" data-i18n="scoreMenu.copyLink">Copy link</button>
+  <button type="button" data-act="save-image" role="menuitem" data-i18n="scoreMenu.saveScreenshot">Save screenshot</button>
+  <button type="button" data-act="copy-image" role="menuitem" data-i18n="scoreMenu.copyScreenshot">Copy screenshot</button>
 </div>
 
 <div class="toast" id="toast"></div>

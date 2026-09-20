@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+- **osu! is found wherever you installed it.** Before, the app knew three drive letters and a
+  handful of folder names, and it stopped looking for osu!stable the moment it found
+  osu!lazer -- so an install in, say, `D:\Games\osu!\osu!` was reported as not installed.
+  - It now asks Windows first, which knows exactly: the file associations osu!stable
+    registers, its uninstall entry, and the Start Menu and taskbar shortcuts you already have.
+    osu!lazer's data folder is read from `storage.ini` if you moved it to another disk.
+  - If a client is still missing, it searches every drive on the machine -- bounded, in the
+    background, skipping the folders that are huge by nature, so it takes seconds rather than
+    crawling the disk. What it finds is remembered, so it does not search again on every start.
+  - If you have several osu! folders side by side -- backups, old versions, practice copies --
+    it picks the one you actually play: the one with a beatmap database, a config and recent
+    activity.
+
+- **Options -> osu! folders.** Shows every osu! folder found and which ones are in use, lets
+  you point at one by hand, and runs the search again on demand. If you pick the folder *above*
+  an install by mistake, it says so and names the folder you meant.
+
+- **"No osu! installation found" no longer closes the app.** The page opens anyway, so you can
+  point it at your osu! folder -- which was always the fix, and was previously only possible by
+  editing `data/config.json`.
+
+- **The page can be read in your own language.** A flag in the top right opens a menu of every
+  language osu! itself offers, each written in its own name, and the first launch asks which
+  one you want. Anything not yet translated stays in English rather than breaking.
+
 ## 1.18.0
 
 - **Import past plays can ignore your play tracking filter.** A new tick box, on by default, so

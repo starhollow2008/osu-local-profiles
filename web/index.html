@@ -14,32 +14,45 @@
 <header class="profile-info">
   <div class="profile-info__bg" id="cover">
     <div class="profile-info__bg-actions">
-      <button class="update-pill" id="updateBtn" type="button" hidden>Update available</button>
+      <button class="update-pill" id="updateBtn" type="button" hidden data-i18n="updateBtn">Update available</button>
       <button class="tracking-pill" id="toggle" type="button">
         <span class="tracking-pill__dot"></span><span id="tracklabel">not tracking</span>
       </button>
+      <!--
+        The language picker: a flag, and a menu of every language osu! itself offers, each
+        written in its own name. See web/js/i18n.js. It sits before Options because it
+        changes what Options is *written in*.
+      -->
+      <div class="lang-wrap">
+        <button class="lang-pill" id="langBtn" type="button" aria-haspopup="true" aria-expanded="false"
+                title="Change language" data-i18n-attr="title:langBtn.title">
+          <img class="lang-pill__flag" id="langFlag" src="/flags/gb.svg" alt="English">
+        </button>
+        <div class="menu lang-menu" id="langMenu" role="menu" aria-label="Language" hidden data-i18n-attr="aria-label:langMenu.label"></div>
+      </div>
       <div class="menu-wrap">
-        <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false">Options &#9662;</button>
+        <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="optionsBtn">Options &#9662;</button>
         <div class="menu" id="optionsMenu" hidden>
-          <button id="optProfiles" type="button">Profiles</button>
-          <button id="optSettings" type="button">Other settings</button>
+          <button id="optProfiles" type="button" data-i18n="optProfiles">Profiles</button>
+          <button id="optFolders" type="button" data-i18n="optFolders">osu! folders</button>
+          <button id="optSettings" type="button" data-i18n="optSettings">Other settings</button>
           <div class="sep"></div>
-          <div class="menu__heading">Tracking</div>
-          <button id="optBackfill" type="button">Import past plays</button>
-          <button id="optFilter" type="button">Play tracking filter</button>
+          <div class="menu__heading" data-i18n="optionsMenu.tracking">Tracking</div>
+          <button id="optBackfill" type="button" data-i18n="optBackfill">Import past plays</button>
+          <button id="optFilter" type="button" data-i18n="optFilter">Play tracking filter</button>
           <div class="sep"></div>
           <button id="optLazerScoring" class="menu__toggle" type="button" role="menuitemcheckbox"
-                  aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale.">
-            <span>Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
+                  aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale." data-i18n-attr="title:optLazerScoring.title">
+            <span data-i18n="optLazerScoring.lazerScoring">Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
           </button>
-          <button id="optShare" type="button">Share &amp; back up</button>
+          <button id="optShare" type="button" data-i18n="optShare">Share &amp; back up</button>
           <div class="sep"></div>
           <div class="note" id="optInfo">&nbsp;</div>
         </div>
       </div>
       <!-- Stops the app. Asks once first: the page cannot bring it back. -->
-      <button class="quit-pill" id="quitBtn" type="button" title="Quit osu! local profiles">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Quit</span>
+      <button class="quit-pill" id="quitBtn" type="button" title="Quit osu! local profiles" data-i18n-attr="title:quitBtn.title">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="quitBtn.quit">Quit</span>
       </button>
     </div>
   </div>
@@ -47,13 +60,13 @@
   <div class="profile-info__details band">
     <div class="band__inner profile-info__details-inner">
       <button class="profile-info__avatar" id="avatar" type="button"
-              title="Change this profile's picture"></button>
+              title="Change this profile's picture" data-i18n-attr="title:avatar.title"></button>
       <div class="profile-info__info">
         <h1 class="profile-info__name u-ellipsis u-text-shadow" id="pname"
-            role="button" tabindex="0" title="Rename this profile">Local Profile</h1>
+            role="button" tabindex="0" title="Rename this profile" data-i18n-attr="title:pname.title">Local Profile</h1>
         <div class="profile-info__flags u-text-shadow" id="pflags"></div>
       </div>
-      <nav class="game-mode" id="modes" aria-label="Game mode"></nav>
+      <nav class="game-mode" id="modes" aria-label="Game mode" data-i18n-attr="aria-label:modes.label"></nav>
     </div>
   </div>
 </header>
@@ -80,13 +93,13 @@
       <div class="profile-detail-stats__chart-numbers profile-detail-stats__chart-numbers--top">
         <div class="profile-detail-stats__values">
           <div class="value-display value-display--rank">
-            <div class="value-display__label">Global Ranking</div>
+            <div class="value-display__label" data-i18n="page.globalRanking">Global Ranking</div>
             <div class="value-display__value" id="globalRank">-</div>
           </div>
           <div class="value-display value-display--rank">
-            <div class="value-display__label">Country Ranking</div>
+            <div class="value-display__label" data-i18n="page.countryRanking">Country Ranking</div>
             <div class="value-display__value" id="countryRank"
-                 title="Not shown: the offline player sample is far too thin to estimate a per-country rank">-</div>
+                 title="Not shown: the offline player sample is far too thin to estimate a per-country rank" data-i18n-attr="title:countryRank.title">-</div>
           </div>
         </div>
       </div>
@@ -96,15 +109,15 @@
       <div class="profile-detail-stats__chart-numbers">
         <div class="profile-detail-stats__values profile-detail-stats__values--grid">
           <div class="value-display value-display--plain">
-            <div class="value-display__label">Medals</div>
+            <div class="value-display__label" data-i18n="page.medals">Medals</div>
             <div class="value-display__value" id="medalTotal">0</div>
           </div>
           <div class="value-display value-display--plain">
-            <div class="value-display__label">pp</div>
+            <div class="value-display__label" data-i18n="page.pp">pp</div>
             <div class="value-display__value" id="totalPp">0</div>
           </div>
           <div class="value-display value-display--plain value-display--plain-wide">
-            <div class="value-display__label">Total Play Time</div>
+            <div class="value-display__label" data-i18n="page.totalPlayTime">Total Play Time</div>
             <div class="value-display__value" id="playTime">0h 0m</div>
           </div>
         </div>
@@ -134,13 +147,13 @@
   </div>
 </div>
 
-<nav class="page-mode band" aria-label="Profile sections">
+<nav class="page-mode band" aria-label="Profile sections" data-i18n-attr="aria-label:page.label">
   <div class="band__inner page-mode__inner" id="sectionTabs"></div>
 </nav>
 
 <main class="user-profile-pages">
   <section class="page-extra" id="section-me">
-    <h2 class="title">me!</h2>
+    <h2 class="title" data-i18n="section-me.me">me!</h2>
     <div class="about" id="aboutView"></div>
     <!--
       osu!'s me! editor, as osu-web's bbcode-editor lays it out: the text (or its preview),
@@ -148,25 +161,25 @@
     -->
     <div class="about-edit bbcode-editor" id="aboutEdit" data-state="write" hidden>
       <textarea class="bbcode-editor__body" id="aboutText" maxlength="60000" rows="12"
-                placeholder="Type page content here"></textarea>
+                placeholder="Type page content here" data-i18n-attr="placeholder:aboutText.placeholder"></textarea>
       <div class="bbcode-editor__preview bbcode" id="aboutPreview"></div>
       <input type="file" id="aboutImageFile" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden>
       <div class="bbcode-editor__bar">
-        <div class="bbcode-editor__toolbar" id="aboutToolbar" role="toolbar" aria-label="Formatting">
-          <button type="button" class="bbcode-editor__button" data-bb="bold" title="Bold" aria-label="Bold"><b class="bbcode-editor__glyph">B</b></button>
-          <button type="button" class="bbcode-editor__button" data-bb="italic" title="Italic" aria-label="Italic"><i class="bbcode-editor__glyph">I</i></button>
-          <button type="button" class="bbcode-editor__button" data-bb="strikethrough" title="Strike Out" aria-label="Strike Out"><s class="bbcode-editor__glyph">S</s></button>
-          <button type="button" class="bbcode-editor__button" data-bb="heading" title="Header" aria-label="Header"><b class="bbcode-editor__glyph">H</b></button>
-          <button type="button" class="bbcode-editor__button" data-bb="link" title="Link" aria-label="Link"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2l2.4-2.4M7.3 4.6l1.1-1.1a2.7 2.7 0 0 1 3.8 3.8L11.1 8.4M8.7 11.4l-1.1 1.1a2.7 2.7 0 0 1-3.8-3.8L4.9 7.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>
-          <button type="button" class="bbcode-editor__button" data-bb="spoilerbox" title="Spoiler Box" aria-label="Spoiler Box"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1.5" y="3" width="1.3" height="10"/><rect x="3.6" y="3" width="0.8" height="10"/><rect x="5.2" y="3" width="1.8" height="10"/><rect x="7.8" y="3" width="0.8" height="10"/><rect x="9.4" y="3" width="1.3" height="10"/><rect x="11.5" y="3" width="0.8" height="10"/><rect x="13.1" y="3" width="1.4" height="10"/></g></svg></button>
-          <button type="button" class="bbcode-editor__button" data-bb="list-numbered" title="Numbered List" aria-label="Numbered List"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="6" y="2.6" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="7.1" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="11.6" width="8.5" height="1.8" rx="0.6"/><text x="1" y="5" font-size="4.6" font-family="Arial, sans-serif" font-weight="700">1</text><text x="1" y="9.5" font-size="4.6" font-family="Arial, sans-serif" font-weight="700">2</text><text x="1" y="14" font-size="4.6" font-family="Arial, sans-serif" font-weight="700">3</text></g></svg></button>
-          <button type="button" class="bbcode-editor__button" data-bb="list" title="List" aria-label="List"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><circle cx="2.6" cy="3.5" r="1.4"/><circle cx="2.6" cy="8" r="1.4"/><circle cx="2.6" cy="12.5" r="1.4"/><rect x="6" y="2.6" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="7.1" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="11.6" width="8.5" height="1.8" rx="0.6"/></g></svg></button>
-          <button type="button" class="bbcode-editor__button" data-bb="image" title="Image" aria-label="Image"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.3" cy="6" r="1.4" fill="currentColor"/><path d="M3 12l3.4-3.6 2.2 2.2 2.6-3.1L13.2 12z" fill="currentColor"/></svg></button>
-          <button type="button" class="bbcode-editor__button" data-bb="imagemap" title="Image Map" aria-label="Image Map"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 3.6l4.4-1.6 5.2 1.8 4.4-1.6v10.2l-4.4 1.6-5.2-1.8L1 13.8z" fill="currentColor"/><path d="M5.4 2v10.2M10.6 3.8V14" stroke="hsl(var(--hsl-b4))" stroke-width="0.9"/></svg></button>
-          <label class="bbcode-size-select" title="Font Size">
-            <span class="bbcode-size-select__label">Font Size</span>
+        <div class="bbcode-editor__toolbar" id="aboutToolbar" role="toolbar" aria-label="Formatting" data-i18n-attr="aria-label:aboutToolbar.label">
+          <button type="button" class="bbcode-editor__button" data-bb="bold" title="Bold" aria-label="Bold" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><b class="bbcode-editor__glyph">B</b></button>
+          <button type="button" class="bbcode-editor__button" data-bb="italic" title="Italic" aria-label="Italic" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><i class="bbcode-editor__glyph">I</i></button>
+          <button type="button" class="bbcode-editor__button" data-bb="strikethrough" title="Strike Out" aria-label="Strike Out" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><s class="bbcode-editor__glyph">S</s></button>
+          <button type="button" class="bbcode-editor__button" data-bb="heading" title="Header" aria-label="Header" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><b class="bbcode-editor__glyph">H</b></button>
+          <button type="button" class="bbcode-editor__button" data-bb="link" title="Link" aria-label="Link" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.8 9.2l2.4-2.4M7.3 4.6l1.1-1.1a2.7 2.7 0 0 1 3.8 3.8L11.1 8.4M8.7 11.4l-1.1 1.1a2.7 2.7 0 0 1-3.8-3.8L4.9 7.6" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg></button>
+          <button type="button" class="bbcode-editor__button" data-bb="spoilerbox" title="Spoiler Box" aria-label="Spoiler Box" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="1.5" y="3" width="1.3" height="10"/><rect x="3.6" y="3" width="0.8" height="10"/><rect x="5.2" y="3" width="1.8" height="10"/><rect x="7.8" y="3" width="0.8" height="10"/><rect x="9.4" y="3" width="1.3" height="10"/><rect x="11.5" y="3" width="0.8" height="10"/><rect x="13.1" y="3" width="1.4" height="10"/></g></svg></button>
+          <button type="button" class="bbcode-editor__button" data-bb="list-numbered" title="Numbered List" aria-label="Numbered List" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><rect x="6" y="2.6" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="7.1" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="11.6" width="8.5" height="1.8" rx="0.6"/><text x="1" y="5" font-size="4.6" font-family="Arial, sans-serif" font-weight="700">1</text><text x="1" y="9.5" font-size="4.6" font-family="Arial, sans-serif" font-weight="700">2</text><text x="1" y="14" font-size="4.6" font-family="Arial, sans-serif" font-weight="700">3</text></g></svg></button>
+          <button type="button" class="bbcode-editor__button" data-bb="list" title="List" aria-label="List" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><svg viewBox="0 0 16 16" aria-hidden="true"><g fill="currentColor"><circle cx="2.6" cy="3.5" r="1.4"/><circle cx="2.6" cy="8" r="1.4"/><circle cx="2.6" cy="12.5" r="1.4"/><rect x="6" y="2.6" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="7.1" width="8.5" height="1.8" rx="0.6"/><rect x="6" y="11.6" width="8.5" height="1.8" rx="0.6"/></g></svg></button>
+          <button type="button" class="bbcode-editor__button" data-bb="image" title="Image" aria-label="Image" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.5" y="2.5" width="13" height="11" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5.3" cy="6" r="1.4" fill="currentColor"/><path d="M3 12l3.4-3.6 2.2 2.2 2.6-3.1L13.2 12z" fill="currentColor"/></svg></button>
+          <button type="button" class="bbcode-editor__button" data-bb="imagemap" title="Image Map" aria-label="Image Map" data-i18n-attr="title:aboutToolbar.title;aria-label:aboutToolbar.label"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 3.6l4.4-1.6 5.2 1.8 4.4-1.6v10.2l-4.4 1.6-5.2-1.8L1 13.8z" fill="currentColor"/><path d="M5.4 2v10.2M10.6 3.8V14" stroke="hsl(var(--hsl-b4))" stroke-width="0.9"/></svg></button>
+          <label class="bbcode-size-select" title="Font Size" data-i18n-attr="title:aboutToolbar.title">
+            <span class="bbcode-size-select__label" data-i18n="aboutToolbar.fontSize">Font Size</span>
             <svg class="bbcode-size-select__chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 6l4.5 4.5L12.5 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <select class="bbcode-size-select__select" id="aboutSize" aria-label="Font Size">
+            <select class="bbcode-size-select__select" id="aboutSize" aria-label="Font Size" data-i18n-attr="aria-label:aboutSize.label">
               <option value="" selected hidden>Font Size</option>
               <option value="50">Tiny</option>
               <option value="85">Small</option>
@@ -174,13 +187,13 @@
               <option value="150">Large</option>
             </select>
           </label>
-          <a class="bbcode-editor__help" href="https://osu.ppy.sh/wiki/BBCode" target="_blank" rel="noreferrer noopener">Help</a>
+          <a class="bbcode-editor__help" href="https://osu.ppy.sh/wiki/BBCode" target="_blank" rel="noreferrer noopener" data-i18n="aboutToolbar.help">Help</a>
         </div>
         <div class="bbcode-editor__actions">
           <span class="about-edit__count" id="aboutCount"></span>
-          <button type="button" class="bbcode-editor__action" id="aboutCancel">Cancel</button>
+          <button type="button" class="bbcode-editor__action" id="aboutCancel" data-i18n="aboutCancel">Cancel</button>
           <button type="button" class="bbcode-editor__action" id="aboutPreviewToggle">Preview</button>
-          <button type="button" class="bbcode-editor__action bbcode-editor__action--save" id="aboutSave">Save</button>
+          <button type="button" class="bbcode-editor__action bbcode-editor__action--save" id="aboutSave" data-i18n="aboutSave">Save</button>
         </div>
       </div>
     </div>
@@ -200,12 +213,12 @@
   <!-- osu!'s "Recent" feed -- medals, new bests, levels -- named for what it holds. The id
        stays `recent` because saved section orders refer to it. -->
   <section class="page-extra" id="section-recent">
-    <h2 class="title">Milestones</h2>
+    <h2 class="title" data-i18n="section-recent.milestones">Milestones</h2>
     <div id="recentActivity"></div>
   </section>
 
   <section class="page-extra" id="section-top_ranks">
-    <h2 class="title">Scores</h2>
+    <h2 class="title" data-i18n="section-top_ranks.scores">Scores</h2>
     <h3 class="title title--sub title--sub-first">Pinned Scores<span class="title__count" id="pinnedCount">0</span></h3>
     <div id="pinnedPlays"></div>
     <h3 class="title title--sub">Best Performance<span class="title__count" id="topCount">0</span></h3>
@@ -215,21 +228,21 @@
   </section>
 
   <section class="page-extra" id="section-medals">
-    <h2 class="title">Medals</h2>
+    <h2 class="title" data-i18n="section-medals.medals">Medals</h2>
     <div class="medals-note" id="medalsNote" hidden></div>
     <div id="medalGroups"></div>
   </section>
 
   <section class="page-extra" id="section-historical">
-    <h2 class="title">Historical</h2>
-    <h3 class="title title--sub title--sub-first">Play History</h3>
+    <h2 class="title" data-i18n="section-historical.historical">Historical</h2>
+    <h3 class="title title--sub title--sub-first" data-i18n="section-historical.playHistory">Play History</h3>
     <div class="page-extra__chart" id="playcountChart"></div>
     <h3 class="title title--sub">Most Played Beatmaps<span class="title__count" id="mostPlayedCount">0</span></h3>
     <div id="mostPlayed"></div>
   </section>
 
   <section class="page-extra" id="section-beatmaps">
-    <h2 class="title">Beatmaps</h2>
+    <h2 class="title" data-i18n="section-beatmaps.beatmaps">Beatmaps</h2>
     <h3 class="title title--sub title--sub-first">Favorite Beatmaps<span class="title__count" id="favoriteCount">0</span></h3>
     <div class="counting-note" id="favoritesNote" hidden></div>
     <div id="favoriteBeatmaps"></div>
@@ -250,19 +263,19 @@
 </div>
 
 <div class="play-menu" id="playMenu" role="menu" hidden>
-  <button type="button" data-act="pin" role="menuitem">Pin to profile</button>
-  <button type="button" data-act="unpin" role="menuitem">Unpin</button>
-  <button type="button" data-act="details" role="menuitem">View Details</button>
-  <button type="button" data-act="replay" role="menuitem">Download Replay</button>
-  <button type="button" data-act="copy-link" role="menuitem">Copy link</button>
-  <button type="button" data-act="save-image" role="menuitem">Save screenshot</button>
-  <button type="button" data-act="copy-image" role="menuitem">Copy screenshot</button>
-  <button type="button" data-act="move-up" role="menuitem">Move up</button>
-  <button type="button" data-act="move-down" role="menuitem">Move down</button>
-  <button type="button" data-act="favorite" role="menuitem">Favorite this beatmap</button>
-  <button type="button" data-act="unfavorite" role="menuitem">Unfavorite this beatmap</button>
+  <button type="button" data-act="pin" role="menuitem" data-i18n="playMenu.pinToProfile">Pin to profile</button>
+  <button type="button" data-act="unpin" role="menuitem" data-i18n="playMenu.unpin">Unpin</button>
+  <button type="button" data-act="details" role="menuitem" data-i18n="playMenu.viewDetails">View Details</button>
+  <button type="button" data-act="replay" role="menuitem" data-i18n="playMenu.downloadReplay">Download Replay</button>
+  <button type="button" data-act="copy-link" role="menuitem" data-i18n="playMenu.copyLink">Copy link</button>
+  <button type="button" data-act="save-image" role="menuitem" data-i18n="playMenu.saveScreenshot">Save screenshot</button>
+  <button type="button" data-act="copy-image" role="menuitem" data-i18n="playMenu.copyScreenshot">Copy screenshot</button>
+  <button type="button" data-act="move-up" role="menuitem" data-i18n="playMenu.moveUp">Move up</button>
+  <button type="button" data-act="move-down" role="menuitem" data-i18n="playMenu.moveDown">Move down</button>
+  <button type="button" data-act="favorite" role="menuitem" data-i18n="playMenu.favoriteThisBeatmap">Favorite this beatmap</button>
+  <button type="button" data-act="unfavorite" role="menuitem" data-i18n="playMenu.unfavoriteThisBeatmap">Unfavorite this beatmap</button>
   <div class="sep" data-sep="hide"></div>
-  <button type="button" class="danger" data-act="hide" role="menuitem">Remove from profile</button>
+  <button type="button" class="danger" data-act="hide" role="menuitem" data-i18n="playMenu.removeFromProfile">Remove from profile</button>
 </div>
 
 <!--
@@ -286,21 +299,21 @@
        data-audio-state="paused" data-audio-has-prev="0" data-audio-has-next="0"
        data-audio-has-duration="0" data-audio-volume="normal" data-audio-autoplay="0">
     <button type="button" class="audio-player__button audio-player__button--prev" data-audio-nav="prev"
-            aria-label="Previous" title="Previous">
+            aria-label="Previous" title="Previous" data-i18n-attr="title:audioPlayer.title;aria-label:audioPlayer.label">
       <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2.5" width="2.2" height="11" rx="0.6" fill="currentColor"/><path d="M14 3.2v9.6a.8.8 0 0 1-1.2.7L5.4 8.7a.8.8 0 0 1 0-1.4l7.4-4.8a.8.8 0 0 1 1.2.7z" fill="currentColor"/></svg>
     </button>
     <button type="button" class="audio-player__button audio-player__button--play" id="audioToggle"
-            aria-label="Play or pause" title="Play / pause">
+            aria-label="Play or pause" title="Play / pause" data-i18n-attr="title:audioToggle.title;aria-label:audioToggle.label">
       <svg class="icon audio-player__play-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.2v11.6c0 .8.9 1.3 1.6.9l9-5.8a1 1 0 0 0 0-1.8l-9-5.8C4.9.9 4 1.4 4 2.2z" fill="currentColor"/></svg>
       <svg class="icon audio-player__pause-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2" width="3.6" height="12" rx="1" fill="currentColor"/><rect x="9.4" y="2" width="3.6" height="12" rx="1" fill="currentColor"/></svg>
     </button>
     <button type="button" class="audio-player__button audio-player__button--next" data-audio-nav="next"
-            aria-label="Next" title="Next">
+            aria-label="Next" title="Next" data-i18n-attr="title:audioPlayer.title;aria-label:audioPlayer.label">
       <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="11.8" y="2.5" width="2.2" height="11" rx="0.6" fill="currentColor"/><path d="M2 3.2v9.6a.8.8 0 0 0 1.2.7l7.4-4.8a.8.8 0 0 0 0-1.4L3.2 2.5a.8.8 0 0 0-1.2.7z" fill="currentColor"/></svg>
     </button>
 
     <div class="audio-player__bar audio-player__bar--progress" id="audioSeek" role="slider"
-         aria-label="Position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+         aria-label="Position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" data-i18n-attr="aria-label:audioSeek.label">
       <div class="audio-player__bar-current"></div>
     </div>
 
@@ -311,7 +324,7 @@
     </div>
 
     <div class="audio-player__volume-control">
-      <button type="button" class="audio-player__volume-button" id="audioMute" aria-label="Mute" title="Mute">
+      <button type="button" class="audio-player__volume-button" id="audioMute" aria-label="Mute" title="Mute" data-i18n-attr="title:audioMute.title;aria-label:audioMute.label">
         <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
           <path d="M1.5 5.8h2.6L7.6 3v10L4.1 10.2H1.5z" fill="currentColor"/>
           <path class="audio-player__volume-wave audio-player__volume-wave--1" d="M9.6 5.9a3 3 0 0 1 0 4.2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
@@ -320,14 +333,14 @@
         </svg>
       </button>
       <div class="audio-player__bar audio-player__bar--volume" id="audioVolume" role="slider"
-           aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="45">
+           aria-label="Volume" aria-valuemin="0" aria-valuemax="100" aria-valuenow="45" data-i18n-attr="aria-label:audioVolume.label">
         <div class="audio-player__bar-current"></div>
       </div>
     </div>
 
     <div class="audio-player__autoplay-control">
       <button type="button" class="audio-player__autoplay-button" id="audioAutoplay"
-              aria-pressed="false" aria-label="Play next track automatically" title="Play next track automatically">
+              aria-pressed="false" aria-label="Play next track automatically" title="Play next track automatically" data-i18n-attr="title:audioAutoplay.title;aria-label:audioAutoplay.label">
         <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.2 8.6A5.3 5.3 0 1 1 11.6 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9.2 1.8 13.4 2l-.4 4.3z" fill="currentColor"/></svg>
       </button>
     </div>
@@ -340,8 +353,8 @@
   card all close it.
 -->
 <div class="backdrop" id="scoreModal" hidden>
-  <div class="score-modal hue-scope" role="dialog" aria-modal="true" aria-label="Score details">
-    <button type="button" class="score-modal__close" id="scoreClose" aria-label="Close" title="Close">&times;</button>
+  <div class="score-modal hue-scope" role="dialog" aria-modal="true" aria-label="Score details" data-i18n-attr="aria-label:scoreModal.label">
+    <button type="button" class="score-modal__close" id="scoreClose" aria-label="Close" title="Close" data-i18n-attr="title:scoreClose.title;aria-label:scoreClose.label">&times;</button>
     <div id="scoreCard"></div>
   </div>
 </div>
@@ -356,80 +369,145 @@
 -->
 <div class="backdrop" id="welcomeModal" hidden>
   <div class="modal modal--welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
-    <button type="button" class="modal__dismiss" id="welcomeDismiss" aria-label="Skip" title="Skip">&times;</button>
-    <h3 id="welcomeTitle">Welcome to osu! local profiles</h3>
+    <button type="button" class="modal__dismiss" id="welcomeDismiss" aria-label="Skip" title="Skip" data-i18n-attr="title:welcomeDismiss.title;aria-label:welcomeDismiss.label">&times;</button>
+    <h3 id="welcomeTitle" data-i18n="welcomeTitle">Welcome to osu! local profiles</h3>
+
+    <!--
+      Asked first, and before anything else is read: every word below this is in whatever
+      language gets picked here. Defaults to whatever the browser asks for, so for most
+      people it is already right and needs only to be left alone.
+    -->
+    <div class="welcome-lang">
+      <label class="field field--wide" for="welcomeLang">
+        <span id="welcomeLangLabel" data-i18n="welcomeLangLabel">Language</span>
+      </label>
+      <select id="welcomeLang" class="welcome-lang__select"></select>
+    </div>
+
     <div class="welcome-intro">
-      <p>
+      <p data-i18n-html="welcomeModal.optionalHaveAnOsuAccount">
         <span class="welcome-intro__badge">Optional</span>
         Have an osu! account? You can bring its avatar, banner, flag, me! and favorite beatmaps
         into this profile.
       </p>
-      <p>
+      <p data-i18n-html="welcomeModal.youDonTNeedTo">
         <b>You don't need to.</b> Your plays are tracked either way. Press Skip and this won't
         show again - it stays under Options &rarr; Profiles if you change your mind.
       </p>
     </div>
     <div id="welcomeSlot"></div>
     <div class="actions">
-      <button id="welcomeSkip" type="button">Skip</button>
+      <button id="welcomeSkip" type="button" data-i18n="welcomeSkip">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  Where the app looks for osu!, and how to correct it.
+
+  This exists because auto-detection missed: somebody's osu!stable was in
+  D:\Games\osu!\osu!, the app found their lazer install, stopped looking, and told them
+  osu!stable was not installed. Detection is much better now and will still miss sometimes,
+  so the page has to be able to be told. See web/js/osu-folders.js.
+-->
+<div class="backdrop" id="foldersModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="foldersTitle">
+    <h3 id="foldersTitle" data-i18n="foldersTitle">osu! folders</h3>
+    <p data-i18n="foldersModal.theFoldersThisAppReads">
+      The folders this app reads your plays from. It finds them by itself on start &mdash; in
+      the registry, in your shortcuts, and by searching your drives &mdash; but osu! can be
+      installed anywhere, so you can also point at one here.
+    </p>
+
+    <div class="folder-list" id="folderList"></div>
+
+    <div class="folder-add">
+      <label class="field field--wide">
+        <span data-i18n="foldersModal.addAFolder">Add a folder</span>
+        <input type="text" id="folderPath" spellcheck="false" autocomplete="off"
+               placeholder="D:\Games\osu!\osu!" data-i18n-attr="placeholder:folderPath.placeholder">
+      </label>
+      <button type="button" id="folderAdd" data-i18n="folderAdd">Add</button>
+    </div>
+    <div class="setting__hint" data-i18n-html="foldersModal.pickTheFolderThatHas">
+      Pick the folder that has <code>osu!.exe</code> in it for osu!stable, or the one with
+      <code>client.realm</code> for osu!lazer &mdash; not the folder above it.
+    </div>
+
+    <div class="folder-search">
+      <button type="button" id="folderRescan">Search again</button>
+      <span class="setting__hint" id="folderSearchNote" data-i18n="folderSearchNote">
+        Your drives have not been searched yet. It takes a few seconds.
+      </span>
+    </div>
+
+    <div class="folder-restart" id="folderRestart" hidden data-i18n="folderRestart">
+      Restart the app for this to take effect &mdash; it reads your plays from the folders it
+      was started with.
+    </div>
+
+    <div class="profile-hint" id="foldersHint">&nbsp;</div>
+
+    <div class="actions">
+      <button id="foldersClose" type="button" data-i18n="foldersClose">Close</button>
     </div>
   </div>
 </div>
 
 <div class="backdrop" id="shareModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
-    <h3 id="shareTitle">Share &amp; back up</h3>
+    <h3 id="shareTitle" data-i18n="shareTitle">Share &amp; back up</h3>
 
-    <h4 class="identity-heading">Share</h4>
+    <h4 class="identity-heading" data-i18n="shareModal.share">Share</h4>
 
     <div class="share-option">
       <div class="share-option__detail">
-        <b>Save as a web page</b>
-        <div class="setting__hint">
+        <b data-i18n="shareModal.saveAsAWebPage">Save as a web page</b>
+        <div class="setting__hint" data-i18n-html="shareModal.thisPageAsOneHtml">
           This page as one <code>.html</code> file that works like it: show more, the mode
           tabs, View Details and the medals all respond. It opens anywhere without this app,
           nothing in it can change the profile, and it holds nothing about this computer, so
           it can be put online as it is.
         </div>
       </div>
-      <button type="button" id="shareHtml" class="primary">Save&hellip;</button>
+      <button type="button" id="shareHtml" class="primary" data-i18n="shareHtml">Save&hellip;</button>
     </div>
 
     <div class="share-option">
       <div class="share-option__detail">
-        <b>Save as an image</b>
+        <b data-i18n="shareModal.saveAsAnImage">Save as an image</b>
         <div class="setting__hint" id="shareScreenshotNote">&nbsp;</div>
       </div>
-      <button type="button" id="shareScreenshot">Save&hellip;</button>
+      <button type="button" id="shareScreenshot" data-i18n="shareScreenshot">Save&hellip;</button>
     </div>
 
-    <h4 class="identity-heading">Back up</h4>
+    <h4 class="identity-heading" data-i18n="shareModal.backUp">Back up</h4>
 
     <div class="share-option">
       <div class="share-option__detail">
-        <b>Export this profile (JSON)</b>
-        <div class="setting__hint">
+        <b data-i18n="shareModal.exportThisProfileJson">Export this profile (JSON)</b>
+        <div class="setting__hint" data-i18n="shareModal.everyScoreThisProfileHas">
           Every score this profile has tracked, with its beatmap, plus the computed totals and
           rank.
         </div>
       </div>
-      <button type="button" id="shareExport">Download</button>
+      <button type="button" id="shareExport" data-i18n="shareExport">Download</button>
     </div>
 
     <div class="share-option">
       <div class="share-option__detail">
-        <b>Back up everything (database)</b>
-        <div class="setting__hint">
+        <b data-i18n="shareModal.backUpEverythingDatabase">Back up everything (database)</b>
+        <div class="setting__hint" data-i18n="shareModal.aCopyOfTheWhole">
           A copy of the whole database, every profile included.
         </div>
       </div>
-      <button type="button" id="shareBackup">Download</button>
+      <button type="button" id="shareBackup" data-i18n="shareBackup">Download</button>
     </div>
 
     <div class="profile-hint" id="shareHint">&nbsp;</div>
 
     <div class="actions">
-      <button id="shareClose" type="button">Close</button>
+      <button id="shareClose" type="button" data-i18n="shareClose">Close</button>
     </div>
   </div>
 </div>
@@ -443,7 +521,7 @@
 -->
 <div class="backdrop" id="filterModal" hidden>
   <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
-    <h3 id="filterTitle">Play tracking filter</h3>
+    <h3 id="filterTitle" data-i18n="filterTitle">Play tracking filter</h3>
     <p>
       Which plays <b id="filterProfileName">this profile</b> records at all. A play this filter
       turns away is not saved anywhere &mdash; no score, no pp, no play count &mdash; and it
@@ -453,10 +531,10 @@
 
     <div class="setting">
       <label class="field">
-        <span>Filter which plays are tracked</span>
+        <span data-i18n="filterModal.filterWhichPlaysAreTracked">Filter which plays are tracked</span>
         <input type="checkbox" id="filterEnabled">
       </label>
-      <div class="setting__hint">
+      <div class="setting__hint" data-i18n="filterModal.offByDefaultAndEvery">
         Off by default, and every play is tracked. Turning it on changes nothing on its own:
         every criterion below starts wide open.
       </div>
@@ -467,7 +545,7 @@
 
     <div class="tfilter" id="filterBody"></div>
 
-    <p class="setting__hint">
+    <p class="setting__hint" data-i18n="filterModal.twoCriteriaCannotJudgeA">
       Two criteria cannot judge a play that was quit, failed or retried: osu!lazer records no
       mods and no star rating for a play it discards, so those plays are matched on the other
       seven. That is deliberate &mdash; osu! counts them, so this does.
@@ -476,9 +554,9 @@
     <div class="profile-hint" id="filterHint">&nbsp;</div>
 
     <div class="actions">
-      <button id="filterReset" class="actions__aside" type="button">Clear every criterion</button>
-      <button id="filterCancel" type="button">Cancel</button>
-      <button id="filterSave" class="primary" type="button">Save</button>
+      <button id="filterReset" class="actions__aside" type="button" data-i18n="filterReset">Clear every criterion</button>
+      <button id="filterCancel" type="button" data-i18n="filterCancel">Cancel</button>
+      <button id="filterSave" class="primary" type="button" data-i18n="filterSave">Save</button>
     </div>
   </div>
 </div>
@@ -487,7 +565,7 @@
 
 <div class="backdrop" id="settingsModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <h3 id="settingsTitle">Other settings</h3>
+    <h3 id="settingsTitle" data-i18n="settingsTitle">Other settings</h3>
     <p>
       These belong to <b id="settingsProfileName">this profile</b>. Every profile keeps its
       own, so a setting changed here does not follow you to another playstyle.
@@ -496,13 +574,13 @@
     <div id="settingsFields"></div>
 
     <div class="removed-scores" id="installSettings">
-      <h4>This install</h4>
+      <h4 data-i18n="installSettings.thisInstall">This install</h4>
       <div class="setting">
         <label class="field">
-          <span>Open in browser on start</span>
+          <span data-i18n="installSettings.openInBrowserOnStart">Open in browser on start</span>
           <input type="checkbox" id="openBrowserSetting">
         </label>
-        <div class="setting__hint">
+        <div class="setting__hint" data-i18n-html="installSettings.openThisPageInYour">
           Open this page in your browser whenever the app starts. This one is not a profile's:
           it decides what happens before any profile is on screen, so it is saved for the whole
           install, in <code>data/config.json</code>.
@@ -512,31 +590,31 @@
 
     <div class="removed-scores" id="removedScores" hidden>
       <h4>Removed scores<span class="title__count" id="removedCount">0</span></h4>
-      <p class="setting__hint">
+      <p class="setting__hint" data-i18n="removedScores.removingAScoreOrA">
         Removing a score, or a play that was not finished or submitted, never deletes it. Put
         one back and it returns to every section and to the totals. The red minus deletes one
         for good: it cannot be put back, and it is never imported again.
       </p>
       <div class="removed-list" id="removedList"></div>
       <div class="removed-scores__actions">
-        <button type="button" class="danger-button" id="removedDeleteAll">Delete all permanently</button>
+        <button type="button" class="danger-button" id="removedDeleteAll" data-i18n="removedDeleteAll">Delete all permanently</button>
       </div>
     </div>
 
     <div class="removed-scores pp-calculator" id="ppCalculator">
-      <h4>pp calculator</h4>
+      <h4 data-i18n="ppCalculator.ppCalculator">pp calculator</h4>
       <p class="setting__hint" id="ppCalculatorVersion"></p>
       <div class="pp-calculator__outdated" id="ppCalculatorOutdated" hidden>
         <p class="setting__hint" id="ppCalculatorOutdatedText"></p>
-        <button type="button" id="ppRecalculate">Recalculate them</button>
+        <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate them</button>
       </div>
     </div>
 
     <div class="profile-hint" id="settingsHint">&nbsp;</div>
 
     <div class="actions">
-      <button id="settingsCancel" type="button">Cancel</button>
-      <button id="settingsSave" class="primary" type="button">Save</button>
+      <button id="settingsCancel" type="button" data-i18n="settingsCancel">Cancel</button>
+      <button id="settingsSave" class="primary" type="button" data-i18n="settingsSave">Save</button>
     </div>
   </div>
 </div>
@@ -549,8 +627,8 @@
 -->
 <div class="backdrop" id="profilesModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profilesTitle">
-    <h3 id="profilesTitle">Profiles</h3>
-    <p>
+    <h3 id="profilesTitle" data-i18n="profilesTitle">Profiles</h3>
+    <p data-i18n="profilesModal.eachProfileIsASeparate">
       Each profile is a separate playstyle with its own scores, pp and level. Only the
       selected one records the plays you set.
     </p>
@@ -559,15 +637,15 @@
 
     <div class="identity-link">
       <input type="text" id="newProfileName" maxlength="60" placeholder="New profile, e.g. left hand"
-             aria-label="New profile name">
-      <button id="profileCreate" type="button">Create &amp; switch</button>
+             aria-label="New profile name" data-i18n-attr="placeholder:newProfileName.placeholder;aria-label:newProfileName.label">
+      <button id="profileCreate" type="button" data-i18n="profileCreate">Create &amp; switch</button>
     </div>
     <div class="profile-hint" id="profileHint">
       A new profile starts empty and tracks from the moment you create it.
     </div>
 
     <section class="profile-section" id="profileEdit">
-      <h4 class="identity-heading">Edit profile</h4>
+      <h4 class="identity-heading" data-i18n="profileEdit.editProfile">Edit profile</h4>
       <p class="setting__hint">
         The name, flag, playstyle, picture and banner for <b id="identityProfileName">this
         profile</b>, the one being tracked. None of this is required &mdash; a new profile starts
@@ -575,38 +653,38 @@
       </p>
 
       <label class="field">
-        <span>Name</span>
+        <span data-i18n="profileEdit.name">Name</span>
         <input type="text" id="identityName" maxlength="60">
       </label>
       <label class="field">
-        <span>Country</span>
-        <input type="text" id="identityCountry" maxlength="2" placeholder="e.g. US">
+        <span data-i18n="profileEdit.country">Country</span>
+        <input type="text" id="identityCountry" maxlength="2" placeholder="e.g. US" data-i18n-attr="placeholder:identityCountry.placeholder">
       </label>
-      <div class="setting__hint">Two-letter code, shown beside the profile name. Leave empty for none.</div>
+      <div class="setting__hint" data-i18n="profileEdit.twoLetterCodeShownBeside">Two-letter code, shown beside the profile name. Leave empty for none.</div>
       <label class="field">
-        <span>Playstyle</span>
-        <input type="text" id="identityTagline" maxlength="120" placeholder="e.g. left hand, mouse only">
+        <span data-i18n="profileEdit.playstyle">Playstyle</span>
+        <input type="text" id="identityTagline" maxlength="120" placeholder="e.g. left hand, mouse only" data-i18n-attr="placeholder:identityTagline.placeholder">
       </label>
-      <div class="setting__hint">What this profile is tracking. Shown under the name.</div>
+      <div class="setting__hint" data-i18n="profileEdit.whatThisProfileIsTracking">What this profile is tracking. Shown under the name.</div>
       <div class="actions actions--inline">
-        <button id="identitySave" class="primary" type="button">Save</button>
+        <button id="identitySave" class="primary" type="button" data-i18n="identitySave">Save</button>
       </div>
 
       <div class="identity-images">
         <div class="identity-image">
-          <div class="identity-image__label">Picture</div>
+          <div class="identity-image__label" data-i18n="profileEdit.picture">Picture</div>
           <div class="identity-image__preview identity-image__preview--avatar" id="identityAvatar"></div>
           <div class="identity-image__actions">
-            <button type="button" data-upload="avatar">Upload&hellip;</button>
-            <button type="button" data-clear="avatar">Remove</button>
+            <button type="button" data-upload="avatar" data-i18n="profileEdit.upload">Upload&hellip;</button>
+            <button type="button" data-clear="avatar" data-i18n="profileEdit.remove">Remove</button>
           </div>
         </div>
         <div class="identity-image">
-          <div class="identity-image__label">Banner</div>
+          <div class="identity-image__label" data-i18n="profileEdit.banner">Banner</div>
           <div class="identity-image__preview identity-image__preview--cover" id="identityCover"></div>
           <div class="identity-image__actions">
-            <button type="button" data-upload="cover">Upload&hellip;</button>
-            <button type="button" data-clear="cover">Remove</button>
+            <button type="button" data-upload="cover" data-i18n="profileEdit.upload">Upload&hellip;</button>
+            <button type="button" data-clear="cover" data-i18n="profileEdit.remove">Remove</button>
           </div>
         </div>
       </div>
@@ -615,18 +693,18 @@
       <div class="profile-hint" id="identityHint">&nbsp;</div>
       <div class="share-option profile-danger">
         <div class="share-option__detail">
-          <b>Reset this profile</b>
-          <div class="setting__hint">
+          <b data-i18n="profileEdit.resetThisProfile">Reset this profile</b>
+          <div class="setting__hint" data-i18n="profileEdit.erasesEverythingTrackedForThis">
             Erases everything tracked for this profile and starts it again from zero. It asks
             first, and your osu! account and replay files are not touched.
           </div>
         </div>
-        <button type="button" class="danger-button" id="profileReset">Reset</button>
+        <button type="button" class="danger-button" id="profileReset" data-i18n="profileReset">Reset</button>
       </div>
     </section>
 
     <section class="profile-section" id="importSection">
-      <h4 class="identity-heading" id="importHeading">Import from osu!</h4>
+      <h4 class="identity-heading" id="importHeading" data-i18n="importHeading">Import from osu!</h4>
       <p class="setting__hint">
         Copies what you choose from an osu! account's public profile into
         <b id="importProfileName">this profile</b>, and links the two. Nothing is ever written
@@ -634,8 +712,8 @@
       </p>
 
       <div class="identity-link">
-        <input type="text" id="importQuery" placeholder="username, user id, or profile link">
-        <button type="button" id="importLookup">Look up</button>
+        <input type="text" id="importQuery" placeholder="username, user id, or profile link" data-i18n-attr="placeholder:importQuery.placeholder">
+        <button type="button" id="importLookup" data-i18n="importLookup">Look up</button>
       </div>
       <div class="identity-found" id="importFound"></div>
 
@@ -649,7 +727,7 @@
         <label class="checkgroup__item"><input type="checkbox" data-import="pinnedScores"> Pinned scores</label>
       </div>
       <p class="setting__hint" id="importNote"></p>
-      <p class="setting__hint">
+      <p class="setting__hint" data-i18n-html="importSection.oneRequestToOsuPpy">
         One request to <code>osu.ppy.sh</code> to find the account, one per picture, one per
         hundred favorites, and a few per game mode for scores -- all when you press Import. No
         login and no API key.
@@ -657,18 +735,18 @@
 
       <div class="profile-hint" id="importHint">&nbsp;</div>
       <div class="actions actions--inline">
-        <button id="importGo" class="primary" type="button">Import</button>
+        <button id="importGo" class="primary" type="button" data-i18n="importGo">Import</button>
       </div>
     </section>
 
     <section class="profile-section" id="sharedSection">
-      <h4 class="identity-heading">Every profile</h4>
+      <h4 class="identity-heading" data-i18n="sharedSection.everyProfile">Every profile</h4>
       <div class="setting">
         <label class="field">
-          <span>Keep Favorite Beatmaps the same on every profile</span>
+          <span data-i18n="sharedSection.keepFavoriteBeatmapsTheSame">Keep Favorite Beatmaps the same on every profile</span>
           <input type="checkbox" id="sharedFavorites">
         </label>
-        <div class="setting__hint">
+        <div class="setting__hint" data-i18n="sharedSection.onByDefaultOneList">
           On by default: one list, shared by every profile. Turn it off and each profile keeps
           its own copy of the list as it stands; turn it back on and the lists are merged.
           Nothing is lost either way.
@@ -677,35 +755,35 @@
     </section>
 
     <div class="actions">
-      <button id="profilesClose" type="button">Close</button>
+      <button id="profilesClose" type="button" data-i18n="profilesClose">Close</button>
     </div>
   </div>
 </div>
 
 <div class="backdrop" id="backfillModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">
-    <h3 id="backfillTitle">Import past plays</h3>
-    <p>
+    <h3 id="backfillTitle" data-i18n="backfillTitle">Import past plays</h3>
+    <p data-i18n="backfillModal.playsSetWhileThisApp">
       Plays set while this app was closed were never tracked. Choose how far back to look
       and they will be imported from that moment onward &mdash; finished plays from their
       replays, and quits, fails and retries from osu!lazer&rsquo;s own logs.
     </p>
-    <div class="warn">
+    <div class="warn" data-i18n="backfillModal.goBackOnlyAsFar">
       Go back only as far as the session you played with this playstyle. Anything earlier
       pulls in plays set with your normal one &mdash; which is exactly what a separate profile
       exists to keep out.
     </div>
 
     <div class="presets" id="backfillPresets">
-      <button type="button" data-hours="1">1 hour</button>
-      <button type="button" data-hours="3">3 hours</button>
-      <button type="button" data-hours="6">6 hours</button>
-      <button type="button" data-hours="12">12 hours</button>
-      <button type="button" data-hours="24">1 day</button>
+      <button type="button" data-hours="1" data-i18n="backfillPresets.1Hour">1 hour</button>
+      <button type="button" data-hours="3" data-i18n="backfillPresets.3Hours">3 hours</button>
+      <button type="button" data-hours="6" data-i18n="backfillPresets.6Hours">6 hours</button>
+      <button type="button" data-hours="12" data-i18n="backfillPresets.12Hours">12 hours</button>
+      <button type="button" data-hours="24" data-i18n="backfillPresets.1Day">1 day</button>
     </div>
 
     <label class="field">
-      <span>Import plays since</span>
+      <span data-i18n="backfillModal.importPlaysSince">Import plays since</span>
       <input type="datetime-local" id="backfillSince">
     </label>
 
@@ -716,7 +794,7 @@
       you say otherwise, and the hint underneath names the filter or offers to set one.
     -->
     <label class="field">
-      <span>Only import plays that match my play tracking filter</span>
+      <span data-i18n="backfillModal.onlyImportPlaysThatMatch">Only import plays that match my play tracking filter</span>
       <input type="checkbox" id="backfillFiltered" checked>
     </label>
     <div class="setting__hint" id="backfillFilterHint"></div>
@@ -729,8 +807,8 @@
     <div class="checkgroup backfill-sources" id="backfillSources" hidden></div>
 
     <div class="actions">
-      <button id="backfillCancel" type="button">Cancel</button>
-      <button id="backfillCheck" type="button">Check</button>
+      <button id="backfillCancel" type="button" data-i18n="backfillCancel">Cancel</button>
+      <button id="backfillCheck" type="button" data-i18n="backfillCheck">Check</button>
       <button id="backfillConfirm" class="primary" type="button" disabled>Import</button>
     </div>
   </div>
@@ -738,19 +816,19 @@
 
 <div class="backdrop" id="resetModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="resetTitle">
-    <h3 id="resetTitle">Reset this profile?</h3>
+    <h3 id="resetTitle" data-i18n="resetTitle">Reset this profile?</h3>
     <p id="resetSummary">This erases everything tracked so far and starts from zero.</p>
-    <div class="warn">
+    <div class="warn" data-i18n="resetModal.thisCannotBeUndoneReplays">
       This cannot be undone. Replays stay on disk, but they will not be re-imported:
       tracking restarts from the moment you confirm.
     </div>
     <ul>
-      <li>All tracked scores are deleted</li>
-      <li>pp, rank, accuracy, level and play count return to zero</li>
-      <li>Your osu! account and your replay files are not touched</li>
+      <li data-i18n="resetModal.allTrackedScoresAreDeleted">All tracked scores are deleted</li>
+      <li data-i18n="resetModal.ppRankAccuracyLevelAnd">pp, rank, accuracy, level and play count return to zero</li>
+      <li data-i18n="resetModal.yourOsuAccountAndYour">Your osu! account and your replay files are not touched</li>
     </ul>
     <div class="actions">
-      <button id="resetCancel" type="button">Cancel</button>
+      <button id="resetCancel" type="button" data-i18n="resetCancel">Cancel</button>
       <button id="resetConfirm" class="danger" type="button">Erase and start fresh</button>
     </div>
   </div>
@@ -758,9 +836,9 @@
 
 <div class="backdrop" id="updateModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
-    <h3 id="updateTitle">Update available</h3>
+    <h3 id="updateTitle" data-i18n="updateTitle">Update available</h3>
     <p class="update-versions" id="updateVersions"></p>
-    <p>
+    <p data-i18n-html="updateModal.yourTrackedScoresSettingsAnd">
       Your tracked scores, settings and profile pictures are kept — they live in
       <code>data/</code>, which an update never touches. The files being replaced are set
       aside until the new version is in place, so an update that is interrupted can be
@@ -769,8 +847,8 @@
     <p id="updateNotes"></p>
     <div class="profile-hint" id="updateHint">&nbsp;</div>
     <div class="actions">
-      <button id="updateCancel" type="button">Not now</button>
-      <button id="updateConfirm" class="primary" type="button">Update and restart</button>
+      <button id="updateCancel" type="button" data-i18n="updateCancel">Not now</button>
+      <button id="updateConfirm" class="primary" type="button" data-i18n="updateConfirm">Update and restart</button>
     </div>
   </div>
 </div>
@@ -780,11 +858,11 @@
   <span class="site-footer__sep" id="footerPpSep" hidden>&middot;</span>
   <span id="footerPp" hidden></span>
   <span class="site-footer__sep">&middot;</span>
-  <a href="https://github.com/jonathant09/osu-local-profiles" target="_blank" rel="noreferrer noopener">
+  <a href="https://github.com/jonathant09/osu-local-profiles" target="_blank" rel="noreferrer noopener" data-i18n="page.sourceCodeGithub">
     Source code (GitHub)
   </a>
   <span class="site-footer__sep">&middot;</span>
-  <span class="site-footer__note">Not affiliated with osu! or ppy.</span>
+  <span class="site-footer__note" data-i18n="page.notAffiliatedWithOsuOr">Not affiliated with osu! or ppy.</span>
 </footer>
 
 <script type="module" src="/js/main.js"></script>

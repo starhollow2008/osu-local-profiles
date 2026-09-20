@@ -1160,7 +1160,10 @@ check(
   false,
 );
 
-check('the menu is six entries', menuLabels.length, 6);
+check('the menu is seven entries', menuLabels.length, 7);
+// The way out when auto-detection missed an install. It has to be reachable from the menu,
+// because the person who needs it is the one the app has already failed.
+check('osu! folders is one of them', menuLabels.includes('osu! folders'), true);
 check(
   'Open in browser, Export, Back up and Reset have left it',
   await evaluate("['optOpenBrowser', 'optExport', 'optBackup', 'optReset'].filter((id) => document.getElementById(id)).length"),

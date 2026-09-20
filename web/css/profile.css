@@ -5159,3 +5159,293 @@ s.bbcode-editor__glyph {
 .mod-chip:disabled {
   cursor: default;
 }
+
+/* ------------------------------------------------------------- language picker */
+
+/*
+ * The flag in the corner, and the menu of every language osu! offers.
+ *
+ * Sized to sit level with the pills beside it rather than to be noticed: a language switcher
+ * is something you use once and then never again, so it earns a flag and no words.
+ */
+.lang-wrap {
+  position: relative;
+}
+
+.lang-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: hsla(var(--hsl-b6), 0.75);
+  border-radius: 10000px;
+  padding: 5px 10px;
+  height: 26px;
+}
+
+.lang-pill:hover {
+  background-color: hsla(var(--hsl-b5), 0.9);
+}
+
+.lang-pill__flag {
+  display: block;
+  width: 21px;
+  height: 14px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+/*
+ * Forty languages do not fit on a screen, so the menu scrolls. Capped at a height that still
+ * leaves the page visible behind it -- this opens over the profile header, and a menu that
+ * covered the whole window would read as a page of its own.
+ */
+.lang-menu {
+  min-width: 260px;
+  max-height: min(60vh, 460px);
+  overflow-y: auto;
+  padding: 5px;
+}
+
+.lang-menu .lang-option {
+  display: grid;
+  /* The native name takes what it needs; the English name gets the rest and truncates. */
+  grid-template-columns: 21px auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-c2));
+}
+
+.lang-menu .lang-option:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.lang-menu .lang-option--active {
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+}
+
+.lang-menu .lang-option__flag {
+  width: 21px;
+  height: 14px;
+  border-radius: 2px;
+  object-fit: cover;
+}
+
+.lang-menu .lang-option__name {
+  /* The language's own name does the work, so it takes the weight. */
+  font-weight: 600;
+  white-space: nowrap;
+  /*
+   * Never reordered by the page's direction. In an RTL page the Latin-script names would
+   * otherwise be laid out right-to-left within the row and read as though punctuation had
+   * moved; each name belongs to its own language, which `lang` on the element states.
+   */
+  unicode-bidi: isolate;
+}
+
+/*
+ * The English name is a search aid, not the label, so it gives way first: it truncates, and
+ * on a long pair like "Espanol (Latinoamerica)" it disappears rather than wrapping the row
+ * onto a second line.
+ */
+.lang-menu .lang-option__english {
+  min-width: 0;
+  font-size: var(--fs-small-2);
+  color: hsl(var(--hsl-f1));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  unicode-bidi: isolate;
+}
+
+/* ----------------------------------------------------------------- osu! folders */
+
+/*
+ * Options -> osu! folders. Each row is one osu! install the app knows about: which client it
+ * is, where, and whether it is the one being read right now.
+ */
+.folder-list {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.folder {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: hsl(var(--hsl-b5));
+  border-radius: var(--radius-base);
+  padding: 9px 11px;
+}
+
+/* The one in use, marked the way a selected profile is. */
+.folder--active {
+  background-color: hsl(var(--hsl-b4));
+  box-shadow: inset 3px 0 0 hsl(var(--hsl-p));
+}
+
+.folder__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.folder__kind {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-c1));
+}
+
+.folder__badge {
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-l1));
+  border-radius: 10000px;
+  padding: 1px 8px;
+  font-size: var(--fs-small);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.folder__badge--active {
+  background-color: hsla(var(--hsl-p), 0.25);
+  color: hsl(var(--hsl-h1));
+}
+
+/*
+ * A path can be longer than the dialog, and the *end* of it is the part that identifies the
+ * install -- `...\Games\osu!\osu!`. So it is clipped from the left.
+ */
+.folder__path {
+  margin-top: 2px;
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /*
+   * Clipped from the *left*, because the end of a path is what identifies the install: the
+   * tail says which folder, the head says which user account.
+   *
+   * `direction: rtl` is what moves the ellipsis to the front. `unicode-bidi: plaintext` is
+   * what keeps the text itself the right way round: it takes each line's direction from its
+   * first strong character, which for a Windows path is a Latin letter. Without it the
+   * browser reorders the whole string and the path reads back to front, which is exactly
+   * what the first attempt at this did.
+   */
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+
+.folder__remove {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-large);
+  line-height: 1;
+  padding: 0 6px;
+}
+
+.folder__remove:hover {
+  color: var(--rank-d);
+}
+
+.folder-add {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/*
+ * The same buttons the rest of a dialog has. They sit outside `.actions`, which is where
+ * that styling lives, because they act on the row beside them rather than on the dialog.
+ */
+.folder-add button,
+.folder-search button {
+  background-color: hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 9px 15px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.folder-add button:hover,
+.folder-search button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.folder-search button:disabled {
+  opacity: 0.6;
+}
+
+.folder-add .field {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* A path needs the room; the label goes above it rather than beside it. */
+.field--wide {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.field--wide input {
+  width: 100%;
+}
+
+.folder-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.folder-search .setting__hint {
+  margin-top: 0;
+}
+
+/*
+ * The app reads plays from the folders it was started with, so a change here takes effect on
+ * the next start. Said plainly, in the colour the page uses for "this needs your attention",
+ * because the alternative is a dialog that looks like it worked.
+ */
+.folder-restart {
+  margin-top: 14px;
+  padding: 9px 11px;
+  border-radius: var(--radius-base);
+  background-color: hsla(var(--hsl-orange-1), 0.12);
+  color: var(--yellow-light);
+  font-size: var(--fs-normal-2);
+}
+
+/* The language row at the top of the one-time welcome. */
+.welcome-lang {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.welcome-lang .field {
+  margin-top: 0;
+  flex: 0 0 auto;
+}
+
+.welcome-lang__select {
+  flex: 1;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 6px 8px;
+  font: inherit;
+  color-scheme: dark;
+}

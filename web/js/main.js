@@ -32,6 +32,18 @@ import {
   saveScoreImage,
 } from './score-share.js';
 import { downloadBlob, hint, postJson, toast } from './ui.js';
+import {
+  DEFAULT_LOCALE,
+  LOCALES,
+  currentLocale,
+  knownLocale,
+  matchLocale,
+  storedLocale,
+  t,
+  useLocale,
+} from './i18n.js';
+import { bindLanguagePicker, chooseLanguage, refreshLanguageButton } from './language-picker.js';
+import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { renderMedals } from './medals.js';
@@ -602,6 +614,9 @@ async function loadState() {
   refreshOpenProfiles();
 
   app = s.app ?? app;
+  // The app's own answer, which outranks what this browser remembered. Not awaited: the
+  // rest of this render is in the language already on screen, and a change re-runs it.
+  void applyConfigLanguage();
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
@@ -732,6 +747,7 @@ document.addEventListener('keydown', (e) => {
   if (trackingFilterOpen()) closeTrackingFilter();
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
+  if (osuFoldersOpen()) closeOsuFolders();
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('welcomeModal').hidden) closeWelcome();
   if (!$('shareModal').hidden) closeShare();
@@ -1711,8 +1727,30 @@ let welcoming = false;
  * set of controls and one set of handlers. The section goes back where it came from when the
  * welcome closes.
  */
+/**
+ * The language row at the top of the welcome.
+ *
+ * Pre-selected from what the browser asks for, because on a first launch that is almost
+ * always right -- somebody whose browser is in Polish wants the page in Polish, and should
+ * have to do nothing to get it. Applied the moment it changes, including to the welcome
+ * itself, so the rest of the dialog is read in the language just picked.
+ */
+function fillWelcomeLanguage() {
+  const select = $('welcomeLang');
+  const guess = currentLocale() === 'en' ? matchLocale(navigator.languages) ?? 'en' : currentLocale();
+  select.innerHTML = LOCALES.map(
+    (l) => `<option value="${l.code}" lang="${l.code}">${escapeHtml(l.native)}</option>`,
+  ).join('');
+  select.value = guess;
+  select.onchange = () => void chooseLanguage(select.value);
+  // The guess is applied straight away rather than waiting for a change event that will
+  // never come if it was already right.
+  if (guess !== currentLocale()) void chooseLanguage(guess);
+}
+
 async function openWelcome() {
   welcoming = true;
+  fillWelcomeLanguage();
   $('welcomeSlot').append($('importSection'));
   $('importHeading').hidden = true;
   resetImport();
@@ -1727,6 +1765,9 @@ function closeWelcome() {
   $('welcomeModal').hidden = true;
   $('importHeading').hidden = false;
   $('sharedSection').before($('importSection'));
+  // Whatever the language row ended on is the answer, including when the answer was to
+  // leave it alone: `language` has to stop being empty, or "never chosen" stays true.
+  if (!knownLocale(app.config?.language)) void chooseLanguage($('welcomeLang').value);
   // However it was left -- Skip, the x, Escape, the backdrop, or an import -- it is not
   // offered again. A save that fails only means it is offered once more next time.
   postJson('/api/welcome', {}).catch(() => {});
@@ -1981,6 +2022,10 @@ function openSettings() {
 
 const closeSettings = () => { $('settingsModal').hidden = true; };
 
+$('optFolders').onclick = () => {
+  setMenuOpen(false);
+  void openOsuFolders();
+};
 $('optSettings').onclick = openSettings;
 $('settingsCancel').onclick = closeSettings;
 $('settingsModal').onclick = (e) => {
@@ -3031,9 +3076,64 @@ on('recompute-progress', (e) => {
   if (p.percent < 100) toast(`Recalculating stored scores... ${p.percent}%`);
 });
 
+/* --- language ------------------------------------------------------------ */
+
+/**
+ * Get the page into the right language before anything is drawn in the wrong one.
+ *
+ * Three answers, in order, and the order is the point: what this browser last chose (in
+ * `localStorage`, so it survives a reload and is available *now*), what the app's config
+ * says (authoritative, but it arrives with the first API response, after first paint), and
+ * what the browser's own `Accept-Language` implies. The last is only a guess, so it is
+ * offered on the first launch rather than applied silently.
+ */
+async function startLanguage() {
+  /*
+   * Always loaded, even for English. `en.json` is not only the fallback -- it is where the
+   * English lives for every string the *scripts* build, which the HTML has no copy of.
+   * Skipping it when the answer was already English left `t('folders.inUse')` with nowhere
+   * to look, and the page rendered its own key on a badge.
+   */
+  await useLocale(storedLocale() ?? DEFAULT_LOCALE);
+  bindLanguagePicker(() => {
+    // Everything the scripts drew is in the old language; the HTML has already been
+    // re-translated in place by useLocale.
+    renderAll();
+  });
+}
+
+/**
+ * Redraw everything the page builds itself, after the language changes underneath it.
+ *
+ * The HTML has already been re-translated in place by `useLocale`; this is the rest -- every
+ * card, label and heading the scripts wrote, which is most of the page and is still in the
+ * language it was drawn in.
+ */
+function renderAll() {
+  refreshLanguageButton();
+  void loadState();
+  void loadProfile();
+}
+
+/**
+ * The language the app has stored, applied once it arrives.
+ *
+ * `loadState` brings the config, which is after the first paint -- so this only does
+ * anything when the app's answer differs from what this browser had remembered, which
+ * happens on a machine's second browser, or after the choice was made elsewhere.
+ */
+async function applyConfigLanguage() {
+  const wanted = app.config?.language;
+  if (!knownLocale(wanted) || wanted === currentLocale()) return;
+  await useLocale(wanted);
+  renderAll();
+}
+
 /* ------------------------------------------------------------------ boot */
 
 applyExportMode();
+bindOsuFolders();
+await startLanguage();
 await loadState();
 applySectionOrder();
 await loadProfile();

@@ -2501,3 +2501,132 @@ and turn it back on -- which 5.42's own code comment admitted.
 - **Against the live app**, on a fresh profile with a keyword filter that matches nothing:
   filtered, 0 replays and 0 log plays importable with 3 and 226 declined; unfiltered, 3 replays
   and 226 log plays importable with 0 declined.
+
+---
+
+## 5.53 - Find osu! wherever it is installed
+
+**Status:** done -- unreleased.
+
+Somebody ran the app, and it found their osu!lazer install and told them osu!stable was not
+installed. It was installed. It was in `D:\Games\osu!\osu!`, which they could see in Explorer
+while reading the message. Detection knew three drive letters and three folder names, checked
+the first thing it found of each kind, and stopped.
+
+Three faults, and the first is the one that made it invisible:
+
+- **One client found was treated as the job done.** `detectInstalls` looked for lazer, looked
+  for stable, and whichever it found it kept -- but a search only ran if the *whole list* came
+  up empty. Somebody with lazer in its default place and stable anywhere unusual got a
+  confident "not installed" for a folder nothing had looked in.
+- **The candidate list was three drives and three folder names.** `C:`, `D:`, `E:`, and `osu!`
+  at the root or under Program Files. A `Games` folder -- where most people who move osu! off
+  C: put it -- was not on it, and neither was the nesting osu!'s own installer makes.
+- **Nothing read what the machine already knew.** osu!stable registers its file associations
+  and lazer writes its data directory to `storage.ini` when it is moved. Both are exact; both
+  were ignored in favour of guessing.
+
+### What was built
+
+`src/clients/discover.ts`, in three tiers, each running only if the one before it left a
+client unaccounted for -- so a machine with osu! where osu! usually is does no process
+spawning and no walking, and finishes in about 25ms.
+
+1. **What the machine already knows.** `reg query` for the `.osz`/`.osr` associations and the
+   uninstall entries, in both hives; lazer's `storage.ini`; and Start Menu, taskbar and
+   desktop shortcuts, whose target is read out of the `.lnk` bytes rather than through the
+   shell. Each is *exact*: a path found this way was written by osu! or by the user.
+2. **A wider guess.** Every drive letter that exists rather than three, and `Games`, `Apps`,
+   `SteamLibrary` and the rest beside `Program Files` -- including `<parent>\osu!\osu!`, which
+   is what the installer produces when it is pointed at a folder.
+3. **A bounded walk of every drive.** Breadth-first, depth 5, 30,000 directories, 25 seconds,
+   skipping only names an install is never *under* -- `Windows`, `node_modules`, and `Songs`
+   and `files`, which are enormous and can be moved out of the install they belong to. `Data`
+   and `Games` are deliberately *not* skipped. It stops at an install rather than descending
+   into it, which is most of the speed. Measured at 585ms across three drives.
+
+And the parts that make the answer usable:
+
+- **The search runs when *either* client is missing**, which is the whole bug. What keeps that
+  from costing every launch a disk walk is that the result is remembered in `config.json` --
+  including a search that found nothing, which is the case that would otherwise repeat forever
+  on a machine that genuinely has no osu!stable.
+- **A whole-disk search finds every copy**, and the screenshot that prompted this had an `osu!`
+  folder holding `osu!`, `osu versions`, `stablebackup`, `osuprac` and a dozen practice
+  installs side by side. All of them are real osu! folders. `installScore` ranks them by what
+  says *played* -- a beatmap database, a per-user config, recent activity -- and pushes
+  anything whose name says "backup" below one whose name does not.
+- **`stableInstall` had to learn that lazer's executable is also `osu!.exe`.** It never came up
+  while detection only looked where lazer's program files are not. A search reaches both
+  `osulazer\current\` and the Velopack stub beside `Update.exe`, and either would have been
+  taken for a stable install with no scores -- and then *been* the answer, because the first
+  hit of each kind wins.
+- **Options -> osu! folders**, because detection can still miss and the person who needs the
+  repair is the one the app has already failed. It lists what was found with the ones in use
+  marked, takes a folder by hand, and runs the search again on demand. Adding the folder
+  *above* an install -- the commonest mistake, because that is the one called "osu!" in
+  Explorer -- is refused by naming the install inside it.
+- **"No osu! installation found" no longer exits.** Stopping there was the worst possible
+  answer: the one thing that fixes a missed install is telling the app where osu! is, and the
+  page is where you tell it. `--check-only` still exits non-zero, because that is its job.
+
+### Verified
+
+- `npm run check`: 495 tests, 17 of them new in `test/discover.test.ts` -- the reported layout
+  reproduced in full (stable two folders deep on a second drive, beside its backups and
+  practice copies, with the real one ranked first), lazer's two `osu!.exe`s both turned away,
+  every parser pinned, and the rule that one client found is not a reason to stop looking.
+- `npm run ui`: 327/327.
+- **On this machine**: the registry and the Start Menu both name osu!stable, so the search
+  never runs -- 27ms to find both clients, against 507ms when the search is forced.
+- Against the live app: adding `C:\Windows` refused, adding the *parent* of an install refused
+  by naming the install inside it, adding the install itself accepted.
+
+**Not done.** A folder added takes effect on the next start: the watchers and the beatmap
+resolver are built from the install list once, and the resolver holds open handles on lazer's
+`online.db`. The dialog says so rather than pretending otherwise.
+
+---
+
+## 5.54 - Every language osu! is offered in
+
+**Status:** in progress -- the machinery and English are done; the translations are not.
+
+**Goal.** The page reads in the player's own language, in every language osu! itself offers,
+picked from a flag in the corner and asked once on the first launch.
+
+**Scope.** osu-web's `available_locales`, all forty, under the same codes (`pt-br`, `zh-tw`,
+`es-419`) and the same native names a player already knows from osu.ppy.sh. Nothing invented,
+and no language osu! does not have.
+
+### What was built
+
+- **`web/js/i18n.js`**: the language list with each one's own name, its flag and its
+  direction; `t(key, vars)`; and `useLocale`, which fetches one file and rewrites the page.
+- **The English stays in the HTML**, with `data-i18n` naming the key that replaces it. So the
+  page reads correctly before any script runs, in a saved copy, and when the fetch fails --
+  the translation improves a page that already works rather than being what makes it work. A
+  missing key falls back to English, so a half-finished translation is a page with some
+  English in it rather than a page with `folders.rescan` written across a button.
+- **Three markers, because three things need translating**: `data-i18n` for text,
+  `data-i18n-html` for a sentence with `<b>` or `<code>` inside it -- kept whole, rather than
+  torn into fragments a translator cannot reassemble -- and `data-i18n-attr` for `title` and
+  `aria-label`, which are exactly the text that gets forgotten.
+- **`scripts/build-i18n.mjs`** keeps `en.json` and the page from drifting: every key the page
+  declares, every `t('key')` a script asks for, and every key a translation holds are checked
+  against each other, and `--write` regenerates `en.json` after the English is edited.
+- **The list exists twice** -- `src/i18n.ts` for the server's validation, `web/js/i18n.js` for
+  the page -- because the page has no build step and cannot import a `.ts` file.
+  `test/i18n.test.ts` pins them together.
+- **Asked on the first launch**, at the top of the welcome, pre-selected from what the browser
+  asks for so that for most people it is already right. Stored in `config.json` so the app
+  starts in it, and in `localStorage` so the *page* starts in it -- the config arrives with
+  the first API response, which is after the first paint.
+
+### What is left
+
+1. The strings the *scripts* build -- most of the page -- are still English literals. Only the
+   HTML and the new dialogs go through `t()` so far.
+2. The forty translation files. None is written yet; every language falls back to English.
+3. Right-to-left. `dir` is set from the language, and `ar` and `he` say `rtl`, but no layout
+   has been looked at in that direction.
