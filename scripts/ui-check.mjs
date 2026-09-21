@@ -122,6 +122,29 @@ for (let i = 0; i < 40; i++) {
   await sleep(250);
 }
 
+/*
+ * Every assertion below is written against the English wording, so the app is put into
+ * English for the run. It may not already be: the language is a real setting kept in
+ * `config.json`, the page re-applies it on every `loadState`, and this check has to pass for
+ * whoever is running it -- not only for somebody who happens to read the page in English.
+ *
+ * Changed through the app's own endpoint and put back at the end, so a run leaves the
+ * setting exactly as it found it.
+ */
+const languageBefore = await evaluate(
+  "fetch('/api/app-config').then((r) => r.json()).then((d) => d.config.language ?? '')",
+);
+const setLanguage = (code) =>
+  evaluate(
+    `fetch('/api/app-config', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ language: ${JSON.stringify(code)} }) }).then((r) => r.ok)`,
+  );
+if (languageBefore && languageBefore !== 'en') {
+  await setLanguage('en');
+  await evaluate("(async () => { const m = await import('/js/i18n.js'); await m.useLocale('en'); })()");
+  await sleep(600);
+}
+
 const shown = (id) =>
   evaluate(`getComputedStyle(document.getElementById('${id}')).display`);
 
@@ -2358,6 +2381,9 @@ check(
   })()`),
   true,
 );
+
+// Put the language back exactly as it was found.
+if (languageBefore && languageBefore !== 'en') await setLanguage(languageBefore);
 
 const failed = checks.filter((c) => !c).length;
 console.log(`\n${checks.length - failed}/${checks.length} checks passed`);
