@@ -111,6 +111,17 @@ tracked when it opens, and replays you *watched* are no longer counted as your o
 them in the same folders, and any already tracked are removed to Removed scores, where they can
 be put back. Import past plays can now be told to ignore your play tracking filter.
 
+**v1.19.0** finds osu! wherever it is installed. Detection used to know three drive letters and
+a handful of folder names, and it stopped looking for osu!stable the moment it found osu!lazer --
+so an install in `D:\Games\osu!\osu!` was reported as not installed. It now asks Windows first
+(the file associations osu!stable registers, its uninstall entry, your Start Menu shortcuts) and
+reads osu!lazer's `storage.ini` if you moved its data folder; if a client is still missing it
+searches every drive, remembers what it found, and picks the folder you actually play out of any
+backups and practice copies beside it. **Options -> osu! folders** shows what was found and takes
+a folder by hand, and "no osu! installation found" no longer closes the app -- the page opens so
+you can point at one. The page can also be read **in your own language**: a flag in the top right
+switches between fifteen so far, and the first launch asks.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it

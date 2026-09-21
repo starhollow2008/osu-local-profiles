@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.19.0
 
 - **osu! is found wherever you installed it.** Before, the app knew three drive letters and a
   handful of folder names, and it stopped looking for osu!stable the moment it found
