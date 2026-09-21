@@ -16,6 +16,13 @@
 
 export const DEFAULT_LOCALE = 'en';
 
+/**
+ * Every locale osu! offers, translated here or not.
+ *
+ * The whole list stays here even while most of it has no translation file: it is the plan
+ * as much as the state, and the codes are settled. What the page *offers* is the shorter
+ * list -- see `done` in `web/js/i18n.js`.
+ */
 export const LOCALE_CODES = [
   'en',
   'ar',
@@ -63,6 +70,14 @@ export type Locale = (typeof LOCALE_CODES)[number];
 
 const KNOWN = new Set<string>(LOCALE_CODES);
 
+/**
+ * Whether the page may be told to use this language.
+ *
+ * Checked against the whole list rather than the translated subset: the server's job is to
+ * refuse a code that is not osu!'s, and which of them have files is the page's business --
+ * it ships them, and it is the one that knows. A code stored for a language that later gains
+ * a translation then simply starts working.
+ */
 export function isLocale(value: unknown): value is Locale {
   return typeof value === 'string' && KNOWN.has(value);
 }

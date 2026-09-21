@@ -113,6 +113,20 @@ function readWeb(rel) {
   return fs.readFileSync(path.join(webDir, rel), 'utf8');
 }
 
+/**
+ * The locale list out of `web/js/i18n.js`, as `[code, done]` pairs.
+ *
+ * Read with a regex rather than imported: that module imports `static-mode.js`, which reads
+ * the DOM, and this script has no DOM. The list is one literal per line by design, so the
+ * pattern is as stable as the file's own formatting.
+ */
+export function localesFromJs(source = readWeb(path.join('js', 'i18n.js'))) {
+  return [...source.matchAll(/^ {2}\{ code: '([\w-]+)'(.*)\},$/gm)].map((m) => [
+    m[1],
+    m[2].includes('done: true'),
+  ]);
+}
+
 function collect() {
   const html = new Map();
   for (const file of HTML_FILES) {
@@ -158,6 +172,18 @@ export function check() {
     for (const key of Object.keys(locale)) {
       if (!(key in en)) problems.push(`${file} has "${key}", which en.json does not`);
     }
+  }
+
+  /*
+   * `done` in web/js/i18n.js decides which languages the picker offers, and it is a hand-set
+   * flag, so it can lie in both directions: a language offered with no file renders English
+   * for somebody who asked for their own language, and a language with a file that nobody can
+   * pick is finished work nobody can reach. Both are checked here against what is on disk.
+   */
+  for (const [code, done] of localesFromJs()) {
+    const exists = fs.existsSync(path.join(i18nDir, `${code}.json`));
+    if (done && !exists) problems.push(`${code} is marked done in web/js/i18n.js, but ${code}.json does not exist`);
+    if (!done && exists) problems.push(`${code}.json exists, but ${code} is not marked done in web/js/i18n.js`);
   }
 
   return problems;

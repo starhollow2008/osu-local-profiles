@@ -2590,7 +2590,8 @@ resolver are built from the install list once, and the resolver holds open handl
 
 ## 5.54 - Every language osu! is offered in
 
-**Status:** in progress -- the machinery and English are done; the translations are not.
+**Status:** in progress -- the machinery is done and 15 languages are translated; the rest
+are listed but not yet offered.
 
 **Goal.** The page reads in the player's own language, in every language osu! itself offers,
 picked from a flag in the corner and asked once on the first launch.
@@ -2623,10 +2624,41 @@ and no language osu! does not have.
   starts in it, and in `localStorage` so the *page* starts in it -- the config arrives with
   the first API response, which is after the first paint.
 
+- **Everything the page says goes through `t()`** -- 577 keys, covering the HTML, the section
+  headings, every dialog, the score card, medals, the import and backfill previews and every
+  toast. Two rules made the conversions safe to do in bulk:
+  - **A key is always a literal first argument to `t()`.** A key built at runtime works and is
+    invisible to the checker, and a key nothing can see is a key nobody notices has gone
+    missing. Families reached by value -- judgements, beatmap statuses, mod groups -- are
+    small tables of literal calls instead.
+  - **A count and its noun are one whole sentence per number.** "1 play was" and "2 plays
+    were" differ in more than an "s" in most languages, and in ways a suffix cannot express.
+- **`format.js` passes the chosen language to every `Intl` call**, so numbers, dates and
+  "3 hours ago" follow the page rather than the machine. A page in German that writes
+  `1,234.56` is not in German.
+- **15 languages translated**: Danish, German, Spanish, Finnish, French, Italian, Japanese,
+  Korean, Dutch, Polish, Portuguese (Brazil), Russian, Swedish, Chinese (Simplified) and
+  Chinese (Traditional).
+
+### Listed is not the same as offered
+
+All forty stay in `LOCALES` -- the codes, names and flags are settled, and the list is the
+plan as much as the state. What the picker *shows* is the shorter list: `availableLocales()`,
+the ones with `done: true`.
+
+An untranslated language in the menu would be worse than no menu entry at all. Somebody picks
+their own language, every key falls back, and they are left looking at an English page
+wondering what they did wrong. `matchLocale` follows the same rule, so a browser set to a
+language with no file is offered nothing rather than a language that would render in English.
+
+`done` is hand-set, so it can lie in both directions -- a language offered with no file, or a
+finished file nobody can reach. `scripts/build-i18n.mjs` compares it with what is on disk and
+`test/i18n.test.ts` pins that the comparison is real, so adding a language is: write the file,
+set the flag, and the check tells you if you did only one of the two.
+
 ### What is left
 
-1. The strings the *scripts* build -- most of the page -- are still English literals. Only the
-   HTML and the new dialogs go through `t()` so far.
-2. The forty translation files. None is written yet; every language falls back to English.
-3. Right-to-left. `dir` is set from the language, and `ar` and `he` say `rtl`, but no layout
-   has been looked at in that direction.
+1. The remaining 24 translation files: ar, be, bg, ca, cs, el, es-419, fil, he, hu, id, lt,
+   lv, ms, no, pt, ro, sk, sl, sr, th, tr, uk, vi. Each is one file plus `done: true`.
+2. Right-to-left. `dir` is set from the language, and `ar` and `he` say `rtl`, but no layout
+   has been looked at in that direction -- which is a reason to do those two last, not first.

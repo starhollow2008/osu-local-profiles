@@ -23,9 +23,14 @@
   point it at your osu! folder -- which was always the fix, and was previously only possible by
   editing `data/config.json`.
 
-- **The page can be read in your own language.** A flag in the top right opens a menu of every
-  language osu! itself offers, each written in its own name, and the first launch asks which
-  one you want. Anything not yet translated stays in English rather than breaking.
+- **The page can be read in your own language.** A flag in the top right opens a menu of
+  languages, each written in its own name, and the first launch asks which one you want.
+  - **15 so far**: Dansk, Deutsch, Español, Suomi, Français, Italiano, 日本語, 한국어,
+    Nederlands, Polski, Português (Brasil), Русский, Svenska, 简体中文 and 繁體中文.
+  - The rest of osu!'s languages are lined up and will appear in the menu as they are
+    translated. A language is only offered once it has a translation -- picking one that had
+    none would just show you an English page.
+  - Numbers, dates and times follow the language too, not your computer's settings.
 
 ## 1.18.0
 

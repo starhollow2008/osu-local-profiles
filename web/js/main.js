@@ -34,7 +34,7 @@ import {
 import { downloadBlob, hint, postJson, toast } from './ui.js';
 import {
   DEFAULT_LOCALE,
-  LOCALES,
+  availableLocales,
   currentLocale,
   knownLocale,
   matchLocale,
@@ -1790,9 +1790,9 @@ let welcoming = false;
 function fillWelcomeLanguage() {
   const select = $('welcomeLang');
   const guess = currentLocale() === 'en' ? matchLocale(navigator.languages) ?? 'en' : currentLocale();
-  select.innerHTML = LOCALES.map(
-    (l) => `<option value="${l.code}" lang="${l.code}">${escapeHtml(l.native)}</option>`,
-  ).join('');
+  select.innerHTML = availableLocales()
+    .map((l) => `<option value="${l.code}" lang="${l.code}">${escapeHtml(l.native)}</option>`)
+    .join('');
   select.value = guess;
   select.onchange = () => void chooseLanguage(select.value);
   // The guess is applied straight away rather than waiting for a change event that will

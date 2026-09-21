@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LOCALES, formatMessage, matchLocale } from '../web/js/i18n.js';
+import { LOCALES, availableLocales, formatMessage, knownLocale, listedLocale, matchLocale } from '../web/js/i18n.js';
 import { DEFAULT_LOCALE, LOCALE_CODES, isLocale, resolveLocale } from '../src/i18n.ts';
-import { check, keysFromJs, stringsFromHtml } from '../scripts/build-i18n.mjs';
+import { check, keysFromJs, localesFromJs, stringsFromHtml } from '../scripts/build-i18n.mjs';
 
 /*
  * The page in every language osu! is offered in.
@@ -60,18 +60,66 @@ test('a language code is checked against the list before it is stored', () => {
   assert.equal(isLocale('xx'), false);
   assert.equal(isLocale(''), false);
   assert.equal(isLocale(null), false);
+  // The server validates against the whole list, translated or not: which locales ship a
+  // file is the page's business, and a stored code starts working the day one lands.
+  assert.equal(isLocale('vi'), true);
   // Empty means "never chosen", which resolves to English without becoming it in config.
   assert.equal(resolveLocale(''), DEFAULT_LOCALE);
   assert.equal(resolveLocale('de'), 'de');
 });
 
+/**
+ * The page draws a line the server does not: `listedLocale` is "one of osu!'s", and
+ * `knownLocale` is "one this app can actually show". Offering a language with no file would
+ * hand somebody who picked their own language an English page.
+ */
+test('the page separates a listed language from one it can actually show', () => {
+  assert.equal(listedLocale('vi'), true, 'Vietnamese is one of osu!’s locales');
+  assert.equal(knownLocale('vi'), false, 'but it has no translation file yet');
+  assert.equal(listedLocale('de'), true);
+  assert.equal(knownLocale('de'), true);
+  assert.equal(listedLocale('xx'), false);
+  assert.equal(knownLocale('xx'), false);
+
+  const offered = availableLocales().map((l) => l.code);
+  assert.ok(offered.includes('en'), 'English is always offered');
+  assert.equal(offered[0], 'en', 'and is first');
+  assert.ok(!offered.includes('vi'), 'an untranslated language is not in the picker');
+  assert.ok(offered.length < LOCALES.length, 'the picker is the shorter list, for now');
+});
+
 test('a browser’s language is matched exactly, then by its base', () => {
   assert.equal(matchLocale(['pt-BR', 'en']), 'pt-br');
-  assert.equal(matchLocale(['pt-PT']), 'pt', 'no pt-PT, so the language without the region');
   assert.equal(matchLocale(['en-US']), 'en');
   assert.equal(matchLocale(['zh-TW', 'zh']), 'zh-tw');
   assert.equal(matchLocale(['kl-GL']), null, 'Greenlandic is not offered, and saying so is right');
   assert.equal(matchLocale(undefined), null);
+  // Only a language that can actually be shown is ever suggested. `vi` is one of osu!'s
+  // locales and has no file, so a Vietnamese browser is offered nothing rather than a
+  // language that would render in English.
+  assert.equal(matchLocale(['vi-VN']), null);
+});
+
+/**
+ * `done` is hand-set and decides what the picker offers, so it can lie in either direction.
+ * `check()` compares it with the files on disk; this pins that the comparison is real.
+ */
+test('the picker’s list and the files on disk are the same set', () => {
+  const marked = localesFromJs()
+    .filter(([, done]) => done)
+    .map(([code]) => code)
+    .sort();
+  const files = fs
+    .readdirSync(i18nDir)
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => path.basename(f, '.json'))
+    .sort();
+  assert.deepEqual(marked, files);
+  assert.deepEqual(
+    availableLocales().map((l) => l.code).sort(),
+    files,
+    'availableLocales() is that same set, in LOCALES order',
+  );
 });
 
 /* --------------------------------------------------------------- strings */

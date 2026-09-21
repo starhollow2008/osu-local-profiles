@@ -13,7 +13,7 @@
  */
 
 import { escapeHtml } from './format.js';
-import { LOCALES, currentLocale, localeFlagUrl, localeInfo, t, useLocale } from './i18n.js';
+import { availableLocales, currentLocale, localeFlagUrl, localeInfo, t, useLocale } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -30,7 +30,9 @@ function renderButton() {
 
 function renderMenu() {
   const active = currentLocale();
-  $('langMenu').innerHTML = LOCALES.map(
+  // Only the translated ones: see `availableLocales` in i18n.js for why an untranslated
+  // language is kept in the list but not offered.
+  $('langMenu').innerHTML = availableLocales().map(
     (l) => `
       <button type="button" class="lang-option${l.code === active ? ' lang-option--active' : ''}"
               role="menuitemradio" aria-checked="${l.code === active}" data-locale="${l.code}"
@@ -51,8 +53,8 @@ export function setLanguageMenuOpen(open) {
   $('langBtn').setAttribute('aria-expanded', String(open));
   if (open) {
     renderMenu();
-    // Bring the language in use into view: forty entries scroll, and the one you are in is
-    // the one you are looking for when you open this by accident.
+    // Bring the language in use into view: the list scrolls once there are enough of them,
+    // and the one you are in is the one you are looking for when you open this by accident.
     $('langMenu').querySelector('.lang-option--active')?.scrollIntoView({ block: 'center' });
   }
 }

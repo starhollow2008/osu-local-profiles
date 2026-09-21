@@ -28,6 +28,16 @@ import { assetUrl, snapshot } from './static-mode.js';
 /**
  * Every language osu! is offered in.
  *
+ * The whole list is here, including the ones not translated yet, because it is the plan as
+ * much as it is the state: the codes, the names and the flags are settled, and adding a
+ * language is then only a matter of writing its file and setting `done`.
+ *
+ * **`done` is what the picker shows.** A language with no file would fetch nothing, fall
+ * back to English on every key, and leave somebody who picked their own language looking at
+ * an English page wondering what went wrong -- so an untranslated one is simply not offered.
+ * `LOCALES` keeps it, `availableLocales()` is what the menu iterates, and
+ * `scripts/build-i18n.mjs` refuses a `done` that does not match the files on disk.
+ *
  * `flag` is a country, which a language is not -- so the mapping is a convention, not a
  * fact, and the two-letter code beside it is what actually identifies the language. The
  * awkward ones are called out rather than pretended about: `ca` (Catalan) has no country of
@@ -35,46 +45,46 @@ import { assetUrl, snapshot } from './static-mode.js';
  * and `en` uses the UK's because the language is named after it.
  */
 export const LOCALES = [
-  { code: 'en', native: 'English', english: 'English', flag: 'gb' },
+  { code: 'en', native: 'English', english: 'English', flag: 'gb', done: true },
   { code: 'ar', native: 'العربية', english: 'Arabic', flag: 'sa', dir: 'rtl' },
   { code: 'be', native: 'Беларуская', english: 'Belarusian', flag: 'by' },
   { code: 'bg', native: 'Български', english: 'Bulgarian', flag: 'bg' },
   { code: 'ca', native: 'Català', english: 'Catalan', flag: 'es' },
   { code: 'cs', native: 'Čeština', english: 'Czech', flag: 'cz' },
-  { code: 'da', native: 'Dansk', english: 'Danish', flag: 'dk' },
-  { code: 'de', native: 'Deutsch', english: 'German', flag: 'de' },
+  { code: 'da', native: 'Dansk', english: 'Danish', flag: 'dk', done: true },
+  { code: 'de', native: 'Deutsch', english: 'German', flag: 'de', done: true },
   { code: 'el', native: 'Ελληνικά', english: 'Greek', flag: 'gr' },
-  { code: 'es', native: 'Español', english: 'Spanish', flag: 'es' },
+  { code: 'es', native: 'Español', english: 'Spanish', flag: 'es', done: true },
   { code: 'es-419', native: 'Español (Latinoamérica)', english: 'Spanish (Latin America)', flag: 'mx' },
-  { code: 'fi', native: 'Suomi', english: 'Finnish', flag: 'fi' },
+  { code: 'fi', native: 'Suomi', english: 'Finnish', flag: 'fi', done: true },
   { code: 'fil', native: 'Filipino', english: 'Filipino', flag: 'ph' },
-  { code: 'fr', native: 'Français', english: 'French', flag: 'fr' },
+  { code: 'fr', native: 'Français', english: 'French', flag: 'fr', done: true },
   { code: 'he', native: 'עברית', english: 'Hebrew', flag: 'il', dir: 'rtl' },
   { code: 'hu', native: 'Magyar', english: 'Hungarian', flag: 'hu' },
   { code: 'id', native: 'Bahasa Indonesia', english: 'Indonesian', flag: 'id' },
-  { code: 'it', native: 'Italiano', english: 'Italian', flag: 'it' },
-  { code: 'ja', native: '日本語', english: 'Japanese', flag: 'jp' },
-  { code: 'ko', native: '한국어', english: 'Korean', flag: 'kr' },
+  { code: 'it', native: 'Italiano', english: 'Italian', flag: 'it', done: true },
+  { code: 'ja', native: '日本語', english: 'Japanese', flag: 'jp', done: true },
+  { code: 'ko', native: '한국어', english: 'Korean', flag: 'kr', done: true },
   { code: 'lt', native: 'Lietuvių', english: 'Lithuanian', flag: 'lt' },
   { code: 'lv', native: 'Latviešu', english: 'Latvian', flag: 'lv' },
   { code: 'ms', native: 'Bahasa Melayu', english: 'Malay', flag: 'my' },
-  { code: 'nl', native: 'Nederlands', english: 'Dutch', flag: 'nl' },
+  { code: 'nl', native: 'Nederlands', english: 'Dutch', flag: 'nl', done: true },
   { code: 'no', native: 'Norsk', english: 'Norwegian', flag: 'no' },
-  { code: 'pl', native: 'Polski', english: 'Polish', flag: 'pl' },
+  { code: 'pl', native: 'Polski', english: 'Polish', flag: 'pl', done: true },
   { code: 'pt', native: 'Português', english: 'Portuguese', flag: 'pt' },
-  { code: 'pt-br', native: 'Português (Brasil)', english: 'Portuguese (Brazil)', flag: 'br' },
+  { code: 'pt-br', native: 'Português (Brasil)', english: 'Portuguese (Brazil)', flag: 'br', done: true },
   { code: 'ro', native: 'Română', english: 'Romanian', flag: 'ro' },
-  { code: 'ru', native: 'Русский', english: 'Russian', flag: 'ru' },
+  { code: 'ru', native: 'Русский', english: 'Russian', flag: 'ru', done: true },
   { code: 'sk', native: 'Slovenčina', english: 'Slovak', flag: 'sk' },
   { code: 'sl', native: 'Slovenščina', english: 'Slovenian', flag: 'si' },
   { code: 'sr', native: 'Српски', english: 'Serbian', flag: 'rs' },
-  { code: 'sv', native: 'Svenska', english: 'Swedish', flag: 'se' },
+  { code: 'sv', native: 'Svenska', english: 'Swedish', flag: 'se', done: true },
   { code: 'th', native: 'ไทย', english: 'Thai', flag: 'th' },
   { code: 'tr', native: 'Türkçe', english: 'Turkish', flag: 'tr' },
   { code: 'uk', native: 'Українська', english: 'Ukrainian', flag: 'ua' },
   { code: 'vi', native: 'Tiếng Việt', english: 'Vietnamese', flag: 'vn' },
-  { code: 'zh', native: '简体中文', english: 'Chinese (Simplified)', flag: 'cn' },
-  { code: 'zh-tw', native: '繁體中文', english: 'Chinese (Traditional)', flag: 'tw' },
+  { code: 'zh', native: '简体中文', english: 'Chinese (Simplified)', flag: 'cn', done: true },
+  { code: 'zh-tw', native: '繁體中文', english: 'Chinese (Traditional)', flag: 'tw', done: true },
 ];
 
 const BY_CODE = new Map(LOCALES.map((l) => [l.code, l]));
@@ -88,8 +98,22 @@ let messages = {};
 let fallback = {};
 let active = DEFAULT_LOCALE;
 
-/** Whether `code` is a language this app has, so a stored or guessed one can be checked. */
+/**
+ * The languages that have a translation and can therefore be chosen.
+ *
+ * In `LOCALES` order, so English stays first and the rest keep the order osu! lists them in.
+ */
+export function availableLocales() {
+  return LOCALES.filter((l) => l.done === true);
+}
+
+/** Whether `code` is a language this app *has a file for*, and so can actually be used. */
 export function knownLocale(code) {
+  return typeof code === 'string' && BY_CODE.get(code)?.done === true;
+}
+
+/** Whether `code` is one of osu!'s locales at all, translated here or not. */
+export function listedLocale(code) {
   return typeof code === 'string' && BY_CODE.has(code);
 }
 
@@ -111,9 +135,11 @@ export function currentLocale() {
 export function matchLocale(tags) {
   for (const raw of tags ?? []) {
     const tag = String(raw).toLowerCase();
-    if (BY_CODE.has(tag)) return tag;
+    // Only a translated one: suggesting a language that would render in English is worse
+    // than suggesting nothing, because the person picks it and then wonders why.
+    if (knownLocale(tag)) return tag;
     const base = tag.split('-')[0];
-    if (BY_CODE.has(base)) return base;
+    if (knownLocale(base)) return base;
   }
   return null;
 }

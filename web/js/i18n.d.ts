@@ -11,12 +11,16 @@ export interface LocaleInfo {
   flag: string;
   /** Only for the two languages that are written right to left. */
   dir?: 'rtl';
+  /** A translation file ships for this language, so the picker may offer it. */
+  done?: boolean;
 }
 
 export const LOCALES: LocaleInfo[];
 export const DEFAULT_LOCALE: string;
 
+export function availableLocales(): LocaleInfo[];
 export function knownLocale(code: unknown): boolean;
+export function listedLocale(code: unknown): boolean;
 export function localeInfo(code: string): LocaleInfo;
 export function currentLocale(): string;
 export function matchLocale(tags: readonly string[] | undefined): string | null;

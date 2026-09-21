@@ -15,6 +15,9 @@ declare module '*/build-i18n.mjs' {
   /** Every literal `t('key')` a script asks for. A key built at runtime is not collected. */
   export function keysFromJs(source: string): string[];
 
+  /** The locale list out of `web/js/i18n.js`, as `[code, done]` pairs. */
+  export function localesFromJs(source?: string): [string, boolean][];
+
   /** Everything that disagrees between the page, the scripts and the locale files. */
   export function check(): string[];
 }
