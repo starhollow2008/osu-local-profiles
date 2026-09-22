@@ -32,6 +32,12 @@ jobs:
             rid: win-x64
           - os: macos-latest
             rid: osx-arm64
+          # Intel Macs, on a runner of that architecture -- the package bundles the runner's
+          # own `node`, so an Intel build cannot be made on an Apple silicon machine. osu!
+          # itself still ships osx-x64, and about a tenth of its macOS users are on it.
+          # `macos-13` was retired; `macos-15-intel` is the standard (free) replacement.
+          - os: macos-15-intel
+            rid: osx-x64
           - os: ubuntu-latest
             rid: linux-x64
 

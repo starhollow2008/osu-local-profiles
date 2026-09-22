@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **An Intel Mac build.** Releases now carry `osx-x64` beside `osx-arm64`. Before this an
+  Intel Mac had nothing it could run: the Apple silicon archive bundles an arm64 Node and pp
+  calculator, and there is no reverse Rosetta. About a tenth of osu!'s own macOS users are on
+  Intel, and osu! still ships for them.
+
 ## 1.20.0
 
 - **Beatmap names in their original language**, the way osu!'s own setting does it: 夜に駆ける

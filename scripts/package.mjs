@@ -27,18 +27,25 @@ const target = process.argv.includes('--rid')
   : defaultRid();
 
 /*
- * A package can only be built on the system it is for.
+ * A package can only be built on the machine it is for -- the same OS *and* the same
+ * architecture.
  *
  * `dotnet publish` will happily cross-compile the pp helper for another runtime, but step 2
  * copies *this* process's Node binary, and there is no cross-platform equivalent of that
  * short of downloading one. Failing here beats shipping a macOS archive containing a
  * Windows node.exe, which would look complete and start on nothing.
+ *
+ * The architecture half matters as much as the OS half, and used to go unchecked: `--rid
+ * osx-x64` on an Apple silicon machine passed, then bundled an arm64 `node` in an archive
+ * labelled Intel -- which is the one build an Intel Mac cannot run, handed to the only people
+ * who need it. Compared against `defaultRid()` rather than `process.arch`, so an x64 Node
+ * under Rosetta is still allowed to build the x64 package.
  */
-const hostOs = defaultRid().split('-')[0];
-if (target.split('-')[0] !== hostOs) {
-  console.error(`\n  cannot build a ${target} package on ${hostOs}.`);
+const hostRid = defaultRid();
+if (target !== hostRid) {
+  console.error(`\n  cannot build a ${target} package on ${hostRid}.`);
   console.error('  The .NET helper would cross-compile, but the bundled Node runtime is this');
-  console.error(`  machine's own binary. Run this on a ${target.split('-')[0]} machine.\n`);
+  console.error(`  machine's own binary. Run this on a ${target} machine.\n`);
   process.exit(1);
 }
 

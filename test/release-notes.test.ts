@@ -23,6 +23,7 @@ test('the release builds are named as each platform\'s updater looks for them', 
   const assets = assetsFor('1.10.0');
   assert.equal(assets.windows, assetNameFor('1.10.0', 'win32', 'x64'));
   assert.equal(assets.macos, assetNameFor('1.10.0', 'darwin', 'arm64'));
+  assert.equal(assets.macosIntel, assetNameFor('1.10.0', 'darwin', 'x64'));
   assert.equal(assets.linux, assetNameFor('1.10.0', 'linux', 'x64'));
 });
 

@@ -26,6 +26,7 @@ export function changelogSection(changelog, version) {
 export const assetsFor = (version) => ({
   windows: `osu-local-profiles-${version}-win-x64.zip`,
   macos: `osu-local-profiles-${version}-osx-arm64.zip`,
+  macosIntel: `osu-local-profiles-${version}-osx-x64.zip`,
   linux: `osu-local-profiles-${version}-linux-x64.zip`,
 });
 
@@ -39,6 +40,7 @@ export function releaseNotes(changelog, version) {
 
 - **Windows:** \`${assets.windows}\`
 - **macOS (Apple silicon):** \`${assets.macos}\`
+- **macOS (Intel):** \`${assets.macosIntel}\`
 - **Linux:** \`${assets.linux}\`
 
 Unzip it anywhere and run the launcher inside; the README beside it says how on each system.

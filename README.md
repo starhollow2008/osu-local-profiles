@@ -153,7 +153,7 @@ ago` by day, and Play History reads `Plays 430` / `March 2020` by month.
 | -------- | ----- |
 | **Windows** | Verified, on both clients. Developed and used on it daily; osu!stable was installed and played against as of 1.12.0 (detection, the beatmap index, the replay watcher, pp and the Classic mod all checked on a real install). |
 | **Linux** | Green on CI (`ubuntu-latest`): typecheck, the full test suite, and a real start-up. Each release has a `linux-x64` build, packaged and started on Linux. Nobody has yet run it against an actual osu! install. |
-| **macOS** | The same, on `macos-latest`, with an `osx-arm64` (Apple silicon) build. |
+| **macOS** | The same, on `macos-latest`, with an `osx-arm64` (Apple silicon) build and an `osx-x64` (Intel) one built on an Intel runner. Each is built and started by CI on its own architecture; neither has been run against a real osu! install. |
 
 The honest summary is that Linux and macOS are *supported but unproven*. What can be
 checked without one of those machines has been: every path the app looks for osu! in is
