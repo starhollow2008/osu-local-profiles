@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.20.0
 
 - **Beatmap names in their original language**, the way osu!'s own setting does it: 夜に駆ける
   instead of Yoru ni Kakeru, across Recent Plays, Scores, Most Played, the score page,
