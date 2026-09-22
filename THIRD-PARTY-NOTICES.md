@@ -3,8 +3,8 @@
 The source in this repository is MIT licensed (see `LICENSE`). A **packaged build**
 additionally bundles other people's software, listed here.
 
-This is a good-faith notice, not legal advice. If you redistribute a build — especially
-commercially — verify each component's terms yourself against the actual contents of
+This is a good-faith notice, not legal advice. If you redistribute a build - especially
+commercially - verify each component's terms yourself against the actual contents of
 `dist/<build>/tools/pp/`.
 
 ## What a release contains
@@ -16,7 +16,7 @@ commercially — verify each component's terms yourself against the actual conte
 | [fyne.io/systray](https://github.com/fyne-io/systray) | the launcher's tray / menu bar icon | Apache-2.0 |
 | [godbus/dbus](https://github.com/godbus/dbus) | the tray icon on Linux | BSD-2-Clause |
 | [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) | the launcher's Windows system calls | BSD-3-Clause |
-| [ppy/osu](https://github.com/ppy/osu) — `osu.Game*`, `osu.Framework`, `osuTK` | the real difficulty and pp code; the entire reason this project can be accurate | MIT |
+| [ppy/osu](https://github.com/ppy/osu) - `osu.Game*`, `osu.Framework`, `osuTK` | the real difficulty and pp code; the entire reason this project can be accurate | MIT |
 | [.NET 8 runtime](https://github.com/dotnet/runtime) | runs the pp helper self-contained | MIT |
 | [Realm](https://github.com/realm/realm-dotnet) | osu!'s model types are Realm objects, so it cannot be removed | Apache-2.0 |
 | [SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp) | pulled in by osu!'s beatmap handling | Six Labors Split License (Apache-2.0 for open-source use) |
@@ -25,7 +25,7 @@ commercially — verify each component's terms yourself against the actual conte
 | various osu! transitive dependencies | AutoMapper, MessagePack, Newtonsoft.Json, SQLitePCLRaw, Remotion.Linq and similar | individually permissive; see each package on NuGet |
 
 The rank curves in `src/calc/rank-tables/` are derived from osu!'s public
-[data.ppy.sh](https://data.ppy.sh) dumps. They contain no personal data — only a
+[data.ppy.sh](https://data.ppy.sh) dumps. They contain no personal data - only a
 pp-to-rank curve computed from an anonymous sample.
 
 ## Artwork and data in the page itself
@@ -42,7 +42,7 @@ from osu!'s copy, because osu-resources is **CC-BY-NC 4.0** and Twemoji is not.
 
 **Nothing here is copied from [ppy/osu-web](https://github.com/ppy/osu-web).** It is
 AGPL-3.0-or-later and this project is MIT, so its stylesheets, images and SVG path data
-are not used. Every visual match to osu! is a *reimplementation from measured values* —
+are not used. Every visual match to osu! is a *reimplementation from measured values* -
 colours, sizes and ratios, recorded in `docs/osu-web-reference.md` with the file each came
 from. `docs/osu-web-fidelity.md` sets out what may and may not be taken, and lists the
 places where this page deliberately differs as a result.
@@ -58,7 +58,7 @@ stack falls back to.
 helper from 273MB to about 112MB. One exclusion matters for licensing rather than size:
 
 - **The native BASS binaries** (`bass.dll`, `bass_fx.dll`, `bassmix.dll`, `basswasapi.dll`).
-  BASS is [un4seen](https://www.un4seen.com/)'s commercial audio library — free for
+  BASS is [un4seen](https://www.un4seen.com/)'s commercial audio library - free for
   non-commercial use but **not freely redistributable**. This app never plays a sound, and
   the native libraries are only loaded on demand, so they are removed. The *managed*
   wrapper `ppy.ManagedBass` (MIT, by ppy) has to stay: osu.Framework references it
@@ -77,7 +77,7 @@ linker warns in advance that `osu.Game`, `osu.Framework`, `Realm`, `Newtonsoft.J
 result and how to repeat it.
 
 **Less can be removed than you would expect.** osu.Framework's `Logger` static constructor
-pulls in nearly the whole managed assembly graph — NUnit, Sentry, OpenTabletDriver and
+pulls in nearly the whole managed assembly graph - NUnit, Sentry, OpenTabletDriver and
 others are all loaded before any of this project's code runs, however irrelevant they are
 to computing pp. Removing any of them kills the helper at startup, so they ship. Sentry in
 particular is present but **inert**: nothing here calls `SentrySdk.Init`, so no telemetry
@@ -99,5 +99,5 @@ Worth stating plainly, since it reads another game's files:
 - It does not automate, assist or alter play in any way.
 
 It is a local read-only viewer of your own replays. The two hosts it may contact are
-`assets.ppy.sh` for cover art and `data.ppy.sh` for rank dumps — both public,
+`assets.ppy.sh` for cover art and `data.ppy.sh` for rank dumps - both public,
 unauthenticated, and optional.

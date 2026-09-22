@@ -1,7 +1,7 @@
-# Roadmap — Phase 5
+# Roadmap - Phase 5
 
 Everything in this file comes from the user's `next steps.txt` (now retired; its content is
-captured here). Phases 1–4 shipped as v1.0.0 — see the CHANGELOG.
+captured here). Phases 1–4 shipped as v1.0.0 - see the CHANGELOG.
 
 **This file is the resume point.** Each feature below is self-contained and ordered so that
 work can stop after any one of them and leave the app shippable. Update the `Status` line as
@@ -78,7 +78,7 @@ is allowed to break them:
   stays explicit; 5.56 adds an opt-in, off by default, that runs the same import over the gap
   the app was closed for and no further.
 - **pp comes only from osu!'s own code.** No second calculator, ever. Where 5.2 changes
-  what pp is asked for, it changes the *input mods* handed to osu!'s calculator — it never
+  what pp is asked for, it changes the *input mods* handed to osu!'s calculator - it never
   computes a pp value itself.
 - **TypeScript runs unbuilt.** No `enum`, no parameter properties, no decorators. Run
   `npm run check` (typecheck + tests), and `npm run ui` for anything that toggles
@@ -86,7 +86,7 @@ is allowed to break them:
 
 ---
 
-## 5.0 — Retire `prompt.txt`, keep the reference links
+## 5.0 - Retire `prompt.txt`, keep the reference links
 
 **Status:** done
 
@@ -106,7 +106,7 @@ and the README points at it.
 
 ---
 
-## 5.1 — Settings store and Settings dialog
+## 5.1 - Settings store and Settings dialog
 
 **Status:** done
 
@@ -118,7 +118,7 @@ one. Reached from the existing Options menu.
   file (port, install roots); settings are app state edited from the page, and the page must
   not be able to corrupt the file the app needs to boot.
 - Settings that describe *the profile* (its me! text, its section order, its identity) are
-  **per profile** — two playstyles are two profiles and should not share a description.
+  **per profile** - two playstyles are two profiles and should not share a description.
   Settings that describe *how scores are counted* (5.2, 5.3) are **also per profile**, so
   one profile can be a strict fresh account and another can be a relax-tracking profile.
   Everything is therefore keyed by `profile_id`.
@@ -142,14 +142,14 @@ one. Reached from the existing Options menu.
 
 ---
 
-## 5.2 — Include pp for unranked mods
+## 5.2 - Include pp for unranked mods
 
 **Status:** done
 
 **Goal.** An opt-in toggle, *"Include pp for unranked mods"*, that lets scores osu! would
 never rank still count toward Best Performance:
 
-- **Relax / Autopilot** count *as if the mod were not on* — RX alone scores as nomod, RX+DT
+- **Relax / Autopilot** count *as if the mod were not on* - RX alone scores as nomod, RX+DT
   scores as DT. (The user asked for this explicitly.)
 - **Rate-changed DT/NC/HT/DC** (1.45×, 1.55×, 1.6× …) count, scored at their actual rate.
 
@@ -177,7 +177,7 @@ never rank still count toward Best Performance:
   take minutes and need the pp helper running. Instead: **always compute pp at ingest**
   whenever a local `.osu` exists, and make eligibility a query-time decision. Flipping the
   toggle then re-renders instantly.
-- Rate-changed rate mods are **not** currently detected — `modsAwardPp` only looks at
+- Rate-changed rate mods are **not** currently detected - `modsAwardPp` only looks at
   acronyms, so a 1.45× DT score is stored as `ranked = 1` today. That is a real bug; fixing
   it is part of this item, and the toggle is what gives those scores a way back in.
 
@@ -185,11 +185,11 @@ never rank still count toward Best Performance:
 - **.NET helper** (`tools/PpCalculator/Program.cs`): `Request` gains
   `stripMods: string[]`. After decoding, remove any mod whose acronym is in that list from
   `scoreInfo.Mods` before calling the difficulty and performance calculators. Everything
-  else — legacy detection, `CL`, `MaximumStatistics` — is untouched.
+  else - legacy detection, `CL`, `MaximumStatistics` - is untouched.
 - **Schema** (`src/db/schema.sql` + `ADDED_COLUMNS` in `src/db/index.ts`):
-  - `map_status INTEGER` — the beatmap's `approved` value at ingest (null = unsubmitted).
-  - `mods_ranked INTEGER` — would osu! rank this mod combination?
-  - `pp_nomod REAL` — pp with RX/AP stripped; only set when the score actually has one.
+  - `map_status INTEGER` - the beatmap's `approved` value at ingest (null = unsubmitted).
+  - `mods_ranked INTEGER` - would osu! rank this mod combination?
+  - `pp_nomod REAL` - pp with RX/AP stripped; only set when the score actually has one.
   - Keep `ranked` meaning *"vanilla osu! ranks this"* so nothing existing shifts under it.
 - **`src/calc/pp.ts`**: `modsAwardPp` learns about mod settings (a rate-adjust mod with a
   non-default `speed_change` is unranked); add `UNRANKED_BUT_STRIPPABLE = ['RX', 'AP']` and
@@ -197,12 +197,12 @@ never rank still count toward Best Performance:
 - **`src/tracker/ingest.ts`**: always calculate when `beatmap.osuPath` exists; calculate a
   second time with `stripMods` when RX/AP are present. Store both.
 - **`src/calc/stats.ts` + `history.ts`**: every query that says `ranked = 1` takes an
-  eligibility predicate built from the settings — a shared `eligibilitySql(settings)` helper
+  eligibility predicate built from the settings - a shared `eligibilitySql(settings)` helper
   so there is exactly one definition. `topPlays` selects `pp_nomod` in preference to `pp`
   when the setting is on and the score has one.
 - **Recomputing old scores.** Existing rows have no pp for ineligible scores. Add
   `POST /api/recompute` (explicit, confirmed, progress over SSE) that walks stored scores
-  with a `replay_path` and fills in missing pp — and offer it from the toggle when it finds
+  with a `replay_path` and fills in missing pp - and offer it from the toggle when it finds
   scores that need it. `scripts/reingest.mjs` keeps working unchanged.
 - **UI.** Plays counted only because of this toggle get a marker in `playRow` (e.g. the pp
   value in the "unofficial" accent with a tooltip saying why), and the Best Performance
@@ -216,7 +216,7 @@ toggle back removes them with no reingest.
 
 ---
 
-## 5.3 — Include pp for unranked maps
+## 5.3 - Include pp for unranked maps
 
 **Status:** done
 
@@ -224,7 +224,7 @@ toggle back removes them with no reingest.
 graveyard, qualified, loved and never-submitted maps.
 
 **Decisions.**
-- Rides on the same machinery as 5.2 — `map_status` plus a query-time predicate. Do 5.2
+- Rides on the same machinery as 5.2 - `map_status` plus a query-time predicate. Do 5.2
   first; this is then mostly settings, SQL and copy.
 - Offer it as a **set of statuses**, not one boolean: loved and qualified are a very
   different proposition from a graveyarded map someone made yesterday. Default all off.
@@ -239,7 +239,7 @@ all follow, and the toggle is instant.
 
 ---
 
-## 5.4 — Score actions: pin, reorder, hide
+## 5.4 - Score actions: pin, reorder, hide
 
 **Status:** done
 
@@ -252,7 +252,7 @@ score from the profile entirely.
   activity, Most Played, the stats totals and the pp history.
 
 **Decisions.**
-- "Remove" is a **hide**, not a `DELETE`: the row stays with `hidden_at` set. Reasons —
+- "Remove" is a **hide**, not a `DELETE`: the row stays with `hidden_at` set. Reasons -
   re-ingest would bring it straight back, dedupe would no longer suppress the replay on
   disk, and an accidental removal has to be undoable. Hidden scores are filtered out of
   every query at the source (one shared `WHERE` fragment, next to `eligibilitySql`).
@@ -266,7 +266,7 @@ score from the profile entirely.
 - `src/calc/stats.ts`: `pinnedPlays()`, and `AND hidden_at IS NULL` everywhere.
 - `web/js/sections.js`: `playRow` gains a `⋯` button and a small popover menu.
 - Drag-and-drop: native HTML5 DnD, no library, keyboard-accessible fallback (move up/down
-  in the menu) — the drag is a convenience, not the only way.
+  in the menu) - the drag is a convenience, not the only way.
 - `test/scores-actions.test.ts`; `npm run ui` checks for the popover's visibility toggle.
 
 **Done when.** Pinning, reordering and hiding all survive a reload, hidden scores are absent
@@ -274,7 +274,7 @@ from every section and from the totals, and a hidden score can be restored.
 
 ---
 
-## 5.5 — Editable identity, and linking an official osu! account
+## 5.5 - Editable identity, and linking an official osu! account
 
 **Status:** done
 
@@ -286,7 +286,7 @@ linked account set in Settings.
 - **Linking is one setting** (`osuUserId` + cached username), and everything else defaults
   from it. It lives in Settings; the click-to-edit controls are shortcuts into the same
   state.
-- **Network layering, in order of preference** — each step is optional and degrades:
+- **Network layering, in order of preference** - each step is optional and degrades:
   1. Avatar: `https://a.ppy.sh/<id>` needs no credentials at all. Cached to `data/`.
   2. **The OAuth layer turned out to be unnecessary and was dropped.** The public profile
      page redirects username -> id and embeds the whole public user object (id, username,
@@ -298,7 +298,7 @@ linked account set in Settings.
   packaged build carries its own identity.
 - **The local osu! session**: osu!stable stores the username in `osu!.<user>.cfg`
   (`Username = …`); lazer stores it in its own config. Read-only, best effort, and only
-  used to *prefill* — never applied without the user confirming.
+  used to *prefill* - never applied without the user confirming.
 
 **Plan.** `src/clients/osu-api.ts` (tiny, optional, all failures non-fatal),
 `POST /api/identity` (set name / set avatar / upload / clear), file upload via a plain
@@ -310,7 +310,7 @@ typing. With a linked account, avatar and banner appear and are cached.
 
 ---
 
-## 5.6 — `me!` section
+## 5.6 - `me!` section
 
 **Status:** done
 
@@ -328,11 +328,11 @@ as literal text.
 
 ---
 
-## 5.7 — Draggable section order
+## 5.7 - Draggable section order
 
 **Status:** done
 
-**Goal.** Reorder `me!`, Recent, Top Ranks, Historical, Medals by dragging, order saved —
+**Goal.** Reorder `me!`, Recent, Top Ranks, Historical, Medals by dragging, order saved -
 the way osu! lets you rearrange your own profile.
 
 **Decisions.** The order lives in settings as an array of section ids. Unknown ids are
@@ -349,28 +349,28 @@ code appends it cleanly to an existing saved order.
 
 ---
 
-## 5.8 — Medals
+## 5.8 - Medals
 
 **Status:** done
 
 **Goal.** A Medals section mirroring the official profile's, restricted to the medals that
 are actually computable from local data:
 
-- **Combo**: 500, 750, 1000, 2000 — *osu!standard only; osu! has no others*
-- **Play count**: 5,000 · 15,000 · 25,000 · 50,000 — *osu!standard only*
-- **Hit count**: four tiers — *the other three modes' equivalent, which osu! does have*
-- **Rank**: top 50,000 · 10,000 · 5,000 · 1,000 — real osu! medals, all modes
+- **Combo**: 500, 750, 1000, 2000 - *osu!standard only; osu! has no others*
+- **Play count**: 5,000 · 15,000 · 25,000 · 50,000 - *osu!standard only*
+- **Hit count**: four tiers - *the other three modes' equivalent, which osu! does have*
+- **Rank**: top 50,000 · 10,000 · 5,000 · 1,000 - real osu! medals, all modes
 - **Beatmap pass** and **FC**: 1★–10★ for osu!standard, 1★–8★ elsewhere
 
 **Decisions.**
-- Derived on the fly from stored scores, not stored as awards — the same reasoning as
+- Derived on the fly from stored scores, not stored as awards - the same reasoning as
   `history.ts`: a reingest or a settings change must not leave stale medals behind. The
   *date* a medal was reached comes from the first score that satisfied it.
 - **FC detection** needs the beatmap's maximum combo, which is not stored per score today.
   The pp helper already returns `maxCombo`; add a `beatmap_max_combo` column and populate it
   at ingest. Definition: no misses **and** combo ≥ the beatmap max (allowing for slider-end
   losses on lazer scores, which is why the map's own value is needed rather than a guess).
-- **Rank medals** use the estimated rank curve, so they are estimates and say so — the same
+- **Rank medals** use the estimated rank curve, so they are estimates and say so - the same
   disclaimer the Global Ranking panel already carries.
 - **Artwork and every name**: taken from osu!'s *published achievement list*, which the
   profile-page payload already carries -- so `scripts/build-medal-table.mjs` generates
@@ -387,23 +387,23 @@ renders offline, and `test/medals.test.ts` covers each family including the boun
 
 ---
 
-## 5.9 — Share: screenshot and standalone HTML
+## 5.9 - Share: screenshot and standalone HTML
 
 **Status:** done
 
 **Goal.** Hand someone else the profile. Three ways, in increasing fidelity:
 
-1. **Standalone `.html`** — one self-contained file with the CSS, the SVG badges and the
+1. **Standalone `.html`** - one self-contained file with the CSS, the SVG badges and the
    data inlined, and remote covers either inlined as data URIs or dropped. Opens anywhere,
    offline, forever. This is the primary answer.
-2. **PNG screenshot** — full-page render.
-3. **Share on your network** — print the LAN URL and a QR code so a phone on the same
+2. **PNG screenshot** - full-page render.
+3. **Share on your network** - print the LAN URL and a QR code so a phone on the same
    Wi-Fi can open the live page. (This is the option the user asked to be told about: it
    needs no export at all. It is opt-in, because the server currently binds locally.)
 
 **Decisions.**
-- The screenshot is produced by driving an **already-installed** Chrome or Edge over CDP —
-  the mechanism `scripts/ui-check.mjs` already uses — never by bundling a browser, which
+- The screenshot is produced by driving an **already-installed** Chrome or Edge over CDP -
+  the mechanism `scripts/ui-check.mjs` already uses - never by bundling a browser, which
   would dwarf the 83MB package. If none is found, say so and offer the HTML export instead.
 - The HTML export must be generated from the same section renderers as the live page, or it
   will drift. That means a small amount of restructuring in `web/js/` so the section markup
@@ -420,18 +420,18 @@ page is never served off the machine; the HTML export and the PNG are the ways t
 
 ---
 
-## 5.10 — macOS and Linux support
+## 5.10 - macOS and Linux support
 
-**Status:** in progress — written and covered by CI on all three platforms; **unverified
+**Status:** in progress - written and covered by CI on all three platforms; **unverified
 against a real osu! install on macOS or Linux**
 
 **Goal.** Everything above works on macOS and Linux. This is last because it cannot be
-verified on the development machine — treat every step as "written carefully, needs a real
+verified on the development machine - treat every step as "written carefully, needs a real
 run on the target OS".
 
 **Scope.**
 - **Detection** (`src/clients/detect.ts`): lazer at `~/.local/share/osu` and
-  `~/Library/Application Support/osu` is already listed but only reached when `HOME` is set —
+  `~/Library/Application Support/osu` is already listed but only reached when `HOME` is set -
   verify, and add `XDG_DATA_HOME`. osu!stable under Wine/CrossOver lives at
   `~/.wine/drive_c/…` and inside the osu! Wine wrapper's bottle; support it if the paths
   can be found, but do not let a missing Wine prefix be an error.
@@ -441,7 +441,7 @@ run on the target OS".
   its extension.
 - **Packaging** (`scripts/package.mjs`): per-platform artifacts, a `start.sh` /
   `.command` beside `start.bat`, and the executable bit set in the archive. Note macOS
-  Gatekeeper will quarantine a downloaded unsigned binary — document the workaround rather
+  Gatekeeper will quarantine a downloaded unsigned binary - document the workaround rather
   than pretending it does not happen.
 - **`openBrowser`** already branches correctly.
 - **CI** (`.github/workflows/`): run `npm run check` on ubuntu and macos runners.
@@ -545,7 +545,7 @@ which platforms are verified and which are only written.
 
 ---
 
-## 5.11 — Incomplete plays (fails, quits and retries)
+## 5.11 - Incomplete plays (fails, quits and retries)
 
 **Status:** done
 
@@ -553,10 +553,10 @@ which platforms are verified and which are only written.
 never finished, whether by early exit, a retry, or an HP fail. They join the play count, the
 monthly play counts, Most Played, and (configurably) Recent Plays.
 
-### What osu! actually counts — established from ppy/osu, not guessed
+### What osu! actually counts - established from ppy/osu, not guessed
 
 `SubmittingPlayer.submitScore` submits a score on fail *or* quit *or* retry. There is **no
-minimum object count** — the questions we assumed might exist ("15 objects? 25?") are not
+minimum object count** - the questions we assumed might exist ("15 objects? 25?") are not
 what osu! asks. It asks exactly three things, and a play counts if all three hold:
 
 1. a score token was issued (the play started while online and logged in, with
@@ -570,7 +570,7 @@ Quitting before hitting anything is the only case osu! itself throws away, and i
 ### Why the replay watcher cannot see these plays
 
 `Player.prepareAndImportScoreAsync` imports a score locally only when
-`ScoreProcessor.HasCompleted && GameplayState.HasPassed`, or when `forceImport` is set —
+`ScoreProcessor.HasCompleted && GameplayState.HasPassed`, or when `forceImport` is set -
 which only `FailOverlay.SaveReplay` does, i.e. the user clicking "Save replay" by hand. So:
 
 | play type | replay in lazer's store | osu! counts it |
@@ -581,7 +581,7 @@ which only `FailOverlay.SaveReplay` does, i.e. the user clicking "Save replay" b
 | quit / early exit / retry | **no** | yes |
 
 Multiplayer is the odd one out because `MultiplayerPlayer.PerformFail` suppresses the fail
-outright — "failing in multiplayer only marks the score with F rank" — so the map plays to
+outright - "failing in multiplayer only marks the score with F rank" - so the map plays to
 the end and is imported normally. That is what every rank-`F` replay in this machine's store
 turned out to be: all 22 of them judged **100%** of their beatmap's hit objects. There is not
 one partially-played replay on disk, which is the clearest possible confirmation that a real
@@ -594,7 +594,7 @@ Measured on one real session (`logs/1789001733.*`): **54 plays started, 45 count
 
 - **The source is lazer's own log files**, `<lazer>/logs/<session>.runtime.log` plus
   `.network.log`. This is the only local record of a play that leaves no replay, and it
-  needs no API, no credentials and no polling — the same trade already accepted for
+  needs no API, no credentials and no polling - the same trade already accepted for
   `src/clients/osu-web.ts`. Like that module it is a private detail of osu! and must fail
   quietly and visibly rather than inventing plays.
 - **A play is counted when osu! counted it.** The log line `Score submission completed!` is
@@ -607,12 +607,12 @@ Measured on one real session (`logs/1789001733.*`): **54 plays started, 45 count
   for a completed map and `exit from <Player>` for one that was abandoned. Verified against
   the corpus: in that session the signal fired 19 times and there were exactly 19 replays on
   disk, matching one-to-one on time and beatmap. A time-window match against ingested scores
-  was considered and rejected — two attempts at the same map minutes apart are genuinely
+  was considered and rejected - two attempts at the same map minutes apart are genuinely
   ambiguous, and the log answers the question directly.
 - **lazer's submission token is the dedupe key.** It is server-issued and unique per play,
   so re-reading a log can never duplicate a play, and it needs no synthesised identity.
 - **Stored in their own table, not in `scores`.** An incomplete play has no accuracy, no
-  combo, no mods, no pp and no total score — that data never leaves lazer's memory. Putting
+  combo, no mods, no pp and no total score - that data never leaves lazer's memory. Putting
   a row of zeroes into `scores` would silently poison weighted accuracy, grade counts,
   ranked score, the level bar and every medal. `incomplete_plays` keeps them separate and
   the four aggregates that should include them opt in explicitly.
@@ -634,10 +634,10 @@ Measured on one real session (`logs/1789001733.*`): **54 plays started, 45 count
 
 ### Plan
 
-- `src/clients/lazer-log.ts` — the log grammar and a `LogSession` that turns lines into
+- `src/clients/lazer-log.ts` - the log grammar and a `LogSession` that turns lines into
   plays. Pure and line-at-a-time, so live tailing and whole-file parsing share one path.
-- `src/tracker/log-watcher.ts` — follow the newest session's logs by byte offset.
-- `src/tracker/incomplete.ts` — resolve the beatmap, apply the cutoff, insert.
+- `src/tracker/log-watcher.ts` - follow the newest session's logs by byte offset.
+- `src/tracker/incomplete.ts` - resolve the beatmap, apply the cutoff, insert.
 - Schema: `incomplete_plays`, keyed by profile and token, with `hidden_at` so `visibleSql()`
   applies to it verbatim.
 - `src/calc/stats.ts` and `src/calc/history.ts`: play count, monthly play counts, Most
@@ -647,14 +647,14 @@ Measured on one real session (`logs/1789001733.*`): **54 plays started, 45 count
 - `test/lazer-log.test.ts` against real log excerpts, plus aggregate tests.
 
 **Done when.** A quit, a retry and an HP fail each raise the play count, appear in the
-monthly chart and Most Played, and show in Recent Plays according to the setting — and a
+monthly chart and Most Played, and show in Recent Plays according to the setting - and a
 passed play is still counted exactly once.
 
 ---
 
-## 5.12 — Incomplete plays on osu!stable
+## 5.12 - Incomplete plays on osu!stable
 
-**Status:** answered on a real osu!stable install (2026-09-11) — stable keeps no usable
+**Status:** answered on a real osu!stable install (2026-09-11) - stable keeps no usable
 record of a play it did not save, so the app says so rather than guessing. See **What a real
 stable install turned out to hold** below; the leads above are kept for the reasoning.
 
@@ -675,7 +675,7 @@ hold for stable too. What differs is only where the evidence lives on disk.
   (<https://github.com/ppy/osu-stable-issues/issues/254>), which settles it: `Data/r/` holds
   passes only, the same shape of gap lazer has.
 - **`scores.db` is "the local leaderboards"** per osu!'s own wiki, and a local leaderboard
-  is a list of completed plays — so it is very unlikely to hold an abandoned one. Worth
+  is a list of completed plays - so it is very unlikely to hold an abandoned one. Worth
   five minutes to disprove, not worth building on.
 
 ### Unverified leads, in the order worth trying
@@ -691,14 +691,14 @@ They are kept because the reasoning still applies to any future attempt.
    this first**: if stable logs its submissions the way lazer does, 5.12 is mostly a second
    grammar and very little else.
    - What to look for: a line written when a score is submitted, and anything naming the
-     beatmap. stable is a different codebase from lazer, so the *wording* will differ — do
+     beatmap. stable is a different codebase from lazer, so the *wording* will differ - do
      not expect `Score submission completed!`.
    - stable's logs are widely described as being obfuscated/minimal compared to lazer's, so
      be ready for this to come to nothing.
 2. **`osu!.db`.** The wiki calls it "osu!'s database of beatmaps"; it is known to record
    whether a beatmap has been played. If it also keeps a per-beatmap *play count* that
    includes failed attempts, that is a source for Most Played and the play count, though
-   not for Recent Plays — a counter has no timestamps, so it can say how much but never
+   not for Recent Plays - a counter has no timestamps, so it can say how much but never
    when. Deltas on a counter would also be fragile across restarts.
 3. **`scores.db`.** Rule it out (see above) rather than assume it.
 4. **Nothing local at all.** If none of the above pans out, say so in the README and stop.
@@ -711,7 +711,7 @@ They are kept because the reasoning still applies to any future attempt.
 Do this before writing any code. It is what turned "lazer probably drops some plays" into a
 number, and it will do the same for stable:
 
-1. Play one normal session — pass some maps, quit some, retry some, fail some.
+1. Play one normal session - pass some maps, quit some, retry some, fail some.
 2. Count **plays started**, **plays osu! counted**, and **replays written to disk** over
    that window. For lazer those came from the session log and from the file store's replay
    timestamps; for stable, `Data/r/` file times will give the third number, and your own
@@ -723,8 +723,8 @@ number, and it will do the same for stable:
 
 The ingest is already client-agnostic and does not need changing:
 
-- `ingestIncompletePlay` in `src/tracker/incomplete.ts` takes a `ResolvedLoggedPlay` —
-  token, timestamp, beatmap id or name, and whether it passed — and knows nothing about
+- `ingestIncompletePlay` in `src/tracker/incomplete.ts` takes a `ResolvedLoggedPlay` -
+  token, timestamp, beatmap id or name, and whether it passed - and knows nothing about
   where that came from. Give it those five facts from any source and everything downstream
   (the play count, the monthly counts, Most Played, Recent Plays, reset, delete) already
   works.
@@ -733,7 +733,7 @@ The ingest is already client-agnostic and does not need changing:
 - The dedupe key must stay something stable and unique per play. lazer's submission token is
   ideal because osu! issues it. If stable offers nothing equivalent, a key will have to be
   synthesised, and it must survive a re-read of the same source without producing a second
-  play — see how `dedupe_key` is used in `src/tracker/incomplete.ts`.
+  play - see how `dedupe_key` is used in `src/tracker/incomplete.ts`.
 - `logDirOf` in `src/clients/lazer-log.ts` already returns null for a stable install, so
   stable installs are silently skipped today rather than half-supported.
 
@@ -783,12 +783,12 @@ build on it must be labelled in the UI as the approximation it is. The osu! API'
 `include_fails=1` remains refused: it needs OAuth credentials and breaks "no login anywhere".
 
 **Done when.** A quit and a retry on osu!stable raise the play count the same way they do on
-lazer — or this section records, with evidence, that stable keeps no local trace of them and
+lazer - or this section records, with evidence, that stable keeps no local trace of them and
 the README says so plainly.
 
 ---
 
-## 5.13 — Paged sections, and charts that match osu!'s
+## 5.13 - Paged sections, and charts that match osu!'s
 
 **Status:** done
 
@@ -809,21 +809,21 @@ thing it is modelled on.
 Each value below comes from osu-web's own source, so this is a match rather than an
 impression of one:
 
-- The line is **`@yellow`, `#ffcc22`, at 2px** — `.line-chart--profile-page` in
+- The line is **`@yellow`, `#ffcc22`, at 2px** - `.line-chart--profile-page` in
   `resources/css/bem/line-chart.less`. It is a literal rather than one of this project's
   `--hsl-*` tokens because it is not derived from the page's base hue: it stays gold
   whatever the accent is.
 - The **hover marker** is a 20px circle filled `--hsl-b5` with a 4px yellow border, over a
-  full-height 2px yellow line — same file.
+  full-height 2px yellow line - same file.
 - The **tooltip** is pinned to a top corner and *flips away from the cursor* rather than
   following the point (`data-float`), which is what keeps it from sitting under the pointer.
   Its value line is white and its date line `--hsl-l1`, with the value on top.
 - The **rank wording** is `<strong>Global Ranking</strong> #123` over `40 days ago`, from
-  `profile-page/rank-chart.tsx` — the x axis there really is days-ago rather than a date,
+  `profile-page/rank-chart.tsx` - the x axis there really is days-ago rather than a date,
   which is why the tooltip says so.
 - **Play History** is the section's real name (`users.show.extra.historical.monthly_playcounts.title`),
   its tooltip is `<strong>Plays</strong> 430` over `March 2020`
-  (`MMMM YYYY`), and it is a `curveLinear` line — `profile-page/chart.tsx`.
+  (`MMMM YYYY`), and it is a `curveLinear` line - `profile-page/chart.tsx`.
 - The **button** is `show-more-link`: a centred pill, white on `--hsl-b2`, `--hsl-b1` on
   hover, label between two chevrons, reading `show more`.
 
@@ -831,7 +831,7 @@ impression of one:
 
 - **The hover marker and tooltip are HTML over the plot, not SVG inside it.** The charts
   stretch with `preserveAspectRatio="none"` in a 0..100 space, which is what makes them
-  responsive without measuring the DOM — and would render a circle as an ellipse whose shape
+  responsive without measuring the DOM - and would render a circle as an ellipse whose shape
   depended on the window width. osu-web does the same thing for the same reason: its hover
   circle is a `div`.
 - **The tooltip text is formatted at render time and carried on the element as JSON.** The
@@ -841,18 +841,18 @@ impression of one:
   the granularity real: daily on the rank chart, monthly on Play History. You are always
   reading a value that was actually recorded.
 - **Paging is server-side.** The page sends the size it wants for each section and gets
-  totals back. The alternative — fetch everything and slice in the browser — would either
+  totals back. The alternative - fetch everything and slice in the browser - would either
   cap how far "show more" can go or make opening a profile cost as much as its whole
   history. Now a profile with thousands of plays opens with twenty rows, and expanding
   stays honest for however long the list is.
 - **The bracketed remaining count was dropped.** osu-web's `ShowMoreLink` can show one, but
-  the profile page does not pass it — and here it would be subtly wrong, because Recent
+  the profile page does not pass it - and here it would be subtly wrong, because Recent
   Plays counts *plays* while it draws *rows*, and a collapsed run of retries is several
   plays in one row.
 - **Knowing when to stop offering needs both halves of the test**, and this is the one real
   trap in the feature. A page shorter than what was asked for is definitely the end. But the
   total counts plays, so a section that came back exactly full might still be complete once
-  retries collapse — `total <= returned` catches that. Either test alone leaves a button
+  retries collapse - `total <= returned` catches that. Either test alone leaves a button
   that reveals nothing.
 - **Top Ranks is capped at 100** regardless of how many eligible maps a profile has, because
   100 is all osu! ever weights.
@@ -866,7 +866,7 @@ computed style in a real browser rather than against markup.
 
 ---
 
-## 5.14 — The osu-web fidelity kit
+## 5.14 - The osu-web fidelity kit
 
 Every "make it look more like osu!" request so far cost a round trip, because the design was
 being reconstructed from description rather than read from the thing that defines it. The
@@ -878,7 +878,7 @@ same failure. This makes the source readable and writes down what may be taken f
 ### Decisions
 
 - **A sparse, gitignored reference checkout, not a fork.** `reference/osu-web` is 6.5MB of
-  the 158MB repo — the LESS, the profile-page TSX, the badge images and `database/mods.json`.
+  the 158MB repo - the LESS, the profile-page TSX, the badge images and `database/mods.json`.
   Building *on* osu-web was considered and rejected: it is a Laravel app needing PHP, MySQL
   8.4+, Elasticsearch 7+ and Redis, its profile page reads osu!'s API schema rather than
   this app's, and 14.5MB of its 158MB is PHP against 689KB of LESS. The part worth having is
@@ -889,7 +889,7 @@ same failure. This makes the source readable and writes down what may be taken f
   (then via `shareOnNetwork`, since removed -- the reasoning still holds for the HTML export).
   Colours, ratios and wording are facts and carry no such condition.
 - **`ppy/osu-resources` is off limits, and it is the trap.** lazer's own flag and mod
-  textures look like the obvious source. They are **CC-BY-NC 4.0** — incompatible with MIT
+  textures look like the obvious source. They are **CC-BY-NC 4.0** - incompatible with MIT
   *and* with AGPL, and NonCommercial sits badly beside taking donations. Flags come from
   Twemoji, which is where osu-resources' own `osu_flags.sh` gets them.
 - **Flags are vendored, not fetched.** `country` is a setting that can be typed with no
@@ -905,13 +905,13 @@ same failure. This makes the source readable and writes down what may be taken f
   rather than listing raw setting keys.
 - **The mod badge is osu!'s shape, with the acronym where the glyph goes.** The hexagon,
   the type colour, the extender tab and the cog are all reproduced from `mod.less`'s
-  measurements — including both darkenings, which happen in *different colour spaces*
+  measurements - including both darkenings, which happen in *different colour spaces*
   (linear sRGB for the glyph at 10%, plain sRGB for the extender at 26.3%, from
   `Colour4.Darken(2.8f)`). The 71 per-mod glyphs are AGPL artwork and are not reproduced;
   osu! itself falls back to the acronym for any mod it has no glyph for.
 - **The gold on SS and S was a half-implemented gradient**, not a palette error. Both
-  variants are the same badge with two different letterform gradients — gold #FFE7A8 →
-  #FFB800, silver white → #AADFF0 — and only the silver one had been implemented, so SS and
+  variants are the same badge with two different letterform gradients - gold #FFE7A8 →
+  #FFB800, silver white → #AADFF0 - and only the silver one had been implemented, so SS and
   S fell back to the flat outline colour and read as washed out.
 
 **Done when.** `docs/osu-web-fidelity.md` maps every region of the page to the osu-web file
@@ -921,7 +921,7 @@ data; and `npm run ui` measures the badge height and the flag's ratio in a real 
 
 ---
 
-## 5.15 — Scrollable dialogs, a footer, a dismissible warning
+## 5.15 - Scrollable dialogs, a footer, a dismissible warning
 
 Three small things asked for together.
 
@@ -944,7 +944,7 @@ Three small things asked for together.
   -- otherwise "don't show again" would be a one-way door on the app's only disclosure that
   its numbers are not osu!'s.
 
-## 5.16 — One-click update from GitHub releases
+## 5.16 - One-click update from GitHub releases
 
 **Status: done.** The one part that cannot be verified from here is the download itself:
 the repository is private, so the unauthenticated releases API answers 404. Everything
@@ -1069,7 +1069,7 @@ updated *from*, so 1.2.0 users must download 1.3.0 by hand once.
 
 ---
 
-## 5.17 — osu! parity: header, Scores, medals, badges
+## 5.17 - osu! parity: header, Scores, medals, badges
 
 **Status: done.** Eight requests arrived together; seven are this entry, the rename is 5.18.
 
@@ -1134,7 +1134,7 @@ is what caught the favicon.
 
 ---
 
-## 5.18 — Rename to osu! local profiles
+## 5.18 - Rename to osu! local profiles
 
 **Status: done** -- released as 1.5.0 (2026-09-11). The local checkout folder and its
 Claude memory directory were renamed to `Desktop\osu! local profiles` by the user
@@ -1194,7 +1194,7 @@ download files. Do not reintroduce it, not even as a compatibility alias.
 
 ---
 
-## 5.19 — Open in browser on start, and a menu toggle
+## 5.19 - Open in browser on start, and a menu toggle
 
 **Status: done** -- released as 1.6.0 (2026-09-11). A genuine 1.5.0 install updated itself
 to the published 1.6.0 with the button, **14/14**: back on its own port and profile name,
@@ -1237,7 +1237,7 @@ branches correctly"; it branched correctly and then failed on the one platform v
 
 ---
 
-## 5.20 — Beatmaps section: Favorite Beatmaps
+## 5.20 - Beatmaps section: Favorite Beatmaps
 
 **Status: done** -- released as 1.7.0 (2026-09-11). A genuine 1.6.0 install updated itself
 to the published 1.7.0 with the button, **15/15**, including its existing database serving
@@ -1326,7 +1326,7 @@ a difficulty popup on hovering the dots, and a heart + download strip on hoverin
 
 ---
 
-## 5.21 — View Details (score card) and Download Replay
+## 5.21 - View Details (score card) and Download Replay
 
 **Status:** done -- released as 1.8.0 (2026-09-11).
 
@@ -1412,7 +1412,7 @@ order after Pin: **View Details**, osu!'s score page (`osu.ppy.sh/scores/<id>`),
 
 ---
 
-## 5.22 — The floating audio player, and pause that resumes
+## 5.22 - The floating audio player, and pause that resumes
 
 **Status:** done -- released as 1.8.0 (2026-09-11).
 
@@ -1468,7 +1468,7 @@ again carries on from there instead of starting over.
 
 ---
 
-## 5.23 — Score links, score pages and score screenshots
+## 5.23 - Score links, score pages and score screenshots
 
 **Status:** done -- released as 1.8.0 (2026-09-11).
 
@@ -1519,7 +1519,7 @@ both the pop-up and that page, **Save screenshot** and **Copy screenshot** of th
 
 ---
 
-## 5.24 — Performance and cleanup pass
+## 5.24 - Performance and cleanup pass
 
 **Status:** done -- released as 1.8.0 (2026-09-11).
 
@@ -1609,7 +1609,7 @@ been `C:\Program Files\nodejs\node.exe`. The fix reached the one path that expos
 
 ---
 
-## 5.25 — The beatmap index in the background, with progress on the page
+## 5.25 - The beatmap index in the background, with progress on the page
 
 **Status:** done -- released as 1.9.0 (2026-09-11).
 
@@ -1669,7 +1669,7 @@ its own bundled `node.exe`, with the index notice in its page.
 The run also measured the problem this release removes: 1.8.1, started from an empty
 `data/`, took **about 99 seconds** before its page answered. 1.9.0 answered in 129ms.
 
-## 5.26 — pp breakdown and calculator version
+## 5.26 - pp breakdown and calculator version
 
 **Status:** done -- released as 1.10.0.
 
@@ -1692,7 +1692,7 @@ flashlight, and the app says which osu! release's calculator priced each score.
   helper's ready line. Footer, Settings and card all show it; Settings counts scores priced
   by another version and offers **Recalculate them** (`POST /api/recompute` with `all`).
 
-## 5.27 — Mod Introduction medals
+## 5.27 - Mod Introduction medals
 
 **Status:** done -- released as 1.10.0.
 
@@ -1710,7 +1710,7 @@ added, at the user's request.
 - **Shown in every mode**, as osu! shows modeless medals, and earned from a pass in any.
 - Groups follow osu-web's order: Mod Introduction, then Skill & Dedication.
 
-## 5.28 — Recent Plays as a section; Recent -> Milestones
+## 5.28 - Recent Plays as a section; Recent -> Milestones
 
 **Status:** done -- released as 1.10.0.
 
@@ -1721,7 +1721,7 @@ them. A saved order that is exactly an earlier release's default is treated as n
 arranged and gets the new default (`RETIRED_DEFAULT_ORDERS` in `main.js`); any other saved
 order is the user's and keeps its arrangement, with Recent Plays slotted in after me!.
 
-## 5.29 — Release builds for macOS and Linux
+## 5.29 - Release builds for macOS and Linux
 
 **Status:** done -- released as 1.10.0.
 
@@ -1750,7 +1750,7 @@ and reporting calculator 2026.730.0.
 Intel Macs have no build: GitHub's Intel macOS runners are being retired. The macOS and
 Linux builds still need a real osu! install to be verified (5.10).
 
-## 5.30 — Split `web/js/main.js`
+## 5.30 - Split `web/js/main.js`
 
 **Status:** done -- released as 1.10.0.
 
@@ -1760,27 +1760,27 @@ lines to 2,295. The rest shares the page's state (mode, profile, settings, pagin
 enough that splitting it would mean passing that state around rather than simplifying
 anything, so it stays.
 
-## 5.31 — Sessions
+## 5.31 - Sessions
 
 **Status:** todo -- not started. The user is still deciding how it should work.
 
 A play session as its own thing: plays grouped by when they were set, with what changed over
 the session (pp, accuracy, plays). How a session is bounded and shown is open.
 
-## 5.32 — Goals and challenges
+## 5.32 - Goals and challenges
 
 **Status:** todo -- for later, at the user's request.
 
 Fun, built-in goals or challenges a player can take on and track locally.
 
-## 5.33 — A page for each beatmap
+## 5.33 - A page for each beatmap
 
 **Status:** todo -- for later, at the user's request.
 
 A page per beatmap gathering every play this profile has on it, as the score page does for a
 score.
 
-## 5.34 — me! editor: osu!'s BBCode toolbar, pasted images
+## 5.34 - me! editor: osu!'s BBCode toolbar, pasted images
 
 **Status:** done -- released as 1.11.0 (2026-09-11).
 
@@ -1802,7 +1802,7 @@ reverses the plain-text decision of 5.6, at the user's request.
   selected.
 - `aboutMe` grows to 60,000 characters (osu!'s me! pages are often long).
 
-## 5.35 — Favourites: import, first-run reminder, shared across profiles
+## 5.35 - Favourites: import, first-run reminder, shared across profiles
 
 **Status:** done -- released as 1.11.0 (2026-09-11).
 
@@ -1818,7 +1818,7 @@ reverses the plain-text decision of 5.6, at the user's request.
   (`shared_favorite_beatmapsets`); switching on merges every profile's list into it,
   switching off copies it into every profile, so nothing is lost either way.
 
-## 5.36 — Import from an osu! profile (Options menu)
+## 5.36 - Import from an osu! profile (Options menu)
 
 **Status:** done -- released as 1.11.0 (2026-09-11).
 
@@ -1830,7 +1830,7 @@ choose what to copy: avatar, banner, flag and me! (checked by default) and favou
 button was pressed. The me! text comes from `user.page.raw` in the same payload the lookup
 already reads.
 
-## 5.37 — Delete removed scores permanently
+## 5.37 - Delete removed scores permanently
 
 **Status:** done -- released as 1.11.0 (2026-09-11).
 
@@ -1839,7 +1839,7 @@ the rule that a removal must stick: the row goes, but its `dedupe_key` stays in
 `deleted_scores`, which ingest and Import past plays both check. A reset clears those
 records too, since a reset is a fresh start.
 
-## 5.38 — An interactive HTML export, fit to host
+## 5.38 - An interactive HTML export, fit to host
 
 **Status:** done -- released as 1.11.0 (2026-09-11).
 

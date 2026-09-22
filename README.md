@@ -5,7 +5,7 @@ Track an alternative osu! playstyle as if it were a brand new account.
 osu! allows one account per person, so there is no way to find out what your rank and pp
 *would* be if you switched from tablet to mouse, or from your right hand to your left. This
 runs locally, watches your plays while it is open, and builds a separate profile from
-scratch — starting at 0pp, unranked, level 1.
+scratch - starting at 0pp, unranked, level 1.
 
 Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker).
 
@@ -363,7 +363,7 @@ A missing pp value is recoverable; a silently wrong one is not.
 
 ### Why local rather than the osu! API
 
-An offline or logged-out play is never submitted, so it never appears in the osu! API — not
+An offline or logged-out play is never submitted, so it never appears in the osu! API - not
 even after you reconnect. In lazer you can only play offline as a guest, so those scores
 exist solely on disk. Reading local files is the only approach that covers them, and it is
 also instant and costs the API nothing.
@@ -411,7 +411,7 @@ descriptions and clearing one stays cleared.
 Drop an image at `data/avatar.png` or `data/cover.jpg` (`.jpg`/`.jpeg`/`.png`/`.webp` all
 work) to use it on the profile. Neither is required.
 
-Scores set before the profile was created are never imported — otherwise switching the app
+Scores set before the profile was created are never imported - otherwise switching the app
 on would pull in the plays you set with your normal playstyle earlier that day.
 
 ## Development
@@ -1052,16 +1052,16 @@ instead, and the app can stay running.
 
 ## Licence
 
-MIT — see [LICENSE](LICENSE).
+MIT - see [LICENSE](LICENSE).
 
 The visual design is reimplemented from osu-web's *published design tokens* rather than
 copied from its stylesheets, which are AGPL-3.0. No osu-web CSS or image asset is included;
 the token table it was rebuilt from is recorded in
 [docs/osu-web-reference.md](docs/osu-web-reference.md).
 
-A packaged build bundles other people's software — osu!'s own pp code, the .NET runtime,
+A packaged build bundles other people's software - osu!'s own pp code, the .NET runtime,
 Node.js and their dependencies. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists
-what, and what is deliberately excluded — notably the commercially-licensed BASS audio
+what, and what is deliberately excluded - notably the commercially-licensed BASS audio
 library, which this app has no use for.
 
 **What this does not do:** it never contacts osu!'s game servers, never logs in, uses no

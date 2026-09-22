@@ -502,7 +502,7 @@ function paintChip(chip) {
   chip.classList.toggle('mod-chip--required', state === 'required');
   chip.classList.toggle('mod-chip--excluded', state === 'excluded');
   chip.setAttribute('aria-pressed', state === 'required' ? 'true' : 'false');
-  chip.title = `${chip.dataset.name} — ${MOD_STATE_WORDS[state]}`;
+  chip.title = `${chip.dataset.name} - ${MOD_STATE_WORDS[state]}`;
 }
 
 /* ------------------------------------------------------------------- readouts */

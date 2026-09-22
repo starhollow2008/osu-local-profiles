@@ -80,7 +80,7 @@ Read only relevant sections of [`docs/architecture.md`](docs/architecture.md) wh
 
 `node src/main.ts` runs TS via Node type stripping. Types erased, never compiled.
 
-- No `constructor(private db: Db)` — declare field + assign in body
+- No `constructor(private db: Db)` - declare field + assign in body
 - No `enum` (use `const` objects `as const`)
 - No `namespace`, no decorators
 
@@ -94,7 +94,7 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 
 - Hand the replay file, never a reconstructed ScoreInfo
 - No fallback calc (`rosu-pp` removed). Helper down = store no pp, say so
-- Do not trim it. `PublishTrimmed` breaks osu!'s own graph — see `docs/architecture.md`, roadmap 5.44
+- Do not trim it. `PublishTrimmed` breaks osu!'s own graph - see `docs/architecture.md`, roadmap 5.44
 - Every pp carries osu! release version + breakdown. Parts must match the pp beside them
 - `docs/reference-links.md` has links to osu-web, ppy/osu, API docs
 
@@ -124,7 +124,7 @@ fails.
 Conventional Commits, scope optional: `feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`,
 `perf:`, `style:`. Releases are `chore: release vX.Y.Z`.
 
-History is linear — rebase onto `main`, do not merge it into a branch.
+History is linear - rebase onto `main`, do not merge it into a branch.
 
 ## Key entry points
 

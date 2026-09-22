@@ -2,8 +2,8 @@
 
 Facts extracted from `ppy/osu-web` (AGPL-3.0) and `ppy/osu` (MIT) so the Phase 2 profile
 page can be **reimplemented** from them. Nothing here is a copy of their stylesheets or
-assets: this file records the design *system* — token tables, colour values, metrics, and
-the DOM skeleton — which is what the page needs in order to look right.
+assets: this file records the design *system* - token tables, colour values, metrics, and
+the DOM skeleton - which is what the page needs in order to look right.
 
 Do not paste osu-web LESS or their SVG path data into this repo. Redraw shapes; reuse
 values.
@@ -25,8 +25,8 @@ Everything below was read from these files on 2026-09-09:
 ## 1. The colour token system
 
 osu-web derives its entire palette from one hue. `--base-hue` is injected on `body`
-(osu! pink = **333**; other sections of the site swap it). Each token is a *fragment* —
-`hue, saturation%, lightness%` — consumed as `hsl(var(--hsl-b3))`.
+(osu! pink = **333**; other sections of the site swap it). Each token is a *fragment* -
+`hue, saturation%, lightness%` - consumed as `hsl(var(--hsl-b3))`.
 
 ```
 --hsl-<key>: var(--base-hue), <saturation>, <lightness>;
@@ -51,11 +51,11 @@ osu-web derives its entire palette from one hue. `--base-hue` is injected on `bo
 **The `b*` family, not `d*`, is what the profile page is built on.** Phase 1's page used
 `d*` throughout, which is why it read as too saturated. Backgrounds, in order of depth:
 
-- page background / separators — `b6`
-- section panels (`.page-extra`) — `b4`
-- header block, stats cards, score row body — `b3`
-- score row title strip (`--bg-main`), hover — `b2`
-- `.profile-stats` key/value box — `b4`
+- page background / separators - `b6`
+- section panels (`.page-extra`) - `b4`
+- header block, stats cards, score row body - `b3`
+- score row title strip (`--bg-main`), hover - `b2`
+- `.profile-stats` key/value box - `b4`
 
 Text: `c1` is effectively white, `c2` is the slightly-tinted value colour, `f1` is the
 muted timestamp grey, `h1` is the pink accent (links, pp values, level bar fill, section
@@ -82,7 +82,7 @@ Same values in `osu-web/colors.less` and `ppy/osu`'s `OsuColour.ForRank`:
 D #ff5a5a   C #ff8e5d   B #e3b130   A #88da20   S/SH #02b5c3   X/XH #de31ae   F #3f3f3f
 ```
 
-### Mod colours — `OsuColour.ForModType` (ppy/osu, MIT)
+### Mod colours - `OsuColour.ForModType` (ppy/osu, MIT)
 
 | mod type | colour |
 |---|---|
@@ -135,7 +135,7 @@ Body base is **14px**.
 ### Fonts
 
 osu-web: `Torus, Inter, "Helvetica Neue", Tahoma, Arial`. **Torus is commercially
-licensed and cannot be redistributed** — leave it first in the stack so a locally
+licensed and cannot be redistributed** - leave it first in the stack so a locally
 installed copy is picked up, and fall back to a geometric sans. Grade letterforms use
 `Venera`, also unavailable; approximate with a heavy sans.
 
@@ -144,7 +144,7 @@ installed copy is picked up, and fall back to a geometric sans. Grade letterform
 ## 3. Page skeleton
 
 Section order on `osu.ppy.sh/users/{id}` (from `profile-page/detail.tsx`,
-`detail-stats.tsx`, `historical.tsx`). `DetailStats` v1 is the default — `detail-stats-v2`
+`detail-stats.tsx`, `historical.tsx`). `DetailStats` v1 is the default - `detail-stats-v2`
 is behind a user preference and is *not* what the live page shows.
 
 ```
@@ -193,7 +193,7 @@ hits_per_play, maximum_combo, replays_watched_by_others`
 `play_time` is rendered **only** in the v2 layout, so v1 omits it. `hits_per_play` is
 `Math.floor(total_hits / play_count)`.
 
-### `.play-detail` — the score row
+### `.play-detail` - the score row
 
 The single most repeated component. Desktop is a flex row of three coloured blocks:
 
@@ -226,8 +226,8 @@ Unranked / no pp renders `-` in the pp slot.
 
 1. `Monthly Playcounts` bar chart (`.page-extra__chart`, height 250px)
 2. `Most Played Beatmaps` list, with a count pill in the title
-3. `Recent Plays (24h)` — a `.play-detail` list
-4. *(Replays Watched — excluded from this project)*
+3. `Recent Plays (24h)` - a `.play-detail` list
+4. *(Replays Watched - excluded from this project)*
 
 ---
 
@@ -258,7 +258,7 @@ Display sizes: `.score-rank` is `2em × 1em`; profile grade counts use `font-siz
 
 ## 5. Beatmap cover art
 
-Covers are on a plain image CDN, not the API, and are keyed by **beatmapset** id — which
+Covers are on a plain image CDN, not the API, and are keyed by **beatmapset** id - which
 `online.db` already gives us offline:
 
 ```

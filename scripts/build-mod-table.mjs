@@ -1,5 +1,5 @@
 /**
- * Generate `web/js/mod-definitions.js` — every mod's name, type and setting labels.
+ * Generate `web/js/mod-definitions.js` - every mod's name, type and setting labels.
  *
  * Same reasoning as `scripts/build-medal-table.mjs`: take the facts from osu! rather than
  * writing them out by hand. The table this replaces was a hand-kept acronym -> type

@@ -6,20 +6,20 @@ constraints in `CLAUDE.md` only make sense next to the thing they were derived f
 ## The project this one is inspired by
 
 - [Sheppsu/osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker/tree/kariyu-left-hand)
-  — the original idea: a locally hosted page that tracks an alternative playstyle as if it
+  - the original idea: a locally hosted page that tracks an alternative playstyle as if it
   were a new account.
-- [kariyu.sheppsu.me](https://kariyu.sheppsu.me/) — it running.
+- [kariyu.sheppsu.me](https://kariyu.sheppsu.me/) - it running.
 
 ## osu! itself
 
-- [ppy/osu](https://github.com/ppy/osu) — the game. The difficulty and performance
+- [ppy/osu](https://github.com/ppy/osu) - the game. The difficulty and performance
   calculators referenced by `tools/PpCalculator`, and `LegacyScoreDecoder`, which is what
   reads a `.osr` correctly for both clients.
-- [ppy/osu-web](https://github.com/ppy/osu-web) — the website. The source of the colour
+- [ppy/osu-web](https://github.com/ppy/osu-web) - the website. The source of the colour
   tokens, metrics and layout recorded in [osu-web-reference.md](osu-web-reference.md).
-- [osu.ppy.sh/users/3119700](https://osu.ppy.sh/users/3119700) — the reference profile the
+- [osu.ppy.sh/users/3119700](https://osu.ppy.sh/users/3119700) - the reference profile the
   page is matched against.
-- [osu! API docs](https://osu.ppy.sh/docs/) — used only for optional enrichment; the app
+- [osu! API docs](https://osu.ppy.sh/docs/) - used only for optional enrichment; the app
   never needs it.
 
 ## Scores, scales and osu!stable
@@ -47,7 +47,7 @@ rankings API only exposes the top 10,000, which never covers a new profile.
 
 ## Why there is no polling loop
 
-From osu!'s API usage guidance — this is the reason detection is local and the API is
+From osu!'s API usage guidance - this is the reason detection is local and the API is
 optional rather than the mechanism:
 
 > Use the API for good. Don't overdo it. If in doubt, ask before serious long term use.
@@ -77,5 +77,5 @@ optional rather than the mechanism:
 > Providing this API is done for free, but it's a substantial infrastructure cost in recent
 > times. Please consume respectfully.
 
-Anything added later that talks to osu! — the optional account link in `docs/roadmap.md`
-§5.5, the medal artwork in §5.8 — is one request, cached to disk, never on a timer.
+Anything added later that talks to osu! - the optional account link in `docs/roadmap.md`
+§5.5, the medal artwork in §5.8 - is one request, cached to disk, never on a timer.

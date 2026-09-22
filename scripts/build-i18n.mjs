@@ -27,7 +27,7 @@ const HTML_FILES = ['index.html', 'score.html'];
 
 const ENTITIES = {
   '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'",
-  '&nbsp;': ' ', '&mdash;': '—', '&ndash;': '–', '&rarr;': '→',
+  '&nbsp;': ' ', '&mdash;': '-', '&ndash;': '–', '&rarr;': '→',
   '&larr;': '←', '&times;': '×', '&rsquo;': '’', '&lsquo;': '‘',
   '&ldquo;': '“', '&rdquo;': '”', '&hellip;': '…', '&middot;': '·',
   '&copy;': '©',

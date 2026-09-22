@@ -1,11 +1,11 @@
-# Phase 2 — the osu-web-faithful profile page
+# Phase 2 - the osu-web-faithful profile page
 
 *Status: built. `npm run check` → 21 tests; `npm run ui` → 19 checks. See
 `docs/osu-web-reference.md` for the design system it implements.*
 
 ## Decisions settled with the user
 
-1. **Vanilla ES modules, no build step** — not Vite + React. `npm run dev` stays instant,
+1. **Vanilla ES modules, no build step** - not Vite + React. `npm run dev` stays instant,
    Phase 4's single-`.exe` packaging is unaffected, and `npm run ui` keeps working. The
    page is data-in/DOM-out with SSE triggering a refetch, so React bought little.
 2. **Local-first assets, CDN when online.** Grade badges, mod pills, the level hexagon and
@@ -13,7 +13,7 @@
    the `beatmapset_id` resolved offline, and are set as backgrounds so a failed request
    leaves the placeholder colour rather than a broken image. Covers cannot come from
    lazer's local store: it names files by SHA-256 and the mapping lives in its Realm DB.
-3. **First Place Ranks is omitted** — a local profile has no leaderboard to be #1 on.
+3. **First Place Ranks is omitted** - a local profile has no leaderboard to be #1 on.
 
 ## What is there
 
@@ -65,7 +65,7 @@ Played Beatmaps, Recent Plays.
 - **Keep `[hidden] { display: none !important }`** in `base.css` and keep the dialog
   checks. That rule exists because a `display: grid` backdrop once outranked the browser's
   low-specificity `[hidden]`, leaving the reset dialog open on load with Cancel, Escape
-  and backdrop-click all apparently dead — so the destructive button was the only one that
+  and backdrop-click all apparently dead - so the destructive button was the only one that
   worked, and it cost a user their tracked scores.
 - **Torus stays first in the font stack** so a locally installed copy is picked up. It is
   commercially licensed and must never be bundled.
@@ -74,7 +74,7 @@ Played Beatmaps, Recent Plays.
 
 | gap | on screen |
 |---|---|
-| Global and country rank (Phase 3 — osu!'s rankings API only exposes the top 10k) | `-`, with a tooltip |
+| Global and country rank (Phase 3 - osu!'s rankings API only exposes the top 10k) | `-`, with a tooltip |
 | No rank history to plot | the chart shows total pp instead, which a new profile does have |
 | Play time is not tracked | omitted from the stats box, which osu-web's v1 layout also does |
 | Replays watched by others | omitted; not applicable to a local profile |
