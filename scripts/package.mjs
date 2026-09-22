@@ -49,6 +49,11 @@ if (target !== hostRid) {
   process.exit(1);
 }
 
+// The OS half of the RID. Past the guard above, `target` and the host agree, so either
+// answers -- several later steps (the launcher script, the README) differ by platform and
+// not by architecture, and want this rather than the whole RID.
+const hostOs = target.split('-')[0];
+
 const name = `osu-local-profiles-${pkg.version}-${target}`;
 const distRoot = path.join(root, 'dist');
 const out = path.join(distRoot, name);
