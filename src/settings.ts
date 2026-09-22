@@ -116,6 +116,26 @@ export interface Settings {
    */
   countUnsubmittedAttempts: boolean;
   /**
+   * Whether a launch brings in the plays set while the app was closed.
+   *
+   * **Off by default, and that is the load-bearing half.** Closing the app is how people stop
+   * tracking -- switching playstyle, warming up, handing the keyboard over -- so a launch that
+   * caught up on the gap by default would overrule that silently, and there is no undoing it
+   * short of picking through the profile by hand (roadmap 5.49). Turned on, it is the same
+   * decision made once instead of every time: the app is simply always tracking, closed or
+   * not.
+   *
+   * Per profile, because it is a rule about what this profile contains -- one that tracks a
+   * left-hand playstyle wants nothing that happened while it was closed, while the main
+   * profile may want everything. It reaches back only as far as the app last ran
+   * (`src/tracker/catch-up.ts`), never further, and never past the profile's own start.
+   *
+   * Live tracking is untouched either way: `Tracker.liveCutoff` still refuses anything from
+   * before the launch, and this runs as an import, once, with the same filter and the same
+   * duplicate checks Import past plays uses.
+   */
+  importPlaysWhileClosed: boolean;
+  /**
    * The order the profile's sections appear in, as their ids.
    *
    * Reconciled against the code's own list on every read: ids that no longer exist are
@@ -245,6 +265,11 @@ const DEFS: Defs = {
     default: true,
     // Defaults to on, so anything but an explicit "off" counts them.
     coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
+  },
+  importPlaysWhileClosed: {
+    default: false,
+    // Off unless explicitly turned on: see the field's own note for why the default matters.
+    coerce: (raw) => raw === true || raw === 'true' || raw === 1 || raw === '1',
   },
   showCountingNote: {
     default: true,

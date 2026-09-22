@@ -13,6 +13,7 @@ import { MODE_ICON, MODE_NAME, difficultyBadge } from './beatmapsets.js';
 import { ppNotes } from './sections.js';
 import { assetUrl } from './static-mode.js';
 import { t } from './i18n.js';
+import { beatmapArtist, beatmapTitle } from './metadata.js';
 
 const RULESET = ['osu', 'taiko', 'fruits', 'mania'];
 
@@ -279,8 +280,9 @@ function beatmapInfo(score) {
   const link = (inner, cls) =>
     href ? `<a class="${cls}" href="${href}" target="_blank" rel="noreferrer noopener">${inner}</a>` : `<span class="${cls}">${inner}</span>`;
 
-  const title = escapeHtml(score.title ?? `unknown beatmap (${(score.beatmapMd5 ?? '').slice(0, 12)})`);
-  const artist = score.artist ? ` <span class="score-beatmap__artist">by ${escapeHtml(score.artist)}</span>` : '';
+  const title = escapeHtml(beatmapTitle(score) ?? `unknown beatmap (${(score.beatmapMd5 ?? '').slice(0, 12)})`);
+  const byArtist = beatmapArtist(score);
+  const artist = byArtist ? ` <span class="score-beatmap__artist">by ${escapeHtml(byArtist)}</span>` : '';
 
   const mapper = score.creator
     ? score.creatorId

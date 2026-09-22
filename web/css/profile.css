@@ -5201,9 +5201,45 @@ s.bbcode-editor__glyph {
  */
 .lang-menu {
   min-width: 260px;
-  max-height: min(60vh, 460px);
-  overflow-y: auto;
+  /*
+   * Capped, so the switch's sentence-long label wraps instead of stretching the menu out to
+   * fit it on one line. This is a list of language names and should stay the shape of one.
+   */
+  max-width: 300px;
   padding: 5px;
+}
+
+/*
+ * Only the list scrolls. The switch above it stays put, which is the point of it being
+ * there: a setting reachable only after scrolling past forty flags is one nobody finds.
+ */
+.lang-menu__options {
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+}
+
+/*
+ * The one menu switch whose label is a sentence rather than two words, because it is osu!'s
+ * own wording and somebody who knows it from there should find it written the same way. So it
+ * wraps, against `.menu__toggle`'s nowrap: the menu is only as wide as a language name, and
+ * widening it to fit one line would make a language picker the shape of a paragraph.
+ */
+/*
+ * Written against `.menu button.menu__toggle` rather than beside it: that rule sets
+ * `white-space: nowrap`, and a selector of equal weight would lose to it here by nothing more
+ * than file order. The label has to outrank it, so it names the class as well.
+ */
+.lang-menu button.menu__toggle.lang-menu__original {
+  align-items: flex-start;
+  font-size: var(--fs-normal-2);
+  line-height: 1.35;
+  white-space: normal;
+  text-align: left;
+}
+
+/* Keeps the switch on the label's first line rather than floating to the middle of the block. */
+.lang-menu .lang-menu__original .menu__switch {
+  margin-top: 2px;
 }
 
 .lang-menu .lang-option {
@@ -5431,6 +5467,19 @@ s.bbcode-editor__glyph {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 10px;
+}
+
+/*
+ * Under the language, not beside it: the two are the same kind of answer, but this one is a
+ * sentence rather than a word, and a third control on that row would push the select narrow
+ * enough to truncate the longer language names.
+ */
+.welcome-lang__original {
+  margin-top: 0;
+}
+
+.welcome-lang__hint {
   margin-bottom: 14px;
 }
 

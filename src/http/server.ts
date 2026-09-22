@@ -215,6 +215,8 @@ export interface AppConfig {
    * what makes the first launch able to ask.
    */
   language?: string;
+  /** Show beatmap artists and titles in the song's own script, as osu!'s own option does. */
+  originalMetadata?: boolean;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -258,6 +260,13 @@ export function startServer(opts: ServerOptions): http.Server {
    * unanswerable -- and that question is exactly what a too-tight filter produces.
    */
   opts.tracker.on('filtered', (play) => broadcast('filtered', play));
+  /*
+   * A launch brought in what was played while the app was closed. Its own event rather than
+   * `backfill`, because the page has to say so: this is the one import nobody pressed a
+   * button for, and an unannounced handful of new scores is how someone concludes the app is
+   * doing something they did not ask for.
+   */
+  opts.tracker.on('caughtUp', (result) => broadcast('caught-up', result));
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
@@ -614,7 +623,7 @@ export function startServer(opts: ServerOptions): http.Server {
 
       return readBody(req, res, (body) => {
         const patch: Partial<AppConfig> = {};
-        for (const key of ['openBrowser', 'sharedFavorites'] as const) {
+        for (const key of ['openBrowser', 'sharedFavorites', 'originalMetadata'] as const) {
           if (!(key in body)) continue;
           if (typeof body[key] !== 'boolean') return json(res, { error: `${key} must be true or false` }, 400);
           patch[key] = body[key];

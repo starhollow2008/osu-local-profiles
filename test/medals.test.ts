@@ -205,6 +205,7 @@ test('a rank medal carries no date, so it never slides to the top of Recent', ()
     achievedAt: 5000,
     dated: false,
     earnedOn: null,
+    earnedOnOriginal: null,
   };
   assert.deepEqual(medalEvents([rank]), []);
 });

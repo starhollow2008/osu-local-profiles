@@ -3,6 +3,7 @@ import type { Ruleset } from '../osr.ts';
 import { beatmapMode, type BeatmapResolver } from '../clients/beatmaps.ts';
 import type { ResolvedLoggedPlay, SessionAttempt } from '../clients/lazer-log.ts';
 import { deletedIncompleteKey, wasDeleted } from '../scores.ts';
+import { describe } from './ingest.ts';
 import {
   beatmapFilterFacts,
   defaultTrackingFilter,
@@ -54,6 +55,8 @@ export interface IngestedIncomplete {
   id: number;
   mode: Ruleset;
   title: string;
+  /** The same beatmap in the song's own script, or null where it reads the same. */
+  titleOriginal: string | null;
   playedAt: number;
   /** An attempt osu! could not submit, rather than a play osu! counted. */
   unsubmitted: boolean;
@@ -63,7 +66,7 @@ export type IncompleteOutcome =
   | { status: 'added'; play: IngestedIncomplete }
   | { status: 'skipped'; reason: 'passed' | 'too-old' | 'duplicate' | 'unresolved' }
   /** Turned away by the play tracking filter, exactly as in tracker/ingest.ts. */
-  | { status: 'filtered'; criterion: FilterCriterion; title: string };
+  | { status: 'filtered'; criterion: FilterCriterion; title: string; titleOriginal: string | null };
 
 /** What both kinds have in common once their beatmap is known. */
 export interface Recording {
@@ -82,6 +85,7 @@ export interface ReadyIncomplete {
   recording: Recording;
   mode: Ruleset;
   title: string;
+  titleOriginal: string | null;
   beatmapId: number | null;
 }
 
@@ -116,9 +120,7 @@ const isRecorded = (ctx: IncompleteContext, key: string): boolean =>
 function assess(entry: Recording, ctx: IncompleteContext): IncompleteCheck {
   const beatmap = ctx.resolver.resolve(entry.md5);
   const mode = beatmap.osuPath ? beatmapMode(beatmap.osuPath) : 0;
-  const name =
-    [beatmap.artist, beatmap.title].filter(Boolean).join(' - ') || entry.md5.slice(0, 12);
-  const title = beatmap.version ? `${name} [${beatmap.version}]` : name;
+  const named = describe(beatmap, entry.md5);
 
   /*
    * The play tracking filter. `mods: null` is the whole point of passing it explicitly rather
@@ -130,10 +132,10 @@ function assess(entry: Recording, ctx: IncompleteContext): IncompleteCheck {
   if (filter.enabled) {
     const facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
     const rejected = filterRejects(filter, playFacts(facts, mode, null));
-    if (rejected) return { status: 'filtered', criterion: rejected, title };
+    if (rejected) return { status: 'filtered', criterion: rejected, ...named };
   }
 
-  return { status: 'ready', recording: entry, mode, title, beatmapId: beatmap.beatmapId };
+  return { status: 'ready', recording: entry, mode, ...named, beatmapId: beatmap.beatmapId };
 }
 
 function write(ready: ReadyIncomplete, ctx: IncompleteContext): IncompleteOutcome {
@@ -166,6 +168,7 @@ function write(ready: ReadyIncomplete, ctx: IncompleteContext): IncompleteOutcom
       id,
       mode: ready.mode,
       title: ready.title,
+      titleOriginal: ready.titleOriginal,
       playedAt: entry.playedAt,
       unsubmitted: entry.unsubmitted,
     },

@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+- **Beatmap names in their original language**, the way osu!'s own setting does it: 夜に駆ける
+  instead of Yoru ni Kakeru, across Recent Plays, Scores, Most Played, the score page,
+  Favorite Beatmaps, Milestones and the live toasts.
+  - Off by default, and in three places: the first launch asks, under the language; the flag
+    menu in the top right has a switch above the language list; and Other settings has the
+    same switch under **This install**.
+  - Flipping it rewrites what is already on screen -- no reload, nothing re-fetched.
+  - Beatmaps already tracked are read for their original-language names once, in the
+    background, so this works on a profile that has been running for years and not only on
+    what you play next.
+
+- **Optionally, import the plays you set while the app was closed.** Off by default -- closing
+  the app is still how you stop tracking, and a launch still brings in nothing from the time it
+  was shut unless you ask it to.
+  - **Other settings -> Import plays set while the app was closed.** Per profile, so a profile
+    tracking one playstyle can stay out of it while another catches up on everything.
+  - It reaches back to when the app last ran and no further, never past the profile's own
+    start, and brings in finished plays, unfinished ones and the attempts osu! could not submit
+    together, so the play count still agrees with osu!'s.
+  - It is the same import as **Options -> Import past plays**: the play tracking filter still
+    applies, plays already tracked are not doubled, and replays somebody else set are not
+    taken. It says what it brought in.
+
 ## 1.19.0
 
 - **osu! is found wherever you installed it.** Before, the app knew three drive letters and a

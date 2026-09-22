@@ -9,6 +9,7 @@
 import { escapeHtml, fmt, shortDate } from './format.js';
 import { coverUrl } from './badges.js';
 import { currentLocale, t } from './i18n.js';
+import { beatmapArtist, beatmapTitle } from './metadata.js';
 
 /* ------------------------------------------------------------------------ */
 /* Difficulty colour                                                         */
@@ -217,14 +218,14 @@ export function beatmapsetCard(card) {
     ${playArea(card)}
     <div class="beatmapset-panel__info">
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--title">
-        ${external(url, 'beatmapset-panel__main-link u-ellipsis', escapeHtml(card.title))}
+        ${external(url, 'beatmapset-panel__main-link u-ellipsis', escapeHtml(beatmapTitle(card) ?? ''))}
         <div class="beatmapset-panel__badge-container">
           ${card.nsfw ? badge('nsfw', t('beatmap.explicit')) : ''}
           ${card.spotlight ? badge('spotlight', t('beatmap.spotlight'), 'https://osu.ppy.sh/wiki/Beatmap_Spotlights') : ''}
         </div>
       </div>
       <div class="beatmapset-panel__info-row beatmapset-panel__info-row--artist">
-        ${external(url, 'beatmapset-panel__main-link u-ellipsis', t('beatmap.by', { artist: escapeHtml(card.artist) }))}
+        ${external(url, 'beatmapset-panel__main-link u-ellipsis', t('beatmap.by', { artist: escapeHtml(beatmapArtist(card) ?? '') }))}
         <div class="beatmapset-panel__badge-container">
           ${card.featuredArtist ? badge('featured_artist', t('beatmap.featuredArtist')) : ''}
         </div>

@@ -74,7 +74,9 @@ is allowed to break them:
 - **No native modules in the Node process.** `node:sqlite` and WASM only.
 - **No API polling in the hot path.** Detection stays local. The osu! API is optional
   enrichment; the app must work with no credentials and no network.
-- **Never scan-and-import on startup.** Importing past plays stays explicit.
+- **Never scan-and-import on startup unless the profile asked for it.** Importing past plays
+  stays explicit; 5.56 adds an opt-in, off by default, that runs the same import over the gap
+  the app was closed for and no further.
 - **pp comes only from osu!'s own code.** No second calculator, ever. Where 5.2 changes
   what pp is asked for, it changes the *input mods* handed to osu!'s calculator — it never
   computes a pp value itself.
@@ -2662,3 +2664,98 @@ set the flag, and the check tells you if you did only one of the two.
    lv, ms, no, pt, ro, sk, sl, sr, th, tr, uk, vi. Each is one file plus `done: true`.
 2. Right-to-left. `dir` is set from the language, and `ar` and `he` say `rtl`, but no layout
    has been looked at in that direction -- which is a reason to do those two last, not first.
+
+## 5.55 - Beatmap metadata in its original language
+
+**Status:** done -- unreleased.
+
+**Goal.** osu!'s own "prefer metadata in original language": 夜に駆ける rather than
+Yoru ni Kakeru, everywhere the page names a beatmap.
+
+- **Both names are sent; the page chooses.** `src/calc/metadata.ts` is the single definition --
+  `NAME_COLUMNS` for what a naming query selects, `names()` for what one row means, and
+  `beatmapName`/`beatmapNameOriginal` for the joined-up form that Milestones, medals and the
+  Removed scores list need. `web/js/metadata.js` is the page's half. The alternative --
+  choosing server-side -- would have put a display preference into `/api/profile`'s cache key,
+  which is about what is *stored*, and made a checkbox cost a round trip on a 20,000-score
+  profile. osu-web makes the same split.
+- **Only when it is different.** Most beatmaps repeat the romanised title in `TitleUnicode` or
+  carry no `TitleUnicode` at all, so `artistUnicode`/`titleUnicode` are null unless they say
+  something the romanised pair does not. That keeps the extra field off nearly every row, and
+  makes `??` the whole rule on the page.
+- **Two new columns, filled lazily and then backfilled once.** `beatmaps.artist_unicode` and
+  `title_unicode`, written by `resolve()` from the `.osu`'s `ArtistUnicode`/`TitleUnicode`.
+  `''` means "looked, and there is none", NULL means "never looked" -- the same convention
+  `length_ms` uses. `backfillOriginalMetadata` fills the NULLs in one sliced pass after the
+  beatmap index, because unlike every other lazily-filled column this one is needed for a
+  hundred rows at once: a setting that only worked on maps you happened to open would look
+  broken rather than lazy. On this machine that was 1,565 rows, 441 of which had a different
+  original-language title.
+- **Kept out of a transaction of its own.** It shares the connection with the tracker, and a
+  transaction held open across a pause would swallow whatever the tracker committed inside it.
+  A row lost to an unrelated rollback is filled in on the next launch.
+- **Install-level, beside the language.** In `config.json` as `originalMetadata` and in
+  `localStorage`, exactly as the language is, for the same reason: the config arrives with the
+  first API response, which is after the first paint. It is the same question as which language
+  the page is in -- how this person reads it -- not how a playstyle is scored.
+- **Three places, one answer**, at the user's request: the first-launch welcome under the
+  language, a switch above the list in the flag menu (outside the part that scrolls, or it
+  would be reachable only past forty flags), and the This install block of Other settings.
+
+### Verified
+
+- `npm run check`: `test/metadata.test.ts` covers the `.osu` parse, the "only when different"
+  rule through two different queries, the backfill of an older database, and a beatmap whose
+  file has gone being settled with `''` rather than retried every launch.
+- Against the real profile: 441 of 1,565 cached beatmaps gained a different original-language
+  title, and `/api/profile` carries them.
+- In headless Chrome against the running app: the switch appears in all three places, flipping
+  it rewrites the titles already on screen with no refetch, the menu stays open while it does,
+  the choice reaches `/api/app-config`, and turning it off in Other settings puts the romanised
+  names back and moves the flag menu's switch with it.
+- `npm run ui`: 327/327.
+
+## 5.56 - Importing the plays set while the app was closed
+
+**Status:** done -- unreleased.
+
+5.49 made live tracking start at the launch and refuse everything before it, because closing
+the app is how people stop tracking. That is still the default. This is the same decision made
+once instead of every time, for someone who wants the app to be tracking whether it is open or
+not -- **off by default**, and that half is the load-bearing one.
+
+- **It is an import, not a widening of live tracking.** `Tracker.catchUp` calls
+  `Tracker.backfill`, so it gets the same scan, the same play tracking filter, the same
+  duplicate checks and the same owner check as Options -> Import past plays. `liveCutoff` is
+  untouched.
+- **Every source**, because a gap is a gap: a quit or an offline retry set while the app was
+  closed is as much a missing play as a finished one, and bringing in half of them would leave
+  the play count disagreeing with osu!'s.
+- **From when the app last ran, and never further.** `kv.lastRunAt`, written at startup, at
+  shutdown, and on a 30-minute heartbeat. Erring *early* is the safe direction: a stamp left by
+  a crash is older than the true shutdown, so the next launch scans a little further back and
+  dedupe turns the overlap away. The heartbeat is slow because any write throws away
+  `/api/profile`'s cache; it exists only for the person who never shuts the app down cleanly.
+  `catchUpSince` also floors it at the profile's own `trackingSince`, so a profile created or
+  reset after the gap does not absorb plays from before it existed.
+- **Null on a first launch.** No gap on record means no catch-up; reaching back to an invented
+  date would import an entire replay store nobody asked for.
+- **Announced.** `caughtUp` -> the `caught-up` SSE event -> a toast, and a line in the console.
+  This is the one import nobody pressed a button for, so scores appearing without a word would
+  read as the app doing something it was not asked to.
+- **Per profile** (`importPlaysWhileClosed` in Other settings, at the user's request), because
+  it is a rule about what this profile contains: one tracking a left-hand playstyle wants
+  nothing from the time it was closed, while the main profile may want everything.
+- The start-up banner follows the setting rather than describing both cases: a profile that has
+  turned this on should not be told every launch that it does not happen.
+- `config.json`'s dead `backfill` key -- a Phase 1 placeholder nothing ever honoured -- is
+  retired here, so it is not mistaken for this switch.
+
+### Verified
+
+- `npm run check`: `test/catch-up.test.ts` pins the default (setting off -> nothing imported,
+  and `catchUp` returns null to say so), the stamp round-trip, `catchUpSince`'s floors, and,
+  against a real replay off this machine, that turning it on imports the play, emits `caughtUp`
+  once, and that a second launch over the same gap adds nothing.
+- Also pinned: a play set *before* the gap stays out, which is what keeps this from quietly
+  absorbing a whole history.

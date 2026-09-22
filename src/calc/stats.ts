@@ -14,6 +14,7 @@ import { incompleteSql,
   VANILLA,
   type Eligibility,
 } from './eligibility.ts';
+import { NAME_COLUMNS, names, withFallbackTitle } from './metadata.ts';
 
 /** osu! weights only the top 100 plays. */
 
@@ -28,6 +29,12 @@ export interface Play {
   beatmapsetId: number | null;
   artist: string | null;
   title: string | null;
+  /**
+   * The artist and title in the song's own script, sent only where they differ from the
+   * romanised pair above. The page picks between them -- see src/calc/metadata.ts.
+   */
+  artistUnicode: string | null;
+  titleUnicode: string | null;
   version: string | null;
   creator: string | null;
   /** Full mod objects, not just acronyms: lazer carries settings such as DT at 1.3x. */
@@ -69,6 +76,8 @@ export interface MostPlayed {
   beatmapsetId: number | null;
   artist: string | null;
   title: string | null;
+  artistUnicode: string | null;
+  titleUnicode: string | null;
   version: string | null;
   creator: string | null;
   count: number;
@@ -118,7 +127,7 @@ function playColumns(e: Eligibility): string {
         s.pp_nomod IS NOT NULL AS has_nomod,
         s.pinned_at IS NOT NULL AS pinned,
         s.replay_path IS NOT NULL AS has_replay,
-        b.beatmapset_id, b.artist, b.title, b.version, b.creator`;
+        b.beatmapset_id, ${NAME_COLUMNS}, b.version, b.creator`;
 }
 
 type Row = Record<string, string | number | null>;
@@ -141,8 +150,7 @@ function toPlay(r: Row, e: Eligibility): Play {
     beatmapMd5: r['beatmap_md5'] as string,
     beatmapId: (r['beatmap_id'] as number | null) ?? null,
     beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
-    artist: (r['artist'] as string | null) ?? null,
-    title: (r['title'] as string | null) ?? null,
+    ...names(r),
     version: (r['version'] as string | null) ?? null,
     creator: (r['creator'] as string | null) ?? null,
     mods,
@@ -381,6 +389,8 @@ export interface IncompletePlay {
   beatmapsetId: number | null;
   artist: string | null;
   title: string | null;
+  artistUnicode: string | null;
+  titleUnicode: string | null;
   version: string | null;
   creator: string | null;
   playedAt: number;
@@ -437,7 +447,7 @@ export function recentPlays(
   const abandoned = db
     .prepare(
       `SELECT s.id, s.beatmap_md5, s.beatmap_id, s.beatmap_name, s.played_at, s.unsubmitted,
-              b.beatmapset_id, b.artist, b.title, b.version, b.creator
+              b.beatmapset_id, ${NAME_COLUMNS}, b.version, b.creator
          FROM incomplete_plays s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.mode = ? AND ${incompleteSql(e)}
@@ -461,10 +471,7 @@ function toIncomplete(r: Row): IncompletePlay {
     beatmapMd5: (r['beatmap_md5'] as string | null) ?? null,
     beatmapId: (r['beatmap_id'] as number | null) ?? null,
     beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
-    artist: (r['artist'] as string | null) ?? null,
-    // Whatever the log called the map stands in when the beatmap itself is not resolvable,
-    // so the row still names something rather than showing a hash.
-    title: (r['title'] as string | null) ?? (r['beatmap_name'] as string | null) ?? null,
+    ...withFallbackTitle(names(r), r['beatmap_name'] as string | null),
     version: (r['version'] as string | null) ?? null,
     creator: (r['creator'] as string | null) ?? null,
     playedAt: r['played_at'] as number,
@@ -566,7 +573,7 @@ export function mostPlayed(
     .prepare(
       `SELECT p.beatmap_md5, MAX(p.beatmap_id) AS beatmap_id,
               COUNT(*) AS count, MAX(p.played_at) AS last_played,
-              b.beatmapset_id, b.artist, b.title, b.version, b.creator
+              b.beatmapset_id, ${NAME_COLUMNS}, b.version, b.creator
          FROM (SELECT s.beatmap_md5, s.beatmap_id, s.played_at
                  FROM scores s
                 WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
@@ -586,8 +593,7 @@ export function mostPlayed(
     beatmapMd5: r['beatmap_md5'] as string,
     beatmapId: (r['beatmap_id'] as number | null) ?? null,
     beatmapsetId: (r['beatmapset_id'] as number | null) ?? null,
-    artist: (r['artist'] as string | null) ?? null,
-    title: (r['title'] as string | null) ?? null,
+    ...names(r),
     version: (r['version'] as string | null) ?? null,
     creator: (r['creator'] as string | null) ?? null,
     count: r['count'] as number,

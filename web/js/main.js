@@ -42,7 +42,13 @@ import {
   t,
   useLocale,
 } from './i18n.js';
-import { bindLanguagePicker, chooseLanguage, refreshLanguageButton } from './language-picker.js';
+import {
+  bindLanguagePicker,
+  chooseLanguage,
+  chooseOriginalMetadata,
+  refreshLanguageButton,
+} from './language-picker.js';
+import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './metadata.js';
 import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
@@ -143,6 +149,12 @@ const SETTINGS_FIELDS = [
       (unsubmittedAttempts > 0
         ? t('setting.countUnsubmittedSoFar', { n: fmt(unsubmittedAttempts) })
         : t('setting.countUnsubmittedNone')),
+  },
+  {
+    key: 'importPlaysWhileClosed',
+    type: 'toggle',
+    label: () => t('setting.importWhileClosed'),
+    hint: () => t('setting.importWhileClosedHint'),
   },
   {
     key: 'includeUnrankedMaps',
@@ -621,6 +633,7 @@ async function loadState() {
   // The app's own answer, which outranks what this browser remembered. Not awaited: the
   // rest of this render is in the language already on screen, and a change re-runs it.
   void applyConfigLanguage();
+  applyConfigOriginalMetadata();
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
@@ -1800,9 +1813,22 @@ function fillWelcomeLanguage() {
   if (guess !== currentLocale()) void chooseLanguage(guess);
 }
 
+/**
+ * The original-language switch under the language row.
+ *
+ * Applied as it is changed, like the language above it, so the choice is made against a page
+ * that is already showing the result rather than described in a sentence.
+ */
+function fillWelcomeOriginal() {
+  const box = $('welcomeOriginal');
+  box.checked = preferOriginalMetadata();
+  box.onchange = () => chooseOriginalMetadata(box.checked);
+}
+
 async function openWelcome() {
   welcoming = true;
   fillWelcomeLanguage();
+  fillWelcomeOriginal();
   $('welcomeSlot').append($('importSection'));
   $('importHeading').hidden = true;
   resetImport();
@@ -1983,7 +2009,7 @@ async function renderRemovedScores() {
               ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmt(h.pp, 0)}pp` : ''}`;
         return `<div class="removed-row">
           <div class="removed-row__detail">
-            <div class="u-ellipsis">${escapeHtml(h.title)}${
+            <div class="u-ellipsis">${escapeHtml(original(h.title, h.titleOriginal))}${
               h.version ? ` <span class="removed-row__version">[${escapeHtml(h.version)}]</span>` : ''
             }</div>
             <div class="removed-row__meta">${meta}</div>
@@ -2094,6 +2120,7 @@ function openSettings() {
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
+  $('originalMetadataSetting').checked = preferOriginalMetadata();
   settingsHint(' ');
   $('settingsModal').hidden = false;
   $('settingsCancel').focus();
@@ -2139,6 +2166,17 @@ $('settingsSave').onclick = async () => {
     const openBrowser = $('openBrowserSetting').checked;
     if (openBrowser !== (app.config?.openBrowser !== false)) {
       const c = await postJson('/api/app-config', { openBrowser }, 'saving that failed');
+      app = { ...app, config: c.config };
+    }
+
+    /*
+     * The same install-level answer as the switch in the flag menu, saved the same way. The
+     * reload below redraws every title, so nothing here has to ask for a redraw of its own.
+     */
+    const originalMetadata = $('originalMetadataSetting').checked;
+    if (setPreferOriginalMetadata(originalMetadata)) {
+      refreshLanguageButton();
+      const c = await postJson('/api/app-config', { originalMetadata }, 'saving that failed');
       app = { ...app, config: c.config };
     }
 
@@ -3181,7 +3219,9 @@ on('score', (e) => {
     shownPp == null
       ? ''
       : `${fmt(shownPp, 0)}pp${counted ? '' : ` ${t('live.notCounted')}`}`;
-  toast(`${s.grade} ${pct(s.accuracy)} ${pp} - ${s.title}`.replace(/\s+/g, ' '));
+  toast(
+    `${s.grade} ${pct(s.accuracy)} ${pp} - ${original(s.title, s.titleOriginal)}`.replace(/\s+/g, ' '),
+  );
   if (s.mode === mode) loadProfile();
   loadState();
 });
@@ -3196,8 +3236,8 @@ on('incomplete', (e) => {
   // toast says which kind it was rather than reading like a counted play.
   toast(
     play.unsubmitted
-      ? t('live.notSubmitted', { title: play.title })
-      : t('live.didntFinish', { title: play.title }),
+      ? t('live.notSubmitted', { title: original(play.title, play.titleOriginal) })
+      : t('live.didntFinish', { title: original(play.title, play.titleOriginal) }),
   );
   if (play.mode === mode) loadProfile();
   loadState();
@@ -3211,7 +3251,7 @@ on('filtered', (e) => {
   const play = JSON.parse(e.data);
   toast(t('live.notTracked', {
     criterion: play.criterion,
-    title: play.title,
+    title: original(play.title, play.titleOriginal),
   }));
   loadState();
 });
@@ -3223,6 +3263,20 @@ on('reset', () => {
 // An import can add dozens of scores at once, so it refreshes the page rather than
 // announcing each one the way a live play does.
 on('backfill', () => {
+  loadProfile();
+  loadState();
+});
+/*
+ * The same, for the import a launch runs by itself when the profile asks it to. Announced,
+ * unlike the one above: nobody pressed a button for this one, so scores appearing without a
+ * word would read as the app doing something it was not asked to.
+ */
+on('caught-up', (e) => {
+  const r = JSON.parse(e.data);
+  const added = r.imported + r.unfinished + r.attempts;
+  if (added > 0) {
+    toast(added === 1 ? t('catchUp.doneOne') : t('catchUp.doneMany', { n: fmt(added) }));
+  }
   loadProfile();
   loadState();
 });
@@ -3308,6 +3362,24 @@ async function applyConfigLanguage() {
   if (!knownLocale(wanted) || wanted === currentLocale()) return;
   await useLocale(wanted);
   renderAll();
+}
+
+/**
+ * The app's answer on original-language metadata, applied once it arrives.
+ *
+ * The same arrangement as `applyConfigLanguage`, and for the same reason: this browser's own
+ * `localStorage` is what the page started in, and the config -- which comes with the first
+ * API response, after the first paint -- is what the *app* was told. It only does anything on
+ * a second browser, or after the switch was thrown somewhere else.
+ *
+ * A config that has never said -- an older `config.json` -- leaves this browser's answer
+ * alone rather than overruling it with a default.
+ */
+function applyConfigOriginalMetadata() {
+  const wanted = app.config?.originalMetadata;
+  if (typeof wanted !== 'boolean' || !setPreferOriginalMetadata(wanted)) return;
+  refreshLanguageButton();
+  void loadProfile();
 }
 
 /* ------------------------------------------------------------------ boot */

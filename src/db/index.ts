@@ -76,6 +76,11 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   // row tracked before it, which the one-off clean-up reads from the replay file instead.
   { table: 'scores', column: 'player_name', definition: 'TEXT' },
   { table: 'scores', column: 'player_id', definition: 'INTEGER' },
+  // Added with beatmap metadata in its original language. NULL marks a beatmap cached before
+  // the columns existed; `originalMetadataBackfill` re-reads each one's .osu file once and
+  // writes '' where the file has no original-language variant, so nothing is read twice.
+  { table: 'beatmaps', column: 'artist_unicode', definition: 'TEXT' },
+  { table: 'beatmaps', column: 'title_unicode', definition: 'TEXT' },
 ];
 
 /**

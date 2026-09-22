@@ -5,6 +5,7 @@ import { estimateRank } from './rank.ts';
 import { bonusPp, isCustomised, weightedTotal } from './pp.ts';
 import type { LazerMod } from '../osr.ts';
 import definitions from './medal-definitions.json' with { type: 'json' };
+import { beatmapName, beatmapNameOriginal, NAME_COLUMNS, names } from './metadata.ts';
 
 /**
  * The medals a profile has earned, derived from its scores.
@@ -47,6 +48,8 @@ export interface Medal {
   dated: boolean;
   /** Filled in for an earned medal: the play that earned it, where there is one. */
   earnedOn: string | null;
+  /** The same beatmap in the song's own script, or null where it reads the same. */
+  earnedOnOriginal: string | null;
   /** osu!'s group for it -- what the section and its medal card are headed. */
   grouping: MedalGrouping;
 }
@@ -135,7 +138,7 @@ export function earnsIntroMedal(
 function introMedals(db: Db, profileId: number): Medal[] {
   const rows = db
     .prepare(
-      `SELECT s.played_at, s.mode, s.client, s.mods_json, b.title, b.artist
+      `SELECT s.played_at, s.mode, s.client, s.mods_json, ${NAME_COLUMNS}
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.passed = 1 AND ${visibleSql()}
@@ -148,6 +151,8 @@ function introMedals(db: Db, profileId: number): Medal[] {
     mods_json: string;
     title: string | null;
     artist: string | null;
+    artist_unicode: string | null;
+    title_unicode: string | null;
   }[];
 
   const earned = new Map<string, (typeof rows)[number]>();
@@ -177,7 +182,8 @@ function introMedals(db: Db, profileId: number): Medal[] {
       threshold: 0,
       achievedAt: row?.played_at ?? null,
       dated: true,
-      earnedOn: row ? [row.artist, row.title].filter(Boolean).join(' - ') || null : null,
+      earnedOn: row ? beatmapName(names(row)) || null : null,
+      earnedOnOriginal: row ? beatmapNameOriginal(names(row)) : null,
       grouping: 'Mod Introduction' as const,
     };
   });
@@ -197,6 +203,8 @@ interface MedalRow {
   beatmap_max_combo: number | null;
   title: string | null;
   artist: string | null;
+  artist_unicode: string | null;
+  title_unicode: string | null;
 }
 
 /**
@@ -214,8 +222,7 @@ function isFullCombo(row: MedalRow): boolean | null {
 }
 
 function title(row: MedalRow): string | null {
-  const name = [row.artist, row.title].filter(Boolean).join(' - ');
-  return name.length > 0 ? name : null;
+  return beatmapName(names(row)) || null;
 }
 
 /**
@@ -239,7 +246,7 @@ export function computeMedals(
               ${starsColumn(e)} AS stars,
               ${ppColumn(e)} AS pp,
               ${countsSql(e)} AS counts,
-              b.title, b.artist
+              ${NAME_COLUMNS}
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
@@ -335,6 +342,7 @@ export function computeMedals(
         achievedAt: row?.played_at ?? null,
         dated: true,
         earnedOn: row ? title(row) : null,
+        earnedOnOriginal: row ? beatmapNameOriginal(names(row)) : null,
         grouping: 'Skill & Dedication',
       });
     }
@@ -354,6 +362,7 @@ export function computeMedals(
         achievedAt: earned ? (rows[rows.length - 1]?.played_at ?? null) : null,
         dated: false,
         earnedOn: null,
+        earnedOnOriginal: null,
         grouping: 'Skill & Dedication',
       });
     }

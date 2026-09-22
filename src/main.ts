@@ -6,10 +6,11 @@ import { loadConfig, saveConfig, dataDir, type Config } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { discoverInstalls, type DiscoveryResult } from './clients/discover.ts';
 import { osuFolderService } from './clients/folders.ts';
-import { BeatmapResolver } from './clients/beatmaps.ts';
+import { backfillOriginalMetadata, BeatmapResolver } from './clients/beatmaps.ts';
 import { openDb } from './db/index.ts';
 import { activeProfileId, getProfile, seedFirstProfile } from './profiles.ts';
 import { Tracker, type IndexState } from './tracker/index.ts';
+import { catchUpSince, HEARTBEAT_MS, lastRunAt, markRunning } from './tracker/catch-up.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
 import { checkForUpdate, launchedFromTray, pruneUpdateLeftovers } from './update/index.ts';
@@ -187,6 +188,13 @@ async function main(): Promise<void> {
   const profileName = active.name;
 
   /*
+   * When this app was last running, read before anything writes it again. It is the cutoff
+   * for `importPlaysWhileClosed` -- the gap between that moment and now is the only stretch a
+   * launch may bring in -- and null on a first launch, which means no catch-up at all.
+   */
+  const gapSince = catchUpSince(lastRunAt(db), active.trackingSince);
+
+  /*
    * `--check-only` verifies the install and exits: does it find osu!, and does it find the
    * pp calculator? It skips the beatmap index, which is slow and irrelevant to that
    * question. `npm run package` uses it to prove a packaged build works before shipping,
@@ -317,13 +325,40 @@ async function main(): Promise<void> {
     console.log(`  indexing beatmaps: ${where}${s.waiting ? `, ${s.waiting} play(s) waiting` : ''}`);
   };
   tracker.on('indexing', onIndexing);
-  void tracker.indexBeatmaps(roots).then(() => {
+  void tracker.indexBeatmaps(roots).then(async () => {
     tracker.off('indexing', onIndexing);
     const s = tracker.indexState;
     if (s.error) console.log(`  beatmap index failed: ${s.error}`);
     else if (s.indexed > 0 || s.firstRun) {
       const total = (db.prepare('SELECT COUNT(*) AS n FROM osu_files').get() as { n: number }).n;
       console.log(`  ${total.toLocaleString()} beatmaps indexed (${s.indexed.toLocaleString()} new)\n`);
+    }
+    /*
+     * Original-language titles for beatmaps cached before there were columns to hold them.
+     * After the index, so a beatmap it has just found is one whose names can be read; and
+     * unannounced, because it is one pass over the maps actually played and finishes well
+     * inside the time the index above takes. See backfillOriginalMetadata.
+     */
+    await backfillOriginalMetadata(db).catch(() => 0);
+
+    /*
+     * The plays set while the app was closed, for a profile that asked for them. After the
+     * index for the same reason a live play waits for it: a beatmap resolved before its file
+     * is indexed caches "not found" and leaves the score with no pp.
+     *
+     * Queued like every other import, so a play landing right now is ingested before or after
+     * it and never during. Nothing happens at all unless the setting is on -- see
+     * Tracker.catchUp.
+     */
+    const caught = await tracker.catchUp(gapSince).catch(() => null);
+    if (caught && caught.imported + caught.unfinished + caught.attempts > 0) {
+      const parts = [
+        `${caught.imported} score(s)`,
+        `${caught.unfinished} unfinished`,
+        `${caught.attempts} not submitted`,
+      ];
+      console.log(`\n  Brought in what was played while the app was closed: ${parts.join(', ')}`);
+      if (caught.filtered > 0) console.log(`  (${caught.filtered} declined by the tracking filter)`);
     }
   });
 
@@ -349,11 +384,15 @@ async function main(): Promise<void> {
         openBrowser: config.openBrowser,
         sharedFavorites: config.sharedFavorites,
         language: config.language,
+        originalMetadata: config.originalMetadata,
       }),
       set: (patch) => {
         const current = loadConfig();
         if (patch.openBrowser !== undefined) current.openBrowser = config.openBrowser = patch.openBrowser;
         if (patch.language !== undefined) current.language = config.language = patch.language;
+        if (patch.originalMetadata !== undefined) {
+          current.originalMetadata = config.originalMetadata = patch.originalMetadata;
+        }
         if (patch.sharedFavorites !== undefined) {
           current.sharedFavorites = config.sharedFavorites = patch.sharedFavorites;
           // Merge or copy the lists now, so the next request already reads the right one.
@@ -404,11 +443,21 @@ async function main(): Promise<void> {
   /*
    * Said every launch, because it is the one thing about tracking that is decided by when the
    * app is open rather than by anything on the page: plays set while it was closed are not
-   * picked up when it opens again (see `Tracker.liveCutoff`). Anyone who did want them has one
-   * answer, and it should be on screen rather than found by hunting through the menu.
+   * picked up when it opens again (see `Tracker.liveCutoff`). Anyone who did want them has two
+   * answers now -- once, or every launch -- and both should be on screen rather than found by
+   * hunting through the menu.
+   *
+   * The wording follows the setting rather than describing both cases: a profile that has
+   * turned catching up on should not be told every launch that it does not happen.
    */
-  console.log('  Plays set while this app is closed are not tracked.');
-  console.log('  Options -> Import past plays brings them in if you want them.');
+  if (getSettings(db, profileId).importPlaysWhileClosed) {
+    console.log('  Plays set while this app was closed are brought in when it opens.');
+    console.log('  Options -> Other settings turns that off.');
+  } else {
+    console.log('  Plays set while this app is closed are not tracked.');
+    console.log('  Options -> Import past plays brings them in if you want them,');
+    console.log('  and Other settings can have every launch do it for you.');
+  }
   if (installs.some((i) => i.kind === 'lazer')) {
     // Worth saying plainly, because the difference is invisible otherwise. Signed in, an
     // unfinished play counts when osu! counted it; offline or signed out, osu! submits
@@ -519,12 +568,25 @@ async function main(): Promise<void> {
 
   // Reachable four ways now -- Ctrl+C, a signal, the page's Quit and the tray -- and two can
   // arrive together, so only the first one stops anything.
+  /*
+   * Record that the app is running, so the next launch knows where the gap it was closed for
+   * begins. Written now, at shutdown, and on a slow heartbeat in between -- see
+   * src/tracker/catch-up.ts for why a stamp that errs early is the safe kind.
+   */
+  markRunning(db);
+  const heartbeat = setInterval(() => markRunning(db), HEARTBEAT_MS);
+  heartbeat.unref();
+
   let stopping = false;
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
     console.log('\n  stopping...');
+    clearInterval(heartbeat);
     tracker.stop();
+    // The last thing written before the database closes: everything after this instant
+    // happened while the app was shut, which is exactly what the next launch may bring in.
+    markRunning(db);
     official?.dispose();
     server.close();
     db.close();

@@ -14,6 +14,11 @@ Each has its reasoning in `docs/architecture.md`.
 - **One definition each, in `src/calc/eligibility.ts`:** `countsSql()` for "counts toward
   pp" (never write `ranked = 1`), `ppColumn`/`scoreColumn` for the pp and score columns
   (never `s.total_score`).
+- **Beatmap names go through `src/calc/metadata.ts`.** `NAME_COLUMNS` for what a naming query
+  selects, `names()` for a row, `beatmapName`/`beatmapNameOriginal` for the joined
+  `artist - title`. Never build that string by hand in a new query, and send the
+  original-language name only where it *differs* from the romanised one (roadmap 5.55).
+
 - **Incomplete plays live in `incomplete_plays`, never in `scores`.** A row of zeroes there
   corrupts accuracy, grades, ranked score, the level bar and medals.
 - **Attempts osu! could not submit count only through `incompleteSql()`.** Stored with
@@ -98,7 +103,10 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 - No native modules in Node process. `node:sqlite` + pure-JS LZMA only
 - `/api/profile` cached until DB changes (`total_changes()` stamp)
 - No API polling. Local detection only. Works with no credentials, no network
-- No scan-and-import on startup. Import past plays is explicit: pick cutoff, preview, confirm
+- No scan-and-import on startup *unless the profile asked for it*. Import past plays is
+  explicit: pick cutoff, preview, confirm. A launch imports the gap it was closed for only
+  with `importPlaysWhileClosed` on (off by default), never further back than the app last
+  ran, and through `Tracker.backfill` like any other import (roadmap 5.56)
 - Ingestion serialized through promise queue (`src/tracker/index.ts`)
 - Live feed is SSE, and a browser allows 6 connections per origin. Only a *visible* tab may
   hold the stream open, or open tabs starve the page itself (`web/js/main.js`)

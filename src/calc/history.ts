@@ -4,6 +4,7 @@ import { bonusPp, weightedTotal } from './pp.ts';
 import { levelFromScore } from './level.ts';
 import { incompleteSql, countsSql, ppColumn, scoreColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
 import type { Medal, MedalFamily } from './medals.ts';
+import { beatmapName, beatmapNameOriginal, NAME_COLUMNS, names } from './metadata.ts';
 
 /**
  * The time-series and activity feed behind the profile page's chart, the Historical
@@ -28,7 +29,15 @@ export interface MonthlyPlaycount {
 }
 
 export type ActivityEvent =
-  | { type: 'best'; at: number; pp: number; title: string; version: string | null }
+  | {
+      type: 'best';
+      at: number;
+      pp: number;
+      title: string;
+      /** The same beatmap in the song's own script, or null where it reads the same. */
+      titleOriginal: string | null;
+      version: string | null;
+    }
   | { type: 'level'; at: number; level: number }
   | { type: 'first'; at: number }
   | {
@@ -143,7 +152,7 @@ export function buildHistory(
       // counts, and both come out of this one chronological pass.
       `SELECT s.played_at, ${ppColumn(e)} AS pp, ${scoreColumn(e)} AS total_score, s.beatmap_md5,
               ${countsSql(e)} AS counts,
-              b.title, b.artist, b.version
+              ${NAME_COLUMNS}, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
@@ -157,6 +166,8 @@ export function buildHistory(
     counts: number;
     title: string | null;
     artist: string | null;
+    artist_unicode: string | null;
+    title_unicode: string | null;
     version: string | null;
   }[];
 
@@ -241,7 +252,8 @@ export function buildHistory(
         type: 'best',
         at: row.played_at,
         pp: row.pp,
-        title: [row.artist, row.title].filter(Boolean).join(' - ') || row.beatmap_md5.slice(0, 12),
+        title: beatmapName(names(row)) || row.beatmap_md5.slice(0, 12),
+        titleOriginal: beatmapNameOriginal(names(row)),
         version: row.version,
       });
     }

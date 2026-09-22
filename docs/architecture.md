@@ -145,6 +145,14 @@ Each watcher already begins at *now* on its own — `ReplayWatcher` never scans 
 
 The start-up banner says so every launch — it is the one tracking rule decided by when the app is open rather than by anything on the page.
 
+### Catching up on the gap, when the profile asks
+
+`importPlaysWhileClosed` (per profile, **off by default**) makes a launch import what was played while the app was shut. It does not weaken the cutoff above: `Tracker.catchUp` calls `Tracker.backfill`, so it is an import with an import's filter, dedupe and owner check, and `liveCutoff` still refuses everything it did before.
+
+The gap is `[kv.lastRunAt, now]`, floored at the profile's `trackingSince` (`catchUpSince`). `lastRunAt` is written at startup, at shutdown, and on a 30-minute heartbeat — slow, because every write throws away `/api/profile`'s `total_changes()` cache stamp, and slowness is safe here: a stamp left by a crash is *older* than the true shutdown, so the next launch scans further back and dedupe turns the overlap away. No stamp at all (a first launch) means no catch-up, not a catch-up from an invented date.
+
+Every source, because a gap is a gap — replays, counted unfinished plays and unsubmitted attempts together, or the play count stops agreeing with osu!'s. Announced through the `caughtUp` event → the `caught-up` SSE event → a toast: it is the only import nobody pressed a button for.
+
 ## Play tracking filter
 
 Decides whether a play is **written**. Declined play leaves no row anywhere.
@@ -342,3 +350,13 @@ osu! profile page has lazer scoring switch (on by default). Off = uncapped class
 ## Favorites: shared by default
 
 `config.sharedFavorites` (default true). `FavoriteScope` in `src/favorites.ts` picks table. `syncFavoriteSharing` merges per-profile lists ↔ shared, once per switch (recorded in `kv`). Nothing lost. Removing shared favorite removes from every profile's own list.
+
+## Beatmap names, and the same names in their own script
+
+osu!'s "prefer metadata in original language". `beatmaps.artist_unicode` / `title_unicode` come from the `.osu`'s `ArtistUnicode` / `TitleUnicode`. `''` = looked and there is none; NULL = never looked (the `length_ms` convention). `backfillOriginalMetadata` fills the NULLs in one sliced pass after the beatmap index — needed for a hundred rows at once, unlike every other lazily-filled column — with no transaction of its own, because the connection is shared with the tracker.
+
+`src/calc/metadata.ts` is the only definition: `NAME_COLUMNS` for what a naming query selects, `names()` for what a row means, `beatmapName` / `beatmapNameOriginal` for the joined `artist - title` that Milestones, medals and Removed scores carry. Do not build `artist - title` by hand in a new query.
+
+**Both names go to the page; the page chooses** (`web/js/metadata.js`), as osu-web does. Server-side choosing would put a display preference into `/api/profile`'s cache key — which is about what is *stored* — and make a checkbox cost a round trip. An original-language name is sent **only when it differs**, so `??` is the whole rule on the page and nearly every row carries nothing extra.
+
+The answer lives in `config.originalMetadata` and in `localStorage`, exactly as the language does, and for the same reason: config arrives with the first API response, after the first paint.

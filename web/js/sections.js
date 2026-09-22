@@ -2,12 +2,18 @@
 import { escapeHtml, fmt, pct, timeAgo, fullDate } from './format.js';
 import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './badges.js';
 import { t } from './i18n.js';
+import { beatmapArtist, beatmapName, beatmapTitle, original } from './metadata.js';
 
 function titleOf(item) {
-  const name = [item.artist, item.title].filter(Boolean).join(' - ');
-  return name || t('beatmap.unknown', {
+  return beatmapName(item) || t('beatmap.unknown', {
     md5: (item.beatmapMd5 ?? '').slice(0, 12),
   });
+}
+
+/** The `by <artist>` after a play's title, in whichever script the page is showing. */
+function playArtist(play) {
+  const artist = beatmapArtist(play);
+  return artist ? ` <small class="play-detail__artist">by ${escapeHtml(artist)}</small>` : '';
 }
 
 /** Links back to osu.ppy.sh when we know the id, and is inert when we do not. */
@@ -168,10 +174,10 @@ function ppCell(play) {
  * accuracy, mods and pp stepping right.
  */
 export function playRow(play, { showWeight = false, actions = false, reorderable = false } = {}) {
-  const artist = play.artist ? ` <small class="play-detail__artist">by ${escapeHtml(play.artist)}</small>` : '';
+  const artist = playArtist(play);
   const title = maybeLink(
     beatmapHref(play),
-    `${escapeHtml(play.title ?? titleOf(play))}${artist}`,
+    `${escapeHtml(beatmapTitle(play) ?? titleOf(play))}${artist}`,
     'play-detail__title u-ellipsis',
   );
 
@@ -245,12 +251,10 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
  * standing in for numbers nobody knows.
  */
 export function incompleteRow(play, { actions = false } = {}) {
-  const artist = play.artist
-    ? ` <small class="play-detail__artist">by ${escapeHtml(play.artist)}</small>`
-    : '';
+  const artist = playArtist(play);
   const title = maybeLink(
     beatmapHref(play),
-    `${escapeHtml(play.title ?? titleOf(play))}${artist}`,
+    `${escapeHtml(beatmapTitle(play) ?? titleOf(play))}${artist}`,
     'play-detail__title u-ellipsis',
   );
 
@@ -348,14 +352,15 @@ export function playList(plays, options = {}) {
 export function beatmapPlaycountRow(item) {
   const cover = coverUrl(item.beatmapsetId);
   const style = cover ? ` style="background-image: url('${cover}')"` : '';
-  const artist = item.artist ? ` <span class="beatmap-playcount__artist">by ${escapeHtml(item.artist)}</span>` : '';
+  const artist = beatmapArtist(item);
+  const by = artist ? ` <span class="beatmap-playcount__artist">by ${escapeHtml(artist)}</span>` : '';
 
   return `<div class="beatmap-playcount">
   <div class="beatmap-playcount__cover"${style}></div>
   <div class="beatmap-playcount__detail">
     ${maybeLink(
       beatmapHref(item),
-      `${escapeHtml(item.title ?? titleOf(item))}${artist}`,
+      `${escapeHtml(beatmapTitle(item) ?? titleOf(item))}${by}`,
       'beatmap-playcount__title u-ellipsis',
     )}
     <div class="beatmap-playcount__version u-ellipsis">${escapeHtml(item.version ?? '')}</div>
@@ -389,7 +394,9 @@ export function activityRow(event) {
     case 'best':
       text = t('activity.best', {
         pp: fmt(event.pp, 0),
-        map: escapeHtml(event.title) + (event.version ? ` [${escapeHtml(event.version)}]` : ''),
+        map:
+          escapeHtml(original(event.title, event.titleOriginal)) +
+          (event.version ? ` [${escapeHtml(event.version)}]` : ''),
       });
       break;
     case 'level':

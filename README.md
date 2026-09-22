@@ -122,6 +122,13 @@ a folder by hand, and "no osu! installation found" no longer closes the app -- t
 you can point at one. The page can also be read **in your own language**: a flag in the top right
 switches between fifteen so far, and the first launch asks.
 
+**v1.20.0** adds two things osu! itself has. **Show beatmap metadata in original language**
+writes each beatmap the way its song does -- 夜に駆ける rather than Yoru ni Kakeru -- and sits
+in three places: the first launch, the flag menu, and Other settings. And a launch can now
+**import the plays you set while the app was closed**, off by default, per profile: it reaches
+back to when the app last ran and no further, applies your play tracking filter, and adds
+nothing you already have.
+
 [docs/osu-web-reference.md](docs/osu-web-reference.md) records the design system it is
 built on -- osu-web's colour tokens, metrics and layout --
 [docs/phase-2-handoff.md](docs/phase-2-handoff.md) covers what the page does, the gaps it
@@ -394,6 +401,8 @@ profile, so the curve comes from the public dumps instead.
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
+| `language` | `""` | the page's language, as one of osu!'s own codes (`de`, `pt-br`, `zh-tw`). Empty means never chosen, which is what lets the first launch ask |
+| `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Other settings** |
 
 `country` and `tagline` are only the starting point. Both are editable from **Options ->
 Profiles**, under Edit profile, and are stored per profile from then on, so two playstyles can carry different
@@ -791,9 +800,10 @@ clears those along with everything else.
 ## Other settings
 
 **Options -> Other settings**, and everything there belongs to the profile you are on -- two
-playstyles are two profiles and should not share how their scores count. The one exception is
-**Open in browser on start**, under *This install*: whether starting the app opens this page
-is about the install, not a profile, so it is saved to `data/config.json`.
+playstyles are two profiles and should not share how their scores count. The exceptions are
+under *This install* -- **Open in browser on start** and **Show beatmap metadata in original
+language** -- which are about the install rather than any one profile, and are saved to
+`data/config.json`.
 
 ### Include pp for unranked mods
 
@@ -860,6 +870,35 @@ These rows carry no accuracy, mods or pp, and are shown dimmed with a "Didn't fi
 rather than with zeroes standing in for numbers nobody recorded. See
 [Plays that were never finished](#plays-that-were-never-finished) for why.
 
+### Import plays set while the app was closed
+
+Off by default, and the default is the point: closing the app is how you stop tracking -- a
+different playstyle, a warm-up, someone else on your keyboard -- so a launch normally brings in
+nothing from the time it was shut. See [Importing plays you set while it was
+closed](#importing-plays-you-set-while-it-was-closed).
+
+Turn it on and every launch does that import for you, over the gap and no more: back to when the
+app last ran, never further, and never past this profile's own start. It is the same import as
+the manual one -- your play tracking filter still applies, plays already tracked are not
+doubled, replays someone else set are not taken -- and it says what it brought in. Per profile,
+so a profile tracking one playstyle can stay out of it while another catches up on everything.
+
+### Show beatmap metadata in original language
+
+Off by default, and the same setting osu! has. On, each beatmap's artist and title read the way
+the song writes them -- 夜に駆ける rather than Yoru ni Kakeru -- everywhere the page names one:
+Recent Plays, Scores, Most Played, the score page, Favorite Beatmaps, Milestones and the live
+notifications. A beatmap that has no separate original-language name is unaffected.
+
+It belongs to the install rather than a profile, the way the language does, and sits in three
+places: the first launch asks, the flag in the top right has a switch above the language list,
+and it is here under *This install*. Switching it redraws what is already on screen -- both
+names are sent with every beatmap, so nothing is re-fetched.
+
+Beatmaps you had already played are read for their original-language names once, in the
+background on the next launch, so this works on a profile that has been running for years and
+not only on what you play next.
+
 ### pp calculator
 
 Says which osu! release's calculator prices your scores -- the footer says so too. After osu!
@@ -911,9 +950,15 @@ ticked, and you untick what you do not want -- bringing in last week's offline a
 have to bring in last week's replays. A play on a beatmap you no longer have installed is
 skipped, and the check says how many.
 
-It never runs by itself, and the warning in the dialog is the important part -- reach back
-further than the session you actually played with this playstyle and you will pull in plays
-set with your normal one, which is the one thing a separate profile must not contain.
+It never runs by itself unless you ask it to, and the warning in the dialog is the important
+part -- reach back further than the session you actually played with this playstyle and you will
+pull in plays set with your normal one, which is the one thing a separate profile must not
+contain.
+
+Asking it to is **Options -> Other settings -> Import plays set while the app was closed**, off
+by default. That runs this same import at every launch, over the gap the app was closed for and
+no further, so you do not have to remember to. Everything above still applies to it: the play
+tracking filter, the duplicate check, and plays on beatmaps you no longer have.
 
 ## Rank estimation
 

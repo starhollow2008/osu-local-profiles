@@ -4,6 +4,7 @@ import { beatmapMode } from './clients/beatmaps.ts';
 import type { BeatmapsetDetails, OsuWebMode } from './clients/osu-web.ts';
 import type { LazerMod } from './osr.ts';
 import { visibleSql } from './calc/eligibility.ts';
+import { names } from './calc/metadata.ts';
 
 /**
  * Favorite Beatmaps: the profile's own list of beatmapsets, shown as osu-web's cards.
@@ -41,6 +42,13 @@ export interface FavoriteCard {
   id: number;
   title: string;
   artist: string;
+  /**
+   * The same two in the song's own script, or null where they read the same. Sent beside the
+   * romanised pair so the card can follow the original-language setting -- see
+   * src/calc/metadata.ts.
+   */
+  titleUnicode: string | null;
+  artistUnicode: string | null;
   creator: string | null;
   userId: number | null;
   status: string | null;
@@ -275,6 +283,9 @@ function fromDetails(d: BeatmapsetDetails, favoritedAt: number): FavoriteCard {
     id: d.id,
     title: d.title,
     artist: d.artist,
+    // Details cached before osu!'s original-language fields were kept have neither.
+    titleUnicode: d.titleUnicode && d.titleUnicode !== d.title ? d.titleUnicode : null,
+    artistUnicode: d.artistUnicode && d.artistUnicode !== d.artist ? d.artistUnicode : null,
     creator: d.creator || null,
     userId: d.userId || null,
     status: d.status,
@@ -325,7 +336,8 @@ export function localCard(
 ): FavoriteCard {
   const cached = db
     .prepare(
-      `SELECT md5, beatmap_id, artist, title, version, creator, status, osu_path
+      `SELECT md5, beatmap_id, artist, title, artist_unicode, title_unicode,
+              version, creator, status, osu_path
          FROM beatmaps WHERE beatmapset_id = ?`,
     )
     .all(beatmapsetId) as {
@@ -333,6 +345,8 @@ export function localCard(
     beatmap_id: number | null;
     artist: string | null;
     title: string | null;
+    artist_unicode: string | null;
+    title_unicode: string | null;
     version: string | null;
     creator: string | null;
     status: number | null;
@@ -394,10 +408,13 @@ export function localCard(
   const userId = online.find((o) => o.userId !== null)?.userId ?? null;
   const statusCode = first?.status ?? online.find((o) => o.status !== null)?.status ?? null;
 
+  const local = first ? names(first) : null;
   return {
     id: beatmapsetId,
     title: first?.title ?? `beatmapset ${beatmapsetId}`,
     artist: first?.artist ?? '',
+    titleUnicode: local?.titleUnicode ?? null,
+    artistUnicode: local?.artistUnicode ?? null,
     creator: first?.creator ?? (userId !== null ? resolver?.username(userId) ?? null : null),
     userId,
     status: statusCode === null ? null : (STATUS_NAME[statusCode] ?? null),

@@ -37,6 +37,18 @@ export interface Config {
    */
   language: string;
   /**
+   * Show a beatmap's artist and title in the song's own script, the way osu!'s own "prefer
+   * metadata in original language" does -- 夜に駆ける rather than Yoru ni Kakeru.
+   *
+   * Off by default, as on osu!. Beside `language` rather than in a profile's settings because
+   * it is the same kind of answer: how this person reads the page, not how a playstyle is
+   * scored. It is asked on the first launch next to the language, for the same reason.
+   *
+   * The page does the choosing -- both names are sent with every beatmap (src/calc/metadata.ts)
+   * -- so this is only where the answer is kept between launches.
+   */
+  originalMetadata: boolean;
+  /**
    * Shown beside the profile name, the way osu! shows a country. Two-letter ISO code;
    * empty means the profile has no country, which is how a new profile starts.
    */
@@ -68,6 +80,7 @@ const DEFAULTS: Config = {
   discoveredRoots: [],
   searchedForInstalls: false,
   language: '',
+  originalMetadata: false,
   country: '',
   tagline: '',
   checkForUpdates: true,
@@ -78,8 +91,13 @@ const DEFAULTS: Config = {
  * Keys older versions wrote that mean nothing now. Dropped on load so the next save does not
  * carry them forward: `shareOnNetwork` opened the page to the local network, and was removed
  * because the page can reset and delete profiles without asking who is calling.
+ *
+ * `backfill` was a placeholder from Phase 1 that was never honoured by anything. It is listed
+ * here now rather than left lying about, because importing plays set while the app was closed
+ * is a real setting again -- `importPlaysWhileClosed`, per profile, in the database -- and a
+ * dead `"backfill": false` sitting in config.json beside it reads like the switch.
  */
-const RETIRED_KEYS = ['shareOnNetwork'];
+const RETIRED_KEYS = ['shareOnNetwork', 'backfill'];
 
 /**
  * Where the profile database, config and any user-supplied images live.

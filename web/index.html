@@ -28,7 +28,22 @@
                 title="Change language" data-i18n-attr="title:langBtn.title">
           <img class="lang-pill__flag" id="langFlag" src="/flags/gb.svg" alt="English">
         </button>
-        <div class="menu lang-menu" id="langMenu" role="menu" aria-label="Language" hidden data-i18n-attr="aria-label:langMenu.label"></div>
+        <!--
+          Above the list, and outside the part that scrolls: forty languages do not fit on a
+          screen, and a switch under them would be reachable only by scrolling past all of
+          them. It is here rather than only in Other settings because which script a beatmap
+          reads in is the same question as which language the page is in.
+        -->
+        <div class="menu lang-menu" id="langMenu" role="menu" aria-label="Language" hidden data-i18n-attr="aria-label:langMenu.label">
+          <button id="langOriginal" class="menu__toggle lang-menu__original" type="button" role="menuitemcheckbox"
+                  aria-checked="false"
+                  title="Show each beatmap's artist and title the way the song writes them, instead of romanised."
+                  data-i18n-attr="title:langOriginal.title">
+            <span data-i18n="langOriginal.label">Show beatmap metadata in original language</span><span class="menu__switch" aria-hidden="true"></span>
+          </button>
+          <div class="sep"></div>
+          <div class="lang-menu__options" id="langOptions"></div>
+        </div>
       </div>
       <div class="menu-wrap">
         <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="optionsBtn">Options &#9662;</button>
@@ -384,6 +399,19 @@
       <select id="welcomeLang" class="welcome-lang__select"></select>
     </div>
 
+    <!--
+      Beside the language because it is the same kind of answer -- how you read the page --
+      and because this is the one moment somebody is already thinking about it. Off by
+      default, as on osu!, and changeable later from the flag menu or Other settings.
+    -->
+    <label class="field welcome-lang__original" for="welcomeOriginal">
+      <span data-i18n="welcomeOriginal.label">Show beatmap metadata in original language</span>
+      <input type="checkbox" id="welcomeOriginal">
+    </label>
+    <div class="setting__hint welcome-lang__hint" data-i18n="welcomeOriginal.hint">
+      Japanese, Korean and Chinese song titles read as they are written, instead of romanised.
+    </div>
+
     <div class="welcome-intro">
       <p data-i18n-html="welcomeModal.optionalHaveAnOsuAccount">
         <span class="welcome-intro__badge">Optional</span>
@@ -584,6 +612,22 @@
           Open this page in your browser whenever the app starts. This one is not a profile's:
           it decides what happens before any profile is on screen, so it is saved for the whole
           install, in <code>data/config.json</code>.
+        </div>
+      </div>
+      <!--
+        The same switch as the one in the flag menu, and the same stored answer. Here as well
+        because this is where settings are looked for, and nobody thinks to open a language
+        menu to find out how titles are written.
+      -->
+      <div class="setting">
+        <label class="field">
+          <span data-i18n="installSettings.originalLanguage">Show beatmap metadata in original language</span>
+          <input type="checkbox" id="originalMetadataSetting">
+        </label>
+        <div class="setting__hint" data-i18n="installSettings.originalLanguageHint">
+          Show each beatmap's artist and title the way the song writes them, instead of
+          romanised. Like the language, this belongs to the whole install rather than to one
+          profile; it is also in the flag menu at the top of the page.
         </div>
       </div>
     </div>

@@ -231,6 +231,13 @@ export interface BeatmapsetDetails {
   id: number;
   title: string;
   artist: string;
+  /**
+   * osu!'s `title_unicode` / `artist_unicode`: the song's own script, for a profile that
+   * prefers metadata in its original language. Null on details cached before these were kept,
+   * which the card reads as "no different name" rather than as a blank.
+   */
+  titleUnicode: string | null;
+  artistUnicode: string | null;
   creator: string;
   userId: number;
   /** osu-web's status name: ranked, approved, qualified, loved, pending, wip, graveyard. */
@@ -311,6 +318,8 @@ export function beatmapsetFromJson(raw: Record<string, unknown>): BeatmapsetDeta
     id,
     title,
     artist,
+    titleUnicode: str(raw['title_unicode']),
+    artistUnicode: str(raw['artist_unicode']),
     creator: str(raw['creator']) ?? '',
     userId: num(raw['user_id']) ?? 0,
     status,

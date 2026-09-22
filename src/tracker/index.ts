@@ -71,11 +71,19 @@ export interface TrackerEvents {
   error: [Error];
   /** How far the beatmap index has got; sent while it runs and once when it finishes. */
   indexing: [IndexState];
+  /**
+   * A launch brought in the plays set while the app was closed, because the profile asked it
+   * to. Announced rather than silent: this is the only kind of import nobody pressed a button
+   * for, so it has to say what it added and be visible on a page that is already open.
+   */
+  caughtUp: [BackfillResult];
 }
 
 /** A play that was not tracked because the filter said so. */
 export interface FilteredPlay {
   title: string;
+  /** The same beatmap in the song's own script, or null where it reads the same. */
+  titleOriginal: string | null;
   criterion: FilterCriterion;
   /** Whether it was a finished score or a play that left no replay. */
   kind: 'score' | 'incomplete';
@@ -579,6 +587,34 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   }
 
   /**
+   * Bring in the plays set while the app was closed, if this profile asks for it.
+   *
+   * Deliberately `backfill` and nothing new: same scan, same filter, same duplicate and owner
+   * checks, same queue. The only thing this adds is *who decides* -- the profile's
+   * `importPlaysWhileClosed`, off by default -- and *from when*, which is the moment the app
+   * last recorded that it was running and never earlier than the profile's own start.
+   *
+   * Every source, because the gap is a gap: a quit or an offline retry set while the app was
+   * closed is exactly as much a missing play as a finished one, and bringing in half of them
+   * would leave the play count disagreeing with osu!'s.
+   *
+   * Returns null when nothing was asked for or there is no gap on record, so a caller can
+   * tell "turned off" from "turned on and found nothing".
+   */
+  async catchUp(since: number | null): Promise<BackfillResult | null> {
+    if (since === null) return null;
+    if (!getSettings(this.opts.db, this.opts.profileId).importPlaysWhileClosed) return null;
+
+    const result = await this.backfill(since, {
+      replays: true,
+      unfinished: true,
+      attempts: true,
+    });
+    this.emit('caughtUp', result);
+    return result;
+  }
+
+  /**
    * How many stored scores predate the eligibility columns, so the page can offer a
    * recompute only when there is something to gain from it.
    */
@@ -712,12 +748,13 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   /** Count a declined play and say so, once, for either kind of play. */
   private reportFiltered(
-    result: { criterion: FilterCriterion; title: string },
+    result: { criterion: FilterCriterion; title: string; titleOriginal: string | null },
     kind: 'score' | 'incomplete',
   ): void {
     this.filtered++;
     this.emit('filtered', {
       title: result.title,
+      titleOriginal: result.titleOriginal,
       criterion: result.criterion,
       kind,
       at: Date.now(),

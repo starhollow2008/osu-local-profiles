@@ -5,6 +5,7 @@ import { playById, type Play } from './calc/stats.ts';
 import { VANILLA, visibleSql, type Eligibility } from './calc/eligibility.ts';
 import { detailsFor, ratingNeutral } from './favorites.ts';
 import type { PpPart } from './calc/official.ts';
+import { beatmapName, beatmapNameOriginal, NAME_COLUMNS, names } from './calc/metadata.ts';
 
 /**
  * What the user can do to an individual tracked score: pin it, order the pins, and remove
@@ -148,6 +149,8 @@ export interface HiddenScore {
   id: number;
   mode: number;
   title: string;
+  /** The same beatmap in the song's own script, or null where it reads the same. */
+  titleOriginal: string | null;
   version: string | null;
   modsLabel: string;
   accuracy: number;
@@ -163,6 +166,7 @@ export interface HiddenIncomplete {
   ids: number[];
   mode: number;
   title: string;
+  titleOriginal: string | null;
   version: string | null;
   unsubmitted: boolean;
   attempts: number;
@@ -193,6 +197,7 @@ function hiddenIncompleteRows(db: Db, profileId: number, limit: number): HiddenI
       `SELECT GROUP_CONCAT(s.id) AS ids, COUNT(*) AS attempts, MIN(s.mode) AS mode,
               MAX(s.played_at) AS played_at, s.hidden_at, s.unsubmitted,
               MAX(s.beatmap_name) AS beatmap_name, MAX(b.artist) AS artist, MAX(b.title) AS title,
+              MAX(b.artist_unicode) AS artist_unicode, MAX(b.title_unicode) AS title_unicode,
               MAX(b.version) AS version
          FROM incomplete_plays s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
@@ -209,8 +214,8 @@ function hiddenIncompleteRows(db: Db, profileId: number, limit: number): HiddenI
     mode: r['mode'] as number,
     // What the log called the map stands in when the beatmap itself is not resolvable.
     title:
-      [r['artist'], r['title']].filter(Boolean).join(' - ') ||
-      ((r['beatmap_name'] as string | null) ?? 'an unknown beatmap'),
+      beatmapName(names(r)) || ((r['beatmap_name'] as string | null) ?? 'an unknown beatmap'),
+    titleOriginal: beatmapNameOriginal(names(r)),
     version: (r['version'] as string | null) ?? null,
     unsubmitted: r['unsubmitted'] === 1,
     attempts: r['attempts'] as number,
@@ -223,7 +228,7 @@ function hiddenScoreRows(db: Db, profileId: number, limit: number): HiddenScore[
   const rows = db
     .prepare(
       `SELECT s.id, s.mode, s.mods_label, s.client, s.accuracy, s.grade, s.pp, s.played_at, s.hidden_at,
-              b.artist, b.title, b.version
+              ${NAME_COLUMNS}, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.profile_id = ? AND s.hidden_at IS NOT NULL
@@ -236,8 +241,8 @@ function hiddenScoreRows(db: Db, profileId: number, limit: number): HiddenScore[
     kind: 'score',
     id: r['id'] as number,
     mode: r['mode'] as number,
-    title:
-      [r['artist'], r['title']].filter(Boolean).join(' - ') || `beatmap ${String(r['id'])}`,
+    title: beatmapName(names(r)) || `beatmap ${String(r['id'])}`,
+    titleOriginal: beatmapNameOriginal(names(r)),
     version: (r['version'] as string | null) ?? null,
     // Named as osu! names it: a stable play carries Classic (see withClassicMod).
     modsLabel: classicLabel(r['mods_label'] as string, r['client'] === 'stable'),

@@ -79,6 +79,16 @@ export interface ResolvedBeatmap {
   status: number | null;
   artist: string | null;
   title: string | null;
+  /**
+   * The song's artist and title in their own script, from the `.osu` file's `ArtistUnicode`
+   * and `TitleUnicode`, for a profile that prefers metadata in its original language.
+   *
+   * `''` rather than null when the file was read and carried none -- an older beatmap, or one
+   * whose title is romanised to begin with -- so "looked and found nothing" is distinct from
+   * "never looked", and the romanised value above is the answer either way.
+   */
+  artistUnicode: string | null;
+  titleUnicode: string | null;
   version: string | null;
   creator: string | null;
 }
@@ -289,9 +299,57 @@ export function indexOneFile(db: Db, file: string): void {
   }
 }
 
+/**
+ * Fill in the original-language artist and title for beatmaps cached before those columns
+ * existed.
+ *
+ * Every other lazily-filled beatmap column -- `length_ms`, the three filter dates -- is read
+ * on the first request that needs it, because each is needed for one beatmap at a time. This
+ * one is not: the page draws a hundred titles in one query, and a setting that only took
+ * effect on the maps someone happened to open would look broken rather than lazy.
+ *
+ * So it is a pass, and it is cheap for the same reason the beatmap index is expensive: this
+ * table holds one row per beatmap actually *played*, not one per file in osu!'s store. A row
+ * whose `.osu` cannot be read is written `''` like one that has no original-language title,
+ * so a missing file costs one attempt and never another.
+ *
+ * Sliced like the index and with no transaction of its own: it shares the connection with the
+ * tracker, and a transaction held open across a pause would swallow whatever the tracker
+ * committed inside it. A row lost to an unrelated rollback is simply filled in on the next
+ * launch.
+ */
+export async function backfillOriginalMetadata(db: Db): Promise<number> {
+  const rows = db
+    .prepare(
+      `SELECT md5, osu_path FROM beatmaps
+        WHERE title_unicode IS NULL OR artist_unicode IS NULL`,
+    )
+    .all() as { md5: string; osu_path: string | null }[];
+  if (rows.length === 0) return 0;
+
+  const update = db.prepare(
+    'UPDATE beatmaps SET artist_unicode = ?, title_unicode = ? WHERE md5 = ?',
+  );
+  let filled = 0;
+  let sliceStart = performance.now();
+  for (const row of rows) {
+    const meta = row.osu_path === null ? null : parseOsuMetadata(row.osu_path);
+    update.run(meta?.artistUnicode ?? '', meta?.titleUnicode ?? '', row.md5);
+    filled++;
+    if (performance.now() - sliceStart >= SLICE_MS) {
+      await breathe();
+      sliceStart = performance.now();
+    }
+  }
+  return filled;
+}
+
 interface OsuMetadata {
   artist: string | null;
   title: string | null;
+  /** `ArtistUnicode` / `TitleUnicode`: the song's own script, where the file carries one. */
+  artistUnicode: string | null;
+  titleUnicode: string | null;
   version: string | null;
   creator: string | null;
   beatmapId: number | null;
@@ -323,6 +381,8 @@ function parseOsuMetadataText(text: string): OsuMetadata {
   const out: OsuMetadata = {
     artist: null,
     title: null,
+    artistUnicode: null,
+    titleUnicode: null,
     version: null,
     creator: null,
     beatmapId: null,
@@ -338,6 +398,10 @@ function parseOsuMetadataText(text: string): OsuMetadata {
     const value = line.slice(sep + 1).trim();
     if (key === 'Artist') out.artist = value;
     else if (key === 'Title') out.title = value;
+    // Not every .osu has these, and plenty that do simply repeat the romanised value. Both
+    // are kept as written: deciding they are "the same" is the reader's job, not the parser's.
+    else if (key === 'ArtistUnicode') out.artistUnicode = value;
+    else if (key === 'TitleUnicode') out.titleUnicode = value;
     else if (key === 'Version') out.version = value;
     else if (key === 'Creator') out.creator = value;
     else if (key === 'BeatmapID') out.beatmapId = Number(value) || null;
@@ -593,6 +657,8 @@ export class BeatmapResolver {
         status: (cached['status'] as number | null) ?? null,
         artist: (cached['artist'] as string | null) ?? null,
         title: (cached['title'] as string | null) ?? null,
+        artistUnicode: (cached['artist_unicode'] as string | null) ?? null,
+        titleUnicode: (cached['title_unicode'] as string | null) ?? null,
         version: (cached['version'] as string | null) ?? null,
         creator: (cached['creator'] as string | null) ?? null,
       };
@@ -610,6 +676,8 @@ export class BeatmapResolver {
       status: null,
       artist: null,
       title: null,
+      artistUnicode: null,
+      titleUnicode: null,
       version: null,
       creator: null,
     };
@@ -636,6 +704,9 @@ export class BeatmapResolver {
       const meta = parseOsuMetadata(result.osuPath);
       result.artist = meta.artist;
       result.title = meta.title;
+      // '' for a file that carried neither, so the row is never read a second time for them.
+      result.artistUnicode = meta.artistUnicode ?? '';
+      result.titleUnicode = meta.titleUnicode ?? '';
       result.version = meta.version;
       result.creator = meta.creator;
       result.beatmapId ??= meta.beatmapId;
@@ -645,8 +716,9 @@ export class BeatmapResolver {
     this.db
       .prepare(
         `INSERT OR REPLACE INTO beatmaps
-         (md5, beatmap_id, beatmapset_id, artist, title, version, creator, status, osu_path, cached_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (md5, beatmap_id, beatmapset_id, artist, title, artist_unicode, title_unicode,
+          version, creator, status, osu_path, cached_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         md5,
@@ -654,6 +726,8 @@ export class BeatmapResolver {
         result.beatmapsetId,
         result.artist,
         result.title,
+        result.artistUnicode,
+        result.titleUnicode,
         result.version,
         result.creator,
         result.status,

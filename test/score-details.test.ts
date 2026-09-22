@@ -235,7 +235,8 @@ test("the difficulty badge is the map's rating, never a modded score's", () => {
 
     // osu!'s own figure wins when the set has been favourited.
     saveDetails(h.db, {
-      id: 1830679, title: 'Cruel Summer', artist: 'Taylor Swift', creator: 'funny', userId: 99,
+      id: 1830679, title: 'Cruel Summer', artist: 'Taylor Swift', titleUnicode: null,
+      artistUnicode: null, creator: 'funny', userId: 99,
       status: 'ranked', nsfw: false, spotlight: false, featuredArtist: false, video: false,
       storyboard: false, favouriteCount: 0, playCount: 0, date: null,
       difficulties: [{ id: 3770193, mode: 'osu', stars: 3.5, version: "Seolv's Hard" }],

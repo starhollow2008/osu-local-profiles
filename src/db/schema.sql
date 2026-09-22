@@ -120,6 +120,12 @@ CREATE TABLE IF NOT EXISTS beatmaps (
   beatmapset_id INTEGER,
   artist        TEXT,
   title         TEXT,
+  -- The same two as the .osu file's ArtistUnicode/TitleUnicode: the song's own script, which
+  -- osu! shows when "prefer metadata in original language" is on. '' means the file was read
+  -- and carried no original-language variant, so the romanised one above is the answer and
+  -- nothing is re-read; NULL means never looked up. See originalMetadataBackfill.
+  artist_unicode TEXT,
+  title_unicode  TEXT,
   version       TEXT,
   creator       TEXT,
   status        INTEGER,

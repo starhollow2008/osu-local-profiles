@@ -15,6 +15,7 @@ import {
 } from '../calc/pp.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { accuracy, gradeOf, passed } from '../calc/grade.ts';
+import { beatmapName, beatmapNameOriginal, resolvedNames } from '../calc/metadata.ts';
 import {
   beatmapFilterFacts,
   defaultTrackingFilter,
@@ -51,6 +52,8 @@ export interface IngestedScore {
   id: number;
   mode: Ruleset;
   title: string;
+  /** The same beatmap in the song's own script, or null where it reads the same. */
+  titleOriginal: string | null;
   modsLabel: string;
   accuracy: number;
   grade: string;
@@ -81,15 +84,33 @@ export type IngestOutcome =
    * decision the user made. It carries what the play was and which criterion rejected it, so
    * the console and the page can say so rather than the play vanishing silently.
    */
-  | { status: 'filtered'; criterion: FilterCriterion; title: string };
+  | { status: 'filtered'; criterion: FilterCriterion; title: string; titleOriginal: string | null };
 
 /**
  * What to call the play in a message. Hoisted out of the result because a play the filter
  * turns away needs naming too, and there is nothing else to identify it by.
+ *
+ * Both scripts, so a page set to prefer metadata in its original language says the same thing
+ * in a toast as it does in the row the toast is about. The console keeps the romanised one:
+ * a terminal is not guaranteed to have a font for the other.
  */
-function describe(beatmap: { artist: string | null; title: string | null; version: string | null }, md5: string): string {
-  const title = [beatmap.artist, beatmap.title].filter(Boolean).join(' - ') || md5.slice(0, 12);
-  return beatmap.version ? `${title} [${beatmap.version}]` : title;
+export function describe(
+  beatmap: {
+    artist: string | null;
+    title: string | null;
+    artistUnicode: string | null;
+    titleUnicode: string | null;
+    version: string | null;
+  },
+  md5: string,
+): { title: string; titleOriginal: string | null } {
+  const n = resolvedNames(beatmap);
+  const withVersion = (name: string) => (beatmap.version ? `${name} [${beatmap.version}]` : name);
+  const original = beatmapNameOriginal(n);
+  return {
+    title: withVersion(beatmapName(n) || md5.slice(0, 12)),
+    titleOriginal: original === null ? null : withVersion(original),
+  };
 }
 
 /** A replay identifies itself; fall back to map+time for stable replays with no hash. */
@@ -177,7 +198,7 @@ export async function ingestScore(
   if (filter.enabled) {
     facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
     const rejected = filterRejects(filter, playFacts(facts, mode, mods));
-    if (rejected) return { status: 'filtered', criterion: rejected, title: named };
+    if (rejected) return { status: 'filtered', criterion: rejected, ...named };
   }
 
   /*
@@ -196,7 +217,7 @@ export async function ingestScore(
   // play whose rating could not be calculated is not rejected on it -- see filterRejects.
   if (facts !== null && computed !== null) {
     const rejected = filterRejects(filter, { stars: computed.stars });
-    if (rejected) return { status: 'filtered', criterion: rejected, title: named };
+    if (rejected) return { status: 'filtered', criterion: rejected, ...named };
   }
 
   /*
@@ -272,7 +293,7 @@ export async function ingestScore(
     score: {
       id,
       mode,
-      title: named,
+      ...named,
       modsLabel: label,
       accuracy: acc,
       grade,

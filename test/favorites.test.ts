@@ -44,6 +44,8 @@ const details = (id: number, over: Partial<BeatmapsetDetails> = {}): BeatmapsetD
   id,
   title: `Title ${id}`,
   artist: 'Artist',
+  titleUnicode: null,
+  artistUnicode: null,
   creator: 'Mapper',
   userId: 42,
   status: 'ranked',

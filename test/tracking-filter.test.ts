@@ -576,6 +576,7 @@ test('the page is told that a filter is on, and when one declines a play', async
     await new Promise((r) => setTimeout(r, 50));
     tracker.emit('filtered', {
       title: 'Artist - Title [Insane]',
+      titleOriginal: null,
       criterion: 'mods',
       kind: 'score',
       at: Date.now(),
