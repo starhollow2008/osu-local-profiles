@@ -1,11 +1,13 @@
 # Changelog
 
-## Unreleased
+## 1.21.0
 
 - **An Intel Mac build.** Releases now carry `osx-x64` beside `osx-arm64`. Before this an
   Intel Mac had nothing it could run: the Apple silicon archive bundles an arm64 Node and pp
   calculator, and there is no reverse Rosetta. About a tenth of osu!'s own macOS users are on
   Intel, and osu! still ships for them.
+
+- Every em dash in the app's text is now a plain hyphen.
 
 ## 1.20.0
 
