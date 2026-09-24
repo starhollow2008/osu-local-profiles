@@ -24,6 +24,7 @@ Features:
 - Import previous plays instead of starting a profile fresh
 - **Play tracking filter** - only track scores that meet specified criteria, e.g. keywords, mods, difficulty, ranked date
 - Option to remove scores from profile
+- Automatically detects updates and installs with one click
 
 
 Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
