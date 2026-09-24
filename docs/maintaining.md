@@ -139,3 +139,21 @@ This rebuilds every tracked score from its replay file. It must not pass a play 
 To fill in values on existing scores *without* replacing them - keeping their ids, which is what
 you want in normal use - the page's **Options -> Other settings** offers a recalculation
 instead, and the app can stay running.
+
+## README screenshots
+
+The README's images live in `docs/images/`, as `.webp`. Git keeps every version of a file
+forever, so every replaced screenshot stays in every clone for good: keep them few, cropped to
+what they show, and re-encoded (a full-width page section is 60-160KB as WebP at quality 90,
+against 150KB-1.4MB as PNG), and replace one only when the page actually looks different.
+`docs/` is never packaged, so none of this reaches a release. Never put them in `web/`, which
+ships with every release.
+
+## The sample profile
+
+The README's sample profile is `index.html` on the `gh-pages` branch, served by GitHub Pages at
+https://jonathant09.github.io/osu-local-profiles/. It is a copy saved from Share -> Save as a
+web page, so it is updated by saving a new one and committing it there. That branch shares no
+history with `main`, which keeps a file of a megabyte or more out of every clone of the code.
+Open a new copy from disk before publishing it: anything it still fetches from the app shows
+up there, broken, exactly as it would online.
