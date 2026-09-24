@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.22.0
 
 - **Back up everything is now a complete backup, and it can be restored.** Share & back up's
   Back up section is rebuilt around one backup:
