@@ -19,6 +19,7 @@ Features:
 - **Works fully offline  (no API key needed)** 
   - Internet connection is optionally used to fetch beatmap cover arts, song audio previews, or import existing profile details.
 - Switching between multiple profiles
+- Default gamemode on launch is automatically determined by last played gamemode
 - Edit or import profile details, such as Name, Avatar, Banner, me! section, scores, etc.
 - **pp for unranked maps**
 - Import previous plays instead of starting a profile fresh
@@ -54,7 +55,7 @@ Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-t
 
 ```
 npm install
-npm run build:pp     # builds the osu! pp helper (needs the .NET 8 SDK)
+npm run build:pp     # builds the osu! pp helper (needs the .NET 10 SDK)
 npm run dev          # or double-click start.bat
 npm run check:app    # verify the install without starting to track
 ```
@@ -75,7 +76,7 @@ Stable users only:
 | TypeScript | app, using Node's type stripping (no compile) |
 | Node.js 22.5+ | `node:sqlite`, `node:http`, `node:zlib` |
 | Vanilla DOM, ES modules and CSS | profile page |
-| .NET 8 | official pp calculator |
+| .NET 10 | official pp calculator |
 | Official `ppy.osu.Game.Rulesets.*` | official pp calculator |
 | Go + `fyne.io/systray` | tray and menu bar launcher |
 | GitHub Actions | CI and cross-platform releases |
@@ -153,6 +154,7 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
 ## Known limitations
 
 - Official osu! pp calculator needs .NET 8 SDK, adding ~70MB to the file size
+- The official osu! pp calculator adds ~70MB to the download (it bundles its own .NET 10 runtime)
 - **Global rank is only an estimate and needs occasional manual refreshes.** It is interpolated from a pp->rank curve built
   from a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase
   grows. Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
