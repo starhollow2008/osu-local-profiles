@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.23.0
+
+- **Mod badges show osu!'s own icon for every mod**, in place of the acronym. The badge is
+  osu-web's own markup and styling, so rate and Difficulty Adjust extenders look as they do on
+  osu!, and a customised mod's cog now overhangs the corner the same way.
+
+- **Grades are osu!'s own badges.** Scores use osu-web's grade pictures, and a card for an
+  osu!stable score shows stable's own grade letters.
+
+- **A profile with no picture shows osu!'s guest avatar**, as osu! does for any player without
+  one, instead of an initial on a colour picked from the name.
+
+- **osu! local profiles is now licensed under the AGPL-3.0-or-later**, the licence osu-web is
+  under, which is what lets the page use osu-web's artwork above. Releases up to 1.22.0 stay
+  MIT. Every download now carries `LICENSE` and `THIRD-PARTY-NOTICES.md`, the page footer links
+  the licence beside Source code, and a copy saved with Share -> Save as a web page names the
+  licence, the source and the osu-web artwork it carries.
+
 ## 1.22.0
 
 - **Back up everything is now a complete backup, and it can be restored.** Share & back up's
