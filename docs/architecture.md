@@ -197,9 +197,14 @@ Page can reset/delete profiles and remove scores with no auth. `startServer` ref
 
 Read `docs/osu-web-fidelity.md` before any "make it look more like osu!" work. Maps every visible region to osu-web LESS/TSX. Carries clone command for `reference/osu-web` (6.5MB sparse, gitignored checkout).
 
-**Values, never files.** osu-web is AGPL-3.0-or-later, this project is MIT. No code/image copied out. Colours, sizes, ratios, wording are facts. `ppy/osu-resources` is CC-BY-NC - cannot use.
+**osu-web's own files, under its own licence.** Project relicensed MIT → AGPL-3.0-or-later (roadmap 5.57), the licence osu-web is under, so osu-web code and artwork may be used with credit. Up to v1.22.0 stays MIT; its notice is kept in `THIRD-PARTY-NOTICES.md`.
 
-Flags from Twemoji (CC-BY 4.0, same source as osu!). Two generated tables: `web/js/mod-definitions.js` (`npm run build:mods`), `web/flags/` (`npm run build:flags`).
+- **Artwork is vendored, never hand-copied.** `scripts/build-osu-web-art.mjs` (`npm run build:osu-web`) copies mod glyphs + badge blanks, GradeSmall badges, stable's `legacy-ranking-*@2x.png`, the guest avatar into `web/osu-web/` byte for byte from one osu-web commit (recorded in `web/osu-web/README.md`; `.gitattributes` keeps line endings untouched), and writes `web/css/osu-web-art.css` mapping classes to files. The acronym → glyph table is read from osu-web's `mod.less`, so new glyphs arrive on the next run. `test/osu-web-art.test.ts` checks every mod in `mod-definitions.js` has one.
+- **Pictures via stylesheet `url()`, not `assetUrl()`.** CSS masks/backgrounds, as osu-web does them. A saved copy inlines the stylesheets, so `inlineCssUrls` in `share-copy.js` turns each same-origin `url()` into a data: URI.
+- **Markup follows osu-web's.** `modPill()` builds `mod.tsx`'s DOM; `.mod` in `profile.css` is `mod.less` ported (`color-mix` darkenings included). `gradeBadge()` is `score-rank`; `legacyRank()` is `legacy-rank`; `guestAvatar()` is `avatar--guest`.
+- **Still off limits:** `ppy/osu-resources` (CC-BY-NC, incompatible with AGPL's no-further-restrictions), Torus/Venera (MyFonts licence restricted to ppy), osu!/ppy logos (trademarks, outside osu-web's grant).
+
+Flags from Twemoji (CC-BY 4.0, same source as osu!). Generated: `web/js/mod-definitions.js` (`npm run build:mods`), `web/flags/` (`npm run build:flags`), `web/osu-web/` + `web/css/osu-web-art.css` (`npm run build:osu-web`).
 
 ## Medal definitions: from osu!, not symmetric
 
@@ -321,7 +326,7 @@ macOS and Linux written, CI-covered, never run against real osu! install. Since 
 
 ## me! (BBCode): never trusted
 
-`web/js/bbcode.js` is our renderer (osu-web's library is AGPL; tag semantics only taken). me! imported from anyone's profile → text treated as hostile:
+`web/js/bbcode.js` is our renderer (osu-web's library is server-side PHP; tag semantics only taken). me! imported from anyone's profile → text treated as hostile:
 
 - Escaped first, never parsed as HTML
 - Every tag emitted is one written in that file

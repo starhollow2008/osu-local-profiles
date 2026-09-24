@@ -17,16 +17,27 @@ cd reference/osu-web
 git sparse-checkout set resources/css resources/js/profile-page resources/js/components \
     resources/js/beatmapset-panel resources/js/utils resources/js/core/osu-audio resources/lang/en \
     resources/js/scores-show resources/js/scores \
-    resources/views/users public/images/badges public/images/flags database
+    resources/views/users public/images/badges public/images/flags public/images/layout \
+    resources/images/scores database
 ```
 
-6.5 MB instead of 158 MB, and `reference/` is gitignored.
+About 7 MB instead of 158 MB, and `reference/` is gitignored.
 
-**It is a reference, not a source of files.** osu-web is AGPL-3.0-or-later; this project is
-MIT. Nothing is copied out of it: not a LESS rule, not an SVG path, not an image. What is
-taken is *values* - colours, sizes, ratios, the order of things, the names in a tooltip -
-which is why every table in `osu-web-reference.md` is a table of numbers rather than a
-stylesheet. Keep it that way, and the licence question never arises.
+**It is a reference, and a source.** This project is AGPL-3.0-or-later, the licence osu-web is
+under, so osu-web's files can be used as they are (roadmap 5.57). There are two ways in, and
+only two:
+
+- **Artwork** goes through `npm run build:osu-web` (`scripts/build-osu-web-art.mjs`), which
+  copies it unedited into `web/osu-web/` from one osu-web commit and writes
+  `web/css/osu-web-art.css` to point the page's classes at it. Never copy an image by hand,
+  and never edit one in place: add it to the script's lists.
+- **Code** (a LESS rule, a TSX component's markup) is ported into this project's files, with
+  a comment naming the osu-web file it came from. `.mod` in `profile.css` and `modPill()`
+  in `badges.js` are the example.
+
+Taking the file beats measuring it: measuring is how the mod glyphs stayed missing for so
+long. Where a value is still reimplemented rather than ported, the tables in
+`osu-web-reference.md` record where it came from.
 
 Refresh it with `git -C reference/osu-web pull` before a fidelity pass, since osu-web moves.
 
@@ -34,18 +45,20 @@ Refresh it with `git -C reference/osu-web pull` before a fidelity pass, since os
 
 | | source | licence | usable here |
 |---|---|---|---|
-| colours, metrics, ratios, layout order | osu-web LESS/TSX | facts, not expression | **yes** |
+| LESS, TSX markup, colours, metrics | osu-web `resources/` | AGPL-3.0-or-later | **yes**, ported with its source named |
+| mod glyphs and blanks, grade badges, stable's grade letters, guest avatar | osu-web `public/images/`, `resources/images/` | AGPL-3.0-or-later | **yes**, vendored by `scripts/build-osu-web-art.mjs` |
 | mod names, types, setting labels | osu-web `database/mods.json` | facts about the game | **yes**, via `scripts/build-mod-table.mjs` |
 | country flags | [Twemoji](https://github.com/jdecked/twemoji) | CC-BY 4.0 | **yes**, vendored by `scripts/build-flags.mjs` |
-| grade badges, mod glyphs, medal art | osu-web `public/images/` | AGPL-3.0 | **no** - redraw, or fall back |
-| in-game textures, lazer's flags | `ppy/osu-resources` | **CC-BY-NC 4.0** | **no** - NonCommercial is incompatible with MIT *and* AGPL, and with taking donations |
-| Torus, Venera | Monotype / Paulo Goode | commercial | **no** - used if the machine already has it, never shipped |
+| medal art | `assets.ppy.sh`, not in the osu-web repository | not granted | loaded at runtime over a drawn placeholder, never shipped |
+| osu! and ppy logos | osu-web `public/images/layout/` | **trademarks**, outside osu-web's grant | **no** |
+| in-game textures, lazer's flags, lazer's mod icons | `ppy/osu-resources` | **CC-BY-NC 4.0** | **no** - NonCommercial is a further restriction, which the AGPL forbids |
+| Torus, Venera | Monotype / Paulo Goode, via MyFonts | licensed to osu!'s website alone (`torus.less` says so) | **no** - used if the machine already has it, never shipped |
 
 The osu-resources row is the one that catches people: lazer's own flag and mod textures
-look like the obvious source and are the one source that cannot be used at all. Twemoji is
-where osu! got the flags from in the first place (`osu-resources`' own `osu_flags.sh`
-generates them from it), so going upstream gets the same artwork under a licence that
-allows redistribution.
+look like the obvious source and are the one source that cannot be used at all. osu-web's
+copies of the mod glyphs are the usable ones. Twemoji is where osu! got the flags from in the
+first place (`osu-resources`' own `osu_flags.sh` generates them from it), and the flags stay
+on it: the same artwork, pinned to a version.
 
 ## Region map
 
@@ -59,12 +72,14 @@ allows redistribution.
 | global rank, pp, ranked maps | `#globalRank`, `#totalPp` | `profile-page/detail-stats.tsx`, `bem/profile-detail-stats.less` |
 | rank chart | `#ppChart` | `profile-page/rank-chart.tsx`, `bem/line-chart.less` |
 | grade counts | `#gradeCounts`, `.profile-rank-count` | `bem/profile-rank-count.less`, `bem/score-rank.less` |
-| grade badges | `gradeBadge()` in `web/js/badges.js` | `public/images/badges/score-ranks-v2019/GradeSmall-*.svg` |
+| grade badges | `gradeBadge()` in `web/js/badges.js`, `.score-rank--*` | `bem/score-rank.less`, `public/images/badges/score-ranks-v2019/GradeSmall-*.svg` |
 | hit counts / stats box | `#profileStats`, `.profile-stats` | `bem/profile-stats.less` |
 | section tabs | `#sectionTabs`, `.page-mode` | `bem/page-mode.less`, `bem/page-mode-link.less` |
 | section panels | `.page-extra` | `bem/page-extra.less`, `bem/title.less` |
 | score rows | `.play-detail` | `profile-page/play-detail.tsx`, `bem/play-detail.less` |
-| mod badges | `modPill()` in `web/js/badges.js` | `components/mod.tsx`, `bem/mod.less`, `bem/mods.less` |
+| mod badges | `modPill()` in `web/js/badges.js`, `.mod` in `profile.css` | `components/mod.tsx`, `bem/mod.less`, `bem/mods.less`, `public/images/badges/mods/` |
+| a stable score's big letter | `legacyRank()` in `web/js/score-card.js` | `bem/legacy-rank.less`, `resources/images/scores/legacy-ranking-*.png` |
+| avatar of a profile with no picture | `guestAvatar()` in `web/js/badges.js` | `bem/avatar.less` (`avatar--guest`), `public/images/layout/avatar-guest.png` |
 | which score a row shows | `scoreColumn()` in `src/calc/eligibility.ts` | `utils/score-helper.ts` (`totalScore`: legacy, then classic, then standardised) |
 | most played | `.beatmap-playcount` | `profile-page/beatmap-playcount.tsx`, `bem/beatmap-playcount.less` |
 | play history chart | `#playHistory` | `profile-page/chart.tsx`, `profile-page/historical.tsx` |
@@ -89,23 +104,17 @@ What is deliberately not identical, and why. Anything not on this list that look
 a bug, not a decision.
 
 - **Typeface, and it is the largest remaining difference.** osu! sets **Torus** for the page
-  (`@font-default`) and **Venera** for the letter on a grade badge and the acronym on a mod
-  (`@font-grade`). Both are commercial and neither can be shipped. `--font-default` and
+  (`@font-default`) and **Venera** for display letters (`@font-grade`). Both are licensed to
+  osu!'s website alone and neither can be shipped, under any licence. `--font-default` and
   `--font-grade` name them first, so a machine that already has them uses them; every other
-  machine falls through to Inter and the body font. Venera is a heavy display face, so those
-  letterforms are lighter and narrower here than on osu! even though the sizes match
-  (`0.4em` on a mod acronym, straight from `mod.less`). Sizes are osu!'s and should not be
-  tuned upward to compensate - that trades a measured value for an eyeballed one.
-- **Mod glyphs.** osu-web masks a per-mod SVG (`public/images/badges/mods/mod-*.svg`, 71 of
-  them, AGPL) into the badge. `badges.js` draws the badge, the type colour, the darkened
-  foreground, the extender tab and the cog exactly, and puts the **acronym** where the glyph
-  would go - which is what osu! itself does for any mod it has no glyph for. The badge is
-  right; the pictogram inside it is not there.
-- **Grade badge facets.** The pill's colours, gradients and 32x16 geometry are osu!'s. The
-  flat triangles that facet the background are drawn to match rather than traced.
-- **Customised-mod cog** sits inside the badge instead of overhanging its top-right corner,
-  because each badge is its own SVG and overhanging would make a customised mod a different
-  size from its neighbours.
+  machine falls through to Inter and the body font. Venera now shows in only two places: the
+  grade in the middle of a lazer score's dial, and the acronym on a mod osu-web has no glyph
+  for (none, as of roadmap 5.57). Grade badges, stable's letters and mod glyphs are osu-web's
+  own pictures, so their letterforms are exact. Sizes are osu!'s and should not be tuned
+  upward to compensate - that trades a measured value for an eyeballed one.
+- **`.mod` takes its size from the row.** osu-web's `.mod` sets its own font-size from
+  `--mod-height`; here the row around it does, as every caller already did. The badge
+  measures the same.
 - **View Details is a card first, and a page second.** osu! opens a score at
   `/scores/<id>`; here View Details is a dialog over the profile, so closing it leaves the
   page as it was, and the same card is also served on a page of its own at `/scores/<id>`
@@ -115,10 +124,6 @@ a bug, not a decision.
   real one is.
 - **The score card's Global Rank and "Watched" rows** are left out: both are facts about
   osu!'s leaderboards. The user card's online dot says whether the profile is tracking.
-- **A stable score's big grade letter** is osu-web's `legacy-ranking-*.png`, stable's
-  default-skin artwork. It is drawn here instead -- the grade's colour top to bottom under a
-  white outline, in `--font-grade`, at osu!'s 200x160 -- so the shape of each letter is the
-  fallback face's, not stable's.
 - **Country rank** is not shown at all - see `CLAUDE.md`. Not a fidelity gap; a deliberate
   refusal to fabricate a number.
 
@@ -127,6 +132,7 @@ a bug, not a decision.
 Regenerate after an osu-web change; both fail loudly rather than writing a partial file.
 
 ```sh
+node scripts/build-osu-web-art.mjs # web/osu-web/, web/css/osu-web-art.css - 70 glyphs, grades, letters
 node scripts/build-mod-table.mjs   # web/js/mod-definitions.js  - 69 mods
 node scripts/build-flags.mjs       # web/flags/<cc>.svg         - 258 flags
 node scripts/build-medal-table.mjs # src/calc/medal-definitions.json
@@ -136,7 +142,7 @@ node scripts/build-medal-table.mjs # src/calc/medal-definitions.json
 
 1. Refresh the checkout.
 2. Find the region in the map above and **read the LESS and the TSX**.
-3. Take values, never files.
+3. Take the file: artwork through `build-osu-web-art.mjs`, code ported with its source named.
 4. Record any new deviation under **Known deltas**, with the reason.
 5. `npm run check`, then `npm run ui` - the browser check asserts computed style, which is
    where a fidelity change actually lands.

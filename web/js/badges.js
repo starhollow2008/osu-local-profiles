@@ -1,10 +1,11 @@
 /**
  * The bits of osu!'s visual language that are images on osu.ppy.sh: grade badges, mod
- * pills, the level hexagon, the avatar.
+ * badges, the level hexagon, the avatar.
  *
- * They are generated as inline SVG rather than fetched, so the page is complete with no
- * network. The palettes come from docs/osu-web-reference.md; the shapes are drawn here
- * rather than copied from osu-web's assets.
+ * Grade badges, mod glyphs and the guest avatar are osu-web's own artwork, vendored into
+ * web/osu-web/ by scripts/build-osu-web-art.mjs and pointed at by web/css/osu-web-art.css.
+ * What is built here is osu-web's markup for them, so the class names are osu-web's too;
+ * everything is local, so the page is complete with no network.
  */
 import { escapeHtml } from './format.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
@@ -13,78 +14,17 @@ import { MOD_DEFINITIONS } from './mod-definitions.js';
 let uid = 0;
 const nextId = (prefix) => `${prefix}${++uid}`;
 
-/*
- * Grade badge palettes, read from GradeSmall-*.svg.
- *
- * `letter` is the flat letterform colour used by A..F. SS and S do not use it: their
- * letterform carries a *gradient*, and which gradient is the entire gold/silver cue --
- * gold #FFE7A8 -> #FFB800 on SS/S, white -> #AADFF0 on the silver SSH/SH. Both run
- * vertically from y=2.08 to y=16 in the same 32x16 box, so the two variants differ by
- * nothing but their two stops.
- */
-const GRADE_GRADIENT = {
-  gold: ['#FFE7A8', '#FFB800'],
-  silver: ['#FFFFFF', '#AADFF0'],
-};
-/*
- * `letter` is osu!'s letterform colour taken about a fifth darker. osu! draws the letter in
- * Venera, a wide heavy display face this project cannot ship; in the fallback face the same
- * colour reads lighter and thinner against the pill, so the extra depth restores roughly
- * the contrast osu!'s own badge has.
- */
-const GRADE_PALETTE = {
-  X: { pill: '#CE1C9D', light: '#DE31AE', darkA: '#C30B90', darkB: '#BE0089', letter: '#4B1D3E' },
-  S: { pill: '#00A8B5', light: '#02B5C3', darkA: '#009DAA', darkB: '#0096A2', letter: '#074045' },
-  A: { pill: '#7CCE14', light: '#88DA20', darkA: '#72C904', darkB: '#69BB00', letter: '#1F421F' },
-  B: { pill: '#E3B130', light: '#EBBD48', darkA: '#DCA519', darkB: '#D99D03', letter: '#442E22' },
-  C: { pill: '#F18252', light: '#FF8E5D', darkA: '#EA7948', darkB: '#E67342', letter: '#392B1E' },
-  D: { pill: '#E95353', light: '#FF5A5A', darkA: '#DE4949', darkB: '#D63D3D', letter: '#411E1E' },
-  F: { pill: '#373737', light: '#3F3F3F', darkA: '#2E2E2E', darkB: '#2E2E2E', letter: '#1F1F1F' },
-};
-
-/** XH/SH are the silver variants of X/S; everything else maps to itself. */
-const GRADE_BASE = { XH: 'X', X: 'X', SH: 'S', S: 'S', A: 'A', B: 'B', C: 'C', D: 'D', F: 'F' };
+/** What each grade says, for its label. The picture is osu-web's GradeSmall-*.svg. */
 const GRADE_TEXT = { XH: 'SS', X: 'SS', SH: 'S', S: 'S', A: 'A', B: 'B', C: 'C', D: 'D', F: 'F' };
 
 /**
- * A 32x16 pill, faceted with flat triangles and stamped with the grade. Returns markup,
- * not an element, so it can be dropped into a template string.
+ * osu-web's `score-rank`: a 2em x 1em badge, sized by the font-size of wherever it sits.
+ * Returns markup, not an element, so it can be dropped into a template string.
  */
 export function gradeBadge(grade, { title } = {}) {
-  const key = GRADE_BASE[grade] ?? 'F';
-  const p = GRADE_PALETTE[key];
-  const text = GRADE_TEXT[grade] ?? 'F';
-  const silver = grade === 'XH' || grade === 'SH';
-
-  const clip = nextId('gclip');
-  const grad = nextId('ggrad');
-  // Only SS and S are gradient-filled; A..F take the flat dark letterform.
-  const stops = key === 'X' || key === 'S' ? GRADE_GRADIENT[silver ? 'silver' : 'gold'] : null;
-  const fill = stops === null ? p.letter : `url(#${grad})`;
-
-  return `<svg viewBox="0 0 32 16" role="img" aria-label="${escapeHtml(title ?? `${text} rank`)}">
-  <defs>
-    <clipPath id="${clip}"><rect width="32" height="16" rx="8"/></clipPath>
-    ${stops === null ? '' : `<linearGradient id="${grad}" x1="16" y1="2.08" x2="16" y2="16" gradientUnits="userSpaceOnUse">
-      <stop stop-color="${stops[0]}"/><stop offset="1" stop-color="${stops[1]}"/>
-    </linearGradient>`}
-  </defs>
-  <g clip-path="url(#${clip})">
-    <rect width="32" height="16" fill="${p.pill}"/>
-    <path d="M16 -8 L34 22 L-2 22 Z" fill="${p.light}"/>
-    <path d="M26 2 L33 14 L19 14 Z" fill="${p.darkA}"/>
-    <path d="M7 -3 L12 5 L2 5 Z" fill="${p.darkB}"/>
-    <path d="M9 12 L14 20 L4 20 Z" fill="${p.darkB}"/>
-  </g>
-  <!-- Sized for the fallback face, which is narrower than osu!'s Venera: at osu!'s own size
-       the letter sat small in the pill. The gold and silver letters get a faint dark edge,
-       because a light gradient on a saturated pill otherwise loses its outline. -->
-  <text x="16" y="12.6" text-anchor="middle" fill="${fill}"
-        font-size="${text.length > 1 ? 12 : 12.5}" font-weight="900"
-        letter-spacing="${text.length > 1 ? -0.5 : 0}"
-        ${stops === null ? '' : 'stroke="rgba(0,0,0,0.28)" stroke-width="0.7" paint-order="stroke"'}
-        style="font-family: var(--font-grade)">${text}</text>
-</svg>`;
+  const key = grade in GRADE_TEXT ? grade : 'F';
+  const label = title ?? `${GRADE_TEXT[key]} rank`;
+  return `<div class="score-rank score-rank--${key}" role="img" aria-label="${escapeHtml(label)}"></div>`;
 }
 
 /**
@@ -109,109 +49,21 @@ export function incompleteBadge() {
 /* ------------------------------------------------------------------------ */
 
 /*
- * The accent colour of each mod type, from ppy/osu's `OsuColour.ForModType`, keyed by
- * osu!'s own type names so this table lines up with `mod-definitions.js` entry for entry.
- *
- * A mod no build of this app has heard of is drawn in a neutral grey. It is not guessed
- * into a category: a wrong colour states a fact about the mod that is not true.
+ * osu!'s six mod types, which colour a badge (`.mod--type-*` in profile.css). A mod no build
+ * of this app has heard of gets no type class and is drawn in a neutral grey: a guessed
+ * colour would state a fact about the mod that is not true.
  */
-const MOD_TYPE_COLOUR = {
-  DifficultyReduction: '#b2ff66',
-  DifficultyIncrease: '#ff6666',
-  Automation: '#66ccff',
-  Conversion: '#8c66ff',
-  Fun: '#ff66ab',
-  System: '#ffcc22',
-};
-
-/* hsl(var(--hsl-b1)) resolved, because the badge does its colour arithmetic in JS. */
-const MOD_UNKNOWN_COLOUR = '#705c65';
-
-const round2 = (n) => Math.round(n * 100) / 100;
-
-const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const linearToSrgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
-
-function channels(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => v / 255);
-}
-
-function toHex(rgb) {
-  const byte = (v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
-  return `#${rgb.map(byte).join('')}`;
-}
-
-/**
- * Darken an accent colour towards black, the two ways osu! does it.
- *
- * The two are not the same operation. The glyph colour is `Colour4` interpolation, which
- * osu!framework does in *linear* sRGB; the extender is a plain sRGB multiply. osu-web's
- * `mod.less` reproduces both with `color-mix` and spells out where each comes from --
- * `.Darken(2.8f)` divides every component by 3.8, which is a mix at 1/3.8 = 26.3%.
- *
- * Doing the arithmetic here rather than leaving it to `color-mix` keeps the result the
- * same on any browser, and keeps both constants visible next to their reason.
- */
-function darken(hex, amount, { linear }) {
-  const rgb = channels(hex);
-  return toHex(linear ? rgb.map((c) => linearToSrgb(srgbToLinear(c) * amount)) : rgb.map((c) => c * amount));
-}
+const MOD_TYPES = new Set(['DifficultyReduction', 'DifficultyIncrease', 'Automation', 'Conversion', 'Fun', 'System']);
 
 /*
- * The badge a mod is stamped on: flat top and bottom, a point at each end, rounded
- * corners. osu-web masks with `blanks/mod-icon.svg` at 100x70 and `mod-icon-extender.svg`
- * at 155x70, which is where these numbers come from -- 70 units to 1em, so the icon is
- * 1.42em wide, the extender 2.2em, and they overlap by 0.5em.
- *
- * The shape is constructed here rather than copied: a hexagon inset by half the stroke
- * width and stroked with a round join comes back out to the full size with rounded
- * corners, at the same edge slope as osu!'s.
+ * The customised-mod cog, osu-web's `blanks/mod-cog-badge.svg` (c) ppy Pty Ltd, AGPL-3.0.
+ * Inline rather than `<use href>`d from the file as mod.tsx does, so a saved copy of the page
+ * carries it; the fills are the badge's own CSS variables either way.
  */
-const MOD_UNIT = 70;
-const MOD_ICON_W = 100;
-const MOD_EXTENDER_W = 155;
-const MOD_OVERLAP = 35;
-const MOD_ROUND = 12;
-
-function hexagonPoints(x, width) {
-  const inset = MOD_ROUND / 2;
-  const middle = MOD_UNIT / 2;
-  const top = inset;
-  const bottom = MOD_UNIT - inset;
-  const left = x + inset;
-  const right = x + width - inset;
-  // osu!'s end slope: 25.5 across for 35 up.
-  const run = (middle - inset) * (25.5 / 35);
-
-  return [
-    [left, middle],
-    [left + run, top],
-    [right - run, top],
-    [right, middle],
-    [right - run, bottom],
-    [left + run, bottom],
-  ]
-    .map(([px, py]) => `${round2(px)},${round2(py)}`)
-    .join(' ');
-}
-
-function hexagon(x, width, colour) {
-  return `<polygon points="${hexagonPoints(x, width)}" stroke-width="${MOD_ROUND}"
-      stroke-linejoin="round" style="fill: ${colour}; stroke: ${colour}"/>`;
-}
-
-/** A gear, generated from its tooth count rather than drawn. */
-function cogPoints(cx, cy, outer, inner, teeth) {
-  const points = [];
-  const steps = teeth * 2;
-  for (let i = 0; i < steps; i += 1) {
-    const r = i % 2 === 0 ? outer : inner;
-    const angle = (i / steps) * Math.PI * 2 - Math.PI / 2;
-    points.push(`${round2(cx + Math.cos(angle) * r)},${round2(cy + Math.sin(angle) * r)}`);
-  }
-  return points.join(' ');
-}
+const COG = `<div class="mod__customised-indicator"><svg viewBox="0 0 32 16" width="100%" height="100%" aria-hidden="true">
+  <circle cx="25.5996" cy="5.59961" r="4" style="fill: var(--type-fg-colour)"/>
+  <path d="M27.7676 6.15915L27.3683 5.92852C27.4086 5.71102 27.4086 5.4879 27.3683 5.2704L27.7676 5.03977C27.8136 5.01352 27.8342 4.95915 27.8192 4.90852C27.7151 4.57477 27.5379 4.2729 27.3064 4.02165C27.2708 3.98321 27.2126 3.97384 27.1676 4.00009L26.7683 4.23071C26.6004 4.08634 26.4073 3.97477 26.1983 3.90165V3.44134C26.1983 3.38884 26.1617 3.3429 26.1101 3.33165C25.7661 3.25477 25.4136 3.25852 25.0864 3.33165C25.0348 3.3429 24.9983 3.38884 24.9983 3.44134V3.90259C24.7901 3.97665 24.597 4.08821 24.4283 4.23165L24.0298 4.00102C23.9839 3.97477 23.9267 3.98321 23.8911 4.02259C23.6595 4.2729 23.4823 4.57477 23.3783 4.90946C23.3623 4.96009 23.3839 5.01446 23.4298 5.04071L23.8292 5.27134C23.7889 5.48884 23.7889 5.71196 23.8292 5.92946L23.4298 6.16009C23.3839 6.18634 23.3633 6.24071 23.3783 6.29134C23.4823 6.62509 23.6595 6.92696 23.8911 7.17821C23.9267 7.21665 23.9848 7.22603 24.0298 7.19978L24.4292 6.96915C24.597 7.11353 24.7901 7.22509 24.9992 7.29821V7.75946C24.9992 7.81196 25.0358 7.8579 25.0873 7.86915C25.4314 7.94603 25.7839 7.94228 26.1111 7.86915C26.1626 7.8579 26.1992 7.81196 26.1992 7.75946V7.29821C26.4073 7.22415 26.6004 7.11259 26.7692 6.96915L27.1686 7.19978C27.2145 7.22603 27.2717 7.21759 27.3073 7.17821C27.5389 6.9279 27.7161 6.62602 27.8201 6.29134C27.8342 6.23977 27.8136 6.1854 27.7676 6.15915ZM25.5983 6.34946C25.1848 6.34946 24.8483 6.0129 24.8483 5.59946C24.8483 5.18602 25.1848 4.84946 25.5983 4.84946C26.0117 4.84946 26.3483 5.18602 26.3483 5.59946C26.3483 6.0129 26.0117 6.34946 25.5983 6.34946Z" style="fill: var(--type-bg-colour)"/>
+</svg></div>`;
 
 /* Mods whose extender shows a rate, and the adjustments Difficulty Adjust can show. */
 const RATE_MODS = new Set(['HT', 'DC', 'DT', 'NC']);
@@ -277,68 +129,35 @@ function modTitle(mod, definition) {
 }
 
 /**
- * One mod, as osu! draws it: the type's colour in the badge, the acronym darkened into it,
- * a tab on the right carrying the rate when the mod was sped up or slowed down, and a cog
- * when anything at all about it was customised.
+ * One mod, as osu-web's `components/mod.tsx` draws it: the type's colour in the badge,
+ * osu!'s glyph darkened into it, a tab on the right carrying the rate when the mod was sped
+ * up or slowed down, and a cog when anything at all about it was customised.
  *
- * The acronym is the label rather than a glyph. osu!'s own glyphs are artwork this project
- * cannot redistribute (see docs/osu-web-fidelity.md), and an acronym on the badge is what
- * osu! itself falls back to for any mod it has no glyph for.
+ * The glyph comes from `.mod__icon--<acronym>` in osu-web-art.css. A mod osu-web has no glyph
+ * for shows its acronym instead (`data-acronym`), which is what osu! itself does.
+ *
+ * `title` replaces the tooltip, for a badge that stands for something other than a mod:
+ * the play tracking filter's "no mods at all".
  */
-export function modPill(mod) {
+export function modPill(mod, { title: named } = {}) {
   const m = typeof mod === 'string' ? { acronym: mod } : mod;
   const definition = MOD_DEFINITIONS[m.acronym] ?? null;
-  const colour = definition === null
-    ? MOD_UNKNOWN_COLOUR
-    : MOD_TYPE_COLOUR[definition.type] ?? MOD_UNKNOWN_COLOUR;
-
-  // osu!'s 10% (linear), taken a little further: the fallback face is lighter than Venera,
-  // so the same colour reads weaker on the badge than it does on osu!.
-  const glyphColour = darken(colour, 0.075, { linear: true });
-  const extenderColour = darken(colour, 0.263, { linear: false });
-
+  const type = MOD_TYPES.has(definition?.type) ? ` mod--type-${definition.type}` : '';
   const extended = extendedContent(m);
   const customised = Object.keys(m.settings ?? {}).length > 0;
-  const width = extended === '' ? MOD_ICON_W : MOD_ICON_W + MOD_EXTENDER_W - MOD_OVERLAP;
-  const title = modTitle(m, definition);
+  const title = escapeHtml(named ?? modTitle(m, definition));
+  const acronym = escapeHtml(m.acronym);
 
-  const parts = [];
-
-  // Drawn first so the icon overlaps it, which is what hides the tab's left-hand notch.
-  if (extended !== '') {
-    parts.push(hexagon(MOD_ICON_W - MOD_OVERLAP, MOD_EXTENDER_W, extenderColour));
-    parts.push(`<text x="${round2((MOD_ICON_W + width) / 2)}" y="${MOD_UNIT / 2}"
-      text-anchor="middle" dominant-baseline="central" font-size="35" font-weight="700"
-      style="fill: ${colour}">${escapeHtml(extended)}</text>`);
-  }
-
-  parts.push(hexagon(0, MOD_ICON_W, colour));
-  // `mod.less` sets 0.4em (28 of 70) in Venera. The fallback face is narrower and lighter,
-  // so it is drawn at ~0.49em to fill the badge the way osu!'s acronym does.
-  parts.push(`<text x="${MOD_ICON_W / 2}" y="${MOD_UNIT / 2 + 1}" text-anchor="middle"
-    dominant-baseline="central" font-size="${m.acronym.length > 2 ? 28 : 34}" font-weight="900" letter-spacing="-0.5"
-    style="fill: ${glyphColour}; font-family: var(--font-grade)">${escapeHtml(m.acronym)}</text>`);
-
-  /*
-   * osu! marks a customised mod with a cog over the badge's top-right corner, half of it
-   * hanging outside. Here it is tucked inside instead: the badge's box is its own SVG, and
-   * growing that box to let the cog overhang would make a customised mod a different size
-   * from every other mod in the row.
-   */
-  if (customised) {
-    parts.push(`<g class="mod__customised-indicator">
-      <polygon points="${cogPoints(72, 16, 10, 7, 7)}" style="fill: ${glyphColour}"/>
-      <circle cx="72" cy="16" r="3.5" style="fill: ${colour}"/>
-    </g>`);
-  }
-
-  return `<svg class="mod" viewBox="0 0 ${width} ${MOD_UNIT}" role="img"
-    aria-label="${escapeHtml(title)}"><title>${escapeHtml(title)}</title>${parts.join('')}</svg>`;
+  return `<div class="mod${type}" role="img" aria-label="${title}" title="${title}">` +
+    `<div class="mod__icon mod__icon--${acronym}" data-acronym="${acronym}"></div>` +
+    (extended === '' ? '' : `<div class="mod__extender"><span>${escapeHtml(extended)}</span></div>`) +
+    (customised ? COG : '') +
+    '</div>';
 }
 
 export function modList(mods) {
   if (!mods || mods.length === 0) return '';
-  return mods.map(modPill).join('');
+  return mods.map((mod) => modPill(mod)).join('');
 }
 
 /* ------------------------------------------------------------------------ */
@@ -372,29 +191,12 @@ export function coverUrl(beatmapsetId, size = 'list@2x') {
   return `https://assets.ppy.sh/beatmaps/${beatmapsetId}/covers/${size}.jpg`;
 }
 
-function hashHue(text) {
-  let h = 0;
-  for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) % 360;
-  return h;
-}
-
-/** A drawn stand-in for a profile picture, since a local profile has no account. */
-export function generatedAvatar(name) {
-  const hue = hashHue(name || 'local');
-  const initial = (name || '?').trim().charAt(0).toUpperCase() || '?';
-  const grad = nextId('agrad');
-  return `<svg viewBox="0 0 100 100" role="img" aria-label="${escapeHtml(name)}">
-  <defs>
-    <linearGradient id="${grad}" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="hsl(${hue}, 45%, 42%)"/>
-      <stop offset="1" stop-color="hsl(${(hue + 40) % 360}, 45%, 22%)"/>
-    </linearGradient>
-  </defs>
-  <rect width="100" height="100" fill="url(#${grad})"/>
-  <text x="50" y="50" text-anchor="middle" dominant-baseline="central"
-        font-size="46" font-weight="700" fill="rgba(255,255,255,.85)"
-        font-family="var(--font-default)">${escapeHtml(initial)}</text>
-</svg>`;
+/**
+ * The picture of a profile that has none: osu!'s own guest avatar, as osu-web shows for any
+ * user without one. Filled by `.avatar-guest` in osu-web-art.css.
+ */
+export function guestAvatar(name) {
+  return `<span class="avatar-guest" role="img" aria-label="${escapeHtml(name)}"></span>`;
 }
 
 /*

@@ -873,7 +873,8 @@ being reconstructed from description rather than read from the thing that define
 chart colour, the hover readout, the missing flag and the washed-out SS badge were all the
 same failure. This makes the source readable and writes down what may be taken from it.
 
-**Status: done.**
+**Status: done.** Its "values, never files" licence decisions below were superseded by 5.57,
+which moved the project to AGPL-3.0-or-later and uses osu-web's files directly.
 
 ### Decisions
 
@@ -2759,3 +2760,60 @@ not -- **off by default**, and that half is the load-bearing one.
   once, and that a second launch over the same gap adds nothing.
 - Also pinned: a play set *before* the gap stays out, which is what keeps this from quietly
   absorbing a whole history.
+
+---
+
+## 5.57 - AGPL-3.0, and osu!'s own artwork
+
+**Status:** done -- unreleased.
+
+The user's decision: relicense from MIT to **AGPL-3.0-or-later**, the licence osu-web is under,
+so the page can use osu-web's own files instead of redrawing them. The mod badges were the
+reason. The 70 per-mod glyphs are osu-web artwork, and an acronym where players expect a
+pictogram was the largest visible gap that could be closed. Fonts could not be.
+
+- **Or-later, as osu-web is.** Releases up to v1.22.0 stay MIT for good. MIT permits the code in
+  them, and PR #1 contributed under it, to continue under the AGPL; `THIRD-PARTY-NOTICES.md`
+  keeps the MIT notice, as MIT requires.
+- **Vendored by a script, never by hand.** `npm run build:osu-web` copies from one resolved
+  osu-web commit into `web/osu-web/`, unedited, and records the commit. Byte for byte, so a
+  file here can always be compared with its source; `.gitattributes` stops Git's line-ending
+  conversion from quietly making them differ. The acronym -> glyph table is osu-web's own
+  `mod.less`, parsed, so a new mod gets its glyph on the next run.
+- **What was taken:** mod glyphs and the badge and extender blanks (`mod.less` masks), the
+  customised-mod cog (inlined in `badges.js`, since `<use href>` to a file would not survive a
+  saved copy), GradeSmall badges, stable's `legacy-ranking-*` letters (@2x only), and the guest
+  avatar. `mod.less` is ported into `profile.css` along with `mod.tsx`'s markup, so the badge is
+  osu-web's DOM and CSS rather than a reconstruction in one SVG. The cog now overhangs the
+  corner as on osu!, which the old one-SVG badge could not do.
+- **A profile with no picture shows osu!'s guest avatar**, as osu-web shows any user without
+  one, instead of an initial on a hue from the name.
+- **Considered and not taken.** `default-bg.png` is used only by osu-web's Wrapped page, not as
+  a missing-cover fallback. The beatmapset stat icons belong to a stats row this app does not
+  have. osu-web's React components need MobX and osu-web's API schema. `page-dark.png`,
+  nav triangles and header images are for regions this app does not draw.
+- **Never, under any licence:** `ppy/osu-resources` (CC-BY-NC, which adds a restriction AGPL
+  forbids), Torus and Venera (osu-web's stylesheet says MyFonts licensed them to the site
+  owner alone), and the osu!/ppy logos (osu-web's README keeps trademarks outside its grant).
+  `test/osu-web-art.test.ts` fails if a logo or font file is ever vendored.
+- **Pictures through stylesheet `url()`s.** That is how osu-web draws them, and a mask cannot
+  come from an `<img>`. A saved copy inlines the stylesheets, so `inlineCssUrls` in
+  `share-copy.js` turns each same-origin `url()` into a data: URI. Every glyph is carried
+  whether the profile uses it or not: about 450KB, simpler than tracing which are used.
+- **Obligations, met where they arise.** `LICENSE` and `THIRD-PARTY-NOTICES.md` now go into
+  every package (section 6), README.txt says what the licence is and where the source is, the
+  page footer links the licence beside Source code (section 13), and a saved copy's header
+  comment names the licence, the source and the osu-web artwork it carries.
+
+### Verified
+
+- `npm run check`: `test/osu-web-art.test.ts` pins that every `url()` in `osu-web-art.css`
+  resolves to a vendored file, that every mod in `mod-definitions.js` has a glyph (all 69, and
+  `NM`), that every grade and stable letter has its picture, that the set records its commit
+  and licence, and that no logo or font file is ever vendored.
+- `npm run ui` against a copy of this machine's profile: 332/332, including new checks that a
+  badge is masked with osu!'s glyph and draws no acronym, that a grade badge is the GradeSmall
+  picture, and that the artwork is served as SVG. The badge still measures 22px.
+- Rendered and looked at: every mod badge, rate and Difficulty Adjust extenders, the cog, the
+  grey acronym fallback for an unknown mod, all nine grades, all eight stable letters and the
+  guest avatar; and the real Best Performance rows.

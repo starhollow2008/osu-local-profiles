@@ -20,6 +20,7 @@
     "rank:refresh": "node scripts/build-rank-table.mjs all --latest",
     "build:flags": "node scripts/build-flags.mjs",
     "build:mods": "node scripts/build-mod-table.mjs",
+    "build:osu-web": "node scripts/build-osu-web-art.mjs",
     "package": "node scripts/package.mjs",
     "check:app": "node src/main.ts --check-only"
   },
@@ -30,7 +31,7 @@
     "@types/node": "^24.0.0",
     "typescript": "^5.7.0"
   },
-  "license": "MIT",
+  "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
     "url": "https://github.com/jonathant09/osu-local-profiles.git"

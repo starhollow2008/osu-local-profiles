@@ -356,19 +356,12 @@ function modChip(acronym) {
 }
 
 /**
- * A stand-in badge for "no mods", drawn in the same hexagon as a real mod so the chip lines up
- * with the rest of the grid. Grey, because it is the absence of a mod rather than one of
- * osu!'s types -- and osu! has no icon for it to copy.
+ * The badge for "no mods": osu-web's own no-mod glyph (`NM`), in the same badge as a real mod
+ * so the chip lines up with the rest of the grid. Grey, because it is the absence of a mod
+ * rather than one of osu!'s types.
  */
 function noModIcon() {
-  return `<svg class="mod" viewBox="0 0 100 70" role="img" aria-label="No mods at all">
-    <title>No mods at all</title>
-    <polygon points="6,35 27.13,6 72.87,6 94,35 72.87,64 27.13,64" stroke-width="12"
-             stroke-linejoin="round" style="fill: #4b4046; stroke: #4b4046"/>
-    <text x="50" y="36" text-anchor="middle" dominant-baseline="central" font-size="34"
-          font-weight="900" letter-spacing="-0.5"
-          style="fill: #1d1a1c; font-family: var(--font-grade)">NM</text>
-  </svg>`;
+  return modPill('NM', { title: t('filter.noModsAtAll') });
 }
 
 function section(title, control, help, { html = false, id = null } = {}) {

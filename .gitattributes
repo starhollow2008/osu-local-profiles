@@ -1,0 +1,3 @@
+# osu-web's artwork, vendored byte for byte by scripts/build-osu-web-art.mjs. Never let a
+# line-ending conversion make these differ from the commit web/osu-web/README.md names.
+web/osu-web/** -text

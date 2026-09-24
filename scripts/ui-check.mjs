@@ -1360,9 +1360,9 @@ check('and that the profile is not comparable with osu!', noStatus.includes('not
 console.log('\nosu! scoring parity');
 const scoring = JSON.parse(await evaluate(`(() => {
   const rows = [...document.querySelectorAll('#recentPlays .play-detail, #topRanks .play-detail')];
-  // A badge's text is its title and then its acronym, so the acronym is the last text node.
+  // The acronym is on the icon, as osu-web's mod.tsx puts it: its glyph is drawn by CSS.
   const mods = rows.map((r) =>
-    [...r.querySelectorAll('.play-detail__mods .mod')].map((m) => [...m.querySelectorAll('text')].pop()?.textContent.trim() ?? ''));
+    [...r.querySelectorAll('.play-detail__mods .mod__icon')].map((m) => m.dataset.acronym ?? ''));
   return JSON.stringify({
     toggle: !!document.getElementById('optLazerScoring'),
     on: document.getElementById('optLazerScoring')?.getAttribute('aria-checked'),
@@ -2231,7 +2231,7 @@ check('a customised mod is marked with a cog', pill.includes('mod__customised-in
 check('the tooltip names the mod, not its acronym', pill.includes('Double Time (1.3×)'), true);
 const plain = await evaluate("import('/js/badges.js').then((m) => m.modPill({ acronym: 'HD' }))");
 check('a default mod is not marked', plain.includes('mod__customised-indicator'), false);
-check('and carries no extender, so it stays one badge wide', plain.includes('viewBox="0 0 100 70"'), true);
+check('and carries no extender, so it stays one badge wide', plain.includes('mod__extender'), false);
 
 /*
  * Where the accuracy sits inside its cell, which only a measurement can tell you.
@@ -2301,6 +2301,32 @@ const modHeight = await evaluate(`(() => {
   return Math.round(h);
 })()`);
 check('a mod badge is @mod-height-normal tall', modHeight, 22);
+
+/*
+ * osu-web's own artwork, from web/osu-web/ through osu-web-art.css. A stylesheet that failed
+ * to load, or a glyph rule that lost to profile.css, would leave the acronym and a bare
+ * rectangle rather than anything that looks like an error, so read what was actually drawn.
+ */
+console.log("\nosu-web's artwork is drawn");
+const art = JSON.parse(await evaluate(`(async () => {
+  const row = document.createElement('div');
+  row.className = 'play-detail__mods';
+  document.body.appendChild(row);
+  row.innerHTML = ${JSON.stringify(pill)} + '<div class="score-rank score-rank--X"></div>';
+  const glyph = getComputedStyle(row.querySelector('.mod__icon'), '::after');
+  const out = {
+    glyph: glyph.maskImage || glyph.webkitMaskImage,
+    content: glyph.content,
+    grade: getComputedStyle(row.querySelector('.score-rank')).backgroundImage,
+    served: (await fetch('/osu-web/mods/mod-double-time.svg')).headers.get('content-type'),
+  };
+  row.remove();
+  return JSON.stringify(out);
+})()`));
+check("a mod badge is masked with osu!'s glyph", art.glyph.includes('mod-double-time.svg'), true);
+check('and draws no acronym over it', art.content, '""');
+check("a grade badge is osu!'s GradeSmall picture", art.grade.includes('GradeSmall-SS.svg'), true);
+check('the artwork is served as SVG', (art.served ?? '').startsWith('image/svg+xml'), true);
 
 /*
  * The flag's width is derived from its height by osu!'s 100/72 ratio, which is what crops

@@ -87,12 +87,23 @@
   background-color: hsl(var(--hsl-b5));
 }
 
-.profile-info__avatar img,
-.profile-info__avatar svg {
+.profile-info__avatar img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/*
+ * osu-web's guest avatar (`avatar--guest` in avatar.less), for a profile with no picture of
+ * its own, wherever an avatar goes. The picture is in osu-web-art.css.
+ */
+.avatar-guest {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
 }
 
 .profile-info__info {
@@ -541,10 +552,8 @@
   gap: 2px;
 }
 
-.profile-rank-count__rank svg {
-  display: block;
-  height: 22px;
-  width: 44px;
+.profile-rank-count__rank .score-rank {
+  font-size: 22px;
 }
 
 /* --- the key/value stats box -------------------------------------------- */
@@ -836,6 +845,10 @@
   height: 20px;
 }
 
+.play-detail__icon .score-rank {
+  font-size: 20px;
+}
+
 .play-detail__detail {
   flex: 1;
   min-width: 0;
@@ -1075,22 +1088,114 @@
   }
 }
 
-/* --- mod pills ---------------------------------------------------------- */
+/* --- mod badges --------------------------------------------------------- */
 
 /*
- * `mod.less`: the whole badge scales off one number. Its height is 1em and every part of
- * it -- the icon's 1.42em width, the extender's 2.2em, the acronym's 0.4em -- is written
- * in em against that, so the row's font-size is the only size there is. @mod-height-normal
- * is 22px. Everything the badge draws is inside its SVG, which is why there is so little
- * here; the shape, the colours and the cog are in web/js/badges.js.
+ * osu-web's `mod.less` (c) ppy Pty Ltd, AGPL-3.0-or-later, ported: the whole badge scales
+ * off one number. Its height is 1em and every part of it -- the icon's 1.42em width, the
+ * extender's 2.2em, the acronym's 0.4em -- is written in em against that, so the row's
+ * font-size is the only size there is. @mod-height-normal is 22px. The markup is
+ * `modPill()` in web/js/badges.js; which picture masks each part is in osu-web-art.css.
+ *
+ * The one difference: osu-web's `.mod` sets its own font-size from --mod-height, where here
+ * the row around it does, as every caller already did.
  *
  * Badges sit flush, as they do on osu!: the points nest into each other.
  */
 .mod {
+  --icon-width: 1.42em;
+  /* A mod this build has no type for is grey, rather than a guessed type's colour. */
+  --type-bg-colour: #705c65;
+  /*
+   * Both darkenings are osu!'s, and they happen in different colour spaces on purpose: the
+   * glyph is osu!framework's Colour4 interpolation, done in linear sRGB; the extender is
+   * `.Darken(2.8f)`, a plain sRGB division by 3.8 (a mix at 1/3.8 = 26.3%).
+   */
+  --type-fg-colour: color-mix(in srgb-linear, black, var(--type-bg-colour) 10%);
+  --type-extender-colour: color-mix(in srgb, black, var(--type-bg-colour) 26.3%);
   height: 1em;
-  width: auto;
-  display: block;
+  display: flex;
   flex: none;
+  position: relative;
+}
+
+/* ppy/osu's `OsuColour.ForModType`, keyed by osu!'s own type names. */
+.mod--type-Automation { --type-bg-colour: #66ccff; }
+.mod--type-Conversion { --type-bg-colour: #8c66ff; }
+.mod--type-DifficultyIncrease { --type-bg-colour: #ff6666; }
+.mod--type-DifficultyReduction { --type-bg-colour: #b2ff66; }
+.mod--type-Fun { --type-bg-colour: #ff66ab; }
+.mod--type-System { --type-bg-colour: #ffcc22; }
+
+.mod__icon {
+  position: relative;
+  width: var(--icon-width);
+}
+
+.mod__icon::before,
+.mod__icon::after {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.mod__icon::before {
+  content: "";
+  display: flex;
+  background-color: var(--type-bg-colour);
+}
+
+/* The acronym, for a mod osu-web has no glyph for; a glyph replaces it (osu-web-art.css). */
+.mod__icon::after {
+  content: attr(data-acronym);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--type-fg-colour);
+  font-family: var(--font-grade);
+  font-weight: 900;
+  font-size: 0.4em;
+}
+
+.mod__extender {
+  width: 2.2em;
+  margin-left: -0.5em;
+  padding-left: 0.5em;
+  /* osu-web's "slight adjustments for small sizes". */
+  padding-right: 3px;
+  padding-bottom: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--type-extender-colour);
+  color: var(--type-bg-colour);
+  font-weight: 700;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.mod__extender span {
+  font-size: 0.5em;
+}
+
+/* The customised-mod cog, over the icon's top-right corner and half outside it. */
+.mod__customised-indicator {
+  position: absolute;
+  left: 0;
+  top: calc((1em - var(--icon-width)) / 2);
+  height: calc(var(--icon-width) / 2);
+  width: var(--icon-width);
+  display: grid;
+  pointer-events: none;
 }
 
 /* ======================================================================== */
@@ -2013,8 +2118,7 @@
   border-radius: 14px;
 }
 
-.identity-image__preview--avatar img,
-.identity-image__preview--avatar svg {
+.identity-image__preview--avatar img {
   display: block;
   width: 100%;
   height: 100%;
@@ -3710,15 +3814,18 @@ a.beatmapset-badge--spotlight:hover {
   opacity: 0.4;
 }
 
+/*
+ * osu-web's `score-rank`: 2em by 1em, so each place sets only a font-size (16px here, 20px
+ * in a score row, 22px in the grade counts). The picture is osu-web's GradeSmall-*.svg, from
+ * osu-web-art.css.
+ */
 .score-rank {
-  width: 32px;
-  height: 16px;
-}
-
-.score-rank svg {
-  display: block;
-  width: 100%;
-  height: 100%;
+  font-size: 16px;
+  width: 2em;
+  height: 1em;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* `score-dial`: 200px, the grade in the middle at @font-size--large-4 with a c1 glow. */
@@ -3748,18 +3855,17 @@ a.beatmapset-badge--spotlight:hover {
   text-shadow: 0 0 10px hsl(var(--hsl-c1));
 }
 
-/* `legacy-rank`: a stable score's letter, in the dial's 200px and 20px above and below. */
+/*
+ * `legacy-rank`: a stable score's letter, in the dial's 200px and 20px above and below. The
+ * picture is osu-web's legacy-ranking-*.png, from osu-web-art.css.
+ */
 .legacy-rank {
   width: 200px;
   height: 160px;
   margin: 20px 0;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
-}
-
-.legacy-rank svg {
-  display: block;
-  width: 100%;
-  height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* `score-player`: mods at 22px, the total score, then who, when and where. */
@@ -3913,8 +4019,7 @@ a.beatmapset-badge--spotlight:hover {
   background-color: hsl(var(--hsl-b4));
 }
 
-.user-card__avatar > img,
-.user-card__avatar > svg {
+.user-card__avatar > img {
   display: block;
   width: 100%;
   height: 100%;
@@ -5154,9 +5259,7 @@ s.bbcode-editor__glyph {
 }
 
 .mod-chip .mod {
-  height: 20px;
-  width: auto;
-  display: block;
+  font-size: 20px;
 }
 
 .mod-chip:hover {

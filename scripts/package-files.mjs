@@ -257,6 +257,12 @@ export function readmeFor(hostOs) {
     'If it cannot find osu!, add the folder to installRoots in data/config.json:',
     '    "installRoots": ["/path/to/osu!"]',
     '',
+    // AGPL-3.0 section 6: a build says what it is licensed under and where its source is.
+    'osu! local profiles is free software under the GNU Affero General Public License v3.0',
+    'or later (LICENSE). Its source code is at',
+    'https://github.com/jonathant09/osu-local-profiles. THIRD-PARTY-NOTICES.md lists what',
+    "else is inside, including osu-web's artwork (c) ppy Pty Ltd. Not affiliated with osu! or ppy.",
+    '',
     // CRLF on Windows so Notepad does not run the whole file together on one line.
   ].join(hostOs === 'win' ? '\r\n' : '\n');
 }

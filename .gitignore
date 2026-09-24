@@ -13,9 +13,9 @@ tools/pp/
 tools/pp.building/
 tools/pp.old/
 
-# Read-only reference checkout of ppy/osu-web (AGPL). Never committed: this repo is MIT,
-# and a copy of their tree inside it would be exactly the thing docs/osu-web-fidelity.md
-# exists to avoid. Recreate it with the clone command in that file.
+# Read-only reference checkout of ppy/osu-web (AGPL). Never committed: what the app uses from
+# it arrives through scripts/build-osu-web-art.mjs, unedited and credited, not as a copy of
+# their tree. Recreate it with the clone command in docs/osu-web-fidelity.md.
 reference/
 
 # go-winres output, made and removed by scripts/build-launcher.mjs

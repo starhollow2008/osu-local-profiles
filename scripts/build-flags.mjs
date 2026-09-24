@@ -3,9 +3,8 @@
  *
  * osu! does not draw its own flags: `ppy/osu-resources` generates them from Twemoji with
  * its own `osu_flags.sh`, and osu-web serves the same SVGs. Going to Twemoji directly
- * gets the *same artwork* under a licence that allows redistribution (CC-BY 4.0), where
- * copying osu-web's or osu-resources' asset trees would not -- osu-web is AGPL and
- * osu-resources is CC-BY-NC. See THIRD-PARTY-NOTICES.md.
+ * gets the *same artwork* from its source (CC-BY 4.0), pinned to a version; osu-resources'
+ * copies are CC-BY-NC and cannot be used at all. See THIRD-PARTY-NOTICES.md.
  *
  * The whole set is vendored rather than fetched on demand because `country` is a setting
  * that can be typed offline, so any of the ~250 codes has to resolve with no network. The

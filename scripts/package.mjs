@@ -175,6 +175,15 @@ if (launcher !== null) {
 
 fs.writeFileSync(path.join(out, 'README.txt'), readmeFor(hostOs));
 
+/*
+ * The licence and the notices travel with every build. A build is this program conveyed as
+ * object code, which AGPL-3.0 (section 6) says must come with the licence; the notices credit
+ * osu-web's artwork in web/osu-web/ and everything else a build bundles.
+ */
+for (const file of ['LICENSE', 'THIRD-PARTY-NOTICES.md']) {
+  fs.copyFileSync(path.join(root, file), path.join(out, file));
+}
+
 /* -------------------------------------------------------- 5. verify it works */
 
 /*

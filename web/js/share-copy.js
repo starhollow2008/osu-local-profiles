@@ -46,6 +46,29 @@ async function fetchDataUri(url) {
   });
 }
 
+/**
+ * A stylesheet with every picture it points at carried inside it.
+ *
+ * osu-web-art.css draws the mod glyphs, grade badges, stable's grade letters and the guest
+ * avatar through `url()`s relative to the stylesheet, which mean nothing once the sheet is
+ * inlined into a file. Each one the app serves becomes a data: URI; anything else (another
+ * host, an existing data: URI) is left as it was, and so is a picture that cannot be read.
+ */
+async function inlineCssUrls(css, href) {
+  const base = new URL(href, location.href);
+  const uris = new Map();
+  for (const [, , ref] of css.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) {
+    if (uris.has(ref) || ref.startsWith('data:')) continue;
+    const target = new URL(ref, base);
+    if (target.origin !== location.origin) continue;
+    uris.set(ref, await fetchDataUri(target.pathname).catch(() => null));
+  }
+  return css.replace(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g, (whole, _quote, ref) => {
+    const uri = uris.get(ref);
+    return uri ? `url("${uri}")` : whole;
+  });
+}
+
 /** Every score the copy lists, so View Details works for each of them. */
 function listedScores(profiles) {
   const ids = new Set();
@@ -167,7 +190,7 @@ export async function buildInteractiveHtml(progress = () => {}) {
   // Every replacement is a function: the text going in is CSS and JavaScript, full of `$`,
   // which a replacement *string* would read as patterns.
   for (const [tag, href] of [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)]) {
-    const css = await fetchText(href);
+    const css = await inlineCssUrls(await fetchText(href), href);
     html = html.replace(tag, () => `<style>\n${css}\n</style>`);
   }
   const icon = /<link rel="icon"[^>]*href="([^"]+)"[^>]*>/.exec(html);
@@ -192,7 +215,13 @@ export async function buildInteractiveHtml(progress = () => {}) {
       `<script type="module">\n${code.replace(/<\/script/gi, '<\\/script')}\n${close}`,
   );
 
+  /*
+   * The copy is this program, bundled, so it says what licence it is under and where its
+   * source is (AGPL-3.0 section 6), and credits the osu-web artwork it carries.
+   */
   const note = `osu! local profiles - "${state.profile.name}" as of ${new Date().toLocaleString()}. ` +
-    'A copy: nothing in it can change the profile. Not an osu! page.';
+    'A copy: nothing in it can change the profile. Not an osu! page. ' +
+    'Free software under the GNU AGPL v3.0 or later; source code: https://github.com/jonathant09/osu-local-profiles. ' +
+    'Mod, grade and avatar artwork (c) ppy Pty Ltd, from https://github.com/ppy/osu-web, AGPL-3.0-or-later.';
   return html.replace(/^<!doctype html>/i, (doctype) => `${doctype}\n<!-- ${escapeHtml(note).replace(/--/g, '- -')} -->`);
 }

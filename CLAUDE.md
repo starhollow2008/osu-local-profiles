@@ -32,8 +32,12 @@ Each has its reasoning in `docs/architecture.md`.
   announced. `scripts/reingest.mjs` must not pass a filter.
 - **The server refuses non-loopback requests, with no switch.** Do not bring back
   `shareOnNetwork`, and do not "fix" it by binding to `127.0.0.1` (drops `::1`).
-- **osu-web is AGPL and `ppy/osu-resources` is CC-BY-NC; this repo is MIT.** Take values
-  (colours, sizes, wording), never files, rules, paths or images.
+- **This repo is AGPL-3.0-or-later, as osu-web is, so osu-web's files may be used.** Its
+  artwork arrives only through `npm run build:osu-web` into `web/osu-web/`, never edited
+  (roadmap 5.57); ported LESS/TSX names the osu-web file it came from; anything new from a
+  third party goes in `THIRD-PARTY-NOTICES.md`. Never, under any licence: `ppy/osu-resources`
+  (CC-BY-NC), Torus or Venera, or the osu!/ppy logos. It cannot return to MIT while it
+  carries osu-web's files.
 - **Medals: osu!'s own definitions plus Mod Introduction only.** Do not add other medal
   groups without asking.
 - **No play counter from osu!stable's `osu!.db` last-played time** without asking: it cannot
@@ -53,7 +57,8 @@ Each has its reasoning in `docs/architecture.md`.
 - **After changing `Program.cs`, run `npm run build:pp:local`.** A stale `tools/pp/` answers
   the old protocol silently.
 - **Web modules stay bundleable** (named imports, `export function/const/class`, no
-  `export let`), and every served image goes through `assetUrl()`.
+  `export let`), and every served image goes through `assetUrl()`, or through a relative
+  `url()` in a stylesheet, which Share inlines (`inlineCssUrls`).
 - **me! BBCode is hostile:** escaped first, only tags written in `web/js/bbcode.js`, every
   attribute validated. Add a case to `test/bbcode.test.ts` with any new tag.
 - **The launcher runs the runtime beside it**, by absolute path, never one from PATH; anything

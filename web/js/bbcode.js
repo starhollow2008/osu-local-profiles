@@ -3,8 +3,8 @@
  *
  * The tags and what they mean are osu!'s -- which tags exist, sizes clamped to 30..200%,
  * lists opened by [*], boxes titled by their argument, a line break for every newline --
- * taken as facts from osu-web. The code is this project's own: nothing is copied from
- * osu-web's (AGPL) BBCode library.
+ * taken as facts from osu-web. The code is this project's own: osu-web's BBCode library is
+ * server-side PHP rendering its own database, where this renders text imported from anywhere.
  *
  * **Why this is safe to show text from anywhere.** me! can be imported from someone else's
  * osu! profile, so it is treated as hostile. The input is never parsed as HTML: every piece

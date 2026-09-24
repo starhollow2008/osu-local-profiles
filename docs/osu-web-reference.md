@@ -1,9 +1,10 @@
 # osu-web design reference
 
 Facts extracted from `ppy/osu-web` (AGPL-3.0) and `ppy/osu` (MIT) so the Phase 2 profile
-page can be **reimplemented** from them. Nothing here is a copy of their stylesheets or
-assets: this file records the design *system* - token tables, colour values, metrics, and
-the DOM skeleton - which is what the page needs in order to look right.
+page could be **reimplemented** from them. This file records the design *system* - token
+tables, colour values, metrics, and the DOM skeleton. Since roadmap 5.57 the project is
+AGPL-3.0-or-later and uses osu-web's artwork and ports its LESS directly where that is
+closer; `docs/osu-web-fidelity.md` says how.
 
 Do not paste osu-web LESS or their SVG path data into this repo. Redraw shapes; reuse
 values.

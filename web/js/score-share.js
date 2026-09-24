@@ -6,7 +6,7 @@
  * whole of what a menu item does.
  */
 import { assetUrl } from './static-mode.js';
-import { generatedAvatar } from './badges.js';
+import { guestAvatar } from './badges.js';
 import { countryName } from './format.js';
 import { downloadBlob, toast } from './ui.js';
 import { t } from './i18n.js';
@@ -22,7 +22,7 @@ export function cardOwner(owner) {
   const code = owner?.country ? owner.country.toUpperCase() : '';
   return {
     name: owner?.name ?? '',
-    avatar: owner?.avatar ? `<img src="${assetUrl(owner.avatar)}" alt="">` : generatedAvatar(owner?.name ?? ''),
+    avatar: owner?.avatar ? `<img src="${assetUrl(owner.avatar)}" alt="">` : guestAvatar(owner?.name ?? ''),
     country: code,
     countryName: code ? countryName(code) : '',
     // In a saved copy these are carried once by address; see share-copy.js.

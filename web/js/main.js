@@ -17,7 +17,7 @@ import {
 } from './format.js';
 import {
   coverUrl,
-  generatedAvatar,
+  guestAvatar,
   gradeBadge,
   levelBadge,
 } from './badges.js';
@@ -233,7 +233,7 @@ function renderIdentity() {
 
   $('avatar').innerHTML = profile.hasAvatar
     ? `<img src="${assetUrl('/api/image/avatar')}" alt="${escapeHtml(profile.name)}">`
-    : generatedAvatar(profile.name);
+    : guestAvatar(profile.name);
 
   const bits = [];
   if (profile.country) {
@@ -1397,7 +1397,7 @@ $('aboutSave').onclick = async () => {
  *
  * Four sources for the picture and banner, in the order they cost the user anything: what osu!
  * is signed in as (read from its own config file, no network), a looked-up account, a file from
- * disk, or nothing at all -- which is the default, and draws an avatar from the profile's name.
+ * disk, or nothing at all -- which is the default, and shows osu!'s guest avatar.
  */
 
 let identitySuggestions = { sessions: [], linked: null };
@@ -1414,7 +1414,7 @@ function renderIdentityPreviews() {
   const stamp = Date.now();
   $('identityAvatar').innerHTML = profile?.hasAvatar
     ? `<img src="/api/image/avatar?v=${stamp}" alt="">`
-    : generatedAvatar(profile?.name ?? '');
+    : guestAvatar(profile?.name ?? '');
   $('identityCover').style.backgroundImage = profile?.hasCover
     ? `url('/api/image/cover?v=${stamp}')`
     : 'none';

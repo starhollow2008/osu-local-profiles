@@ -218,40 +218,14 @@ export function scoreDial(score) {
 
 /*
  * A stable score gets its grade as a big letter instead of the dial, as on osu! (osu-web's
- * `legacy-rank`, shown whenever a score came from stable). osu!'s letter is an image of
- * stable's default ranking letter, which is its artwork; this is drawn to the same idea --
- * the grade's colour top to bottom, a white outline -- at the same 200x160.
+ * `legacy-rank`, shown whenever a score came from stable): stable's default-skin ranking
+ * letter, osu-web's own `legacy-ranking-*.png`, at its 200x160 (`.legacy-rank--*` in
+ * osu-web-art.css). osu! has no letter for F, so a failed stable score keeps the dial.
  */
-const LEGACY_LETTER = {
-  X: ['#fff4b8', '#f0a800'],
-  S: ['#fff4b8', '#f0a800'],
-  XH: ['#ffffff', '#9ab8c8'],
-  SH: ['#ffffff', '#9ab8c8'],
-  A: ['#c4f76a', '#2f9406'],
-  B: ['#97dcff', '#1f66cf'],
-  C: ['#eaa6ff', '#9031c2'],
-  D: ['#ffa3a3', '#c81818'],
-};
+const LEGACY_RANKS = new Set(['XH', 'X', 'SH', 'S', 'A', 'B', 'C', 'D']);
 
 export function legacyRank(grade) {
-  const stops = LEGACY_LETTER[grade];
-  const text = DISPLAY_RANK[grade];
-  const id = `legacy-rank-${++dialId}`;
-  // Two letters have to fit the same box one does, so they are set tighter rather than small.
-  const two = text.length > 1;
-  return `<div class="legacy-rank" role="img" aria-label="${text} rank">
-  <svg viewBox="0 0 200 160" aria-hidden="true">
-    <defs>
-      <linearGradient id="${id}" x1="0" y1="0" x2="0.35" y2="1">
-        <stop offset="0" style="stop-color: ${stops[0]}"/>
-        <stop offset="1" style="stop-color: ${stops[1]}"/>
-      </linearGradient>
-    </defs>
-    <text x="100" y="${two ? 136 : 146}" text-anchor="middle" font-size="${two ? 150 : 176}" font-weight="900"
-          letter-spacing="${two ? -18 : 0}" fill="url(#${id})" stroke="#fff" stroke-width="6"
-          stroke-linejoin="round" paint-order="stroke" style="font-family: var(--font-grade)">${text}</text>
-  </svg>
-</div>`;
+  return `<div class="legacy-rank legacy-rank--${grade}" role="img" aria-label="${DISPLAY_RANK[grade]} rank"></div>`;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -269,7 +243,7 @@ function tower(grade) {
   return `<div class="score-tower">${ranks
     .map((rank) => {
       const cls = current < TOWER_VALUE[rank] ? ' score-tower__item--missed' : current > TOWER_VALUE[rank] ? ' score-tower__item--passed' : '';
-      return `<div class="score-tower__item${cls}"><div class="score-rank">${gradeBadge(rank)}</div></div>`;
+      return `<div class="score-tower__item${cls}">${gradeBadge(rank)}</div>`;
     })
     .join('')}</div>`;
 }
@@ -454,7 +428,7 @@ export function scoreCard(score, who, calculator = null) {
   const cover = coverUrl(score.beatmapsetId, 'cover@2x');
   // osu-web shows stable's letter for a stable score; it has no letter for F, so a failed
   // stable score keeps the dial.
-  const grade = score.client === 'stable' && LEGACY_LETTER[score.grade] ? legacyRank(score.grade) : scoreDial(score);
+  const grade = score.client === 'stable' && LEGACY_RANKS.has(score.grade) ? legacyRank(score.grade) : scoreDial(score);
 
   return `<div class="score-page">
   ${beatmapInfo(score)}

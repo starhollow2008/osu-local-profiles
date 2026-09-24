@@ -172,7 +172,7 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
 ## Credits
 
 - [ppy/osu](https://github.com/ppy/osu) - official rulesets and performance calculator
-- [ppy/osu-web](https://github.com/ppy/osu-web) - published mod and medal definitions, and design values
+- [ppy/osu-web](https://github.com/ppy/osu-web) - mod glyphs, grade badges, stable's grade letters, the guest avatar and mod badge styling (AGPL-3.0-or-later, © ppy Pty Ltd), plus mod and medal definitions
 - [data.ppy.sh](https://data.ppy.sh) - public ladder dumps behind the pp-to-rank curves
 - [Twemoji](https://github.com/jdecked/twemoji) - country flag artwork
 - [fyne.io/systray](https://github.com/fyne-io/systray), [godbus/dbus](https://github.com/godbus/dbus) and [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) for the tray launcher
@@ -186,12 +186,15 @@ This is an ai-assisted project written largely with Claude Code, which I have re
 
 ## License
 
-[MIT LICENSE](LICENSE)
+osu! local profiles is free software under the [GNU Affero General Public License v3.0 or later](LICENSE).
+Versions up to and including v1.22.0 were released under the MIT License and remain available under it.
 
-This app's visual design is reimplemented from osu-web's *published design tokens* rather than copied from its stylesheets, which are AGPL-3.0. No osu-web CSS or image asset is included. See [docs/osu-web-reference.md](docs/osu-web-reference.md) for the token table that it was rebuilt from.
-
-See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for bundled/included software.
+The page uses artwork and styling from [osu-web](https://github.com/ppy/osu-web) (© ppy Pty Ltd), under
+osu-web's own AGPL-3.0 licence. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for that and for
+everything a release bundles. osu!'s Torus and Venera fonts are not included; if they are installed on
+your computer, the page uses them.
 
 This app does **not** contact osu! game servers, log in, use API credentials, or automate/assist gameplay in any way.
 
-This is an unofficial community project and is not affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
+"osu!" and "ppy" are trademarks of ppy Pty Ltd. This is an unofficial community project and is not
+affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
