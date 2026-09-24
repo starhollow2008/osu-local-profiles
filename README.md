@@ -1,6 +1,6 @@
 # osu! local profiles
 
-Tracks local / offline profiles in a profile page in your browser that resembles the official osu! site. App watches for plays while it is running, calculates pp, and records to profile. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
+App that tracks local / offline profiles in a browser profile page that resembles the official osu! site. App watches for plays while it is running, then calculates pp and records to profile. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
 
 Preview sample profile: https://jonathant09.github.io/osu-local-profiles/
 
