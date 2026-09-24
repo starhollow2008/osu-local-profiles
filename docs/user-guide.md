@@ -585,9 +585,16 @@ not only on what you play next.
 ### pp calculator
 
 Says which osu! release's calculator prices your scores - the footer says so too. After osu!
-reworks pp, a new version of this app ships the new calculator; when some of this profile's
-scores were priced by an older one, this says how many and **Recalculate them** brings them up
-to date from their replays, so every score is ranked against the others by one algorithm.
+reworks pp, a new version of this app ships the new calculator, and **the first launch after
+that update recalculates every score the old one priced**, in every profile, from their
+replays, so no profile ranks scores from two algorithms against each other. It runs in the
+background once the beatmap index is ready, shows its progress on the page, and happens once
+per osu! release: a score whose replay has since been deleted keeps the pp it had, and is not
+retried at every launch. Plays you set while it runs are tracked as usual.
+
+When some of this profile's scores are still priced by another release, this says how many.
+**Recalculate every score** does the whole thing on demand, for every score in every profile,
+whatever priced it.
 
 ### Recalculating older scores
 

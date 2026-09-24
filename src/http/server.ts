@@ -278,6 +278,22 @@ export function startServer(opts: ServerOptions): http.Server {
    * doing something they did not ask for.
    */
   opts.tracker.on('caughtUp', (result) => broadcast('caught-up', result));
+  /*
+   * Recalculating every profile's scores, after an update or from Other settings. Progress
+   * once per percent, which is all a toast can show; the result to every open page, since
+   * the one after an update was started by nobody on any of them.
+   */
+  let lastPercent = -1;
+  opts.tracker.on('recalculating', ({ done, total }) => {
+    const percent = total === 0 ? 100 : Math.floor((done / total) * 100);
+    if (percent === lastPercent && done !== 0) return;
+    lastPercent = percent;
+    broadcast('recompute-progress', { done, total, percent });
+  });
+  opts.tracker.on('recalculated', (result) => {
+    lastPercent = -1;
+    broadcast('recompute', { ...result, everyProfile: true });
+  });
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
@@ -458,6 +474,8 @@ export function startServer(opts: ServerOptions): http.Server {
          */
         ppCalculator: {
           version: opts.tracker.calculatorVersion,
+          // A page opened half-way through a recalculation holds its button rather than start a second.
+          recalculating: opts.tracker.recalculating,
           outdated:
             opts.tracker.calculatorVersion === null
               ? 0
@@ -707,7 +725,23 @@ export function startServer(opts: ServerOptions): http.Server {
         if (body['confirm'] !== true) {
           return json(res, { error: 'recomputing requires an explicit confirmation' }, 400);
         }
-        const onlyMissing = body['all'] !== true;
+        /*
+         * Every score of every profile, the same run a new calculator starts by itself after
+         * an update. Its progress and result reach the page through the tracker's events.
+         */
+        if (body['all'] === true) {
+          try {
+            const result = await opts.tracker.recalculate(false);
+            console.log(
+              `\n  recalculated ${result.updated} score(s) in every profile from their replays` +
+                `${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}\n`,
+            );
+            return json(res, { ok: true, ...result });
+          } catch (e) {
+            return json(res, { error: (e as Error).message }, 409);
+          }
+        }
+        const onlyMissing = true;
         try {
           let lastReported = -1;
           const result = await opts.tracker.recompute(onlyMissing, (done, total) => {

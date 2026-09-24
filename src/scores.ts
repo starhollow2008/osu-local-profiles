@@ -638,9 +638,22 @@ export function outdatedPpCount(db: Db, profileId: number, current: string): num
   const row = db
     .prepare(
       `SELECT COUNT(*) AS n FROM scores s
-        WHERE s.profile_id = ? AND s.replay_path IS NOT NULL AND s.pp IS NOT NULL AND ${visibleSql()}
-          AND (s.pp_version IS NULL OR s.pp_version <> ?)`,
+        WHERE s.profile_id = ? AND ${visibleSql()} AND ${outdatedPpSql()}`,
     )
     .get(profileId, current) as { n: number };
   return row.n;
+}
+
+/**
+ * A score priced by a different osu! release than `?`, or before the release was recorded,
+ * that its replay could price again. The one definition, for the count Other settings shows
+ * and for what a recalculation after an update picks up (src/tracker/recompute.ts). A score
+ * with no pp is not one: its beatmap was not on disk to price it, and retrying it after every
+ * update would find the same thing. Binds one parameter, the running release.
+ */
+export function outdatedPpSql(alias = 's'): string {
+  return (
+    `${alias}.replay_path IS NOT NULL AND ${alias}.imported_at IS NULL AND ${alias}.pp IS NOT NULL` +
+    ` AND (${alias}.pp_version IS NULL OR ${alias}.pp_version <> ?)`
+  );
 }

@@ -11,6 +11,7 @@ import {
   strippableMods,
 } from '../calc/pp.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
+import { outdatedPpSql } from '../scores.ts';
 
 /**
  * Recalculate stored scores in place from their replay files.
@@ -233,4 +234,73 @@ async function recheckStoredMods(
     awardsPp(row.map_status) && answer.ranked ? 1 : 0,
     row.id,
   );
+}
+
+/* --------------------------------------------------- after a new calculator */
+
+/**
+ * How many scores one queued recalculation step takes. The whole run is several of these, so
+ * a play set meanwhile waits for one step -- seconds -- rather than for every score there is.
+ */
+export const RECALCULATE_BATCH = 50;
+
+/** One step of a recalculation: some of one profile's scores. */
+export interface RecalculateBatch {
+  profileId: number;
+  ids: number[];
+}
+
+/**
+ * What to recalculate, across every profile, in steps of `RECALCULATE_BATCH`: every score a
+ * replay can price again, or with `outdatedFor`, only those priced by another release than it
+ * (`outdatedPpSql`). Hidden scores are included -- one put back later should not come back
+ * priced by an algorithm the rest of the profile has moved on from.
+ */
+export function recalculationBatches(db: Db, outdatedFor: string | null): RecalculateBatch[] {
+  const rows = (
+    outdatedFor === null
+      ? db
+          .prepare(
+            `SELECT id, profile_id FROM scores
+              WHERE replay_path IS NOT NULL AND imported_at IS NULL
+              ORDER BY profile_id, played_at`,
+          )
+          .all()
+      : db
+          .prepare(`SELECT s.id, s.profile_id FROM scores s WHERE ${outdatedPpSql('s')} ORDER BY s.profile_id, s.played_at`)
+          .all(outdatedFor)
+  ) as { id: number; profile_id: number }[];
+
+  const batches: RecalculateBatch[] = [];
+  for (const row of rows) {
+    const last = batches.at(-1);
+    if (last && last.profileId === row.profile_id && last.ids.length < RECALCULATE_BATCH) {
+      last.ids.push(row.id);
+    } else {
+      batches.push({ profileId: row.profile_id, ids: [row.id] });
+    }
+  }
+  return batches;
+}
+
+const RECALCULATED_KEY = 'pp_recalculated_for';
+
+/**
+ * The osu! release the last recalculation after an update was for.
+ *
+ * Kept so that the recalculation happens once per release, on the first launch that has it,
+ * rather than on every launch: a score whose replay has since been deleted stays priced by
+ * the old release for good, and would otherwise be retried -- and announced -- every time.
+ */
+export function recalculatedFor(db: Db): string | null {
+  const row = db.prepare('SELECT value FROM kv WHERE key = ?').get(RECALCULATED_KEY) as
+    | { value: string }
+    | undefined;
+  return row?.value ?? null;
+}
+
+export function markRecalculatedFor(db: Db, release: string): void {
+  db.prepare(
+    'INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  ).run(RECALCULATED_KEY, release);
 }

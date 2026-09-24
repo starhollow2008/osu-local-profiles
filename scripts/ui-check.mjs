@@ -1467,6 +1467,21 @@ check(
   true,
 );
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
+/*
+ * Recalculating every score is offered whenever there is a calculator, not only when some
+ * scores are outdated: it is also how to reprice everything on demand.
+ */
+check(
+  'Recalculate every score is offered beside the calculator it uses',
+  await evaluate(`(() => {
+    const hasCalculator = document.getElementById('ppCalculatorVersion').textContent.includes('osu! 20');
+    const row = document.getElementById('ppCalculatorAll');
+    const button = document.getElementById('ppRecalculate');
+    return hasCalculator === !row.hidden && button.textContent === 'Recalculate every score' &&
+      getComputedStyle(row).display === (hasCalculator ? 'flex' : 'none');
+  })()`),
+  true,
+);
 
 /*
  * A dialog taller than the window has to scroll itself. The backdrop is `position: fixed`

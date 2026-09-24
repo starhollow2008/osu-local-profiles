@@ -2572,12 +2572,12 @@ function renderPpCalculator() {
   const n = ppCalculator.outdated;
   $('ppCalculatorOutdated').hidden = !v || n === 0;
   const outdated = { n: fmt(n) };
-  $('ppCalculatorOutdatedText').textContent =
-    (n === 1
+  $('ppCalculatorOutdated').textContent =
+    n === 1
       ? t('recompute.outdatedOne', outdated)
-      : t('recompute.outdatedMany', outdated)) +
-    ' ' +
-    t('recompute.outdatedFix');
+      : t('recompute.outdatedMany', outdated);
+  $('ppCalculatorAll').hidden = !v;
+  $('ppRecalculate').disabled = recomputing || ppCalculator.recalculating === true;
 }
 
 $('ppRecalculate').onclick = () => {
@@ -2585,23 +2585,33 @@ $('ppRecalculate').onclick = () => {
   void runRecompute(true);
 };
 
+/** What a finished recalculation did, for its toast. */
+function recomputeDone(d) {
+  const updated = { n: fmt(d.updated) };
+  return (
+    (d.updated === 1
+      ? t('recompute.doneOne', updated)
+      : t('recompute.doneMany', updated)) +
+    (d.gainedPp > 0
+      ? t('recompute.gained', { n: fmt(d.gainedPp) })
+      : '') +
+    (d.skipped > 0
+      ? t('recompute.skipped', { n: fmt(d.skipped) })
+      : '')
+  );
+}
+
+/*
+ * `all` is every score of every profile, and is announced by the `recompute` event it sends
+ * to every open page (see below) rather than here -- the same run starts by itself after an
+ * update that brings a new calculator, with no page having asked for it.
+ */
 async function runRecompute(all = false) {
   recomputing = true;
   toast(t('recompute.running'));
   try {
     const d = await postJson('/api/recompute', { confirm: true, all }, 'recompute failed');
-    const updated = { n: fmt(d.updated) };
-    toast(
-      (d.updated === 1
-        ? t('recompute.doneOne', updated)
-        : t('recompute.doneMany', updated)) +
-        (d.gainedPp > 0
-          ? t('recompute.gained', { n: fmt(d.gainedPp) })
-          : '') +
-        (d.skipped > 0
-          ? t('recompute.skipped', { n: fmt(d.skipped) })
-          : ''),
-    );
+    if (!all) toast(recomputeDone(d));
   } catch (err) {
     toast(t('recompute.failed', { error: err.message }));
   } finally {
@@ -3390,6 +3400,13 @@ on('recompute-progress', (e) => {
       percent: p.percent,
     }));
   }
+});
+// Every profile's scores recalculated: from Other settings, or by itself after an update.
+on('recompute', (e) => {
+  const d = JSON.parse(e.data);
+  if (!d.everyProfile) return;
+  toast(recomputeDone(d));
+  void Promise.all([loadState(), loadProfile()]);
 });
 
 /* --- language ------------------------------------------------------------ */

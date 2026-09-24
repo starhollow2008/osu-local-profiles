@@ -21,6 +21,7 @@ import {
   SWAPPER_PID_FILE,
 } from './update/index.ts';
 import { applyPendingRestore } from './backup.ts';
+import { recalculatedFor, recalculationBatches } from './tracker/recompute.ts';
 import { runningInstance, stopWhenLauncherCloses } from './instance.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
@@ -382,6 +383,29 @@ async function main(): Promise<void> {
       ];
       console.log(`\n  Brought in what was played while the app was closed: ${parts.join(', ')}`);
       if (caught.filtered > 0) console.log(`  (${caught.filtered} declined by the tracking filter)`);
+    }
+
+    /*
+     * An update that brings a new osu! release -- a pp rework, typically -- reprices what the
+     * old one priced, on its first launch, so no profile ranks scores from two algorithms
+     * against each other. After the index for the reason above: a beatmap not yet indexed
+     * would price as missing. See Tracker.recalculateAfterUpdate.
+     */
+    const outdated = official?.version ? recalculationBatches(db, official.version) : [];
+    if (outdated.length > 0 && recalculatedFor(db) !== official?.version) {
+      const n = outdated.reduce((sum, b) => sum + b.ids.length, 0);
+      console.log(`\n  pp: osu! ${official?.version} is new here -- recalculating ${n} score(s) priced by an older release`);
+    }
+    const repriced = await tracker.recalculateAfterUpdate().catch((e: Error) => {
+      console.log(`  pp recalculation failed: ${e.message}`);
+      return null;
+    });
+    if (repriced) {
+      const { updated, skipped } = repriced.result;
+      console.log(
+        `  pp: recalculated ${updated} score(s) with osu! ${repriced.release}` +
+          `${skipped > 0 ? ` (${skipped} left as they were: replay or beatmap no longer on disk)` : ''}\n`,
+      );
     }
   });
 

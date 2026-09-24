@@ -4493,26 +4493,28 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
 }
 
 /* Settings: which calculator prices scores, and the way to bring older ones up to date. */
-.pp-calculator__outdated {
+/* The hint is a paragraph, so the button goes under it rather than squeezing it into a column. */
+.pp-calculator__row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   margin-top: 6px;
 }
 
-.pp-calculator__outdated p {
+.pp-calculator__row p {
   flex: 1;
   margin: 0;
 }
 
-.pp-calculator__outdated button {
+.pp-calculator__row button {
   flex: none;
   padding: 5px 10px;
   border-radius: var(--radius-base);
   background-color: hsl(var(--hsl-b3));
 }
 
-.pp-calculator__outdated button:hover {
+.pp-calculator__row button:hover {
   background-color: hsl(var(--hsl-b2));
 }
 

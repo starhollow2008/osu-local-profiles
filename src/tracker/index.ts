@@ -23,7 +23,14 @@ import {
 import { ingestReplayFile, type IngestedScore } from './ingest.ts';
 import { scanForReplays, type BackfillScan } from './backfill.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
-import { countStale, recomputeScores, type RecomputeResult } from './recompute.ts';
+import {
+  countStale,
+  markRecalculatedFor,
+  recalculatedFor,
+  recalculationBatches,
+  recomputeScores,
+  type RecomputeResult,
+} from './recompute.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { getSettings } from '../settings.ts';
 import {
@@ -77,6 +84,13 @@ export interface TrackerEvents {
    * for, so it has to say what it added and be visible on a page that is already open.
    */
   caughtUp: [BackfillResult];
+  /**
+   * How far a recalculation of every profile's scores has got: after an update brings a new
+   * pp calculator, or from Other settings. Sent as it starts and after each step.
+   */
+  recalculating: [{ done: number; total: number }];
+  /** A recalculation of every profile's scores finished. */
+  recalculated: [RecomputeResult];
 }
 
 /** A play that was not tracked because the filter said so. */
@@ -662,6 +676,81 @@ export class Tracker extends EventEmitter<TrackerEvents> {
         ids: [id],
       });
     });
+  }
+
+  private recalculation: Promise<RecomputeResult> | null = null;
+
+  /** Whether every profile's scores are being recalculated right now. */
+  get recalculating(): boolean {
+    return this.recalculation !== null;
+  }
+
+  /**
+   * Recalculate every profile's scores from their replays with the calculator running now:
+   * all of them, or with `outdatedOnly` those priced by another osu! release.
+   *
+   * Queued a step at a time (`RECALCULATE_BATCH` scores) rather than as one task, so a play
+   * set while a few thousand scores are recalculated is ingested within seconds, between two
+   * steps, instead of after all of them. Only one runs at once.
+   */
+  recalculate(outdatedOnly: boolean): Promise<RecomputeResult> {
+    const official = this.opts.official;
+    if (!official) {
+      return Promise.reject(new Error('the pp calculator is not available -- run: npm run build:pp'));
+    }
+    if (this.recalculation) return Promise.reject(new Error('scores are already being recalculated'));
+
+    const db = this.opts.db;
+    // With no release to compare against, nothing can be said to be outdated.
+    const batches = outdatedOnly
+      ? official.version === null
+        ? []
+        : recalculationBatches(db, official.version)
+      : recalculationBatches(db, null);
+    const total = batches.reduce((n, b) => n + b.ids.length, 0);
+
+    const run = (async () => {
+      const sum: RecomputeResult = { considered: 0, updated: 0, skipped: 0, gainedPp: 0 };
+      let done = 0;
+      this.emit('recalculating', { done, total });
+      for (const batch of batches) {
+        const step = await this.enqueue(() =>
+          recomputeScores({ db, resolver: this.opts.resolver, profileId: batch.profileId, official, ids: batch.ids }),
+        );
+        sum.considered += step.considered;
+        sum.updated += step.updated;
+        sum.skipped += step.skipped;
+        sum.gainedPp += step.gainedPp;
+        done += batch.ids.length;
+        this.emit('recalculating', { done, total });
+      }
+      this.emit('recalculated', sum);
+      return sum;
+    })();
+    this.recalculation = run.finally(() => {
+      this.recalculation = null;
+    });
+    return this.recalculation;
+  }
+
+  /**
+   * The first launch with a new pp calculator recalculates what the old one priced, so every
+   * score is ranked against the others by one algorithm. Once per release (`recalculatedFor`),
+   * and recorded only when it finishes, so a launch closed half-way picks up where it stopped.
+   *
+   * Null when there was nothing to do: no calculator, this release already done, or no score
+   * priced by another one -- which is every fresh install, recorded so it is not asked again.
+   */
+  async recalculateAfterUpdate(): Promise<{ release: string; result: RecomputeResult } | null> {
+    const release = this.opts.official?.version ?? null;
+    if (release === null || recalculatedFor(this.opts.db) === release) return null;
+    if (recalculationBatches(this.opts.db, release).length === 0) {
+      markRecalculatedFor(this.opts.db, release);
+      return null;
+    }
+    const result = await this.recalculate(true);
+    markRecalculatedFor(this.opts.db, release);
+    return { release, result };
   }
 
   /** The osu! release the pp calculator comes from, or null when there is no calculator. */

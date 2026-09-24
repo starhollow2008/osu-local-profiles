@@ -675,9 +675,14 @@
     <div class="removed-scores pp-calculator" id="ppCalculator">
       <h4 data-i18n="ppCalculator.ppCalculator">pp calculator</h4>
       <p class="setting__hint" id="ppCalculatorVersion"></p>
-      <div class="pp-calculator__outdated" id="ppCalculatorOutdated" hidden>
-        <p class="setting__hint" id="ppCalculatorOutdatedText"></p>
-        <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate them</button>
+      <p class="setting__hint" id="ppCalculatorOutdated" hidden></p>
+      <div class="pp-calculator__row" id="ppCalculatorAll">
+        <p class="setting__hint" data-i18n="ppCalculator.recalculateHint">
+          When an update brings a new osu! release, scores priced by the old one are recalculated
+          by themselves on its first launch. This recalculates every score in every profile now,
+          from its replay; one whose replay is gone is left as it is.
+        </p>
+        <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate every score</button>
       </div>
     </div>
 

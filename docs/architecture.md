@@ -42,7 +42,9 @@
 
 **Do not trim the helper.** `PublishTrimmed` takes it 113MB -> 36MB but breaks inside osu!'s own graph (`StringEnumConverter`, reading lazer's extended block); .NET's linker warns osu.Game, osu.Framework, Realm, Newtonsoft, AutoMapper and MongoDB.Bson are all trim-unsafe. Measured at 1.13.1. Making it work means a trimmer root descriptor over osu!'s internals, re-verified on every package bump, guarding against a *wrong pp value* rather than a crash. `docs/roadmap.md` 5.44 has the four failures in order and the reproduction.
 
-**After a pp rework:** bump package versions in `PpCalculator.csproj`, run `node scripts/reingest.mjs`.
+**After a pp rework:** bump package versions in `PpCalculator.csproj`, `npm run build:pp:local`. Installs reprice themselves.
+
+**A new calculator reprices what the old one priced, once, on its first launch.** `Tracker.recalculateAfterUpdate`, after the index and catch-up (an unindexed beatmap prices as missing). Picks `outdatedPpSql` across every profile, hidden scores included; `outdatedPpCount` is the same predicate plus `visibleSql`. Done once per release (`kv` `pp_recalculated_for`, written when it finishes): a score whose replay is gone stays on the old release for good and must not be retried and announced every launch. Queued `RECALCULATE_BATCH` scores at a time, never as one task, so a live play waits seconds, not minutes. One run at a time; Other settings' **Recalculate every score** is the same run over every score (`recalculate(false)`). Progress and result go out as tracker events to every page, since nobody on any page started the automatic one.
 
 ## Incomplete plays: over half of plays leave no replay
 
