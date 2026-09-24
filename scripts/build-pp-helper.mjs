@@ -121,10 +121,47 @@ function sizeOf(dir) {
 
 const mb = (bytes) => `${(bytes / 1048576).toFixed(0)}MB`;
 
-/** Publish into `outDir`, replacing whatever is there, and prune it. */
+/**
+ * Publish into `outDir`, replacing whatever is there, and prune it.
+ *
+ * Built beside `outDir` and swapped in only once it has succeeded. Deleting `outDir` first
+ * meant a build that failed -- an osu! release needing a newer .NET SDK than this machine has
+ * -- left no helper at all, and the app then records no pp until someone rebuilds it.
+ */
 export function buildPpHelper(outDir, target = defaultRid()) {
-  fs.rmSync(outDir, { recursive: true, force: true });
+  const staging = `${outDir}.building`;
+  fs.rmSync(staging, { recursive: true, force: true });
+  try {
+    const result = publishAndPrune(staging, target);
+    swapIn(staging, outDir);
+    return result;
+  } finally {
+    fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
 
+/**
+ * Put `staging` where `outDir` is. The old helper is renamed aside first rather than deleted:
+ * with the app running, Windows refuses to rename a folder whose files are open, all at once,
+ * where deleting it would get half way and leave a helper that cannot start.
+ */
+function swapIn(staging, outDir) {
+  const old = `${outDir}.old`;
+  fs.rmSync(old, { recursive: true, force: true });
+  if (fs.existsSync(outDir)) {
+    try {
+      fs.renameSync(outDir, old);
+    } catch (e) {
+      throw new Error(
+        `could not replace ${outDir} (${e.code ?? e.message}). Close the app, which has it open, and build again.`,
+      );
+    }
+  }
+  fs.renameSync(staging, outDir);
+  fs.rmSync(old, { recursive: true, force: true });
+}
+
+function publishAndPrune(outDir, target) {
   const result = spawnSync(
     'dotnet',
     [

@@ -241,7 +241,7 @@ async function main(): Promise<void> {
     console.log('');
     console.log('  WARNING: the pp calculator is not available.');
     console.log('  Scores will still be tracked, but with no pp or star rating.');
-    console.log('  Build it with:  npm run build:pp    (needs the .NET 8 SDK)');
+    console.log('  Build it with:  npm run build:pp    (needs the .NET 10 SDK)');
     console.log('  Then run:       node scripts/reingest.mjs    to fill in the missing values.');
   }
 

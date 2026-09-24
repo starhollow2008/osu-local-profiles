@@ -55,7 +55,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       # Builds the tray launcher each package opens with (scripts/build-launcher.mjs).
       - uses: actions/setup-go@v5

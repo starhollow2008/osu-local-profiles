@@ -122,7 +122,7 @@ const REQUEST_TIMEOUT_MS = 30_000;
 function candidates(): Array<{ command: string; args: string[] }> {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const selfContained = path.join(root, 'tools', 'pp', process.platform === 'win32' ? 'osu-pp.exe' : 'osu-pp');
-  const built = path.join(root, 'tools', 'PpCalculator', 'bin', 'Release', 'net8.0');
+  const built = path.join(root, 'tools', 'PpCalculator', 'bin', 'Release', 'net10.0');
   const exe = path.join(built, process.platform === 'win32' ? 'osu-pp.exe' : 'osu-pp');
   const dll = path.join(built, 'osu-pp.dll');
 

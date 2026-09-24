@@ -79,11 +79,21 @@ algorithm, but osu! reworked difficulty again on 2026-07-03. On a real play:
 
 After an osu! pp rework:
 
-1. Bump the package versions in `tools/PpCalculator/PpCalculator.csproj`.
-2. `npm run build:pp:local`.
-3. `node scripts/reingest.mjs` (app stopped), or ship it and let users press **Recalculate
-   them** under Other settings -> pp calculator.
-4. Refresh the rank curves (below) in the same pass.
+1. Bump the package versions in `tools/PpCalculator/PpCalculator.csproj`. Check what .NET the
+   new release targets (`NU1202 ... supports: net10.0` if it moved): osu! moves ahead of the
+   project now and then, and the helper's `TargetFramework`, `setup-dotnet` in both workflows,
+   the `bin/Release/<tfm>` fallback in `src/calc/official.ts` and THIRD-PARTY-NOTICES then all
+   move with it. 2026.916.0 was the move to .NET 10.
+2. `npm run build:pp:local`. It builds beside `tools/pp` and swaps only on success, so a failed
+   build leaves the old helper working. Close the app first: it holds `tools/pp` open.
+3. Read the diff of `osu.Game.Rulesets.*/Difficulty` between the two releases before calling
+   it a rework, and price a few real scores with both: 2026.916.0 changed eleven difficulty
+   files and not one pp value.
+4. Ship it. Every install recalculates the scores the old release priced on its first launch
+   after updating (`Tracker.recalculateAfterUpdate`), and **Recalculate every score** under
+   Other settings -> pp calculator does the same on demand. Locally, restart the app, or run
+   `node scripts/reingest.mjs` with it stopped to rebuild the rows outright.
+5. Refresh the rank curves (below) in the same pass.
 
 ## Refreshing the rank curves
 

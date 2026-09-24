@@ -15,6 +15,26 @@
   - The per-profile JSON moves under a new **Export** heading, worded as what it is: scores
     for a spreadsheet or another tool, which cannot be restored from.
 
+- **A pp rework reaches every score you already have, by itself.** Until now an update with a
+  new osu! pp calculator priced new plays with it and left every older score on the old
+  algorithm until **Recalculate them** was pressed, one profile at a time.
+  - The first launch after such an update recalculates every score the old calculator
+    priced, in every profile, from their replays. It runs in the background once the beatmap
+    index is ready, with its progress on the page, and plays set meanwhile are tracked as
+    usual.
+  - **Other settings -> pp calculator -> Recalculate every score** does the same on demand,
+    for every score in every profile.
+
+- **pp is calculated by osu! 2026.916.0**, up from 2026.730.0. Not a pp rework: its
+  difficulty changes are tidy-ups that give the same numbers, plus one fix for an osu!stable
+  score whose recorded total is 0. Your scores are repriced once on the first launch, as above,
+  and come out the same.
+  - osu! now targets .NET 10, so the pp helper does too. A packaged build carries its own
+    runtime and needs nothing installed; building from source needs the **.NET 10 SDK**.
+  - `npm run build:pp:local` builds beside `tools/pp` and swaps it in only once the build has
+    worked. It used to delete the old helper first, so a failed build left the app with no pp
+    calculator at all.
+
 ## 1.21.0
 
 - **An Intel Mac build.** Releases now carry `osx-x64` beside `osx-arm64`. Before this an

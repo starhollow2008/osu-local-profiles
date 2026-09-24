@@ -9,6 +9,9 @@ web/dist/
 tools/**/bin/
 tools/**/obj/
 tools/pp/
+# The helper being built, and the one it replaces, while build:pp:local swaps them.
+tools/pp.building/
+tools/pp.old/
 
 # Read-only reference checkout of ppy/osu-web (AGPL). Never committed: this repo is MIT,
 # and a copy of their tree inside it would be exactly the thing docs/osu-web-fidelity.md

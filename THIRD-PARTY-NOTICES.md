@@ -17,7 +17,7 @@ commercially - verify each component's terms yourself against the actual content
 | [godbus/dbus](https://github.com/godbus/dbus) | the tray icon on Linux | BSD-2-Clause |
 | [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) | the launcher's Windows system calls | BSD-3-Clause |
 | [ppy/osu](https://github.com/ppy/osu) - `osu.Game*`, `osu.Framework`, `osuTK` | the real difficulty and pp code; the entire reason this project can be accurate | MIT |
-| [.NET 8 runtime](https://github.com/dotnet/runtime) | runs the pp helper self-contained | MIT |
+| [.NET 10 runtime](https://github.com/dotnet/runtime) | runs the pp helper self-contained | MIT |
 | [Realm](https://github.com/realm/realm-dotnet) | osu!'s model types are Realm objects, so it cannot be removed | Apache-2.0 |
 | [SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp) | pulled in by osu!'s beatmap handling | Six Labors Split License (Apache-2.0 for open-source use) |
 | [SharpCompress](https://github.com/adamhathcock/sharpcompress) | archive handling in osu!'s IO layer | MIT |
