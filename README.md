@@ -1,6 +1,8 @@
 # osu! local profiles
 
-Tracks local/offline profiles in a profile page that resembles the official osu! site.
+Tracks local / offline profiles in a profile page in your browser that resembles the official osu! site. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
+
+Preview a sample profile: https://jonathant09.github.io/osu-local-profiles/
 
 Good for:
 - Creating multiple profiles to track pp without multiaccounting
@@ -26,13 +28,19 @@ Features:
 - **Play tracking filter** - only track scores that meet specified criteria, e.g. keywords, mods, difficulty, ranked date
 - Option to remove scores from profile
 - Automatically detects updates and installs with one click
+- Recalculates pp automatically for scores on each pp rework
 
 
-Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
+Last Updated:
+- **pp:** osu!'s official calculator from [osu! 2026.916.0](https://github.com/ppy/osu/releases/tag/2026.916.0), which includes the July 2026 pp rework
+- **Global rank estimate:** osu!'s ranking data from [September 2026](https://data.ppy.sh/)
 
-> **AI Disclaimer:** This is an ai-assisted project written largely with Claude Code, which I have reviewed and tested before release. Note that pp calculation uses the official osu! pp calculator.
+## Screenshots
 
-> This is an unofficial community project and is not affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
+| | |
+|---|---|
+| ![Profile page](docs/images/profile.webp) | ![Historical](docs/images/historical.webp) |
+| ![Scores](docs/images/scores.webp) | ![Beatmaps and medals](docs/images/beatmaps-and-medals.webp) |
 
 ## Installation
 
@@ -186,4 +194,4 @@ See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for bundled/included softwa
 
 This app does **not** contact osu! game servers, log in, use API credentials, or automate/assist gameplay in any way.
 
-> This is an unofficial community project and is not affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
+This is an unofficial community project and is not affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
