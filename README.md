@@ -1,13 +1,13 @@
 # osu! local profiles
 
-Tracks local / offline profiles in a profile page in your browser that resembles the official osu! site. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
+Tracks local / offline profiles in a profile page in your browser that resembles the official osu! site. App watches for plays while it is running, calculates pp, and records to profile. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
 
-Preview a sample profile: https://jonathant09.github.io/osu-local-profiles/
+Preview sample profile: https://jonathant09.github.io/osu-local-profiles/
 
 Good for:
 - Creating multiple profiles to track pp without multiaccounting
 - Alternative playstyles - e.g. using non-dominant hand, mouse/tablet, touchscreen
-- Tracking only certain plays - e.g. **unranked maps**, old maps, EZ mod only, etc.
+- Tracking only certain plays - e.g. unranked maps, old maps, EZ mod only, etc.
 - Speedrun or restriction challenges - e.g. "How fast can I reach 5 digit", "Reaching 5 digit with no misses", "Who can get the most pp before the time runs out"
 - Players with no internet connection or unstable connections as this app works fully offline
 
@@ -18,14 +18,14 @@ Supports:
 - 16 languages
 
 Features:
-- **Works fully offline  (no API key needed)** 
+- Works fully offline  (no API key needed)
   - Internet connection is optionally used to fetch beatmap cover arts, song audio previews, or import existing profile details.
 - Switching between multiple profiles
 - Default gamemode on launch is automatically determined by last played gamemode
 - Edit or import profile details, such as Name, Avatar, Banner, me! section, scores, etc.
-- **pp for unranked maps**
+- pp for unranked maps
 - Import previous plays instead of starting a profile fresh
-- **Play tracking filter** - only track scores that meet specified criteria, e.g. keywords, mods, difficulty, ranked date
+- Play tracking filter - only track scores that meet specified criteria, e.g. keywords, mods, difficulty, ranked date
 - Option to remove scores from profile
 - Automatically detects updates and installs with one click
 - Recalculates pp automatically for scores on each pp rework
@@ -161,9 +161,9 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
 
 ## Known limitations
 
-- Official osu! pp calculator needs .NET 8 SDK, adding ~70MB to the file size
 - The official osu! pp calculator adds ~70MB to the download (it bundles its own .NET 10 runtime)
-- **Global rank is only an estimate and needs occasional manual refreshes.** It is interpolated from a pp->rank curve built
+- pp reworks require manual updates
+- Global rank is an estimate and requires manual refreshes. It is interpolated from a pp->rank curve built
   from a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase
   grows. Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
 - Country rank is not supported
