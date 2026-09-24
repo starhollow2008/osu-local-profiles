@@ -4839,10 +4839,11 @@ s.bbcode-editor__glyph {
 
 /* ======================================================================== */
 /* A shared copy of the page (static-mode.js, share-copy.js): whatever would */
-/* change the profile is gone; whatever only shows it still works.           */
+/* change the profile is gone; whatever only shows it still works. So is the  */
+/* language picker: a copy carries the one language it was saved in.         */
 /* ======================================================================== */
 
-.static-copy :is(#optionsBtn, .menu-wrap, #toggle, #updateBtn, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
+.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
   #aboutEdit, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;

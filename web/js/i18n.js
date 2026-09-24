@@ -212,7 +212,9 @@ async function fetchFile(code) {
  * arrive leaves the English that is already in the HTML, which is why it is left there.
  */
 export async function useLocale(code, root = document) {
-  const target = knownLocale(code) ? code : DEFAULT_LOCALE;
+  // A copy is in the language it was saved in, whatever this browser last chose.
+  const wanted = snapshot?.strings ? snapshot.locale : code;
+  const target = knownLocale(wanted) ? wanted : DEFAULT_LOCALE;
 
   /*
    * A saved copy of the page carries one set of strings -- the language it was saved in --

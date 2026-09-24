@@ -14,7 +14,7 @@
  */
 import { escapeHtml } from './format.js';
 import { bundleModules } from './bundle.js';
-import { t } from './i18n.js';
+import { currentLocale, DEFAULT_LOCALE, t } from './i18n.js';
 
 /** How much of each list the copy carries: every row the page could ask for, within reason. */
 const LENGTHS = { events: 500, top: 100, recent: 500, mostPlayed: 500, favorites: 500 };
@@ -125,8 +125,22 @@ export async function buildInteractiveHtml(progress = () => {}) {
     if (uri) about = about.split(url).join(uri);
   }
 
+  /*
+   * The page's words travel with it too. The HTML has only its own English; everything the
+   * scripts write -- the stat labels, play time, every chart -- comes from the language files,
+   * which a copy has no app to fetch from, so without these it shows keys (`stats.rankedScore`).
+   * English under the language in use, as the app itself falls back.
+   */
+  const locale = currentLocale();
+  const english = await fetchJson(`/i18n/${DEFAULT_LOCALE}.json`);
+  const strings = locale === DEFAULT_LOCALE
+    ? english
+    : { ...english, ...(await fetchJson(`/i18n/${locale}.json`)) };
+
   const snapshot = {
     exportedAt: new Date().toISOString(),
+    locale,
+    strings,
     state: {
       ...state,
       settings: { ...state.settings, aboutMe: about },

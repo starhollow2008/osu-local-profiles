@@ -35,6 +35,12 @@
     worked. It used to delete the old helper first, so a failed build left the app with no pp
     calculator at all.
 
+- **A shared copy reads properly away from the app.** Share -> Save as a web page left out the
+  page's own words, so a copy opened anywhere but the running app - from disk, or put online -
+  showed `stats.rankedScore` and the like in place of its labels, and a broken flag. A copy
+  now carries them, in the language it was saved in, and leaves out the language picker,
+  which had nothing to switch to.
+
 ## 1.21.0
 
 - **An Intel Mac build.** Releases now carry `osx-x64` beside `osx-arm64`. Before this an
