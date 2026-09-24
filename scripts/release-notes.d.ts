@@ -11,6 +11,21 @@ declare module '*/release-notes.mjs' {
     linux: string;
   };
 
-  /** The whole release body. Throws when CHANGELOG.md has nothing for the version. */
-  export function releaseNotes(changelog: string, version: string): string;
+  /** How many changes a release lists before pointing at the CHANGELOG for the rest. */
+  export const MAX_HIGHLIGHTS: number;
+
+  /** One line for a CHANGELOG entry. */
+  export function headline(entry: string): string;
+
+  /** What a release changed, a line each. */
+  export function highlights(section: string): string[];
+
+  /** The paragraph a section opens with, when it is short. */
+  export function intro(section: string): string | null;
+
+  /**
+   * The whole release body, naming the downloads in `assets` (every platform by default).
+   * Throws when CHANGELOG.md has nothing for the version.
+   */
+  export function releaseNotes(changelog: string, version: string, assets?: string[]): string;
 }

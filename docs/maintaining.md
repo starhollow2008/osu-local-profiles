@@ -50,6 +50,12 @@ So releases are built by **GitHub Actions** (`.github/workflows/release.yml`): p
 version's release, with notes from `CHANGELOG.md`. Running the workflow by hand with no tag is a
 dry run that builds them all and publishes nothing.
 
+The notes are short on purpose (`scripts/release-notes.mjs`): each entry's bold lead, at most
+eight, a link to the full CHANGELOG entry, and which download is which. GitHub lists the
+downloads *under* the notes, and a whole CHANGELOG section there meant scrolling past it to
+reach them. So the bold lead of a CHANGELOG entry is what a release page shows: write it to say
+what changed on its own.
+
 Most of that script is *removal*. osu!'s NuGet packages carry the entire game - fonts,
 textures, audio samples, ffmpeg, SDL, a shader compiler - and a self-contained publish is
 273MB, of which 125MB is `osu.Game.Resources.dll` alone.
