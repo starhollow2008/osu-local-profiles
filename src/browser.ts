@@ -49,3 +49,32 @@ export function openBrowser(url: string, platform: string = process.platform): v
     /* as above */
   }
 }
+
+/**
+ * Opening a folder in the system's file manager: Explorer, Finder, or whatever `xdg-open`
+ * hands a directory to.
+ *
+ * Not through `cmd` on Windows, unlike the browser: `explorer.exe` is a program and takes the
+ * path as its one argument, so the C runtime's quoting is exactly what it reads. Explorer
+ * exits with 1 even when it opened the window, so the exit code means nothing either way.
+ */
+export function folderCommand(platform: string, dir: string): BrowserCommand {
+  const options: SpawnOptions = { detached: true, stdio: 'ignore' };
+  if (platform === 'win32') return { command: 'explorer.exe', args: [dir], options };
+  if (platform === 'darwin') return { command: 'open', args: [dir], options };
+  return { command: 'xdg-open', args: [dir], options };
+}
+
+/** Best effort, like `openBrowser`: the page shows the path as well. */
+export function openFolder(dir: string, platform: string = process.platform): void {
+  const { command, args, options } = folderCommand(platform, dir);
+  try {
+    const child = spawn(command, args, options);
+    child.on('error', () => {
+      /* no file manager to hand it to; the path is on the page */
+    });
+    child.unref();
+  } catch {
+    /* as above */
+  }
+}

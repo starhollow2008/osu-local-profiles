@@ -1521,6 +1521,20 @@
   cursor: default;
 }
 
+/* The data folder's path, whole and selectable: it is there to be found in a file manager. */
+.data-folder-path {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.data-folder-path:empty {
+  display: none;
+}
+
 /*
  * `?export=1`: the same page with everything you would only use while *using* it removed.
  * The screenshot renderer loads this, and so does anyone who wants to read without the

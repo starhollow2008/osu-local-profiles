@@ -971,6 +971,17 @@ function openShare() {
 
   $('shareModal').hidden = false;
   $('shareClose').focus();
+  void showDataFolder();
+}
+
+/** Asked for each time rather than kept in /api/state, which the saved web page is built from. */
+async function showDataFolder() {
+  try {
+    const r = await fetch('/api/data-folder');
+    $('dataFolderPath').textContent = r.ok ? (await r.json()).path : '';
+  } catch {
+    $('dataFolderPath').textContent = '';
+  }
 }
 
 const closeShare = () => { $('shareModal').hidden = true; };
@@ -2766,6 +2777,76 @@ $('shareBackup').onclick = () => {
   window.location.href = '/api/backup';
   toast(t('backup.backingUp'));
 };
+
+$('openDataFolder').onclick = async () => {
+  try {
+    await postJson('/api/data-folder/open', {}, t('backup.openFailed'));
+  } catch (err) {
+    shareHint(err.message, true);
+  }
+};
+
+/*
+ * Restore, in two steps: the file is uploaded and checked, the page says which profiles it
+ * holds, and only a yes applies it. Applying restarts the app, because the backup is swapped
+ * in before the database opens (src/backup.ts), and this page reloads once it is back.
+ */
+$('shareRestore').onclick = () => {
+  $('restoreFile').value = '';
+  $('restoreFile').click();
+};
+
+$('restoreFile').onchange = async () => {
+  const file = $('restoreFile').files?.[0];
+  if (!file) return;
+  $('shareRestore').disabled = true;
+  shareHint(t('restore.checking'));
+  try {
+    const r = await fetch('/api/restore', { method: 'PUT', body: file });
+    const staged = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(staged.error ?? t('restore.failed'));
+
+    const lines = staged.profiles.map((p) => {
+      const values = { name: p.name, n: fmt(p.plays) };
+      return p.plays === 1 ? t('restore.profileOne', values) : t('restore.profileMany', values);
+    });
+    if (!confirm(`${t('restore.ask')}\n\n${lines.join('\n')}\n\n${t('restore.nothingDeleted')}`)) {
+      await fetch('/api/restore', { method: 'DELETE' });
+      shareHint(t('restore.cancelled'));
+      return;
+    }
+
+    const before = await (await fetch('/api/app')).json();
+    const applied = await postJson('/api/restore/apply', {}, t('restore.failed'));
+    if (!applied.restarting) {
+      shareHint(t('restore.restartYourself'));
+      return;
+    }
+    shareHint(t('restore.restarting'));
+    await reloadWhenRestarted(before.pid);
+  } catch (err) {
+    shareHint(err.message, true);
+  } finally {
+    $('shareRestore').disabled = false;
+  }
+};
+
+/** Reload once a different process answers, or say to restart by hand after a minute. */
+async function reloadWhenRestarted(pid) {
+  for (let waited = 0; waited < 60; waited += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    try {
+      const now = await (await fetch('/api/app')).json();
+      if (now.pid !== pid) {
+        location.reload();
+        return;
+      }
+    } catch {
+      /* not back yet */
+    }
+  }
+  shareHint(t('restore.restartYourself'));
+}
 
 /* ------------------------------------------------------ import past plays */
 

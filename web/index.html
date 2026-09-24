@@ -513,23 +513,50 @@
 
     <div class="share-option">
       <div class="share-option__detail">
-        <b data-i18n="shareModal.exportThisProfileJson">Export this profile (JSON)</b>
-        <div class="setting__hint" data-i18n="shareModal.everyScoreThisProfileHas">
-          Every score this profile has tracked, with its beatmap, plus the computed totals and
-          rank.
+        <b data-i18n="shareModal.backUpEverything">Back up everything</b>
+        <div class="setting__hint" data-i18n="shareModal.backUpEverythingHint">
+          Every profile, with its scores, pictures and me! images, as one .zip file. Restore it
+          below, on this computer or another.
         </div>
       </div>
-      <button type="button" id="shareExport" data-i18n="shareExport">Download</button>
+      <button type="button" id="shareBackup" data-i18n="shareBackup">Download</button>
     </div>
 
     <div class="share-option">
       <div class="share-option__detail">
-        <b data-i18n="shareModal.backUpEverythingDatabase">Back up everything (database)</b>
-        <div class="setting__hint" data-i18n="shareModal.aCopyOfTheWhole">
-          A copy of the whole database, every profile included.
+        <b data-i18n="shareModal.restore">Restore from backup</b>
+        <div class="setting__hint" data-i18n="shareModal.restoreHint">
+          Replaces every profile here with the backup's. Nothing is deleted: what is here now is
+          moved to a before-restore folder inside the data folder.
         </div>
       </div>
-      <button type="button" id="shareBackup" data-i18n="shareBackup">Download</button>
+      <button type="button" id="shareRestore" data-i18n="shareRestore">Restore&hellip;</button>
+      <input type="file" id="restoreFile" accept=".zip,.db" hidden>
+    </div>
+
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b data-i18n="shareModal.dataFolder">The data folder</b>
+        <div class="setting__hint" data-i18n="shareModal.dataFolderHint">
+          Everything is kept in this one folder. With the app closed, copying it somewhere else is
+          a complete backup too, and putting it back restores it.
+        </div>
+        <code class="data-folder-path" id="dataFolderPath"></code>
+      </div>
+      <button type="button" id="openDataFolder" data-i18n="openDataFolder">Open folder</button>
+    </div>
+
+    <h4 class="identity-heading" data-i18n="shareModal.export">Export</h4>
+
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b data-i18n="shareModal.exportScores">Export this profile's scores (JSON)</b>
+        <div class="setting__hint" data-i18n="shareModal.exportScoresHint">
+          Every score with its beatmap, plus the totals and rank, for a spreadsheet or another
+          tool. It cannot be restored from: Back up is for that.
+        </div>
+      </div>
+      <button type="button" id="shareExport" data-i18n="shareExport">Download</button>
     </div>
 
     <div class="profile-hint" id="shareHint">&nbsp;</div>

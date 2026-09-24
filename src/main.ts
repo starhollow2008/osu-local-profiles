@@ -13,7 +13,14 @@ import { Tracker, type IndexState } from './tracker/index.ts';
 import { catchUpSince, HEARTBEAT_MS, lastRunAt, markRunning } from './tracker/catch-up.ts';
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
-import { checkForUpdate, launchedFromTray, pruneUpdateLeftovers } from './update/index.ts';
+import {
+  checkForUpdate,
+  launchedFromTray,
+  pruneUpdateLeftovers,
+  RESTART_EXIT_CODE,
+  SWAPPER_PID_FILE,
+} from './update/index.ts';
+import { applyPendingRestore } from './backup.ts';
 import { runningInstance, stopWhenLauncherCloses } from './instance.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
@@ -175,8 +182,24 @@ async function main(): Promise<void> {
   // Decided before openDb creates the file: only a brand-new install is welcomed, never one
   // upgraded from a version that had no welcome. `npm run package` deletes the data/ its own
   // --check-only run makes, so a download still starts new.
+  /*
+   * A backup restored from the page is swapped in here, before anything opens the database
+   * it replaces -- see src/backup.ts. What it replaced is moved aside, never deleted.
+   */
+  const restored = applyPendingRestore(dataDir());
+  if (restored.applied) {
+    console.log(`\n  Restored a backup. What was here before is in ${restored.aside}\n`);
+  } else if (restored.error) {
+    console.log(`\n  The backup could not be restored, and nothing was changed: ${restored.error}\n`);
+  }
   const firstRun = !fs.existsSync(dbFile);
   const db = openDb(dbFile);
+  /*
+   * A restored database remembers the app last running when the backup was made. Left alone,
+   * `importPlaysWhileClosed` would read everything since then as a gap the app was closed for
+   * and import it -- but the app was running for all of it, only on the data now aside.
+   */
+  if (restored.applied) markRunning(db);
 
   // config.profileName only seeds the very first profile. After that the set of profiles
   // lives in the database and which one is live is chosen from the page, so that renaming
@@ -372,6 +395,12 @@ async function main(): Promise<void> {
     dataDir: dataDir(),
     port: config.port,
     onQuit: () => shutdown(),
+    /*
+     * Only the tray launcher: it starts the app again on the updater's exit code, and with no
+     * update in progress there is no swap to wait for. `start.sh`'s terminal loop would too,
+     * but announces it as installing an update.
+     */
+    onRestart: fromTray ? () => shutdown(RESTART_EXIT_CODE) : undefined,
     launcher: fromTray ? 'tray' : 'terminal',
     /*
      * The page's "Open in browser on start" toggle. It is install-level, not per profile --
@@ -497,7 +526,8 @@ async function main(): Promise<void> {
       : '  Close this window, press Ctrl+C, or press Quit on the page to stop tracking.\n',
   );
 
-  if (config.openBrowser) openBrowser(url);
+  // Restarted from the page to restore a backup, that page reloads itself: no second tab.
+  if (config.openBrowser && !(restored.applied && fromTray)) openBrowser(url);
 
   /*
    * Tidy away what a previous update left, then ask once whether there is a newer release.
@@ -578,7 +608,7 @@ async function main(): Promise<void> {
   heartbeat.unref();
 
   let stopping = false;
-  const shutdown = () => {
+  const shutdown = (code = 0) => {
     if (stopping) return;
     stopping = true;
     console.log('\n  stopping...');
@@ -590,11 +620,16 @@ async function main(): Promise<void> {
     official?.dispose();
     server.close();
     db.close();
-    process.exit(0);
+    if (code === RESTART_EXIT_CODE) {
+      // Left by an update long finished, a swapper pid would have the launcher wait on
+      // whatever process has that number now.
+      fs.rmSync(path.join(dataDir(), 'update', SWAPPER_PID_FILE), { force: true });
+    }
+    process.exit(code);
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
-  if (fromTray) stopWhenLauncherCloses(process.stdin, shutdown);
+  process.on('SIGINT', () => shutdown());
+  process.on('SIGTERM', () => shutdown());
+  if (fromTray) stopWhenLauncherCloses(process.stdin, () => shutdown());
 }
 
 await main();

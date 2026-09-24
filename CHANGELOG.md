@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **Back up everything is now a complete backup, and it can be restored.** Share & back up's
+  Back up section is rebuilt around one backup:
+  - **Back up everything** saves `osu-local-profiles-backup-<date>.zip`: every profile with its
+    scores, pictures and me! images, laid out as the `data` folder is. The old download was
+    the database alone, so a profile restored from it came back without its pictures.
+  - **Restore from backup** takes that zip, or a `.db` from an earlier version, says which
+    profiles it holds, and asks first. The app restarts to swap it in, and what it replaces is
+    moved to `data/before-restore-<date and time>/` rather than deleted.
+  - **The data folder** is named in full with an **Open folder** button, and the dialog says
+    that copying it while the app is closed is a complete backup too.
+  - The per-profile JSON moves under a new **Export** heading, worded as what it is: scores
+    for a spreadsheet or another tool, which cannot be restored from.
+
 ## 1.21.0
 
 - **An Intel Mac build.** Releases now carry `osx-x64` beside `osx-arm64`. Before this an

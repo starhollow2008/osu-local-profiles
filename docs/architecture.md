@@ -335,7 +335,17 @@ Share → Save as web page (`web/js/share-copy.js`): saves index.html + CSS + bu
 **Consequences:**
 
 1. Page modules must stay bundleable: named `import { } from './x.js'` + `export function / async function / const / class` only. `test/bundle.test.ts` bundles real page and syntax-checks it. `npm run ui` loads real copy, clicks Show more.
-2. Images served by app go through `assetUrl()`. Copy never contains install paths or other profiles.
+2. Images served by app go through `assetUrl()`. Copy never contains install paths or other profiles. So the data folder's path has its own endpoint (`/api/data-folder`), never a field in `/api/state`.
+
+## Backup and restore: `data/` as a zip, swapped in at startup
+
+`src/backup.ts`. A backup = `profiles.db` (`VACUUM INTO` snapshot: WAL mode means the file alone can miss writes) + pictures + `about-images/`, under their `data/` names. `isProfileFile` is the one list of what that is; a restore writes nothing else, whatever the zip holds. `config.json` left out: install settings, wrong on another machine.
+
+**Restore never swaps a running app's database.** The handle is shared by tracker, server and `total_changes()`-stamped caches. Upload is checked (read-only probe for `profiles` + `scores` *before* `openDb`, which would create them in any SQLite file) and staged in `data/restore/`; apply writes `ready` and exits `RESTART_EXIT_CODE`; `applyPendingRestore` swaps before `openDb`. Tray launcher only (`onRestart`): `start.sh`'s loop would announce it as an update. Stale `update/swapper.pid` removed first, or the launcher waits on whatever process owns that pid now.
+
+- Nothing deleted: replaced files → `data/before-restore-<local time>/`. Any failed move is undone. Staging is dropped either way, so a bad backup is not retried every launch.
+- **A restore marks the app as running now** (`markRunning`). The restored `kv` last-run is the backup's, and `importPlaysWhileClosed` would import everything since as a gap the app was closed for.
+- `PUT /api/restore`, `POST /api/restore/apply`, `POST /api/data-folder/open` refuse other origins (`isOwnPage`), like `/api/quit`.
 
 ## Score scales
 

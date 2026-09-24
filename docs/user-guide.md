@@ -609,11 +609,26 @@ exactly as it is.
 - **Save as an image** - a full-page PNG, rendered by the Chrome or Edge already on your
   machine. Nothing is bundled: a headless browser would be several times the size of this whole
   app. Without one installed the button says so and points at the HTML export.
-- **Export this profile** downloads the active profile as JSON: every score with its beatmap,
-  plus the computed totals and rank.
-- **Back up everything** downloads a copy of the whole database, all profiles included. It is
-  written with `VACUUM INTO` rather than copied, because the database runs in WAL mode and a
-  plain file copy can miss recent writes.
+- **Back up everything** downloads `osu-local-profiles-backup-<date>.zip`: every profile, with
+  its scores, pictures and me! images. Inside it is laid out exactly as the `data` folder is,
+  so it doubles as a copy of that folder. The database in it is a consistent snapshot, taken
+  while the app runs.
+- **Restore from backup** takes that zip (or a `.db` saved by a version before 1.22.0), says
+  which profiles it holds and how many plays each has, and asks before doing anything. The app
+  then restarts to swap it in. Nothing is deleted: the profiles it replaces are moved to
+  `data/before-restore-<date and time>/`, where they can be copied back by hand. Restoring does
+  not import the plays set between the backup and now, even with *Import plays set while the
+  app was closed* on; **Import past plays** can bring them in deliberately. Run from a terminal
+  rather than the tray, the app cannot restart itself, and the page asks you to do it.
+- **The data folder** is where everything lives, shown with its full path and an **Open
+  folder** button. With the app closed, copying the folder somewhere else is a complete backup
+  too, and putting it back restores it. It has to be closed: while it runs, the latest writes
+  can sit in `profiles.db-wal` beside the database, and a copy taken then can miss them.
+  `config.json` in the same folder is this install's own settings (osu! paths, port,
+  language), which is why a backup leaves it out.
+- **Export this profile's scores (JSON)**, under *Export*: every score with its beatmap, plus
+  the computed totals and rank, for a spreadsheet or another tool. It is not a backup and
+  cannot be restored from.
 
 Replays on disk remain the real source of truth - `node scripts/reingest.mjs` rebuilds
 everything from them - but these are portable and outlive the app.

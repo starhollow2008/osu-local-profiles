@@ -3,7 +3,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 
 /**
- * Just enough ZIP to unpack a release.
+ * Just enough ZIP to unpack a release, and to write and read back a backup (src/backup.ts).
  *
  * A dependency is not available here -- `node:sqlite` and one pure-JS LZMA codec are the
  * whole runtime dependency list, and an archive extractor pulled off npm is exactly the
@@ -130,7 +130,7 @@ export function readZipEntries(buf: Buffer): ZipEntry[] {
 }
 
 /** The bytes of one entry, decompressed. */
-function entryData(buf: Buffer, entry: ZipEntry): Buffer {
+export function entryData(buf: Buffer, entry: ZipEntry): Buffer {
   const header = entry.localHeaderOffset;
   if (buf.readUInt32LE(header) !== LOCAL_SIGNATURE) {
     throw new Error(`corrupt local header for ${entry.name}`);
@@ -190,4 +190,72 @@ export function extractZip(file: string, dest: string, stripComponents = 0): num
   }
 
   return written;
+}
+
+/**
+ * Write `files` as one archive, deflated, with UTF-8 names.
+ *
+ * The inverse of `readZipEntries` and no more: no directories (a name with a slash implies
+ * its folder), no permissions, no zip64. A backup is a database and some pictures, and the
+ * 4GB a plain archive can address is refused outright rather than written as a corrupt one.
+ */
+export function writeZip(files: ReadonlyArray<{ name: string; data: Buffer }>, at = new Date()): Buffer {
+  // MS-DOS time and date, in local time, as every unzip tool shows them.
+  const time = (at.getHours() << 11) | (at.getMinutes() << 5) | (at.getSeconds() >> 1);
+  const date = ((at.getFullYear() - 1980) << 9) | ((at.getMonth() + 1) << 5) | at.getDate();
+  const UTF8_NAMES = 0x0800;
+
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+
+  for (const file of files) {
+    const name = Buffer.from(file.name.replace(/\\/g, '/'), 'utf8');
+    const deflated = zlib.deflateRawSync(file.data);
+    // A picture is already compressed and can come out larger; store it as it is then.
+    const method = deflated.length < file.data.length ? DEFLATED : STORED;
+    const body = method === DEFLATED ? deflated : file.data;
+    const crc = zlib.crc32(file.data);
+
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(LOCAL_SIGNATURE, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(UTF8_NAMES, 6);
+    local.writeUInt16LE(method, 8);
+    local.writeUInt16LE(time, 10);
+    local.writeUInt16LE(date, 12);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(body.length, 18);
+    local.writeUInt32LE(file.data.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(0, 28);
+
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(CENTRAL_SIGNATURE, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(UTF8_NAMES, 8);
+    central.writeUInt16LE(method, 10);
+    central.writeUInt16LE(time, 12);
+    central.writeUInt16LE(date, 14);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(body.length, 20);
+    central.writeUInt32LE(file.data.length, 24);
+    central.writeUInt16LE(name.length, 28);
+    central.writeUInt32LE(offset, 42);
+
+    locals.push(local, name, body);
+    centrals.push(central, name);
+    offset += local.length + name.length + body.length;
+    if (offset > 0xffffffff) throw new Error('too large for a zip file (4GB)');
+  }
+
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(EOCD_SIGNATURE, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
 }

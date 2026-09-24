@@ -722,6 +722,35 @@ check(
   true,
 );
 check(
+  'restoring takes the backup zip, or a .db from an older version',
+  await evaluate("!!document.getElementById('shareRestore') && document.getElementById('restoreFile').accept"),
+  '.zip,.db',
+);
+/*
+ * The path arrives from its own endpoint after the dialog opens, never from /api/state,
+ * which the saved web page is built from.
+ */
+check(
+  'the data folder is named in full, with a way to open it',
+  await evaluate(`new Promise((resolve) => setTimeout(() => {
+    const path = document.getElementById('dataFolderPath');
+    resolve(/data$/.test(path.textContent) && getComputedStyle(path).display === 'block' &&
+      !!document.getElementById('openDataFolder'));
+  }, 500))`),
+  true,
+);
+check(
+  'the JSON export is under Export, not Back up, so it is not taken for a backup',
+  await evaluate(`(() => {
+    const headings = [...document.querySelectorAll('#shareModal h4')];
+    const exportHeading = headings.find((h) => h.textContent === 'Export');
+    return !!exportHeading &&
+      !!(exportHeading.compareDocumentPosition(document.getElementById('shareExport')) & Node.DOCUMENT_POSITION_FOLLOWING) &&
+      !!(document.getElementById('shareBackup').compareDocumentPosition(exportHeading) & Node.DOCUMENT_POSITION_FOLLOWING);
+  })()`),
+  true,
+);
+check(
   'the web page export is the primary action',
   await evaluate("document.getElementById('shareHtml').classList.contains('primary')"),
   true,

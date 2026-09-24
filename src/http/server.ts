@@ -9,6 +9,8 @@ import type { OsuInstall } from '../clients/detect.ts';
 import { isLocale } from '../i18n.ts';
 import type { Ruleset } from '../osr.ts';
 import { dismissWelcome, welcomePending } from '../welcome.ts';
+import { backupFileName, createBackup, discardRestore, markRestoreReady, stageRestore } from '../backup.ts';
+import { openFolder } from '../browser.ts';
 import {
   unsubmittedAttemptCount,
   computeStats,
@@ -125,6 +127,9 @@ function isLocal(remoteAddress: string | undefined): boolean {
 /** Upload ceiling for an avatar or banner; anything larger is a mistake. */
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
+/** Upload ceiling for a backup to restore. A big library's database is tens of MB. */
+const MAX_BACKUP_BYTES = 1024 * 1024 * 1024;
+
 const webRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'web');
 
 const MIME: Record<string, string> = {
@@ -181,6 +186,12 @@ export interface ServerOptions {
    * one, so no test can end the process running them.
    */
   onQuit?: () => void;
+  /**
+   * Stop the app for its launcher to start it again, which is how a restored backup is
+   * applied (src/backup.ts). Absent when nothing would start it again -- run from a terminal,
+   * or in the tests -- and the page then asks for a restart instead.
+   */
+  onRestart?: () => void;
   /** What started the app, so the page can say where else it can be stopped from. */
   launcher?: 'tray' | 'terminal';
 }
@@ -1564,34 +1575,95 @@ export function startServer(opts: ServerOptions): http.Server {
     }
 
     /*
-     * A copy of the whole database, every profile included.
-     *
-     * `VACUUM INTO` rather than copying the file: the database runs in WAL mode, so the
-     * .db on disk is not self-contained and a plain copy can miss the most recent writes.
-     * This produces a consistent, already-compacted snapshot.
+     * Back up everything: every profile, with the pictures and me! images kept beside the
+     * database, as one zip laid out the way `data/` is. See src/backup.ts.
      */
     if (url.pathname === '/api/backup') {
-      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-      const file = path.join(opts.dataDir, `backup-${stamp}.db`);
+      const at = new Date();
+      let zip: Buffer;
       try {
-        fs.rmSync(file, { force: true });
-        opts.db.exec(`VACUUM INTO '${file.replace(/'/g, "''")}'`);
+        zip = createBackup(opts.db, opts.dataDir, at);
       } catch (e) {
         return json(res, { error: (e as Error).message }, 500);
       }
-
-      fs.readFile(file, (err, buf) => {
-        if (err) return json(res, { error: err.message }, 500);
-        res.writeHead(200, {
-          'content-type': 'application/octet-stream',
-          'content-disposition': `attachment; filename="osu-local-profiles-${stamp}.db"`,
-          'cache-control': 'no-store',
-        });
-        res.end(buf);
-        // The download has the bytes; leaving a copy in data/ would just accumulate.
-        fs.rmSync(file, { force: true });
+      res.writeHead(200, {
+        'content-type': 'application/zip',
+        'content-disposition': `attachment; filename="${backupFileName(at)}"`,
+        'cache-control': 'no-store',
       });
+      res.end(zip);
       return;
+    }
+
+    /*
+     * Restore from a backup, in two steps so the page can say what it is about to replace
+     * everything with: a PUT of the file checks and stages it and answers with its profiles,
+     * then a POST applies it by restarting (or a DELETE drops it). Only this app's own page
+     * may do any of it, as with Quit: any website open in the browser can send a POST here.
+     */
+    if (url.pathname === '/api/restore' || url.pathname === '/api/restore/apply') {
+      if (!isOwnPage(req.headers.origin, req.socket.localPort)) {
+        return json(res, { error: "only this app's own page can restore a backup" }, 403);
+      }
+
+      if (url.pathname === '/api/restore' && req.method === 'PUT') {
+        const chunks: Buffer[] = [];
+        let size = 0;
+        let aborted = false;
+        req.on('data', (chunk: Buffer) => {
+          if (aborted) return;
+          size += chunk.length;
+          if (size > MAX_BACKUP_BYTES) {
+            aborted = true;
+            json(res, { error: 'that file is too large to be a backup (1GB max)' }, 413);
+            req.destroy();
+            return;
+          }
+          chunks.push(chunk);
+        });
+        req.on('end', () => {
+          if (aborted) return;
+          try {
+            return json(res, { ok: true, ...stageRestore(opts.dataDir, Buffer.concat(chunks)) });
+          } catch (e) {
+            return json(res, { error: (e as Error).message }, 400);
+          }
+        });
+        return;
+      }
+
+      if (url.pathname === '/api/restore' && req.method === 'DELETE') {
+        discardRestore(opts.dataDir);
+        return json(res, { ok: true });
+      }
+
+      if (url.pathname === '/api/restore/apply' && req.method === 'POST') {
+        try {
+          markRestoreReady(opts.dataDir);
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
+        }
+        const restart = opts.onRestart;
+        if (restart) res.once('finish', () => setTimeout(restart, 250));
+        return json(res, { ok: true, restarting: Boolean(restart) });
+      }
+    }
+
+    /*
+     * Where `data/` is, for Share & back up's note that copying it is a backup too. An
+     * endpoint of its own rather than a field in /api/state, because the saved web page is
+     * built from /api/state and must hold nothing about this computer.
+     */
+    if (url.pathname === '/api/data-folder' && req.method === 'GET') {
+      return json(res, { path: opts.dataDir });
+    }
+
+    if (url.pathname === '/api/data-folder/open' && req.method === 'POST') {
+      if (!isOwnPage(req.headers.origin, req.socket.localPort)) {
+        return json(res, { error: "only this app's own page can open the data folder" }, 403);
+      }
+      openFolder(opts.dataDir);
+      return json(res, { ok: true });
     }
 
     if (url.pathname === '/api/tracking' && req.method === 'POST') {
