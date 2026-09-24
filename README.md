@@ -44,7 +44,7 @@ Last Updated:
 
 ## Installation
 
-1. Download the latest release for your OS and unzip the folder.
+1. [Download the latest release](https://github.com/jonathant09/osu-local-profiles/releases/latest) for your OS and unzip the folder.
 2. Run the app as follows:
 
 | Platform | Start | Location when running |
