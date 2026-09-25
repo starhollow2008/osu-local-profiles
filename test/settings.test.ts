@@ -225,3 +225,51 @@ test('the osu!stable note is offered until a profile turns it off', () => {
     h.cleanup();
   }
 });
+
+test('a new profile counts every unranked mod and beatmap status by default', () => {
+  const h = harness();
+  try {
+    const settings = getSettings(h.db, h.profileId);
+    assert.equal(settings.includeUnrankedMods, true);
+    assert.deepEqual(
+      [...settings.includeUnrankedMaps].sort(),
+      ['graveyard', 'loved', 'pending', 'qualified', 'unsubmitted', 'wip'],
+    );
+    // And the note that says so is shown until it is dismissed.
+    assert.equal(settings.showCountingNote, true);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a profile from before those defaults keeps counting what it counted, once and for good', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-settings-pin-'));
+  const file = path.join(tmp, 'test.db');
+  try {
+    // A database written by an earlier version: its profiles exist, and nothing is pinned.
+    let db = openDb(file);
+    const untouched = getOrCreateProfile(db, 'Never opened Other settings');
+    const chose = getOrCreateProfile(db, 'Turned unranked mods on');
+    updateSettings(db, chose, { includeUnrankedMods: true });
+    db.prepare("DELETE FROM kv WHERE key = 'countingDefaultsPinned'").run();
+    db.close();
+
+    db = openDb(file);
+    // Kept on osu!'s own rules, which were the defaults it was made under...
+    assert.equal(getSettings(db, untouched).includeUnrankedMods, false);
+    assert.deepEqual(getSettings(db, untouched).includeUnrankedMaps, []);
+    // ...while a choice a profile made is its own.
+    assert.equal(getSettings(db, chose).includeUnrankedMods, true);
+    assert.deepEqual(getSettings(db, chose).includeUnrankedMaps, []);
+
+    // A profile made afterwards gets the new defaults, and reopening pins nothing more.
+    const fresh = getOrCreateProfile(db, 'Made after the update');
+    db.close();
+    db = openDb(file);
+    assert.equal(getSettings(db, fresh).includeUnrankedMods, true);
+    assert.equal(getSettings(db, fresh).includeUnrankedMaps.length, 6);
+    db.close();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

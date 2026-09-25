@@ -2870,3 +2870,33 @@ source, with five real plays set for the purpose.
 - `npm run ui` against a copy of this machine's profile with the five imported: 333/333,
   including the MC chip among the Fun mods and an MC tooltip naming its mods. Rendered and
   looked at: Recent Plays and a McOsu score page.
+
+## 5.59 - Unranked mods and beatmaps count by default
+
+**Status:** done -- unreleased.
+
+The user's decision: a new profile counts every play toward pp -- unranked mods, and beatmaps
+of every status osu! does not rank (loved, qualified, pending, WIP, graveyard, never
+submitted). A local profile is for all of someone's playing, and the Scores note says how to
+narrow it. Tracking needed no change: the play tracking filter is off by default and already
+records every play; this is only what counts toward pp.
+
+- **New profiles only.** `pinCountingDefaults` (src/db/index.ts) writes the old defaults, off
+  and none, onto every profile that existed before, once, where it had stored no choice of its
+  own. So nobody's pp moves on the update, and a profile that never opened Other settings does
+  not flip while one that saved it once stays put. Runs on any database opened, a restored
+  older backup included; `kv countingDefaultsPinned` stops it running twice.
+- **The Scores note says so**: after "This profile counts plays on mods and beatmaps osu! does
+  not rank", it adds that new profiles count them by default and to turn them off in Options ->
+  Other settings, by the names the menu and dialog have in the page's language. Its Don't show
+  again and X were English-only, as were the Favorite Beatmaps hint's; now translated.
+- Relax and Autopilot keep the "as if the mod were off" basis, which was already the default
+  once unranked mods were on.
+
+### Verified
+
+- `npm run check`: 568 tests, including a new profile's defaults, a pre-existing one keeping
+  osu!'s rules while a choice it made stands, and a profile made after the pin getting the new
+  defaults.
+- `npm run ui` against a copy of this machine's profile: 334/334. The reworded note rendered and
+  looked at.

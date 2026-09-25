@@ -103,6 +103,38 @@ function migrate(db: Db): void {
   // Here rather than in schema.sql: on an existing database the column does not exist until
   // the loop above has added it, and schema.sql runs first.
   db.exec('CREATE INDEX IF NOT EXISTS osu_files_name ON osu_files (name)');
+  pinCountingDefaults(db);
+}
+
+const COUNTING_PINNED = 'countingDefaultsPinned';
+
+/**
+ * Unranked mods and every beatmap status count toward pp by default -- for a profile made
+ * from this version on (roadmap 5.59). One that already existed keeps counting exactly what
+ * it counted: its pp does not jump on an update nobody asked to change it.
+ *
+ * Done by writing the old defaults, off and none, onto every existing profile that never
+ * stored its own choice, once. A stored value always wins over a default, so from here the
+ * new defaults reach only profiles created afterwards. Runs on every database opened,
+ * including an older one restored from a backup, and does nothing on one already pinned.
+ * Raw JSON rather than through src/settings.ts, which would make the database layer depend
+ * on the settings it stores.
+ */
+function pinCountingDefaults(db: Db): void {
+  if (db.prepare('SELECT 1 AS hit FROM kv WHERE key = ?').get(COUNTING_PINNED)) return;
+  db.exec('BEGIN');
+  try {
+    const pin = db.prepare(
+      'INSERT OR IGNORE INTO profile_settings (profile_id, key, value) SELECT id, ?, ? FROM profiles',
+    );
+    pin.run('includeUnrankedMods', 'false');
+    pin.run('includeUnrankedMaps', '[]');
+    db.prepare('INSERT INTO kv (key, value) VALUES (?, ?)').run(COUNTING_PINNED, String(Date.now()));
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
 }
 
 /** Read-only handle for a database owned by the osu! client (never written to). */

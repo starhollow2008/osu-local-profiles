@@ -75,3 +75,13 @@ test('a profile that cannot know what its beatmaps are says so, before anything 
   // And with a status source it is the ordinary note again, or nothing at all.
   assert.equal(countingNoteText({ includeUnrankedMods: false, extraMapStatuses: [] }), '');
 });
+
+test('the note on a profile counting unranked plays says where to turn them off', () => {
+  const text = countingNoteText({ includeUnrankedMods: true, preferStrippedPp: true, extraMapStatuses: [4] });
+  assert.match(text, /^This profile counts plays on mods and beatmaps osu! does not rank\. /);
+  assert.match(
+    text,
+    /New profiles count them by default\. To count only what osu! ranks, turn them off in Options → Other settings\./,
+  );
+  assert.match(text, /not comparable with a real osu! account\.$/);
+});

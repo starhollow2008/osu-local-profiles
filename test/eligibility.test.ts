@@ -46,10 +46,28 @@ function rules(patch: Partial<Settings>) {
   return eligibilityOf({ ...defaultSettings(), ...patch });
 }
 
+/** osu!'s own rules on mods and beatmaps, which a profile from before roadmap 5.59 keeps. */
+const OFFICIAL: Partial<Settings> = { includeUnrankedMods: false, includeUnrankedMaps: [] };
+const official = (patch: Partial<Settings>) => rules({ ...OFFICIAL, ...patch });
+
+test('a new profile counts every unranked mod and beatmap by default', () => {
+  assert.deepEqual(rules({}), {
+    ...VANILLA,
+    includeUnrankedMods: true,
+    // Relax and Autopilot priced as if the mod were off, the basis the user asked for.
+    preferStrippedPp: true,
+    // Every status there is: loved, qualified, pending, WIP, graveyard and never submitted.
+    extraMapStatuses: [
+      Status.GRAVEYARD, Status.WIP, Status.PENDING, Status.QUALIFIED, Status.LOVED, UNRESOLVED_STATUS,
+    ].sort((a, b) => a - b),
+    countUnsubmitted: true,
+  });
+});
+
 test('the pp basis only applies while unranked mods are counted at all', () => {
-  // Default settings are osu!'s own rules in all but one respect: attempts osu! could not submit
-  // count by default, because osu! never received them to count.
-  assert.deepEqual(rules({}), { ...VANILLA, countUnsubmitted: true });
+  // osu!'s own rules in all but one respect: attempts osu! could not submit count by default,
+  // because osu! never received them to count.
+  assert.deepEqual(official({}), { ...VANILLA, countUnsubmitted: true });
   // The default basis is the "as if the mod were off" one the user asked for.
   assert.equal(rules({ includeUnrankedMods: true }).preferStrippedPp, true);
   assert.equal(
@@ -57,7 +75,7 @@ test('the pp basis only applies while unranked mods are counted at all', () => {
     false,
   );
   // Off, the basis is irrelevant and must not leak into an otherwise-official profile.
-  assert.equal(rules({ unrankedModPp: 'without-the-mod' }).preferStrippedPp, false);
+  assert.equal(official({ unrankedModPp: 'without-the-mod' }).preferStrippedPp, false);
 });
 
 /* ------------------------------------------------------------ the queries */
@@ -172,7 +190,7 @@ test('an unranked map stays out even with unranked mods included', () => {
     h.add({ md5: 'graveyard', pp: 300, mapStatus: Status.GRAVEYARD });
     h.add({ md5: 'unsubmitted', pp: 300, mapStatus: UNRESOLVED_STATUS });
 
-    const top = topPlays(h.db, h.profileId, 0, 100, rules({ includeUnrankedMods: true }));
+    const top = topPlays(h.db, h.profileId, 0, 100, official({ includeUnrankedMods: true }));
     assert.deepEqual(top, []);
   } finally {
     h.cleanup();
@@ -319,7 +337,7 @@ test('map and mod rules are both required, not either', () => {
     });
 
     const counted = (patch: Parameters<typeof rules>[0]) =>
-      topPlays(h.db, h.profileId, 0, 100, rules(patch)).length;
+      topPlays(h.db, h.profileId, 0, 100, official(patch)).length;
 
     assert.equal(counted({}), 0);
     assert.equal(counted({ includeUnrankedMods: true }), 0);

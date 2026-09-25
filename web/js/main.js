@@ -414,9 +414,11 @@ function renderCountingNote(next) {
 
   note.innerHTML = `<div class="counting-note__text">${escapeHtml(text)}</div>
     <div class="counting-note__actions">
-      <button type="button" class="counting-note__dismiss" data-dismiss-note>Don't show again</button>
+      <button type="button" class="counting-note__dismiss" data-dismiss-note>${escapeHtml(
+        t('common.dontShowAgain'),
+      )}</button>
       <button type="button" class="counting-note__close" data-dismiss-note
-              aria-label="Don't show this again">&times;</button>
+              aria-label="${escapeHtml(t('common.dontShowThisAgain'))}">&times;</button>
     </div>`;
 }
 
@@ -457,9 +459,11 @@ function renderFavoritesNote(total) {
     </div>
     <div class="counting-note__actions">
       <button type="button" class="counting-note__import" data-import-favorites>Import&hellip;</button>
-      <button type="button" class="counting-note__dismiss" data-dismiss-note>Don't show again</button>
+      <button type="button" class="counting-note__dismiss" data-dismiss-note>${escapeHtml(
+        t('common.dontShowAgain'),
+      )}</button>
       <button type="button" class="counting-note__close" data-dismiss-note
-              aria-label="Don't show this again">&times;</button>
+              aria-label="${escapeHtml(t('common.dontShowThisAgain'))}">&times;</button>
     </div>`;
 }
 

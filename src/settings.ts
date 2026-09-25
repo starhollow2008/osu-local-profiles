@@ -30,8 +30,10 @@ export interface Settings {
   tagline: string;
   /**
    * Count scores osu! refuses to rank because of their mods -- Relax, Autopilot, a
-   * customised rate such as DT at 1.45x. Off by default: on, the profile stops being
-   * comparable with a real osu! account, which is the whole point of it.
+   * customised rate such as DT at 1.45x. On by default for a profile made from roadmap 5.59
+   * on: a local profile is for every play, and the Scores note says so and where to turn it
+   * off. A profile from before keeps what it had (`pinCountingDefaults`). On, the profile is
+   * not comparable with a real osu! account.
    */
   includeUnrankedMods: boolean;
   /**
@@ -47,7 +49,7 @@ export interface Settings {
   unrankedModPp: 'without-the-mod' | 'as-played';
   /**
    * Beatmap states to count besides ranked and approved: `loved`, `qualified`, `pending`,
-   * `wip`, `graveyard`, `unsubmitted`. Empty by default.
+   * `wip`, `graveyard`, `unsubmitted`. All of them by default, like `includeUnrankedMods`.
    *
    * A list rather than one switch, because these are not one proposition -- a Loved map is
    * played competitively, a graveyarded one may be a draft nobody finished, and an
@@ -244,7 +246,7 @@ const DEFS: Defs = {
     coerce: (raw) => cleanText(raw, 120),
   },
   includeUnrankedMods: {
-    default: false,
+    default: true,
     // Checkboxes post strings, and JSON round-trips booleans, so accept both shapes.
     coerce: (raw) => raw === true || raw === 'true' || raw === 1 || raw === '1',
   },
@@ -344,7 +346,8 @@ const DEFS: Defs = {
     },
   },
   includeUnrankedMaps: {
-    default: [],
+    // Every status there is, so no play is left out of pp for its beatmap until asked.
+    default: Object.keys(UNRANKED_MAP_STATUSES) as UnrankedMapStatus[],
     coerce: (raw) => {
       if (!Array.isArray(raw)) return [];
       // Filtered against the known set and de-duplicated, so a stored list written by a

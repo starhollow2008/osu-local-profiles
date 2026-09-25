@@ -65,6 +65,12 @@ export function countingNoteText(counting) {
   // "mods", "beatmaps", or both joined. The joining word is translated too: a language that
   // does not put "and" between two nouns the way English does still reads correctly.
   let text = `${t('note.countsUnranked', { what: included.join(t('note.and')) })} `;
+  // On by default for a new profile (roadmap 5.59), so say so and where to turn it off -- by
+  // the names the menu and the dialog go by in this language.
+  text += `${t('note.turnOff', {
+    options: t('optionsBtn').replace('▾', '').trim(),
+    settings: t('optSettings'),
+  })} `;
   if (counting.includeUnrankedMods) {
     text += counting.preferStrippedPp
       ? `${t('note.strippedPp')} `
