@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -18,9 +18,26 @@ import {
 import { entryData, readZipEntries, writeZip } from '../src/update/zip.ts';
 import { folderCommand } from '../src/browser.ts';
 
+/** Every folder these tests made, removed once they have all run. */
+const made: string[] = [];
+
 function tempDir(): string {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'olp-backup-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-backup-'));
+  made.push(dir);
+  return dir;
 }
+
+// Without this every run left a folder per test behind -- hundreds, over a project's life.
+// A database a test left open keeps its folder on Windows; that one is left rather than failing.
+after(() => {
+  for (const dir of made) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* still open */
+    }
+  }
+});
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 

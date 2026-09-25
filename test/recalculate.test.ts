@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -20,8 +20,21 @@ import type { OfficialCalculator } from '../src/calc/official.ts';
  * Every replay path points at nothing, so a recalculation reads none of them: what it chose
  * to look at is the thing under test, not osu!'s calculator.
  */
+/** Every folder these tests made, removed once they have all run -- each closes its database first. */
+const made: string[] = [];
+after(() => {
+  for (const dir of made) {
+    try {
+      fs.rmSync(dir, { recursive: true, force: true });
+    } catch {
+      /* still open */
+    }
+  }
+});
+
 function fixture(): { db: Db; left: number; mouse: number; dir: string } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-recalc-'));
+  made.push(dir);
   const db = openDb(path.join(dir, 'profiles.db'));
   const left = getOrCreateProfile(db, 'Left');
   const mouse = getOrCreateProfile(db, 'Mouse');
