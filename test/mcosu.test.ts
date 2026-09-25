@@ -389,7 +389,11 @@ test('a McOsu folder is recognised, with its beatmaps where its osu_folder point
   t.after(f.cleanup);
   assert.equal(isMcosuRoot(f.root), true);
   assert.equal(isMcosuRoot(f.osu), false);
+  // Written with McOsu's trailing backslash, as on Windows -- which macOS and Linux would read as
+  // part of the folder's name if it were kept.
   assert.equal(mcosuSongs(f.root), path.join(f.osu, 'Songs'));
+  fs.writeFileSync(path.join(f.root, 'cfg', 'osu.cfg'), `osu_folder ${f.osu}/\n`);
+  assert.equal(mcosuSongs(f.root), path.join(f.osu, 'Songs'), 'and with a trailing slash, as on Linux');
   const install = mcosuInstall(f.root, f.built);
   assert.deepEqual(install, {
     kind: 'mcosu',

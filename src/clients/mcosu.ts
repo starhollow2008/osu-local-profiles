@@ -592,7 +592,13 @@ export function mcosuSongs(root: string): string | null {
   } catch {
     return null;
   }
-  const folder = /^[ \t]*osu_folder[ \t]+(.+?)[ \t]*$/m.exec(cfg)?.[1]?.replace(/^"|"$/g, '');
+  // McOsu on Windows writes the folder with a trailing backslash (`C:\...\osu!\`), which on
+  // macOS and Linux is an ordinary filename character rather than a separator -- a config
+  // written on Windows, or McOsu under Wine, would otherwise find no Songs folder there.
+  const folder = /^[ \t]*osu_folder[ \t]+(.+?)[ \t]*$/m
+    .exec(cfg)?.[1]
+    ?.replace(/^"|"$/g, '')
+    .replace(/[\\/]+$/, '');
   if (!folder) return null;
   const songs = path.join(folder, 'Songs');
   return exists(songs) ? songs : null;
