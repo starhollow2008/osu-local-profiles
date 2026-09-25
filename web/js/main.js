@@ -488,16 +488,24 @@ $('favoritesNote').onclick = async (e) => {
  * left, so a score appears seconds after the play rather than at the moment it ends; and it
  * keeps no usable record of a play that was quit, failed or retried, so those are not counted
  * at all. lazer has neither limitation, so the note is shown only where stable was found.
+ *
+ * McOsu has the second limitation too, worse: it keeps nothing at all of a play it did not
+ * save. So a McOsu install gets its own paragraph in the same note, and one dismissal covers
+ * both -- they are the same news about the same kind of play.
  */
 function renderStableNote() {
-  const show = installKinds.includes('stable') && settings.showStableNote !== false;
+  const paragraphs = [
+    ...(installKinds.includes('stable') ? [t('stableNote.text')] : []),
+    ...(installKinds.includes('mcosu') ? [t('mcosuNote.text')] : []),
+  ];
+  const show = paragraphs.length > 0 && settings.showStableNote !== false;
   for (const note of document.querySelectorAll('[data-stable-note]')) {
     note.hidden = !show;
     if (!show) {
       note.innerHTML = '';
       continue;
     }
-    note.innerHTML = `<div class="counting-note__text">${t('stableNote.text')}</div>
+    note.innerHTML = `<div class="counting-note__text">${paragraphs.join('<br><br>')}</div>
       <div class="counting-note__actions">
         <button type="button" class="counting-note__dismiss" data-dismiss-stable>${escapeHtml(
           t('common.dontShowAgain'),

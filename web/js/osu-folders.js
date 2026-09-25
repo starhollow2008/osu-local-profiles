@@ -25,6 +25,9 @@ let searching = false;
 
 const setHint = (message, isError = false) => hint('foldersHint', message, isError);
 
+/** Each kind of folder, by the name its game goes by. */
+const KIND_NAMES = { lazer: 'osu!lazer', stable: 'osu!stable', mcosu: 'McOsu' };
+
 function render() {
   const list = $('folderList');
   if (!folders) {
@@ -50,7 +53,7 @@ function render() {
         return `
           <div class="folder${c.active ? ' folder--active' : ''}">
             <div class="folder__info">
-              <div class="folder__kind">${c.kind === 'lazer' ? 'osu!lazer' : 'osu!stable'}${badges.join('')}</div>
+              <div class="folder__kind">${KIND_NAMES[c.kind] ?? c.kind}${badges.join('')}</div>
               <div class="folder__path" title="${escapeHtml(c.root)}">${escapeHtml(c.root)}</div>
             </div>
             ${

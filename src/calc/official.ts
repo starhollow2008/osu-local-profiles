@@ -33,6 +33,13 @@ export interface OfficialRequest {
    * as if those mods had not been on. Used for Relax and Autopilot; see src/calc/pp.ts.
    */
   stripMods?: string[];
+  /**
+   * Mods to price with in place of the ones the replay decodes to, applied before `stripMods`.
+   * For a McOsu play, whose built stable replay cannot hold a custom rate or an override.
+   */
+  mods?: LazerMod[];
+  /** Price without the total osu!stable recorded, which a McOsu play may have on another footing. */
+  ignoreLegacyTotalScore?: boolean;
 }
 
 export interface OfficialResult {

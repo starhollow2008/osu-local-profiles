@@ -1,11 +1,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { dataDir } from '../config.ts';
+import { isMcosuRoot, mcosuSongs, steamLibraries, steamMcosuCandidates } from './mcosu.ts';
 
 export interface OsuInstall {
-  kind: 'lazer' | 'stable';
+  kind: 'lazer' | 'stable' | 'mcosu';
   root: string;
-  /** Directory to watch for new replays. */
+  /**
+   * Directory to watch for new replays. McOsu writes none, so for McOsu this is the app's own
+   * folder of the replays it builds from McOsu's scores.db -- see src/clients/mcosu.ts.
+   */
   replayDir: string;
   /** Roots to scan for local .osu beatmap files. */
   beatmapRoots: string[];
@@ -346,6 +351,55 @@ export function stableInstall(root: string): OsuInstall | null {
 }
 
 /**
+ * Where Steam itself might be. Steam's own folder lists every other library it has in
+ * `libraryfolders.vdf`, so finding Steam finds McOsu on whichever disk it was installed to.
+ * A bare `SteamLibrary` at a drive root is the folder Steam suggests for a second library,
+ * and is looked in directly in case Steam's own folder is somewhere this list does not reach.
+ */
+export function steamRoots(e: DetectEnvironment, drives: readonly string[] = ['C:\\', 'D:\\', 'E:\\']): string[] {
+  const out: string[] = [];
+  if (e.platform === 'win32') {
+    const x86 = e.env['PROGRAMFILES(X86)'] ?? e.env['ProgramFiles(x86)'];
+    if (x86) out.push(path.join(x86, 'Steam'));
+    if (e.env['PROGRAMFILES']) out.push(path.join(e.env['PROGRAMFILES'], 'Steam'));
+    for (const drive of drives) {
+      out.push(path.join(drive, 'Steam'), path.join(drive, 'SteamLibrary'));
+    }
+  }
+  out.push(path.join(e.home, '.steam', 'steam'), path.join(xdgDataHome(e), 'Steam'));
+  return out;
+}
+
+/**
+ * Where McOsu might be: its Steam folder in every Steam library. Cheap enough -- a few
+ * `access()` calls and one small file -- to ask on every launch, which matters: a player who
+ * has both osu! clients never has the rest of detection look further, and would otherwise
+ * never have McOsu found at all. A copy from outside Steam is found by the drive search or
+ * added from the page.
+ */
+export function mcosuCandidates(e: DetectEnvironment, drives?: readonly string[]): string[] {
+  return steamMcosuCandidates(steamLibraries(steamRoots(e, drives)));
+}
+
+/**
+ * A McOsu install, if that is what is at `root`.
+ *
+ * Its beatmaps are wherever its `osu_folder` points, which is normally the osu!stable
+ * install, and its "replays" are the ones this app builds for its plays, under `data/`.
+ */
+export function mcosuInstall(root: string, builtReplays = path.join(dataDir(), 'mcosu')): OsuInstall | null {
+  if (!isMcosuRoot(root)) return null;
+  const songs = mcosuSongs(root);
+  return {
+    kind: 'mcosu',
+    root,
+    replayDir: builtReplays,
+    beatmapRoots: songs ? [songs] : [],
+    onlineDb: null,
+  };
+}
+
+/**
  * Find the osu! installations on this machine.
  *
  * `configured` comes from `installRoots` in config.json and is tried first, which is what
@@ -379,6 +433,7 @@ export function candidateRoots(
     ...windowsStableCandidates(e, drives.length > 0 ? drives : undefined),
     ...wineStableCandidates(e),
     ...wineStableRoots(e),
+    ...mcosuCandidates(e, drives.length > 0 ? drives : undefined),
   ];
 }
 
@@ -397,13 +452,16 @@ export function installsFrom(
   const found: OsuInstall[] = [];
   let lazer: OsuInstall | null = null;
   let stable: OsuInstall | null = null;
+  let mcosu: OsuInstall | null = null;
 
   for (const root of roots) {
     if (!lazer) lazer = lazerInstall(root);
     if (!stable) stable = stableInstall(root);
-    if (lazer && stable) break;
+    if (!mcosu) mcosu = mcosuInstall(root);
+    if (lazer && stable && mcosu) break;
   }
   if (lazer) found.push(lazer);
   if (stable) found.push(stable);
+  if (mcosu) found.push(mcosu);
   return found;
 }

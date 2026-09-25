@@ -5,8 +5,12 @@
  * LZMA-compressed JSON block after the replay data (`LegacyReplaySoloScoreInfo`) that
  * carries the *authoritative* mods, statistics and rank. The legacy header alone is
  * misleading for lazer scores -- it reports rank "F" for plays that actually ranked A.
+ *
+ * It also reads the replays this app builds for McOsu plays, which are osu!stable replays
+ * with a block of the app's own after them -- see src/clients/mcosu.ts.
  */
 import { createRequire } from 'node:module';
+import { readMcosuBlock, type McosuFacts } from './clients/mcosu.ts';
 
 const require = createRequire(import.meta.url);
 const LZMA = require('lzma-js-simple-v2') as {
@@ -41,8 +45,19 @@ export interface LazerExtras {
   pauses?: unknown[];
 }
 
+/** Which game set a play. */
+export type Client = 'lazer' | 'stable' | 'mcosu';
+
+/**
+ * Whether osu! scores a client's plays as osu!stable plays: the Classic mod, classic slider
+ * accuracy, the legacy grades, ScoreV1. McOsu's are, because McOsu is stable's scoring.
+ */
+export function scoredAsStable(client: string): boolean {
+  return client === 'stable' || client === 'mcosu';
+}
+
 export interface ReplayScore {
-  client: 'lazer' | 'stable';
+  client: Client;
   mode: Ruleset;
   version: number;
   beatmapMD5: string;
@@ -63,6 +78,8 @@ export interface ReplayScore {
   playedAt: Date;
   onlineScoreId: bigint | null;
   extras: LazerExtras | null;
+  /** What McOsu recorded that a stable replay cannot hold. Only on a replay built for a McOsu play. */
+  mcosu: McosuFacts | null;
 }
 
 /**
@@ -91,6 +108,7 @@ class Cursor {
   long() { const v = this.b.readBigInt64LE(this.o); this.o += 8; return v; }
   skip(n: number) { this.o += n; }
   slice(n: number) { const s = this.b.subarray(this.o, this.o + n); this.o += n; return s; }
+  rest() { return this.b.subarray(this.o); }
   /** ULEB128-prefixed UTF-8 string; a leading 0x00 means null. */
   string(): string | null {
     if (this.b[this.o++] === 0x00) return null;
@@ -139,6 +157,7 @@ export async function parseReplay(buf: Buffer): Promise<ReplayScore> {
 
   let onlineScoreId: bigint | null = null;
   let extras: LazerExtras | null = null;
+  let mcosu: McosuFacts | null = null;
 
   if (c.remaining >= 8) {
     onlineScoreId = c.long();
@@ -151,16 +170,19 @@ export async function parseReplay(buf: Buffer): Promise<ReplayScore> {
           extras = null;   // corrupt or unknown block: fall back to legacy fields
         }
       }
+    } else if (version < LAZER_EXT_MIN_VERSION) {
+      mcosu = readMcosuBlock(c.rest());
     }
   }
 
   return {
-    client: version >= LAZER_EXT_MIN_VERSION ? 'lazer' : 'stable',
+    client: version >= LAZER_EXT_MIN_VERSION ? 'lazer' : mcosu ? 'mcosu' : 'stable',
     mode, version, beatmapMD5, username, replayMD5,
     count300, count100, count50, countGeki, countKatu, countMiss,
     totalScore, maxCombo, perfectCombo, legacyMods,
     playedAt: new Date(Number(ticks / 10000n) - TICKS_EPOCH_OFFSET_MS),
     onlineScoreId: onlineScoreId === -1n ? null : onlineScoreId,
     extras,
+    mcosu,
   };
 }

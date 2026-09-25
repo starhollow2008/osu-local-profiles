@@ -200,6 +200,7 @@ function replay(over: Partial<ReplayScore> = {}): ReplayScore {
     playedAt: new Date('2025-01-01T00:00:00Z'),
     onlineScoreId: null,
     extras: null,
+    mcosu: null,
     ...over,
   };
 }

@@ -126,7 +126,8 @@ function playColumns(e: Eligibility): string {
         ${countsSql(e)} AS counts,
         s.pp_nomod IS NOT NULL AS has_nomod,
         s.pinned_at IS NOT NULL AS pinned,
-        s.replay_path IS NOT NULL AS has_replay,
+        -- A McOsu play's replay is one this app built, with no cursor data: nothing to offer.
+        (s.replay_path IS NOT NULL AND s.client <> 'mcosu') AS has_replay,
         b.beatmapset_id, ${NAME_COLUMNS}, b.version, b.creator`;
 }
 
@@ -142,7 +143,7 @@ function toPlay(r: Row, e: Eligibility): Play {
     /* a malformed row should not take the whole page down */
   }
   // As osu! lists a stable play: with Classic, which osu! itself scored it with.
-  mods = withClassicMod(mods, r['client'] === 'stable' ? 'stable' : 'lazer');
+  mods = withClassicMod(mods, String(r['client']));
 
   return {
     kind: 'score',

@@ -17,6 +17,12 @@ import { beatmapArtist, beatmapTitle } from './metadata.js';
 
 const RULESET = ['osu', 'taiko', 'fruits', 'mania'];
 
+/** osu-web's "Played on", with McOsu beside osu!'s own two. */
+const CLIENT_NAMES = { lazer: 'Lazer', stable: 'Stable', mcosu: 'McOsu' };
+
+/** McOsu is osu!stable's scoring, so osu! grades its plays as stable ones. */
+const scoredAsStable = (client) => client === 'stable' || client === 'mcosu';
+
 /* ------------------------------------------------------------------------ */
 /* Statistics                                                                */
 /* ------------------------------------------------------------------------ */
@@ -183,7 +189,7 @@ let dialId = 0;
  * middle.
  */
 export function scoreDial(score) {
-  const cutoffs = rankCutoffs(score.mode, score.client === 'stable');
+  const cutoffs = rankCutoffs(score.mode, scoredAsStable(score.client));
   const fill = dialFill(score.accuracy, score.grade, cutoffs);
   const gradient = `dial-outer-${++dialId}`;
 
@@ -293,7 +299,7 @@ function player(score, who) {
   <div class="score-player__row score-player__row--player">
     <span>${escapeHtml(t('score.playedBy'))}</span><strong>${escapeHtml(who.name)}</strong>
     <span>${escapeHtml(t('score.submittedOn'))}</span><strong>${escapeHtml(submitted(score.playedAt))}</strong>
-    <span>${escapeHtml(t('score.playedOn'))}</span><strong>${score.client === 'stable' ? 'Stable' : 'Lazer'}</strong>
+    <span>${escapeHtml(t('score.playedOn'))}</span><strong>${CLIENT_NAMES[score.client] ?? 'Lazer'}</strong>
   </div>
 </div>`;
 }
@@ -427,8 +433,8 @@ function breakdown(score, calculator) {
 export function scoreCard(score, who, calculator = null) {
   const cover = coverUrl(score.beatmapsetId, 'cover@2x');
   // osu-web shows stable's letter for a stable score; it has no letter for F, so a failed
-  // stable score keeps the dial.
-  const grade = score.client === 'stable' && LEGACY_RANKS.has(score.grade) ? legacyRank(score.grade) : scoreDial(score);
+  // stable score keeps the dial. A McOsu score is a stable one to osu!.
+  const grade = scoredAsStable(score.client) && LEGACY_RANKS.has(score.grade) ? legacyRank(score.grade) : scoreDial(score);
 
   return `<div class="score-page">
   ${beatmapInfo(score)}

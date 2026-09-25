@@ -1,5 +1,5 @@
 import type { Db } from '../db/index.ts';
-import type { Ruleset } from '../osr.ts';
+import { scoredAsStable, type Ruleset } from '../osr.ts';
 import { countsSql, ppColumn, starsColumn, visibleSql, VANILLA, type Eligibility } from './eligibility.ts';
 import { estimateRank } from './rank.ts';
 import { bonusPp, isCustomised, weightedTotal } from './pp.ts';
@@ -164,7 +164,8 @@ function introMedals(db: Db, profileId: number): Medal[] {
     } catch {
       continue;
     }
-    const client = row.client === 'stable' ? 'stable' : 'lazer';
+    // A McOsu play is a stable one to osu!, which runs no lazer-only awarder on those.
+    const client = scoredAsStable(row.client) ? 'stable' : 'lazer';
     for (const definition of TABLE.intro) {
       if (earned.has(definition.slug)) continue;
       if (earnsIntroMedal(definition.rule, mods, row.mode, client)) earned.set(definition.slug, row);

@@ -1,5 +1,6 @@
-import type { LazerMod, ReplayScore } from '../osr.ts';
+import { scoredAsStable, type LazerMod, type ReplayScore } from '../osr.ts';
 import type { OfficialCalculator, PpPart } from './official.ts';
+import { mcosuMods, readBaseDifficulty } from '../clients/mcosu.ts';
 
 /** Each successive play in the top 100 is worth 5% less than the one above it. */
 export const WEIGHT = 0.95;
@@ -52,14 +53,15 @@ export function isCustomised(mod: LazerMod): boolean {
 export async function rankedByOsu(
   score: ReplayScore,
   official: OfficialCalculator | null,
+  osuPath: string | null = null,
 ): Promise<boolean | null> {
   if (!official) return null;
   // The same choice as scoreMods: a lazer replay's own mod list, else stable's bitmask, which
-  // osu! converts itself -- including the key-count and Random bits decodeLegacyMods skips.
+  // osu! converts itself -- including the key-count and Random bits decodeLegacyMods skips. A
+  // McOsu play is its mods as osu! would write them, a custom rate or McOsu's own MC included.
+  const mods = score.mcosu ? scoreMods(score, osuPath) : score.extras?.mods;
   const result = await official.ranked(
-    score.extras?.mods
-      ? { ruleset: score.mode, mods: score.extras.mods }
-      : { ruleset: score.mode, legacyMods: score.legacyMods },
+    mods ? { ruleset: score.mode, mods } : { ruleset: score.mode, legacyMods: score.legacyMods },
   );
   return result?.ranked ?? null;
 }
@@ -98,9 +100,40 @@ export function decodeLegacyMods(bitmask: number): LazerMod[] {
   );
 }
 
-/** The mods actually in effect, preferring lazer's structured list (which carries settings). */
-export function scoreMods(score: ReplayScore): LazerMod[] {
+/**
+ * The mods actually in effect, preferring lazer's structured list (which carries settings).
+ *
+ * A McOsu play's are worked out from what McOsu recorded (`mcosuMods`), and telling an
+ * override from the map's own values takes the map: `osuPath`, where there is one.
+ */
+export function scoreMods(score: ReplayScore, osuPath: string | null = null): LazerMod[] {
+  if (score.mcosu) return mcosuModsFor(score, osuPath).mods;
   return score.extras?.mods ?? decodeLegacyMods(score.legacyMods);
+}
+
+function mcosuModsFor(score: ReplayScore, osuPath: string | null) {
+  return mcosuMods(score.legacyMods, score.mcosu!, osuPath ? readBaseDifficulty(osuPath) : null);
+}
+
+/** How osu!'s calculator is to price a replay, beyond decoding it. */
+export interface Pricing {
+  /** Mods to price with in place of the ones the replay decodes to. */
+  mods?: LazerMod[];
+  /** Price without the total osu!stable recorded; see the helper's `ignoreLegacyTotalScore`. */
+  ignoreLegacyTotalScore?: boolean;
+  /** osu!'s mods cannot say what was played, so there is no honest pp to ask for. */
+  unpriceable?: boolean;
+}
+
+/**
+ * Nothing for a replay osu! set: its own file says it all. A McOsu play's replay is one this
+ * app built, and a speed or override its mod bits could not hold is priced from here.
+ */
+export function scorePricing(score: ReplayScore, osuPath: string | null): Pricing {
+  if (!score.mcosu) return {};
+  const derived = mcosuModsFor(score, osuPath);
+  if (derived.priced === null) return { unpriceable: true };
+  return { mods: derived.priced, ignoreLegacyTotalScore: derived.ignoreLegacyTotalScore };
 }
 
 /**
@@ -112,8 +145,8 @@ export function scoreMods(score: ReplayScore): LazerMod[] {
  * only: `mods_json` keeps what the player actually chose, which is what medals, play time
  * and eligibility read.
  */
-export function withClassicMod(mods: LazerMod[], client: 'lazer' | 'stable'): LazerMod[] {
-  if (client !== 'stable' || mods.some((m) => m.acronym === 'CL')) return mods;
+export function withClassicMod(mods: LazerMod[], client: string): LazerMod[] {
+  if (!scoredAsStable(client) || mods.some((m) => m.acronym === 'CL')) return mods;
   return [...mods, { acronym: 'CL' }];
 }
 
@@ -161,14 +194,17 @@ export async function calculateScorePp(
   osuPath: string,
   official: OfficialCalculator | null,
   stripMods?: string[],
+  pricing: Pricing = {},
 ): Promise<PpResult | null> {
-  if (!official) return null;
+  if (!official || pricing.unpriceable) return null;
 
-  const result = await official.calculate(
-    stripMods && stripMods.length > 0
-      ? { replayPath, beatmapPath: osuPath, stripMods }
-      : { replayPath, beatmapPath: osuPath },
-  );
+  const result = await official.calculate({
+    replayPath,
+    beatmapPath: osuPath,
+    ...(stripMods && stripMods.length > 0 ? { stripMods } : {}),
+    ...(pricing.mods ? { mods: pricing.mods } : {}),
+    ...(pricing.ignoreLegacyTotalScore ? { ignoreLegacyTotalScore: true } : {}),
+  });
   if (!result || result.pp === null) return null;
 
   return {

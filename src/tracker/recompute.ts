@@ -8,6 +8,7 @@ import {
   modsLabel,
   rankedByOsu,
   scoreMods,
+  scorePricing,
   strippableMods,
 } from '../calc/pp.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
@@ -155,17 +156,18 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
     }
 
     const beatmap = opts.resolver.resolve(score.beatmapMD5);
-    const mods = scoreMods(score);
-    const modsRanked = await rankedByOsu(score, opts.official);
+    const mods = scoreMods(score, beatmap.osuPath);
+    const pricing = scorePricing(score, beatmap.osuPath);
+    const modsRanked = await rankedByOsu(score, opts.official, beatmap.osuPath);
     const countable = modsCountable(mods);
 
     const computed = beatmap.osuPath
-      ? await calculateScorePp(row.replay_path, beatmap.osuPath, opts.official)
+      ? await calculateScorePp(row.replay_path, beatmap.osuPath, opts.official, undefined, pricing)
       : null;
     const strippable = strippableMods(mods);
     const stripped =
       strippable.length > 0 && beatmap.osuPath
-        ? await calculateScorePp(row.replay_path, beatmap.osuPath, opts.official, strippable)
+        ? await calculateScorePp(row.replay_path, beatmap.osuPath, opts.official, strippable, pricing)
         : null;
 
     if (!beatmap.osuPath) {

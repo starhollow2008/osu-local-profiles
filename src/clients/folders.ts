@@ -140,7 +140,7 @@ export function osuFolderService(deps: FolderDeps): FolderService {
         }
         throw new Error(
           `${root} does not look like an osu! install -- an osu!stable folder has osu!.exe ` +
-            'in it, and an osu!lazer folder has client.realm.',
+            'in it, an osu!lazer folder has client.realm, and a McOsu folder has McEngine.exe.',
         );
       }
 

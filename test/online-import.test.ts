@@ -138,6 +138,7 @@ function stableReplay(over: Partial<ReplayScore> = {}): ReplayScore {
     playedAt: new Date('2023-05-04T10:10:36Z'),
     onlineScoreId: 4430944113n,
     extras: null,
+    mcosu: null,
     ...over,
   };
 }

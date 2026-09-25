@@ -16,6 +16,11 @@
 //
 // Two kinds of request: a pp calculation (the default), and `"type": "ranked"`, which asks
 // osu!'s own mod classes whether a mod combination is ranked.
+//
+// A McOsu play has no replay of its own, so the app builds an osu!stable one from McOsu's
+// scores.db and hands that over like any other: the decoder still does all of the stable
+// work. What a stable replay cannot hold -- a custom speed, a difficulty override -- comes
+// alongside it as `mods`, applied after decoding.
 
 using System.Reflection;
 using System.Text.Json;
@@ -67,8 +72,30 @@ public sealed class Request
     /// <summary>Ranked request: the ruleset's legacy id (0 osu!, 1 taiko, 2 catch, 3 mania).</summary>
     [JsonPropertyName("ruleset")] public int Ruleset { get; set; }
 
-    /// <summary>Ranked request: the mods a lazer replay recorded, with any settings the player changed.</summary>
+    /// <summary>
+    /// Ranked request: the mods a lazer replay recorded, with any settings the player changed.
+    /// Calculation request: the mods to score with in place of the ones the replay decoded to.
+    /// </summary>
+    /// <remarks>
+    /// For a McOsu play. McOsu writes no replay, so the app builds an osu!stable one from its
+    /// scores.db, and a stable replay's mod bitmask cannot say what McOsu can: a speed that is
+    /// not 1.5x or 0.75x, or a CS/AR/OD/HP override. Those arrive here as osu!'s own mods with
+    /// settings (Double Time at 1.2x, Difficulty Adjust), and replace the decoded list after
+    /// the decoder has done its stable work. The Classic mod it added stays.
+    /// </remarks>
     [JsonPropertyName("mods")] public ModRequest[]? Mods { get; set; }
+
+    /// <summary>
+    /// Calculation request: price the play without the total score osu!stable recorded.
+    /// </summary>
+    /// <remarks>
+    /// osu! estimates a stable play's combo breaks from its total score, assuming stable's own
+    /// mod multipliers. A McOsu play at a speed its mod bits did not set, or with overridden
+    /// difficulty, recorded a total on a different footing, which would misstate the breaks.
+    /// Without it osu! estimates them from the combo, as it does for every lazer play. Only the
+    /// pp is affected: the classic score reported is still the one recorded.
+    /// </remarks>
+    [JsonPropertyName("ignoreLegacyTotalScore")] public bool IgnoreLegacyTotalScore { get; set; }
 
     /// <summary>Ranked request: an osu!stable replay's mod bitmask, used in place of <see cref="Mods"/>.</summary>
     [JsonPropertyName("legacyMods")] public long? LegacyMods { get; set; }
@@ -147,6 +174,12 @@ public static class Program
         var scoreInfo = score.ScoreInfo;
         var ruleset = RulesetFor(scoreInfo.Ruleset.OnlineID);
 
+        if (request.Mods != null)
+        {
+            var classic = scoreInfo.Mods.OfType<ModClassic>();
+            scoreInfo.Mods = BuildMods(ruleset, request.Mods).Concat(classic).ToArray();
+        }
+
         var stripped = false;
         if (request.StripMods is { Length: > 0 })
         {
@@ -159,7 +192,11 @@ public static class Program
         }
 
         var difficulty = ruleset.CreateDifficultyCalculator(working).Calculate(scoreInfo.Mods);
+
+        var legacyTotalScore = scoreInfo.LegacyTotalScore;
+        if (request.IgnoreLegacyTotalScore) scoreInfo.LegacyTotalScore = null;
         var performance = ruleset.CreatePerformanceCalculator()?.Calculate(scoreInfo, difficulty);
+        scoreInfo.LegacyTotalScore = legacyTotalScore;
 
         return new
         {
@@ -210,11 +247,7 @@ public static class Program
 
         Mod[] mods = request.LegacyMods is long bits
             ? ruleset.ConvertFromLegacyMods((LegacyMods)bits).ToArray()
-            : (request.Mods ?? Array.Empty<ModRequest>())
-                // An acronym this ruleset does not have comes back as osu!'s UnknownMod, which
-                // is not ranked.
-                .Select(m => new APIMod { Acronym = m.Acronym, Settings = SettingValues(m.Settings) }.ToMod(ruleset))
-                .ToArray();
+            : BuildMods(ruleset, request.Mods ?? Array.Empty<ModRequest>());
 
         var unranked = mods.Where(m => !m.Ranked).Select(m => m.Acronym).ToArray();
 
@@ -226,6 +259,14 @@ public static class Program
             version = OsuVersion,
         };
     }
+
+    /// <summary>
+    /// osu!'s own mod objects, built the way osu! builds them from a lazer replay. An acronym
+    /// this ruleset does not have comes back as osu!'s UnknownMod, which is not ranked.
+    /// </summary>
+    private static Mod[] BuildMods(Ruleset ruleset, IEnumerable<ModRequest> mods) =>
+        mods.Select(m => new APIMod { Acronym = m.Acronym, Settings = SettingValues(m.Settings) }.ToMod(ruleset))
+            .ToArray();
 
     /// <summary>JSON setting values as the plain values osu!'s bindables parse.</summary>
     private static Dictionary<string, object> SettingValues(Dictionary<string, JsonElement>? settings)

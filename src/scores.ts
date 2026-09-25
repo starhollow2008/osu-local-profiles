@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import type { Db } from './db/index.ts';
-import type { Ruleset } from './osr.ts';
+import { scoredAsStable, type Client, type Ruleset } from './osr.ts';
 import { playById, type Play } from './calc/stats.ts';
 import { VANILLA, visibleSql, type Eligibility } from './calc/eligibility.ts';
 import { detailsFor, ratingNeutral } from './favorites.ts';
@@ -245,7 +245,7 @@ function hiddenScoreRows(db: Db, profileId: number, limit: number): HiddenScore[
     titleOriginal: beatmapNameOriginal(names(r)),
     version: (r['version'] as string | null) ?? null,
     // Named as osu! names it: a stable play carries Classic (see withClassicMod).
-    modsLabel: classicLabel(r['mods_label'] as string, r['client'] === 'stable'),
+    modsLabel: classicLabel(r['mods_label'] as string, scoredAsStable(String(r['client']))),
     accuracy: r['accuracy'] as number,
     grade: r['grade'] as string,
     pp: (r['pp'] as number | null) ?? null,
@@ -351,7 +351,7 @@ export type Statistics = Record<string, number>;
 export interface ScoreDetail extends Play {
   mode: Ruleset;
   /** Which client set the score. osu-web's "Played on", and what picks the dial or the letter. */
-  client: 'lazer' | 'stable';
+  client: Client;
   statistics: Statistics;
   /** Empty for a stable score: its replay records what was hit, not what could have been. */
   maximumStatistics: Statistics;
@@ -501,14 +501,15 @@ export function scoreDetail(
   return {
     ...play,
     mode,
-    client: row['client'] === 'stable' ? 'stable' : 'lazer',
+    client: row['client'] === 'stable' || row['client'] === 'mcosu' ? row['client'] : 'lazer',
     statistics,
     maximumStatistics: parseStatistics(row['max_statistics_json'] as string | null) ?? {},
     // The medals' definition of a full combo, so the card and the FC medals never disagree.
     perfectCombo: mapMax === null || mapMax <= 0 ? null : play.maxCombo >= mapMax,
     difficultyStars: difficultyStars(db, profileId, play.beatmapMd5, mode, play.beatmapId, play.beatmapsetId),
     creatorId: details?.userId ?? null,
-    replayAvailable: replayPath !== null && fs.existsSync(replayPath),
+    // A McOsu play's replay is one this app built, with no cursor data: nothing to watch.
+    replayAvailable: row['client'] !== 'mcosu' && replayPath !== null && fs.existsSync(replayPath),
     ppBreakdown: parseBreakdown(parts),
     ppVersion: (row['pp_version'] as string | null) ?? null,
   };
@@ -601,7 +602,7 @@ export function replayDownload(
 ): { path: string; fileName: string } | { error: string } {
   const row = db
     .prepare(
-      `SELECT s.replay_path, s.played_at, b.artist, b.title, b.creator, b.version
+      `SELECT s.replay_path, s.client, s.played_at, b.artist, b.title, b.creator, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.id = ? AND s.profile_id = ? AND ${visibleSql()}`,
@@ -611,6 +612,8 @@ export function replayDownload(
   if (!row) return { error: `no score ${id} on this profile` };
   const file = row['replay_path'] as string | null;
   if (!file) return { error: 'no replay was recorded for this score' };
+  // McOsu writes no replays; the one this app built for the play holds no cursor data.
+  if (row['client'] === 'mcosu') return { error: 'McOsu does not save replays' };
   if (!fs.existsSync(file)) {
     return { error: "the replay is no longer in osu!'s files - it may have been deleted from osu!" };
   }

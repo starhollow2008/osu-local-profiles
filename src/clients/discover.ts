@@ -8,11 +8,14 @@ import {
   candidateRoots,
   lazerCandidates,
   lazerInstall,
+  mcosuCandidates,
+  mcosuInstall,
   stableInstall,
   windowsDrives,
   type DetectEnvironment,
   type OsuInstall,
 } from './detect.ts';
+import { MCOSU_STEAM_APP } from './mcosu.ts';
 
 const run = promisify(execFile);
 
@@ -94,6 +97,8 @@ export function registryQueries(): string[] {
   for (const hive of ['HKCU', 'HKLM']) {
     out.push(`${hive}\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\osu!`);
     out.push(`${hive}\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\osulazer`);
+    // Steam's entry for McOsu, whose InstallLocation is McOsu's folder in whichever library.
+    out.push(`${hive}\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App ${MCOSU_STEAM_APP}`);
   }
   return out;
 }
@@ -299,7 +304,7 @@ export function skipDir(name: string): boolean {
  */
 export function looksLikeInstall(names: readonly string[]): boolean {
   const lower = new Set(names.map((n) => n.toLowerCase()));
-  return lower.has('osu!.exe') || lower.has('client.realm');
+  return lower.has('osu!.exe') || lower.has('client.realm') || lower.has('mcengine.exe') || lower.has('mcosu.exe');
 }
 
 export interface ScanLimits {
@@ -440,7 +445,7 @@ export function installScore(root: string): number {
   }
   // Recency breaks the tie between two installs that both look real. Capped so it can never
   // outweigh having a database at all.
-  const marker = stat('osu!.db') ?? stat('client.realm') ?? stat('osu!.exe');
+  const marker = stat('osu!.db') ?? stat('client.realm') ?? stat('osu!.exe') ?? stat('scores.db');
   if (marker) {
     const days = (Date.now() - marker.mtimeMs) / 86_400_000;
     score += Math.max(0, 30 - days);
@@ -476,7 +481,7 @@ export async function targetedRoots(
 /** A directory that holds an osu! install, with enough about it to choose between several. */
 export interface InstallCandidate {
   root: string;
-  kind: 'lazer' | 'stable';
+  kind: OsuInstall['kind'];
   /** How likely this is the install being played. See `installScore`. */
   score: number;
   /** How it was found, so the page can say "you chose this" rather than "we guessed". */
@@ -494,7 +499,7 @@ export interface DiscoveryResult {
 
 /** Classify a directory, without the caller having to say which client it expected. */
 export function classify(root: string): OsuInstall | null {
-  return lazerInstall(root) ?? stableInstall(root);
+  return lazerInstall(root) ?? stableInstall(root) ?? mcosuInstall(root);
 }
 
 function rank(roots: readonly string[], source: InstallCandidate['source']): InstallCandidate[] {
@@ -559,6 +564,13 @@ export async function discoverInstalls(opts: DiscoverOptions = {}): Promise<Disc
    */
   add(opts.configured ?? [], 'configured');
   add(opts.remembered ?? [], 'remembered');
+  /*
+   * McOsu is looked for every time, not only when an osu! client is missing: someone with
+   * both of those would otherwise never reach a tier that could find it. It costs a few
+   * `access()` calls and Steam's small library list. It is deliberately not part of
+   * `missing()` -- not having McOsu is normal, and must not cost every launch a disk walk.
+   */
+  add(mcosuCandidates(e), 'detected');
   if (force || missing()) add(candidateRoots([], e), 'detected');
   if (force || missing()) {
     add(lazerRedirects(e), 'detected');
@@ -582,7 +594,7 @@ export async function discoverInstalls(opts: DiscoverOptions = {}): Promise<Disc
   candidates.sort((a, b) => bySource[a.source] - bySource[b.source] || b.score - a.score);
 
   const installs: OsuInstall[] = [];
-  for (const kind of ['lazer', 'stable'] as const) {
+  for (const kind of ['lazer', 'stable', 'mcosu'] as const) {
     const best = candidates.find((c) => c.kind === kind);
     if (!best) continue;
     const install = classify(best.root);

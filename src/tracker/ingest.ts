@@ -11,6 +11,7 @@ import {
   modsLabel,
   rankedByOsu,
   scoreMods,
+  scorePricing,
   strippableMods,
 } from '../calc/pp.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
@@ -113,8 +114,13 @@ export function describe(
   };
 }
 
-/** A replay identifies itself; fall back to map+time for stable replays with no hash. */
+/**
+ * A replay identifies itself; fall back to map+time for stable replays with no hash. A McOsu
+ * play is known by its beatmap and the second it ended, as McOsu itself knows it -- the
+ * replay built for it has no hash of its own.
+ */
 export function dedupeKey(score: ReplayScore): string {
+  if (score.client === 'mcosu') return `mcosu:${score.beatmapMD5}:${score.playedAt.getTime()}`;
   return score.replayMD5 ?? `${score.beatmapMD5}:${score.playedAt.getTime()}`;
 }
 
@@ -174,7 +180,8 @@ export async function ingestScore(
 
   const mode = score.mode;
   const beatmap = ctx.resolver.resolve(score.beatmapMD5);
-  const mods = scoreMods(score);
+  const mods = scoreMods(score, beatmap.osuPath);
+  const pricing = scorePricing(score, beatmap.osuPath);
   const label = modsLabel(mods);
   const didPass = passed(score);
   const grade = gradeOf(score, mode, mods);
@@ -210,7 +217,7 @@ export async function ingestScore(
    * excluding a class of score instant and reversible.
    */
   const computed = beatmap.osuPath
-    ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official)
+    ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official, undefined, pricing)
     : null;
 
   // The filter's second half: the star rating as played, now that osu! has produced one. A
@@ -229,11 +236,11 @@ export async function ingestScore(
   const strippable = strippableMods(mods);
   const stripped =
     strippable.length > 0 && beatmap.osuPath
-      ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official, strippable)
+      ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official, strippable, pricing)
       : null;
 
   // Asked of osu! after the filter, so a play it turns away costs no round trip.
-  const modsRanked = await rankedByOsu(score, ctx.official);
+  const modsRanked = await rankedByOsu(score, ctx.official, beatmap.osuPath);
   // What osu! itself would say. Kept as `ranked` so nothing downstream shifts meaning. Mods
   // osu! could not be asked about are not ranked until a recompute asks again.
   const eligible = mapRanked && modsRanked === true;

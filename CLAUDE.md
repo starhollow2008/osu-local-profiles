@@ -38,6 +38,9 @@ Each has its reasoning in `docs/architecture.md`.
   third party goes in `THIRD-PARTY-NOTICES.md`. Never, under any licence: `ppy/osu-resources`
   (CC-BY-NC), Torus or Venera, or the osu!/ppy logos. It cannot return to MIT while it
   carries osu-web's files.
+- **McOsu plays are built osu!stable replays, scored as stable** (`scoredAsStable`, roadmap
+  5.58). Never offered for download: they hold no cursor data. McOsu's own mods (Nightmare,
+  experimental) are one app-own mod, `MC`, never one each and never shown to osu!'s calculator.
 - **Medals: osu!'s own definitions plus Mod Introduction only.** Do not add other medal
   groups without asking.
 - **No play counter from osu!stable's `osu!.db` last-played time** without asking: it cannot
@@ -97,7 +100,9 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 
 `tools/PpCalculator/` wraps `ppy.osu.Game.Rulesets.*` NuGet. Driven via JSON-lines pipe from `src/calc/official.ts`.
 
-- Hand the replay file, never a reconstructed ScoreInfo
+- Hand the replay file, never a reconstructed ScoreInfo. McOsu writes none: hand the stable
+  replay the app built for the play (`data/mcosu/`, `src/clients/mcosu.ts`), with a custom
+  rate or override as the request's `mods`
 - No fallback calc (`rosu-pp` removed). Helper down = store no pp, say so
 - Do not trim it. `PublishTrimmed` breaks osu!'s own graph - see `docs/architecture.md`, roadmap 5.44
 - Every pp carries osu! release version + breakdown. Parts must match the pp beside them
@@ -136,6 +141,7 @@ History is linear - rebase onto `main`, do not merge it into a branch.
 - `src/main.ts`: application startup
 - `tools/launcher/main.go`: the tray launcher (`launcher.go` runs the app, `tray.go` the icon)
 - `src/osr.ts`: legacy and lazer replay parser
+- `src/clients/mcosu.ts`: McOsu's scores.db, the replays built from it, and its mods
 - `src/tracker/index.ts`: serialized replay ingestion
 - `src/calc/official.ts`: JSON-lines bridge to `tools/PpCalculator/`
 - `src/http/server.ts`: HTTP API and static serving

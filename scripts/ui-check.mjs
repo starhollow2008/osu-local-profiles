@@ -350,11 +350,20 @@ check(
   await evaluate("document.querySelectorAll('#filterBody .tfilter-section').length"),
   9,
 );
-// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod.
+// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod
+// and McOsu's MC.
 check(
   'every mod in the game has a chip',
   await evaluate("document.querySelectorAll('#tf-mods .mod-chip').length"),
-  67,
+  68,
+);
+check(
+  "McOsu's own mods are one chip, among the Fun mods",
+  await evaluate(`(() => {
+    const chip = document.querySelector('#tf-mods .mod-chip[data-mod=MC]');
+    return chip ? chip.closest('.mod-grid__group').querySelector('.mod-grid__label').textContent.trim() : null;
+  })()`),
+  'Fun',
 );
 check(
   'the readout starts by saying nothing is excluded',
@@ -2413,6 +2422,13 @@ check(
   ].join('|'))()`),
   'Recent Plays|true|true|Milestones',
 );
+// McOsu's own mods are one MC badge, whose tooltip says which (roadmap 5.58).
+{
+  const title = await evaluate(
+    "document.querySelector('.mod__icon--MC')?.parentElement.getAttribute('title') ?? null",
+  );
+  check('an MC badge names the McOsu mods it stands for', title === null ? SKIP : /^McOsu \(.+\)$/.test(title), true);
+}
 // osu-web's own names: `extra.top_ranks.title` is "Scores", its pinned list "Pinned Scores".
 check(
   "the scores section uses osu!'s names",

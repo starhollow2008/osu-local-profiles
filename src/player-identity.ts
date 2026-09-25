@@ -112,6 +112,10 @@ export function stableConfigUsername(install: OsuInstall): string | null {
  * name is behind at least four fifths of the plays. Below that there is no clear owner and
  * it says so, because a profile with two players' replays in it is the very thing being
  * fixed and must not be resolved by majority vote alone.
+ *
+ * McOsu's plays are left out. McOsu's name is whatever its `name` setting says -- `Guest`
+ * until changed -- and says nothing about who plays osu!, so an evening of McOsu must not
+ * decide whose osu! replays these are.
  */
 export function dominantTrackedName(
   db: Db,
@@ -121,7 +125,7 @@ export function dominantTrackedName(
     .prepare(
       `SELECT player_name AS name, player_id AS id, COUNT(*) AS n
          FROM scores
-        WHERE profile_id = ? AND player_name IS NOT NULL AND player_name <> ''
+        WHERE profile_id = ? AND player_name IS NOT NULL AND player_name <> '' AND client <> 'mcosu'
         GROUP BY LOWER(player_name)
         ORDER BY n DESC`,
     )

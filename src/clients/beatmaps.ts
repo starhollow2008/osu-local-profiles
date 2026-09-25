@@ -364,7 +364,7 @@ interface OsuMetadata {
  * `[HD] ...`. Measured across this machine's 12,811 beatmaps, that rule lost or corrupted 327
  * names and filed 23 beatmaps under the wrong mode.
  */
-function osuSection(text: string, header: string): string | null {
+export function osuSection(text: string, header: string): string | null {
   let body: number;
   if (text.startsWith(header)) {
     body = header.length;

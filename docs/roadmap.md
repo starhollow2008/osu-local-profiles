@@ -2817,3 +2817,56 @@ pictogram was the largest visible gap that could be closed. Fonts could not be.
 - Rendered and looked at: every mod badge, rate and Difficulty Adjust extenders, the cog, the
   grey acronym fallback for an unknown mod, all nine grades, all eight stable letters and the
   guest avatar; and the real Best Performance rows.
+
+## 5.58 - McOsu
+
+**Status:** done -- unreleased.
+
+Asked for by a user: McOsu plays on the profile, priced by osu!'s own current calculator rather
+than McOsu's. Measured against McOsu 33.14 (Steam build, score version 20251214) and its GitHub
+source, with five real plays set for the purpose.
+
+- **What McOsu leaves.** No replays and no log: one entry per play in its own `scores.db`
+  (`OsuDatabase::saveScores`), written only for a play that was finished, not failed, scored
+  above zero and not Autoplay or AP+RX (`OsuBeatmapStandard::onBeforeStop`). A fail and a quit
+  were played to confirm: nothing was written. Its debug output goes nowhere (`McEngine.exe`
+  is a windowed program), and its LAN multiplayer would mean impersonating a server that
+  controls map selection. So McOsu, like stable, cannot have incomplete plays; the stable note
+  gains a McOsu paragraph.
+- **A built replay, not a reconstructed score.** Each play becomes an osu!stable `.osr` with
+  no cursor data under `data/mcosu/`, and osu!'s decoder gives it everything a stable replay
+  gets (Classic, classic slider accuracy, maximum statistics). What the bitmask cannot hold is
+  appended in the app's own block after the replay, which the decoder never reads. Keyed
+  `mcosu:<md5>:<ms>`, as McOsu keys it. Import past plays, recalculation and dedupe all work
+  on it unchanged, and it survives the entry being deleted in McOsu. Never offered as a
+  download.
+- **Mods as osu! would write them** (`mcosuMods`). McOsu's speed slider sets no DT/HT bit, so
+  speed comes from what was played: DT/NC/HT with `speed_change` when not the default; outside
+  0.5x-2.0x no pp (osu! prices 2.5x as 2.0x, measured). CS/AR/OD/HP that differ from the map's
+  own through EZ/HR become Difficulty Adjust, listed after EZ/HR because osu! applies mods in
+  order (HR then DA reproduced plain HR exactly; DA then HR did not); past 11, no pp. McOsu
+  stores AR and OD before speed, so a speed-locked override maps directly. Nightmare (McOsu
+  sets Cinema's bit for it -- read naively, never countable) and the experimental mods are one
+  app-own mod, **MC**, whose settings name them; osu! is never shown it, and does not rank it.
+- **McOsu's total score.** osu! estimates a stable play's combo breaks from its total, assuming
+  stable's mod multipliers, and moving the total moved one real play's pp from 66.7 to 81.5.
+  McOsu's ScoreV1 is stable's formula on the map's own values, so it is kept where McOsu's
+  multipliers for its bits equal osu!'s for the priced mods, and withheld otherwise
+  (`ignoreLegacyTotalScore`) -- a slider speed with no bit, or EZ+NF.
+- **Found on every launch**, not only when an osu! client is missing: every Steam library from
+  `libraryfolders.vdf`, plus Steam's `Uninstall\Steam App 607260` key for the registry tier.
+  Deliberately not part of `missing()`, so not having McOsu never costs a drive walk. Beatmaps
+  come from its `osu_folder`, usually stable's own Songs, indexed once.
+- **Scored as stable everywhere** (`scoredAsStable`): CL, legacy grades, rank cutoffs, stable's
+  medal rules. McOsu's names are left out of the owner's-name majority vote.
+
+### Verified
+
+- The five real plays, through the whole pipeline: DT 42.18pp ranked; slider 1.2x as DT 1.2x,
+  48.53pp; DT + AR 7 as DT + DA, 78.65pp; 1.3x with misses, 39.55pp; Nightmare + Wobble + Full
+  Alternate as MC, 17.02pp -- McOsu itself said 41.10, 43.03, 73.67, 37.52 and 14.90.
+- `npm run check`: 564 tests, 27 of them in `test/mcosu.test.ts`, including McOsu's real
+  155-byte `scores.db` and pricing through the helper.
+- `npm run ui` against a copy of this machine's profile with the five imported: 333/333,
+  including the MC chip among the Fun mods and an MC tooltip naming its mods. Rendered and
+  looked at: Recent Plays and a McOsu score page.

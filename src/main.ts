@@ -135,7 +135,7 @@ async function main(): Promise<void> {
   if (installs.length === 0) {
     banner('No osu! installation found.');
     console.log(`  Looked for osu!lazer (${lazerSearchHint()})`);
-    console.log('  and osu!stable (a folder containing osu!.exe),');
+    console.log('  osu!stable (a folder containing osu!.exe) and McOsu (in any Steam library),');
     console.log(
       discovery.searched
         ? '  in the registry, in your shortcuts, and through every drive on this machine.'
@@ -334,9 +334,10 @@ async function main(): Promise<void> {
    *
    * Started before the watchers, so no play can reach the queue ahead of it.
    */
-  const roots = installs.flatMap((i) =>
-    i.beatmapRoots.map((p) => ({ path: p, byExtension: i.kind === 'stable' })),
-  );
+  // McOsu's Songs folder is a stable one -- usually stable's own, so it is walked only once.
+  const roots = installs
+    .flatMap((i) => i.beatmapRoots.map((p) => ({ path: p, byExtension: i.kind !== 'lazer' })))
+    .filter((r, n, all) => all.findIndex((o) => path.resolve(o.path).toLowerCase() === path.resolve(r.path).toLowerCase()) === n);
   let lastLine = 0;
   const onIndexing = (s: IndexState) => {
     // Only a first run, or one that has turned out slow, is worth a line.
@@ -517,6 +518,12 @@ async function main(): Promise<void> {
     // nothing, so the attempt is read from its log instead -- and counts unless Settings says
     // not to.
     console.log('  Unfinished plays (quit, retried, failed) count too, online or offline.');
+  }
+  if (installs.some((i) => i.kind === 'mcosu')) {
+    // McOsu saves a play only once it is finished and passed, and keeps no log, so the rest
+    // leave nothing to count. Its pp here is osu!'s own, not McOsu's.
+    console.log("  McOsu: finished plays are tracked, priced by osu!'s own calculator; quits,");
+    console.log('  retries and fails are not, because McOsu records nothing of them.');
   }
   /*
    * Said at start-up only when the filter can actually turn a play away. A profile that has

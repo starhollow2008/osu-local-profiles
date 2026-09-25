@@ -201,14 +201,14 @@ export interface OsuFolders {
   /** Every osu! folder found, best first. */
   candidates: {
     root: string;
-    kind: 'lazer' | 'stable';
+    kind: OsuInstall['kind'];
     /** Set by the user, rather than found. Shown differently, and removable. */
     configured: boolean;
     /** Whether this is the one being tracked for its client. */
     active: boolean;
   }[];
   /** The roots in use right now, which change only on a restart. */
-  tracking: { root: string; kind: 'lazer' | 'stable' }[];
+  tracking: { root: string; kind: OsuInstall['kind'] }[];
   /** Whether the app has ever walked the drives, so the page can offer to. */
   searched: boolean;
   /** True once the list no longer matches what is being tracked. */

@@ -10,6 +10,7 @@ import {
 } from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
 import { LogWatcher } from './log-watcher.ts';
+import { buildMcosuReplays, McosuWatcher } from './mcosu-watcher.ts';
 import { logDirOf, type ResolvedLoggedPlay, type SessionAttempt } from '../clients/lazer-log.ts';
 import {
   checkIncompletePlay,
@@ -182,6 +183,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   private readonly opts: TrackerOptions;
   private watcher: ReplayWatcher | null = null;
   private logWatcher: LogWatcher | null = null;
+  private mcosuWatchers: McosuWatcher[] = [];
   private enabled = false;
   /** When this run started watching. Zero until `start()` -- see `liveCutoff`. */
   private liveSince = 0;
@@ -375,7 +377,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
      * same gap that closing and reopening the app does -- it is the same decision.
      */
     this.liveSince = this.opts.liveSince ?? Date.now();
-    const dirs = this.opts.installs.map((i) => i.replayDir);
+    // McOsu's replay folder is the app's own, of replays it builds; McosuWatcher feeds it.
+    const dirs = this.opts.installs.filter((i) => i.kind !== 'mcosu').map((i) => i.replayDir);
     this.watcher = new ReplayWatcher({
       dirs,
       onReplay: (file) => this.handleReplay(file),
@@ -404,6 +407,21 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       this.logWatcher.start();
     }
 
+    /*
+     * McOsu keeps no replays and no log -- only its scores.db, rewritten after each finished
+     * play. Each new entry there becomes a built replay and takes the same path as any other.
+     */
+    for (const install of this.opts.installs.filter((i) => i.kind === 'mcosu')) {
+      const watcher = new McosuWatcher({
+        root: install.root,
+        dir: install.replayDir,
+        onReplay: (file) => this.handleReplay(file),
+        onError: (e) => this.emit('error', e),
+      });
+      this.mcosuWatchers.push(watcher);
+      void watcher.start();
+    }
+
     this.enabled = true;
   }
 
@@ -412,6 +430,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     this.watcher = null;
     this.logWatcher?.stop();
     this.logWatcher = null;
+    for (const w of this.mcosuWatchers) w.stop();
+    this.mcosuWatchers = [];
     this.enabled = false;
   }
 
@@ -437,6 +457,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   previewBackfill(since: number, applyFilter = true): Promise<BackfillPreview> {
     return this.enqueue(async () => {
       const filter = this.importFilter(applyFilter);
+      await this.buildMcosuReplays(since);
       const replays = await scanForReplays(
         this.opts.db,
         this.opts.profileId,
@@ -534,6 +555,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       const owner = this.currentIdentity();
 
       if (sources.replays) {
+        await this.buildMcosuReplays(since);
         const scan = await scanForReplays(
           this.opts.db,
           this.opts.profileId,
@@ -756,6 +778,21 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   /** The osu! release the pp calculator comes from, or null when there is no calculator. */
   get calculatorVersion(): string | null {
     return this.opts.official?.version ?? null;
+  }
+
+  /**
+   * Build the replays for McOsu's plays since `since`, so an import's scan finds them where it
+   * finds every other replay. The preview does it too, or it would count none of them: this
+   * writes only into the app's own `data/mcosu/`, and changes nothing a profile holds.
+   */
+  private async buildMcosuReplays(since: number): Promise<void> {
+    for (const install of this.opts.installs.filter((i) => i.kind === 'mcosu')) {
+      try {
+        await buildMcosuReplays(install.root, install.replayDir, since);
+      } catch (e) {
+        this.emit('error', e as Error);
+      }
+    }
   }
 
   private logDirs(): string[] {

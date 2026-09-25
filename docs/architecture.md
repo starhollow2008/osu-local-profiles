@@ -22,7 +22,7 @@
 
 `tools/PpCalculator/Program.cs` references official `ppy.osu.Game.Rulesets.*` NuGet packages. Driven over JSON-lines pipe from `src/calc/official.ts`.
 
-**Hand the replay file, not a reconstructed ScoreInfo.** `LegacyScoreDecoder` sets `IsLegacyScore` from replay version, applies Classic mod to legacy scores, populates `MaximumStatistics`, reads lazer's extended block. Stable scores: `isLegacy=true` with `CL` added (selects classic slider accuracy + legacy miss estimation in `OsuPerformanceCalculator`).
+**Hand the replay file, not a reconstructed ScoreInfo.** `LegacyScoreDecoder` sets `IsLegacyScore` from replay version, applies Classic mod to legacy scores, populates `MaximumStatistics`, reads lazer's extended block. Stable scores: `isLegacy=true` with `CL` added (selects classic slider accuracy + legacy miss estimation in `OsuPerformanceCalculator`). McOsu keeps no replay, so the app builds a stable one for each McOsu play and hands that over - see McOsu below.
 
 **Difficulty calculator is Relax-aware.** Same RX replay: 6.26★/110.93pp as played, 7.83★/238.54pp mod-removed. `unrankedModPp` setting picks between them. Both stored at ingest (`pp`/`stars` and `pp_nomod`/`stars_nomod`).
 
@@ -250,6 +250,16 @@ Section lists **paged by server**. Page asks for size per section, gets totals. 
 - **Songs folder can be moved.** Stable writes path to `BeatmapDirectory` in `osu!.<user>.cfg`. `stableSongs` in `src/clients/detect.ts` reads it. Relative values resolve against install dir; stale value falls back to `<root>/Songs`.
 - **Signed-in username** only present when "remember" was checked (`Username` field in cfg). `detectLocalSessions` finds nothing for stable → page falls back to manual name entry. Correct behavior.
 - **Ranked status for stable plays** comes from lazer's `online.db`. Stable-only install → every beatmap = `UNRESOLVED_STATUS`. pp unaffected (needs `.osu` from Songs). `BeatmapResolver.knowsStatus` = false, `countUnresolved` in eligibility, `countsSql` counts unresolved beatmaps *in addition*. Page says so in Scores note. Beatmap-status settings dimmed. Not a setting - follows what the machine knows.
+
+## McOsu (roadmap 5.58)
+
+McOsu writes **no replays and no log** - only its own `scores.db` (and `scoresvr.db` for VR), rewritten whole after each play it keeps: finished, not failed, score > 0, not Autoplay or AP+RX. Fails, quits and retries leave nothing anywhere, so, as with stable, they cannot be counted.
+
+- **Each play becomes a built osu!stable replay** in `data/mcosu/<md5>-<unix seconds>.osr`: the entry's judgements, combo, total and mods, no cursor data, then this app's own block (`MCOSU_BLOCK` + JSON of what the bitmask cannot hold). osu!'s decoder treats it as the stable replay it is - Classic, classic slider accuracy, maximum statistics - and ignores the block. From there it is an ordinary replay: dedupe (`mcosu:<md5>:<ms>`), Import past plays, recalculation. Kept when the entry is deleted in McOsu. **Never offered for download** (`has_replay`, `replayAvailable`, `replayDownload`).
+- **Live:** `McosuWatcher` watches the McOsu folder (through `watchablePath`), remembers what was there at start, and builds a replay for each new entry. Import past plays builds the range first (`buildMcosuReplays`), then scans `data/mcosu/` with every other replay folder. McOsu's copies of stable scores (`isImportedLegacyScore`) are never built.
+- **Mods** are what osu! would write (`mcosuMods`): speed from what was played, not the bits (the speed slider sets none); overrides as Difficulty Adjust **after** EZ/HR, because osu! applies mods in order; Nightmare (Cinema's bit in McOsu) and experimental mods as the app's own **MC**, never shown to osu!'s calculator. Speed outside 0.5x-2.0x or a value past DA's extended limits stores no pp: osu! would clamp, not refuse.
+- **The helper takes McOsu's mods after decoding** (`mods` on a calculation request) and can withhold the stable total (`ignoreLegacyTotalScore`), which osu! uses to estimate combo breaks assuming stable's mod multipliers. Withheld only where McOsu's multipliers for its bits differ from osu!'s for the priced mods (`legacyTotalComparable`).
+- **Scored as stable everywhere** (`scoredAsStable`). Its player name is McOsu's `name` setting and is left out of `dominantTrackedName`. Found on every launch from Steam's libraries, outside `missing()` so it never triggers a drive walk.
 
 ## Windows: only verified platform
 

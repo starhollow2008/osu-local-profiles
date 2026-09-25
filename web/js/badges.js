@@ -9,6 +9,12 @@
  */
 import { escapeHtml } from './format.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
+import { MCOSU_DEFINITIONS, mcosuModNames } from './mcosu-mods.js';
+
+/** A mod's name, type and settings: osu-web's, or McOsu's MC beside them. */
+export function modDefinition(acronym) {
+  return MOD_DEFINITIONS[acronym] ?? MCOSU_DEFINITIONS[acronym] ?? null;
+}
 
 /* Unique ids per generated SVG, since several appear on the page at once. */
 let uid = 0;
@@ -114,6 +120,12 @@ function settingValue(value) {
  * than shown under its raw key.
  */
 function modTitle(mod, definition) {
+  // MC stands for McOsu's own mods, and its settings are which of them were on.
+  if (mod.acronym === 'MC') {
+    const names = mcosuModNames(mod.settings);
+    return names.length === 0 ? 'McOsu' : `McOsu (${names.join(', ')})`;
+  }
+
   const settings = [];
   for (const [key, value] of Object.entries(mod.settings ?? {})) {
     if (key === 'speed_change') {
@@ -141,10 +153,11 @@ function modTitle(mod, definition) {
  */
 export function modPill(mod, { title: named } = {}) {
   const m = typeof mod === 'string' ? { acronym: mod } : mod;
-  const definition = MOD_DEFINITIONS[m.acronym] ?? null;
+  const definition = modDefinition(m.acronym);
   const type = MOD_TYPES.has(definition?.type) ? ` mod--type-${definition.type}` : '';
   const extended = extendedContent(m);
-  const customised = Object.keys(m.settings ?? {}).length > 0;
+  // MC's settings say which McOsu mods it stands for, not that anything was customised.
+  const customised = m.acronym !== 'MC' && Object.keys(m.settings ?? {}).length > 0;
   const title = escapeHtml(named ?? modTitle(m, definition));
   const acronym = escapeHtml(m.acronym);
 

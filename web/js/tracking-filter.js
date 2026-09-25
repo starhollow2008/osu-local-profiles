@@ -17,8 +17,9 @@
  * edits the object and posts it back. Nothing here re-implements the matching rule.
  */
 import { escapeHtml, MODE_NAMES } from './format.js';
-import { modPill } from './badges.js';
+import { modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
+import { MCOSU_DEFINITIONS } from './mcosu-mods.js';
 import { hint, postJson, toast } from './ui.js';
 import { t } from './i18n.js';
 
@@ -301,10 +302,13 @@ function datesSection(key, title, help, { unknown } = {}) {
  * because the mode criterion is its own section and splitting would draw Hidden four times.
  */
 function modsSection() {
-  const acronyms = Object.keys(MOD_DEFINITIONS).filter((a) => !HIDDEN_MODS.has(a));
+  // McOsu's MC among the Fun mods: every McOsu-only mod, as one chip.
+  const acronyms = [...Object.keys(MOD_DEFINITIONS), ...Object.keys(MCOSU_DEFINITIONS)].filter(
+    (a) => !HIDDEN_MODS.has(a),
+  );
   const groups = MOD_GROUPS.map(([type, label]) => {
     const heading = label();
-    const inGroup = acronyms.filter((a) => MOD_DEFINITIONS[a].type === type).sort();
+    const inGroup = acronyms.filter((a) => modDefinition(a).type === type).sort();
     if (inGroup.length === 0) return '';
     return `<div class="mod-grid__group">
       <div class="mod-grid__label">${escapeHtml(heading)}</div>
@@ -338,7 +342,7 @@ function modsSection() {
 
 /** One chip. `NM` is this app's own, not a mod: it stands for a play with no mods at all. */
 function modChip(acronym) {
-  const definition = MOD_DEFINITIONS[acronym];
+  const definition = modDefinition(acronym);
   const modes =
     definition && definition.modes.length < 4
       ? ` ${t('filter.modesOnly', {
