@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.24.0
+
+- **McOsu support.** Plays set in McOsu are tracked like osu!stable and osu!lazer plays, and
+  priced with osu!'s own current pp system rather than McOsu's, so the pp here can differ
+  from what McOsu shows.
+  - Found automatically in any Steam library. A copy from elsewhere can be added under
+    **Options -> osu! folders**.
+  - Plays are tracked live while the app is open, and **Import past plays** brings in ones
+    set before.
+  - McOsu's speed slider shows as Double Time or Half Time at that rate, e.g. 1.20x, and its
+    CS/AR/OD/HP overrides as Difficulty Adjust, as osu!lazer shows them.
+  - Nightmare and McOsu's experimental mods appear as one mod, **MC**. Hover over it to see
+    which were on.
+  - McOsu only saves plays that were finished and passed, so fails, quits and retries are
+    not counted. McOsu plays have no replay to download.
+
+- **Unranked mods and beatmaps count toward pp by default** on new profiles: Relax,
+  Autopilot, custom rates and Difficulty Adjust, and loved, qualified, pending, WIP,
+  graveyarded and never-submitted beatmaps.
+  - Profiles you already have keep counting exactly what they counted before.
+  - To count only what osu! ranks, turn them off in **Options -> Other settings**. The note
+    above Best Performance says so, and can be dismissed for good.
+
+- **A smaller download.** The pp calculator bundled with the app is about half its old size,
+  so each download is roughly 30MB smaller (Windows 89MB -> 61MB). The pp it calculates is
+  exactly the same: every release checks this on every platform before shipping it.
+
+- The **Don't show again** buttons on the Scores note and the empty Favorite Beatmaps hint
+  are now in your language.
+
 ## 1.23.0
 
 - **Mod badges show osu!'s own icon for every mod**, in place of the acronym. The badge is
