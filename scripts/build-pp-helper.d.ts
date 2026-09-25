@@ -30,6 +30,6 @@ declare module '*/build-pp-helper.mjs' {
   export function buildCheckedPpHelper(
     outDir: string,
     target?: string,
-    options?: { corpus?: string | null },
+    options?: { live?: boolean },
   ): { slim: boolean; reason: string; before: number; full: number; after: number; removed: number };
 }

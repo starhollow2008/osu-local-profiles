@@ -2905,9 +2905,8 @@ records every play; this is only what counts toward pp.
 
 ## 5.60 - A smaller pp helper, proven identical
 
-**Status:** done -- unreleased. Checked automatically on every build, on every platform:
-Windows and Linux (through WSL) verified here; macOS by the release runners once the corpus
-and its key are on GitHub.
+**Status:** done -- unreleased. Checked automatically on every build, on every platform,
+against generated plays: Windows, Linux (here and through WSL) and both macOS runners.
 
 The user's question: the helper is over half of every download (52MB of the Windows zip's
 89MB). Rewriting the calculator was considered and rejected -- a copy is what 5.44 and the
@@ -2917,11 +2916,10 @@ because a new check proves nothing it answers has changed.
 
 - **`scripts/pp-parity.mjs` (`npm run pp:parity <old> <new>`).** Two helpers, the same
   requests, every answer compared as text: values, errors and the ready line. The requests are
-  the app's own, built by the app's code: every replay on the machine (2,268 here -- lazer's
-  store and stable's Data/r), McOsu plays through their built replays, then beatmaps of all
-  four rulesets and their converts as stable replays under spread bitmasks and as lazer
-  replays, under every mod osu! offers each ruleset alone and with the settings the app sends,
-  osu!'s ranked-mods answer for all of them, and ten requests that must fail. First run: the
+  the app's own, built by the app's code, for every replay (see generated plays below), then
+  the beatmaps of all four rulesets and their converts as stable replays under spread bitmasks,
+  under every mod osu! offers each ruleset alone and with the settings the app sends, osu!'s
+  ranked-mods answer for all of them, and ten requests that must fail. First run: the
   shipped helper disagreed *with itself* on unseeded Random and Target Practice, which pick a
   new seed each run; those go only with a seed, as a lazer replay records one. `--modules`
   lists which of a helper's files its process ever loaded.
@@ -2935,16 +2933,24 @@ because a new check proves nothing it answers has changed.
   inside osu! code that catches exceptions could change a result instead of failing.
 - **Result:** 121MB -> 58MB on disk, 52MB -> 24.7MB zipped, so the Windows download should
   drop from about 89MB to about 62MB.
-
 - **Checked on every build, not by hand.** `buildCheckedPpHelper` builds the full helper and the
   slim one side by side, runs the parity check between them, and ships the slim one only if it
   passes -- otherwise the full one, with the reason, never failing the build. `npm run
-  build:pp:local` does it with this machine's plays; `npm run package` on the release runners
-  with an encrypted export of them (`pp-parity.mjs --export`, AES-256-GCM with the
-  `PP_PARITY_KEY` secret, kept on the draft release `pp-parity-corpus`), fetched by a job that
-  alone can read drafts and runs nothing from npm. The requests are always built by the code
-  being released, so a mod osu! adds later is tested with no new export. On Windows,
-  `--rid linux-x64` checks the Linux helpers under WSL.
+  build:pp:local` and `npm run package` both do it. On Windows, `--rid linux-x64` checks the
+  Linux helpers under WSL.
+- **Generated plays, not collected ones** (`scripts/pp-parity-corpus.mjs`). The first version
+  checked this machine's 2,274 replays, and the release runners an encrypted export of them
+  kept on a draft release -- private data, a 97MB upload, and four minutes a platform. The
+  plays are now written from a fixed seed: seven beatmaps (aim, every slider curve with
+  repeats and velocity changes, BPM changes with spinners and a break, taiko, catch, mania 4K
+  and 7K) with stable, lazer and McOsu replays on them. 1,820 requests, 12-25 seconds, the same
+  everywhere, nothing to download, nothing private. `--errors` lists what both helpers failed:
+  only the ten `error:` requests may. Proven sufficient where it counts: a fully trimmed helper
+  (5.44) fails it, on the generated lazer replays. `--live` adds this machine's replays on top.
+- **The `pp helper` workflow** runs the checked build with `--require-slim` on all four
+  platforms whenever the helper, its build, the check or the request-building code changes --
+  a pp rework's package bump included -- so a pull request hears about a break before a release
+  would quietly ship the full helper.
 
 ### Verified
 
@@ -2958,10 +2964,10 @@ because a new check proves nothing it answers has changed.
 - `npm run check` 569 tests; `npm run ui` 334/334. `test/pp-helper.test.ts` pins the new
   prune names on every platform, the runtime files that must never match, that only the slim
   helper drops the new natives, and that the slim build trims partially while the project
-  file trims nothing.
-
-- The checked build, three ways: Windows (`npm run build:pp:local`) and Linux through WSL
-  (`--rid linux-x64`, 132MB -> 64MB) both 8,059/8,059 identical and shipped slim; the same
-  request set from the encrypted corpus, 8,059/8,059. And failing safe: a slim helper missing
-  a ruleset library fails the check (exit 1), a wrong key or missing corpus is "nothing to
-  compare" (exit 3), and a build without one shipped the full helper and exited 0.
+  file trims nothing; `test/pp-parity-corpus.test.ts` that the generated plays are the same on
+  every run and reach every ruleset and both replay formats.
+- The checked build on this machine's 2,274 replays: Windows and Linux through WSL (132MB ->
+  64MB), and the four release runners, 8,059/8,059 each. Then on the generated plays: Windows
+  1,820/1,820 (the whole checked build 46 seconds), Linux through WSL 1,820/1,820 (58
+  seconds). Failing safe: a slim helper missing a ruleset library fails the check, and so does
+  a fully trimmed one.

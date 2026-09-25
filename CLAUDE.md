@@ -106,8 +106,10 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 - No fallback calc (`rosu-pp` removed). Helper down = store no pp, say so
 - Slim (partially trimmed, extra natives pruned) only through `buildCheckedPpHelper`, which
   ships it only when `scripts/pp-parity.mjs` finds every answer identical to the full helper
-  on that platform, and the full helper otherwise (roadmap 5.60). Never put trim settings in
-  `PpCalculator.csproj`, never full trimming (5.44). `--full` builds skip it, for iterating
+  on that platform, and the full helper otherwise (roadmap 5.60). Its plays are generated
+  (`scripts/pp-parity-corpus.mjs`): never commit or upload real replays or beatmaps for it.
+  Never put trim settings in `PpCalculator.csproj`, never full trimming (5.44). `--full`
+  builds skip the check, for iterating
 - Every pp carries osu! release version + breakdown. Parts must match the pp beside them
 - `docs/reference-links.md` has links to osu-web, ppy/osu, API docs
 

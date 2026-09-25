@@ -2,7 +2,7 @@
  * Publish the self-contained osu! pp helper into a directory, pruned to what a pp
  * calculator actually needs.
  *
- *   node scripts/build-pp-helper.mjs [outDir] [--rid win-x64] [--full] [--corpus <file>]
+ *   node scripts/build-pp-helper.mjs [outDir] [--rid win-x64] [--full] [--live] [--require-slim]
  *
  * With no arguments this refreshes `tools/pp/`, which is what `src/calc/official.ts`
  * prefers over the plain `dotnet build` output. Keeping that directory current matters more
@@ -18,14 +18,16 @@
  * **Slim, but only when proven identical** (roadmap 5.60). Every build makes the helper twice:
  * the *full* one, as it has always shipped, and a *slim* one -- .NET's own libraries trimmed
  * (never osu!'s: see `SLIM_PUBLISH_ARGS`) and the natives in `SLIM_PRUNE_NATIVES` removed, 58MB
- * against 121MB on Windows. `scripts/pp-parity.mjs` then asks both thousands of questions, and
- * the slim one ships only if every answer is identical. Otherwise -- a difference, a helper that
- * will not start, no plays to test with, a platform this machine cannot run -- the full one
- * ships and the build says why. Nobody has to remember to check: a build cannot ship a slim
- * helper that was not checked, on that platform, against that osu! release.
+ * against 121MB on Windows. `scripts/pp-parity.mjs` then asks both some 1,800 questions about
+ * generated plays -- seconds, on any machine, with nothing to download -- and the slim one ships
+ * only if every answer is identical. Otherwise -- a difference, a helper that will not start, a
+ * platform this machine cannot run -- the full one ships and the build says why. Nobody has to
+ * remember to check: a build cannot ship a slim helper that was not checked, on that platform,
+ * against that osu! release.
  *
- * `--full` skips all of that for a quick build while working on Program.cs. `--corpus` names
- * the encrypted plays to test with where there are none on the machine (the release runners).
+ * `--full` skips all of that for a quick build while working on Program.cs. `--live` adds every
+ * replay on this machine to the check. `--require-slim` fails the build instead of falling back,
+ * which is what CI wants: a pull request that breaks the slim helper should say so.
  *
  * What can go is narrower than it looks. osu.Framework's `Logger` static constructor drags
  * in nearly the whole *managed* graph -- NUnit, OpenTabletDriver, Sentry, the lot -- so
@@ -206,12 +208,12 @@ export function runnerFor(target) {
  * The helper that ships: slim if, and only if, it answers every parity request exactly as the
  * full one does on this platform; the full one otherwise, with the reason.
  *
- * Fails safe in every direction. A slim helper that differs, crashes or will not start; no
- * replays to test with (`pp-parity.mjs` exits 3); a platform this machine cannot run -- each
- * ships the full helper, which is what shipped before 5.60, and never stops a build. Only a
- * full helper that will not *build* throws, as it always has.
+ * Fails safe in every direction. A slim helper that differs, crashes or will not start, or a
+ * platform this machine cannot run, ships the full helper, which is what shipped before 5.60,
+ * and never stops a build. Only a full helper that will not *build* throws, as it always has.
+ * `live` adds this machine's own replays to the check.
  */
-export function buildCheckedPpHelper(outDir, target = defaultRid(), { corpus = null } = {}) {
+export function buildCheckedPpHelper(outDir, target = defaultRid(), { live = false } = {}) {
   const full = `${outDir}.full`;
   const slim = `${outDir}.slim`;
   const clear = () => {
@@ -237,19 +239,13 @@ export function buildCheckedPpHelper(outDir, target = defaultRid(), { corpus = n
         console.log(`\n  checking the slim helper (${mb(slimResult.after)}) against the full one (${mb(fullResult.after)})...`);
         const check = spawnSync(
           process.execPath,
-          [path.join(root, 'scripts', 'pp-parity.mjs'), full, slim, ...runner, ...(corpus ? ['--corpus', corpus] : [])],
+          [path.join(root, 'scripts', 'pp-parity.mjs'), full, slim, ...runner, ...(live ? ['--live'] : [])],
           { stdio: 'inherit' },
         );
         verdict =
           check.status === 0
             ? { slim: true, reason: 'identical to the full helper on every parity request' }
-            : {
-                slim: false,
-                reason:
-                  check.status === 3
-                    ? 'there were no plays to check it with (the check above says what it looked for)'
-                    : 'it did not answer every parity request as the full helper does',
-              };
+            : { slim: false, reason: 'it did not answer every parity request as the full helper does' };
       }
     }
     swapIn(verdict.slim ? slim : full, outDir);
@@ -346,8 +342,7 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
   const argv = process.argv.slice(2);
   const value = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : null);
   const rid = value('--rid') ?? defaultRid();
-  const corpus = value('--corpus');
-  const positional = argv.find((a, i) => !a.startsWith('--') && !['--rid', '--corpus'].includes(argv[i - 1]));
+  const positional = argv.find((a, i) => !a.startsWith('--') && argv[i - 1] !== '--rid');
   const outDir = positional ? path.resolve(positional) : path.join(root, 'tools', 'pp');
 
   console.log(`\n  publishing the pp helper (${rid}) into ${outDir}\n`);
@@ -357,11 +352,13 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
     removed = result.removed;
     console.log(`\n  ${mb(result.before)} -> ${mb(result.after)}, full helper (--full: no slim build, no check)\n`);
   } else {
-    const result = buildCheckedPpHelper(outDir, rid, { corpus: corpus ? path.resolve(corpus) : null });
+    const result = buildCheckedPpHelper(outDir, rid, { live: argv.includes('--live') });
     removed = result.removed;
     console.log(
       `\n  ${mb(result.before)} -> ${mb(result.after)}: ${result.slim ? 'slim' : 'full'} helper -- ${result.reason}\n`,
     );
+    // CI: a change that breaks the slim helper fails here, rather than quietly shipping full.
+    if (argv.includes('--require-slim') && !result.slim) process.exitCode = 1;
   }
   // On a platform whose native library names were never verified, pruning nothing is the
   // failure mode to catch: the helper still works, it is just three times the size and

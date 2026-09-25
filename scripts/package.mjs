@@ -90,11 +90,10 @@ fs.mkdirSync(out, { recursive: true });
 console.log('  building the pp calculator (self-contained)...');
 const ppOut = path.join(out, 'tools', 'pp');
 /*
- * Slim only past the parity check, on this platform (roadmap 5.60). The release runners have
- * no osu! plays of their own, so the release workflow hands over the encrypted corpus in
- * PP_PARITY_CORPUS; without it this ships the full helper, which is always safe.
+ * Slim only past the parity check, run here on this platform against generated plays (roadmap
+ * 5.60); the full helper, which is always safe, otherwise.
  */
-const pruned = buildCheckedPpHelper(ppOut, target, { corpus: process.env.PP_PARITY_CORPUS || null });
+const pruned = buildCheckedPpHelper(ppOut, target);
 console.log(`    ${mb(pruned.before)} -> ${mb(pruned.after)}: ${pruned.slim ? 'slim' : 'full'} helper -- ${pruned.reason}
 `);
 // Said where a release's summary shows it, so a platform shipping the full helper is noticed.

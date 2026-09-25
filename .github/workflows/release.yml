@@ -21,41 +21,7 @@ permissions:
   contents: read
 
 jobs:
-  # The plays the slim pp helper is checked against on each platform (roadmap 5.60): replays and
-  # beatmaps exported by `node scripts/pp-parity.mjs --export`, encrypted with the
-  # PP_PARITY_KEY secret, kept as the asset of a *draft* release tagged `pp-parity-corpus`,
-  # which only maintainers can see. Reading a draft needs write access, so this job alone has
-  # it -- and runs nothing from npm -- and hands the file on still encrypted, for one day.
-  #
-  # Missing or unreadable, nothing fails: each platform then ships its full pp helper, as
-  # before 5.60, and says so in the run's summary.
-  parity-corpus:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Fetch the encrypted parity corpus
-        id: fetch
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          if gh release download pp-parity-corpus --repo "$GITHUB_REPOSITORY" \
-               --pattern pp-parity-corpus.bin --dir corpus; then
-            echo "found=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning title=pp helper::no parity corpus (draft release pp-parity-corpus) -- every platform ships its full pp helper"
-          fi
-
-      - if: steps.fetch.outputs.found == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: pp-parity-corpus
-          path: corpus/pp-parity-corpus.bin
-          retention-days: 1
-
   package:
-    needs: parity-corpus
     strategy:
       # All or nothing: a release missing one platform's archive is worse than a late one,
       # because that platform's updater would find a release with nothing for it.
@@ -110,20 +76,11 @@ jobs:
             exit 1
           fi
 
-      # Absent when there is no corpus; the package step then ships the full pp helper.
-      - uses: actions/download-artifact@v4
-        continue-on-error: true
-        with:
-          name: pp-parity-corpus
-          path: ${{ runner.temp }}/corpus
-
       # Builds the pp helper -- full and slim, and the slim one only if it answers every parity
-      # request as the full one does on this runner -- bundles the runtime, starts the result
-      # from an unrelated directory to prove it finds its calculator, and zips it.
+      # request about generated plays as the full one does on this runner (roadmap 5.60) --
+      # bundles the runtime, starts the result from an unrelated directory to prove it finds
+      # its calculator, and zips it.
       - run: npm run package -- --rid ${{ matrix.rid }}
-        env:
-          PP_PARITY_CORPUS: ${{ runner.temp }}/corpus/pp-parity-corpus.bin
-          PP_PARITY_KEY: ${{ secrets.PP_PARITY_KEY }}
 
       - uses: actions/upload-artifact@v4
         with:

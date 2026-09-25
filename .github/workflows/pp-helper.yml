@@ -1,0 +1,76 @@
+name: pp helper
+
+# Whether the slim pp helper still answers exactly as the full one does, on every platform a
+# release ships for (roadmap 5.60) -- run when something that could change that changes: an
+# osu! package bump for a pp rework, Program.cs, the build or the parity check, or the app code
+# that builds the requests. Every other change skips it.
+#
+# Fails the run rather than falling back, which is the difference from a release build: a
+# release ships the full helper when the check fails, so a pull request is where anyone hears
+# about it. The check runs against generated plays (scripts/pp-parity-corpus.mjs), so it needs
+# nothing but the repository and takes seconds past the two builds.
+
+on:
+  pull_request:
+    paths:
+      - 'tools/PpCalculator/**'
+      - 'scripts/build-pp-helper.mjs'
+      - 'scripts/pp-parity.mjs'
+      - 'scripts/pp-parity-corpus.mjs'
+      - 'src/osr.ts'
+      - 'src/calc/pp.ts'
+      - 'src/calc/official.ts'
+      - 'src/clients/mcosu.ts'
+      - 'web/js/mod-definitions.js'
+      - '.github/workflows/pp-helper.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/PpCalculator/**'
+      - 'scripts/build-pp-helper.mjs'
+      - 'scripts/pp-parity.mjs'
+      - 'scripts/pp-parity-corpus.mjs'
+      - 'src/osr.ts'
+      - 'src/calc/pp.ts'
+      - 'src/calc/official.ts'
+      - 'src/clients/mcosu.ts'
+      - 'web/js/mod-definitions.js'
+      - '.github/workflows/pp-helper.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  parity:
+    strategy:
+      # Every platform's answer is worth having, whichever one fails first.
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - run: npm ci
+
+      - name: Build the full and slim helpers and check them against each other
+        run: node scripts/build-pp-helper.mjs tools/pp --rid ${{ matrix.rid }} --require-slim
