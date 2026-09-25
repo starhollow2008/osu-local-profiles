@@ -12,7 +12,7 @@ Good for:
 - Players with no internet connection or unstable connections as this app works fully offline
 
 Supports:
-- Stable and lazer
+- osu!stable, osu!lazer and McOsu
 - All 4 gamemodes: standard, mania, catch, taiko
 - Windows, Mac, Linux
 - 16 languages
@@ -23,7 +23,7 @@ Features:
 - Switching between multiple profiles
 - Default gamemode on launch is automatically determined by last played gamemode
 - Edit or import profile details, such as Name, Avatar, Banner, me! section, scores, etc.
-- pp for unranked maps
+- pp for unranked maps and mods
 - Import previous plays instead of starting a profile fresh
 - Play tracking filter - only track scores that meet specified criteria, e.g. keywords, mods, difficulty, ranked date
 - Option to remove scores from profile
@@ -64,6 +64,7 @@ Last Updated:
 ```
 npm install
 npm run build:pp     # builds the osu! pp helper (needs the .NET 10 SDK)
+npm run build:pp:local  # the smaller pp helper releases ship, checked against the full one
 npm run dev          # or double-click start.bat
 npm run check:app    # verify the install without starting to track
 ```
@@ -73,9 +74,19 @@ Open <http://localhost:7272>.
 ## Warnings for stable
 
 Stable users only:
-- **Unranked maps will always count for pp** since this app can't differentiate between ranked and unranked maps
+- **Unranked maps will always count for pp** if lazer isn't installed, since stable doesn't record ranked status
 - Scores are only tracked once you exit the results screen
 - Incomplete plays (fail, quit, retry) are not tracked in Recent Plays or for playcount
+
+## Warnings for McOsu
+
+McOsu users only:
+- Only finished, passed plays are tracked: McOsu keeps no record of fails, quits or retries,
+  so they don't count in Recent Plays or for playcount
+- pp comes from osu!'s current pp system, so it can differ from the pp McOsu shows
+- McOsu doesn't save replays, so McOsu plays have no replay to download
+- McOsu-only mods (Nightmare and experimental mods) show as one **MC** mod, and count toward
+  pp only while unranked mods are counted (the default)
 
 ## Technologies Used
 
