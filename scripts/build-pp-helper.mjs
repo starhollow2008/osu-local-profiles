@@ -2,7 +2,7 @@
  * Publish the self-contained osu! pp helper into a directory, pruned to what a pp
  * calculator actually needs.
  *
- *   node scripts/build-pp-helper.mjs [outDir] [--rid win-x64]
+ *   node scripts/build-pp-helper.mjs [outDir] [--rid win-x64] [--full] [--corpus <file>]
  *
  * With no arguments this refreshes `tools/pp/`, which is what `src/calc/official.ts`
  * prefers over the plain `dotnet build` output. Keeping that directory current matters more
@@ -14,6 +14,18 @@
  * textures, audio samples, ffmpeg, SDL, a shader compiler and native binaries for Android,
  * iOS, Linux and macOS. Dropping what a pp calculator cannot use takes the helper from
  * 273MB to about 114MB.
+ *
+ * **Slim, but only when proven identical** (roadmap 5.60). Every build makes the helper twice:
+ * the *full* one, as it has always shipped, and a *slim* one -- .NET's own libraries trimmed
+ * (never osu!'s: see `SLIM_PUBLISH_ARGS`) and the natives in `SLIM_PRUNE_NATIVES` removed, 58MB
+ * against 121MB on Windows. `scripts/pp-parity.mjs` then asks both thousands of questions, and
+ * the slim one ships only if every answer is identical. Otherwise -- a difference, a helper that
+ * will not start, no plays to test with, a platform this machine cannot run -- the full one
+ * ships and the build says why. Nobody has to remember to check: a build cannot ship a slim
+ * helper that was not checked, on that platform, against that osu! release.
+ *
+ * `--full` skips all of that for a quick build while working on Program.cs. `--corpus` names
+ * the encrypted plays to test with where there are none on the machine (the release runners).
  *
  * What can go is narrower than it looks. osu.Framework's `Logger` static constructor drags
  * in nearly the whole *managed* graph -- NUnit, OpenTabletDriver, Sentry, the lot -- so
@@ -71,6 +83,40 @@ const PRUNE_NATIVES = [
   'Microsoft.DiaSymReader.Native.amd64', 'Microsoft.DiaSymReader.Native.x86',
 ];
 
+/**
+ * Natives removed from the *slim* helper only, which ships only past the parity check.
+ *
+ * Never loaded under anything `scripts/pp-parity.mjs` sends -- 2,268 real replays, every mod in
+ * every ruleset -- and each for a reason that has nothing to do with pp (roadmap 5.60): Realm's
+ * and SQLite's native engines (the helper opens no database; the *managed* Realm, which osu!'s
+ * model types need, stays), HTTP/3 (no network), the debugger's data access and interface
+ * libraries, and the two alternative garbage collectors, loaded only when configuration asks.
+ * The full helper, the parity check's reference, keeps them, so the check covers their removal
+ * on every platform too.
+ */
+const SLIM_PRUNE_NATIVES = ['realm-wrappers', 'e_sqlite3', 'msquic', 'mscordaccore', 'mscordbi', 'clrgc', 'clrgcexp'];
+
+/**
+ * Windows keeps a second copy of the debugger's data access library under a versioned name,
+ * `mscordaccore_amd64_amd64_10.0.1226.42308.dll`, which the base-name patterns do not reach.
+ */
+const SLIM_VERSIONED_NATIVES = [/^mscordaccore_[a-z0-9]+_[a-z0-9]+_[0-9.]+\.dll$/i];
+
+/**
+ * How the slim helper is trimmed: `partial`, so only .NET's own libraries -- which declare
+ * themselves trimmable -- lose what is unused, and osu!'s, Newtonsoft, Realm and the rest stay
+ * whole. Full trimming broke inside those (roadmap 5.44). Reflection-based System.Text.Json
+ * stays on: the helper's own requests and responses use it, and trimming turns it off by
+ * default. The warnings are about the libraries kept whole, which is the point of partial
+ * mode; the parity check is the guard, not the warnings.
+ */
+export const SLIM_PUBLISH_ARGS = [
+  '-p:PublishTrimmed=true',
+  '-p:TrimMode=partial',
+  '-p:JsonSerializerIsReflectionEnabledByDefault=true',
+  '-p:SuppressTrimAnalysisWarnings=true',
+];
+
 const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /*
@@ -80,18 +126,19 @@ const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  * test would take both. The two version slots cover where each platform puts it --
  * `avcodec-58.dll`, `libavcodec.58.dylib`, `libavcodec.so.58`, `libSDL2-2.0.so.0`.
  */
-const NATIVE_PATTERNS = PRUNE_NATIVES.map(
-  (name) =>
-    new RegExp(
-      `^(lib)?${escape(name)}([-.][0-9][0-9.]*)?\\.(dll|dylib|so)(\\.[0-9][0-9.]*)?$`,
-      'i',
-    ),
-);
+const nativePattern = (name) =>
+  new RegExp(`^(lib)?${escape(name)}([-.][0-9][0-9.]*)?\\.(dll|dylib|so)(\\.[0-9][0-9.]*)?$`, 'i');
+const NATIVE_PATTERNS = PRUNE_NATIVES.map(nativePattern);
+const SLIM_PATTERNS = [...SLIM_PRUNE_NATIVES.map(nativePattern), ...SLIM_VERSIONED_NATIVES];
 
-/** Whether a published file is one this helper has no use for. Exported for the tests. */
-export function shouldPrune(filename) {
+/**
+ * Whether a published file is one this helper has no use for: in the full helper, or with
+ * `slim` (the default) in the slim one. Exported for the tests.
+ */
+export function shouldPrune(filename, slim = true) {
   if (PRUNE_ASSEMBLIES.includes(filename)) return true;
-  return NATIVE_PATTERNS.some((pattern) => pattern.test(filename));
+  if (NATIVE_PATTERNS.some((pattern) => pattern.test(filename))) return true;
+  return slim && SLIM_PATTERNS.some((pattern) => pattern.test(filename));
 }
 
 /** The .NET runtime identifier for the machine this is running on. */
@@ -104,7 +151,7 @@ export function defaultRid() {
 
 /*
  * Kept despite looking unnecessary, each verified by removing it and watching the helper
- * die: Realm (osu!'s model types are Realm objects), System.Private.Xml and
+ * die: Realm's managed library (osu!'s model types are Realm objects), System.Private.Xml and
  * DataContractSerialization, ImageSharp, ppy.ManagedBass, NUnit, Sentry and
  * OpenTabletDriver. The last four are reached from osu.Framework's Logger initializer, so
  * they load before any of our code runs no matter how irrelevant they are to pp.
@@ -122,21 +169,100 @@ function sizeOf(dir) {
 const mb = (bytes) => `${(bytes / 1048576).toFixed(0)}MB`;
 
 /**
- * Publish into `outDir`, replacing whatever is there, and prune it.
+ * Publish into `outDir`, replacing whatever is there, and prune it: the full helper, or with
+ * `slim` the slim one, unchecked. What ships is `buildCheckedPpHelper`.
  *
  * Built beside `outDir` and swapped in only once it has succeeded. Deleting `outDir` first
  * meant a build that failed -- an osu! release needing a newer .NET SDK than this machine has
  * -- left no helper at all, and the app then records no pp until someone rebuilds it.
  */
-export function buildPpHelper(outDir, target = defaultRid()) {
+export function buildPpHelper(outDir, target = defaultRid(), { slim = false } = {}) {
   const staging = `${outDir}.building`;
   fs.rmSync(staging, { recursive: true, force: true });
   try {
-    const result = publishAndPrune(staging, target);
+    const result = publishAndPrune(staging, target, slim);
     swapIn(staging, outDir);
-    return result;
+    return { ...result, slim };
   } finally {
     fs.rmSync(staging, { recursive: true, force: true });
+  }
+}
+
+/**
+ * How this machine can run a `target` helper, as `pp-parity.mjs` flags: none for its own
+ * platform, `--wsl` for a Linux one on Windows with WSL, null when it cannot run it at all.
+ */
+export function runnerFor(target) {
+  if (target === defaultRid()) return [];
+  const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+  if (process.platform === 'win32' && target === `linux-${arch}`) {
+    const wsl = spawnSync('wsl.exe', ['-e', 'true'], { stdio: 'ignore', timeout: 120_000 });
+    if (wsl.status === 0) return ['--wsl'];
+  }
+  return null;
+}
+
+/**
+ * The helper that ships: slim if, and only if, it answers every parity request exactly as the
+ * full one does on this platform; the full one otherwise, with the reason.
+ *
+ * Fails safe in every direction. A slim helper that differs, crashes or will not start; no
+ * replays to test with (`pp-parity.mjs` exits 3); a platform this machine cannot run -- each
+ * ships the full helper, which is what shipped before 5.60, and never stops a build. Only a
+ * full helper that will not *build* throws, as it always has.
+ */
+export function buildCheckedPpHelper(outDir, target = defaultRid(), { corpus = null } = {}) {
+  const full = `${outDir}.full`;
+  const slim = `${outDir}.slim`;
+  const clear = () => {
+    fs.rmSync(full, { recursive: true, force: true });
+    fs.rmSync(slim, { recursive: true, force: true });
+  };
+  clear();
+  try {
+    const fullResult = publishAndPrune(full, target, false);
+    const runner = runnerFor(target);
+    let verdict;
+    if (runner === null) {
+      verdict = { slim: false, reason: `this machine cannot run a ${target} helper to check a slim one against` };
+    } else {
+      let slimResult;
+      try {
+        slimResult = publishAndPrune(slim, target, true);
+      } catch (e) {
+        slimResult = null;
+        verdict = { slim: false, reason: `the slim helper did not build (${e.message})` };
+      }
+      if (slimResult) {
+        console.log(`\n  checking the slim helper (${mb(slimResult.after)}) against the full one (${mb(fullResult.after)})...`);
+        const check = spawnSync(
+          process.execPath,
+          [path.join(root, 'scripts', 'pp-parity.mjs'), full, slim, ...runner, ...(corpus ? ['--corpus', corpus] : [])],
+          { stdio: 'inherit' },
+        );
+        verdict =
+          check.status === 0
+            ? { slim: true, reason: 'identical to the full helper on every parity request' }
+            : {
+                slim: false,
+                reason:
+                  check.status === 3
+                    ? 'there were no plays to check it with (the check above says what it looked for)'
+                    : 'it did not answer every parity request as the full helper does',
+              };
+      }
+    }
+    swapIn(verdict.slim ? slim : full, outDir);
+    return {
+      ...verdict,
+      before: fullResult.before,
+      full: fullResult.after,
+      after: sizeOf(outDir),
+      // The full helper's own pruning, which is what says BASS is gone on this platform.
+      removed: fullResult.removed,
+    };
+  } finally {
+    clear();
   }
 }
 
@@ -150,24 +276,41 @@ function swapIn(staging, outDir) {
   fs.rmSync(old, { recursive: true, force: true });
   if (fs.existsSync(outDir)) {
     try {
-      fs.renameSync(outDir, old);
+      renameSettled(outDir, old);
     } catch (e) {
       throw new Error(
         `could not replace ${outDir} (${e.code ?? e.message}). Close the app, which has it open, and build again.`,
       );
     }
   }
-  fs.renameSync(staging, outDir);
+  renameSettled(staging, outDir);
   fs.rmSync(old, { recursive: true, force: true });
 }
 
-function publishAndPrune(outDir, target) {
+/**
+ * Rename, waiting out Windows' brief hold on files a process has only just let go of -- the
+ * parity check's helpers, and above all a Linux helper that ran through WSL, keep a folder busy
+ * for a moment after exiting. Ten seconds at most; anything longer is a real lock.
+ */
+function renameSettled(from, to) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return fs.renameSync(from, to);
+    } catch (e) {
+      if (attempt >= 20 || !['EPERM', 'EBUSY', 'EACCES'].includes(e.code)) throw e;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 500);
+    }
+  }
+}
+
+function publishAndPrune(outDir, target, slim) {
   const result = spawnSync(
     'dotnet',
     [
       'publish', path.join(root, 'tools', 'PpCalculator', 'PpCalculator.csproj'),
       '-c', 'Release', '-r', target, '--self-contained', 'true',
       '-o', outDir, '--nologo', '-v', 'q',
+      ...(slim ? SLIM_PUBLISH_ARGS : []),
     ],
     { stdio: 'inherit', shell: false },
   );
@@ -188,7 +331,7 @@ function publishAndPrune(outDir, target) {
       fs.rmSync(path.join(outDir, entry.name), { recursive: true, force: true });
       continue;
     }
-    if (!shouldPrune(entry.name)) continue;
+    if (!shouldPrune(entry.name, slim)) continue;
     fs.rmSync(path.join(outDir, entry.name), { force: true });
     removed++;
   }
@@ -200,15 +343,26 @@ function publishAndPrune(outDir, target) {
 // pathToFileURL rather than string-building the URL: this project's own path contains a
 // space, which has to be percent-encoded to match import.meta.url.
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  const rid = process.argv.includes('--rid')
-    ? process.argv[process.argv.indexOf('--rid') + 1]
-    : defaultRid();
-  const positional = process.argv.slice(2).find((a) => !a.startsWith('--') && a !== rid);
+  const argv = process.argv.slice(2);
+  const value = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] : null);
+  const rid = value('--rid') ?? defaultRid();
+  const corpus = value('--corpus');
+  const positional = argv.find((a, i) => !a.startsWith('--') && !['--rid', '--corpus'].includes(argv[i - 1]));
   const outDir = positional ? path.resolve(positional) : path.join(root, 'tools', 'pp');
 
   console.log(`\n  publishing the pp helper (${rid}) into ${outDir}\n`);
-  const { before, after, removed } = buildPpHelper(outDir, rid);
-  console.log(`\n  ${mb(before)} -> ${mb(after)}, ${removed} native file(s) pruned\n`);
+  let removed;
+  if (argv.includes('--full')) {
+    const result = buildPpHelper(outDir, rid);
+    removed = result.removed;
+    console.log(`\n  ${mb(result.before)} -> ${mb(result.after)}, full helper (--full: no slim build, no check)\n`);
+  } else {
+    const result = buildCheckedPpHelper(outDir, rid, { corpus: corpus ? path.resolve(corpus) : null });
+    removed = result.removed;
+    console.log(
+      `\n  ${mb(result.before)} -> ${mb(result.after)}: ${result.slim ? 'slim' : 'full'} helper -- ${result.reason}\n`,
+    );
+  }
   // On a platform whose native library names were never verified, pruning nothing is the
   // failure mode to catch: the helper still works, it is just three times the size and
   // carries BASS, which is not ours to redistribute.

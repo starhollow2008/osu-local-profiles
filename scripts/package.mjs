@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPpHelper, defaultRid } from './build-pp-helper.mjs';
+import { buildCheckedPpHelper, defaultRid } from './build-pp-helper.mjs';
 import { launcherFor, readmeFor } from './package-files.mjs';
 import { buildLauncher } from './build-launcher.mjs';
 
@@ -89,9 +89,18 @@ fs.mkdirSync(out, { recursive: true });
 
 console.log('  building the pp calculator (self-contained)...');
 const ppOut = path.join(out, 'tools', 'pp');
-const pruned = buildPpHelper(ppOut, target);
-console.log(`    ${mb(pruned.before)} -> ${mb(pruned.after)} after pruning
+/*
+ * Slim only past the parity check, on this platform (roadmap 5.60). The release runners have
+ * no osu! plays of their own, so the release workflow hands over the encrypted corpus in
+ * PP_PARITY_CORPUS; without it this ships the full helper, which is always safe.
+ */
+const pruned = buildCheckedPpHelper(ppOut, target, { corpus: process.env.PP_PARITY_CORPUS || null });
+console.log(`    ${mb(pruned.before)} -> ${mb(pruned.after)}: ${pruned.slim ? 'slim' : 'full'} helper -- ${pruned.reason}
 `);
+// Said where a release's summary shows it, so a platform shipping the full helper is noticed.
+if (process.env.GITHUB_ACTIONS) {
+  console.log(`::${pruned.slim ? 'notice' : 'warning'} title=pp helper (${target})::${pruned.slim ? 'slim' : 'full'} helper, ${mb(pruned.after)}: ${pruned.reason}`);
+}
 
 /* ------------------------------------------------------- 2. the Node runtime */
 

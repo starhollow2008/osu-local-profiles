@@ -14,6 +14,7 @@
     "check": "npm run typecheck && npm test",
     "build:pp": "dotnet build tools/PpCalculator/PpCalculator.csproj -c Release --nologo -v q",
     "build:pp:local": "node scripts/build-pp-helper.mjs",
+    "pp:parity": "node scripts/pp-parity.mjs",
     "build:launcher": "node scripts/build-launcher.mjs",
     "build:icons": "node scripts/build-icons.mjs",
     "ui": "node scripts/ui-check.mjs",

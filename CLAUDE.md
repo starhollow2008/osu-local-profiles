@@ -104,7 +104,10 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
   replay the app built for the play (`data/mcosu/`, `src/clients/mcosu.ts`), with a custom
   rate or override as the request's `mods`
 - No fallback calc (`rosu-pp` removed). Helper down = store no pp, say so
-- Do not trim it. `PublishTrimmed` breaks osu!'s own graph - see `docs/architecture.md`, roadmap 5.44
+- Slim (partially trimmed, extra natives pruned) only through `buildCheckedPpHelper`, which
+  ships it only when `scripts/pp-parity.mjs` finds every answer identical to the full helper
+  on that platform, and the full helper otherwise (roadmap 5.60). Never put trim settings in
+  `PpCalculator.csproj`, never full trimming (5.44). `--full` builds skip it, for iterating
 - Every pp carries osu! release version + breakdown. Parts must match the pp beside them
 - `docs/reference-links.md` has links to osu-web, ppy/osu, API docs
 

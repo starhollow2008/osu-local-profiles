@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { defaultRid, shouldPrune } from '../scripts/build-pp-helper.mjs';
+import { SLIM_PUBLISH_ARGS, defaultRid, shouldPrune } from '../scripts/build-pp-helper.mjs';
 
 /*
  * Which files the shipped pp helper drops.
@@ -32,6 +32,15 @@ const WINDOWS_NATIVES = [
   'stbi.dll',
   'Microsoft.DiaSymReader.Native.amd64.dll',
   'Microsoft.DiaSymReader.Native.x86.dll',
+  // Never loaded by anything the parity check sends (roadmap 5.60).
+  'realm-wrappers.dll',
+  'e_sqlite3.dll',
+  'msquic.dll',
+  'mscordaccore.dll',
+  'mscordaccore_amd64_amd64_10.0.1226.42308.dll',
+  'mscordbi.dll',
+  'clrgc.dll',
+  'clrgcexp.dll',
 ];
 
 test('every file the verified Windows list named is still pruned', () => {
@@ -65,6 +74,15 @@ test('the macOS and Linux spellings of the same libraries are pruned too', () =>
     'libveldrid-spirv.so',
     'libstbi.dylib',
     'libstbi.so',
+    'librealm-wrappers.so',
+    'librealm-wrappers.dylib',
+    'libe_sqlite3.so',
+    'libe_sqlite3.dylib',
+    'libmscordaccore.so',
+    'libmscordaccore.dylib',
+    'libmscordbi.so',
+    'libclrgc.so',
+    'libclrgcexp.dylib',
   ];
   for (const file of elsewhere) {
     assert.equal(shouldPrune(file), true, `${file} should be pruned`);
@@ -95,6 +113,16 @@ test('the managed assemblies the helper cannot start without are kept', () => {
     'OpenTabletDriver.dll',
     'System.Private.Xml.dll',
     'System.Private.DataContractSerialization.dll',
+    // The runtime itself, beside the libraries 5.60 prunes: none may be caught by a pattern.
+    'coreclr.dll',
+    'clrjit.dll',
+    'hostfxr.dll',
+    'hostpolicy.dll',
+    'mscorrc.dll',
+    'clretwrc.dll',
+    'System.IO.Compression.Native.dll',
+    'libcoreclr.so',
+    'libclrjit.dylib',
   ];
   for (const file of required) {
     assert.equal(shouldPrune(file), false, `${file} must be kept`);
@@ -113,8 +141,25 @@ test('nothing in an already-pruned helper is matched', (t) => {
   const files = fs.readdirSync(dir).filter((f) => !fs.statSync(path.join(dir, f)).isDirectory());
   assert.ok(files.length > 50, 'expected a real published helper');
 
-  const matched = files.filter(shouldPrune);
+  // A full helper (a `--full` build, or one the parity check turned down) keeps what only the
+  // slim one drops; either way nothing its own kind prunes may be left in it.
+  const slim = !files.some((f) => shouldPrune(f, true) && !shouldPrune(f, false));
+  const matched = files.filter((f) => shouldPrune(f, slim));
   assert.deepEqual(matched, [], 'these would be removed from a working helper');
+});
+
+/*
+ * The slim helper's extra pruning is its alone. The full helper is the parity check's reference
+ * and what ships when the check fails, so it must keep everything it has always had.
+ */
+test('only the slim helper drops the natives 5.60 found unused', () => {
+  for (const file of ['realm-wrappers.dll', 'libe_sqlite3.so', 'msquic.dll', 'mscordbi.dll', 'libclrgc.dylib']) {
+    assert.equal(shouldPrune(file, true), true, `${file} goes from the slim helper`);
+    assert.equal(shouldPrune(file, false), false, `${file} stays in the full helper`);
+  }
+  // What was always pruned stays pruned in both.
+  assert.equal(shouldPrune('bass.dll', false), true);
+  assert.equal(shouldPrune('osu.Game.Resources.dll', false), true);
 });
 
 test('the runtime identifier follows the machine, not Windows', () => {
@@ -123,4 +168,21 @@ test('the runtime identifier follows the machine, not Windows', () => {
   const expected =
     process.platform === 'win32' ? 'win' : process.platform === 'darwin' ? 'osx' : 'linux';
   assert.equal(rid.split('-')[0], expected);
+});
+
+/*
+ * Full trimming breaks inside osu!'s own libraries (roadmap 5.44): not a crash but wrong mods,
+ * and so wrong pp. Partial trimming leaves every library but .NET's own whole, and is what
+ * passed the parity check (5.60). The slim build trims partially, and the project file trims
+ * nothing, so no publish is ever trimmed without the check that decides whether it ships.
+ */
+test('the helper is trimmed only by the checked slim build, and only partially', () => {
+  assert.ok(SLIM_PUBLISH_ARGS.includes('-p:PublishTrimmed=true'));
+  assert.ok(SLIM_PUBLISH_ARGS.includes('-p:TrimMode=partial'));
+  assert.ok(!SLIM_PUBLISH_ARGS.some((a) => /TrimMode=(full|link)/i.test(a)));
+  const csproj = fs.readFileSync(
+    path.join(process.cwd(), 'tools', 'PpCalculator', 'PpCalculator.csproj'),
+    'utf8',
+  );
+  assert.doesNotMatch(csproj, /<PublishTrimmed>|<TrimMode>/, 'a trim setting here would trim every publish, checked or not');
 });

@@ -2077,6 +2077,8 @@ end by announcing that the folder is incomplete.
 
 **Status:** measured 2026-09-12. **Do not ship it.**
 
+**Update:** *full* trimming stays rejected. Partial trimming, which keeps osu!'s libraries whole, shipped in 5.60 behind a parity check.
+
 `PublishTrimmed` is the obvious remaining lever on the helper's 113MB, and the prize is real:
 **36MB pruned, against 113MB today.** It is still the wrong trade, and this is what it cost to
 find out, so that nobody has to repeat it.
@@ -2900,3 +2902,66 @@ records every play; this is only what counts toward pp.
   defaults.
 - `npm run ui` against a copy of this machine's profile: 334/334. The reworded note rendered and
   looked at.
+
+## 5.60 - A smaller pp helper, proven identical
+
+**Status:** done -- unreleased. Checked automatically on every build, on every platform:
+Windows and Linux (through WSL) verified here; macOS by the release runners once the corpus
+and its key are on GitHub.
+
+The user's question: the helper is over half of every download (52MB of the Windows zip's
+89MB). Rewriting the calculator was considered and rejected -- a copy is what 5.44 and the
+removal of rosu-pp already argue against, a second implementation that lags every rework and
+is wrong silently. The helper stays osu!'s own code, made smaller two ways, each allowed only
+because a new check proves nothing it answers has changed.
+
+- **`scripts/pp-parity.mjs` (`npm run pp:parity <old> <new>`).** Two helpers, the same
+  requests, every answer compared as text: values, errors and the ready line. The requests are
+  the app's own, built by the app's code: every replay on the machine (2,268 here -- lazer's
+  store and stable's Data/r), McOsu plays through their built replays, then beatmaps of all
+  four rulesets and their converts as stable replays under spread bitmasks and as lazer
+  replays, under every mod osu! offers each ruleset alone and with the settings the app sends,
+  osu!'s ranked-mods answer for all of them, and ten requests that must fail. First run: the
+  shipped helper disagreed *with itself* on unseeded Random and Target Practice, which pick a
+  new seed each run; those go only with a seed, as a lazer replay records one. `--modules`
+  lists which of a helper's files its process ever loaded.
+- **Partial trimming** (`SLIM_PUBLISH_ARGS`). Only .NET's own libraries are trimmed;
+  osu!'s, Newtonsoft, Realm and the rest stay whole, which is what full trimming broke. Needs
+  reflection-based System.Text.Json kept on. 121MB -> 69MB.
+- **Natives never loaded, pruned**: Realm's and SQLite's engines (the managed Realm stays),
+  HTTP/3, the debugger's data access and interface libraries, and the two alternative garbage
+  collectors. 69MB -> 58MB. Never-loaded *managed* libraries (about 5MB zipped) were left: the
+  runtime refuses to start without anything its dependency manifest lists, and a missing one
+  inside osu! code that catches exceptions could change a result instead of failing.
+- **Result:** 121MB -> 58MB on disk, 52MB -> 24.7MB zipped, so the Windows download should
+  drop from about 89MB to about 62MB.
+
+- **Checked on every build, not by hand.** `buildCheckedPpHelper` builds the full helper and the
+  slim one side by side, runs the parity check between them, and ships the slim one only if it
+  passes -- otherwise the full one, with the reason, never failing the build. `npm run
+  build:pp:local` does it with this machine's plays; `npm run package` on the release runners
+  with an encrypted export of them (`pp-parity.mjs --export`, AES-256-GCM with the
+  `PP_PARITY_KEY` secret, kept on the draft release `pp-parity-corpus`), fetched by a job that
+  alone can read drafts and runs nothing from npm. The requests are always built by the code
+  being released, so a mod osu! adds later is tested with no new export. On Windows,
+  `--rid linux-x64` checks the Linux helpers under WSL.
+
+### Verified
+
+- `npm run pp:parity` against the shipped 2026.916.0 helper: 8,059/8,059 identical (6 maps
+  per ruleset, 42 beatmap/ruleset pairs, 9 matching errors).
+- Through the app: a copy of this machine's profile, all 78 scores (72 lazer, 6 McOsu) priced
+  by the old helper, recalculated by the new one with Recalculate every score -- 0 of pp,
+  stars, stripped pp, both breakdowns, both score scales, the ranked answer and max combo
+  changed. The running helper was confirmed to be the trimmed one (3.4MB CoreLib, 15.3MB
+  untrimmed), not a fallback build.
+- `npm run check` 569 tests; `npm run ui` 334/334. `test/pp-helper.test.ts` pins the new
+  prune names on every platform, the runtime files that must never match, that only the slim
+  helper drops the new natives, and that the slim build trims partially while the project
+  file trims nothing.
+
+- The checked build, three ways: Windows (`npm run build:pp:local`) and Linux through WSL
+  (`--rid linux-x64`, 132MB -> 64MB) both 8,059/8,059 identical and shipped slim; the same
+  request set from the encrypted corpus, 8,059/8,059. And failing safe: a slim helper missing
+  a ruleset library fails the check (exit 1), a wrong key or missing corpus is "nothing to
+  compare" (exit 3), and a build without one shipped the full helper and exited 0.
