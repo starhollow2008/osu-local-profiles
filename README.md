@@ -1,5 +1,12 @@
 # osu! local profiles
 
+[![CI](https://github.com/jonathant09/osu-local-profiles/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/jonathant09/osu-local-profiles/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/jonathant09/osu-local-profiles)](https://github.com/jonathant09/osu-local-profiles/releases/latest)
+[![License](https://img.shields.io/github/license/jonathant09/osu-local-profiles)](LICENSE)
+[![Downloads](https://img.shields.io/github/downloads/jonathant09/osu-local-profiles/total)](https://github.com/jonathant09/osu-local-profiles/releases)
+[![pp version](https://img.shields.io/badge/pp%20version-July%202026-ff66ab)](https://github.com/ppy/osu/releases)
+[![Last updated](https://img.shields.io/github/release-date/jonathant09/osu-local-profiles?label=last%20updated)](https://github.com/jonathant09/osu-local-profiles/releases/latest)
+
 App that tracks local / offline profiles in a browser profile page that resembles the official osu! site. App watches for plays while it is running, then calculates pp and records to profile. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
 
 Preview sample profile: https://jonathant09.github.io/osu-local-profiles/
@@ -76,7 +83,7 @@ Open <http://localhost:7272>.
 Stable users only:
 - **Unranked maps will always count for pp** if lazer isn't installed, since stable doesn't record ranked status
 - Scores are only tracked once you exit the results screen
-- Incomplete plays (fail, quit, retry) are not tracked in Recent Plays or for playcount
+- Incomplete plays (fail, quit, retry) are not tracked in Recent Plays or for playcount, including failed multiplayer plays
 
 ## Warnings for McOsu
 
@@ -181,6 +188,8 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
   grows. Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
 - Country rank is not supported
 - No support for tracking incomplete plays for playcount in stable
+- A map's ranked status comes from osu!lazer's list of beatmaps, which osu!lazer updates about once a month, so a map ranked since then counts as unranked until the next update
+
 
 ## Credits
 
