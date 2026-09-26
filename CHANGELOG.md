@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.25.0
+
+- **Beatmaps downloaded while the app is open are found** (osu!stable and McOsu). A play on a
+  map you had just downloaded, including every multiplayer pick you didn't have, showed as
+  "Unknown beatmap" with no pp, and stayed that way. Plays already stored like that are fixed
+  the next time the app starts.
+
+- **ScoreV2 and the rest of osu!stable's mods are shown.** ScoreV2, mania's key counts, Fade
+  In, Random and Mirror were missing from osu!stable plays, so a ScoreV2 play looked like a
+  nomod one. Plays you already have are corrected the first time this version starts.
+  - osu! does not rank ScoreV2, so those plays count toward pp only while unranked mods are
+    counted.
+
+- **Relax and Autopilot are priced by osu!'s own pp calculator by default** on new profiles.
+  "As if the mod were off" is still there in **Options -> Other settings**. Profiles you
+  already have keep the pricing they had.
+
+- **A replay that isn't tracked says so.** When a replay is turned away because someone else
+  set it (one you watched, say) or because it can't be read, the page shows who set it and on
+  which map, and the Options menu counts them.
+
+- **Finding your beatmaps is a small note** in the top-right corner, under the buttons, instead
+  of a banner across the page. It scrolls away with the header, and the menus open over it.
+
 ## 1.24.0
 
 - **McOsu support.** Plays set in McOsu are tracked like osu!stable and osu!lazer plays, and
