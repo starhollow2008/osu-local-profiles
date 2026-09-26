@@ -1,18 +1,17 @@
 import fs from 'node:fs';
+import type { SQLInputValue } from 'node:sqlite';
 import type { Db } from '../db/index.ts';
 import { parseReplay, parseReplayHeader, type LazerMod } from '../osr.ts';
-import { awardsPp, UNRESOLVED_STATUS, type BeatmapResolver } from '../clients/beatmaps.ts';
-import {
-  calculateScorePp,
-  decodeLegacyMods,
-  modsCountable,
-  modsLabel,
-  rankedByOsu,
-  scoreMods,
-  scorePricing,
-  strippableMods,
-} from '../calc/pp.ts';
+import { awardsPp, type BeatmapResolver } from '../clients/beatmaps.ts';
+import { decodeLegacyMods, scoreMods, scorePricing } from '../calc/pp.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
+import {
+  BEATMAP_PRICED,
+  priceAsPlayed,
+  pricedColumns,
+  priceTheRest,
+  type PricedColumns,
+} from './pricing.ts';
 import { outdatedPpSql } from '../scores.ts';
 
 /**
@@ -81,49 +80,34 @@ export function countStale(db: Db, profileId: number): number {
 }
 
 /**
- * The columns a recompute rewrites, in the order the statement binds them.
- *
- * The SQL is generated from this list and the values are read back out by name, so a column
- * added without its value -- or a value without its column -- cannot silently shift every
- * parameter after it. That happened once: two columns joined the SET clause without their
- * values, which left `WHERE id = ?` bound to NULL, and the recompute wrote nothing at all
- * while reporting every row as updated.
+ * An UPDATE of these columns of one score, generated from the values themselves: the priced
+ * row (`pricedColumns`, shared with ingest) is the column list, so a column cannot be added
+ * without its value or bound to the wrong one. That happened once, when the list was kept by
+ * hand: two columns joined the SET clause without their values, which left `WHERE id = ?`
+ * bound to NULL, and the recompute wrote nothing at all while reporting every row as updated.
  */
-const UPDATE_COLUMNS = [
-  'mods_json',
-  'mods_label',
-  'stars',
-  'pp',
-  'pp_source',
-  'score_standard',
-  'score_classic',
-  'pp_nomod',
-  'stars_nomod',
-  'beatmap_max_combo',
-  'map_status',
-  'mods_ranked',
-  'mods_ranked_by',
-  'mods_countable',
-  'ranked',
-  'beatmap_id',
-  'pp_parts',
-  'pp_nomod_parts',
-  'pp_version',
-] as const;
-
-type UpdateValues = Record<(typeof UPDATE_COLUMNS)[number], string | number | null>;
+function updater(db: Db): (id: number, values: Partial<PricedColumns>) => void {
+  const statements = new Map<string, ReturnType<Db['prepare']>>();
+  return (id, values) => {
+    const columns = Object.keys(values);
+    const sql = `UPDATE scores SET ${columns.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`;
+    let statement = statements.get(sql);
+    if (!statement) statements.set(sql, (statement = db.prepare(sql)));
+    statement.run(...(Object.values(values) as SQLInputValue[]), id);
+  };
+}
 
 /**
- * The columns only a beatmap file can produce. A score whose `.osu` is gone -- the map deleted
- * since, or its file not found -- keeps these as they were rather than having them wiped: a
+ * What a score whose `.osu` is gone -- the map deleted since, or its file not found -- may have
+ * rewritten: everything but what only a beatmap file can produce (`BEATMAP_PRICED`). A
  * recalculation after a pp rework once erased the pp of every such score for good, while a
  * score whose *replay* was gone was deliberately left alone.
  */
-const PRICED_COLUMNS: ReadonlySet<string> = new Set([
-  'stars', 'pp', 'pp_source', 'score_standard', 'score_classic', 'pp_nomod', 'stars_nomod',
-  'beatmap_max_combo', 'pp_parts', 'pp_nomod_parts', 'pp_version',
-]);
-const UNPRICED_COLUMNS = UPDATE_COLUMNS.filter((c) => !PRICED_COLUMNS.has(c));
+function withoutBeatmapPricing(values: PricedColumns): Partial<PricedColumns> {
+  return Object.fromEntries(
+    Object.entries(values).filter(([column]) => !BEATMAP_PRICED.has(column as keyof PricedColumns)),
+  ) as Partial<PricedColumns>;
+}
 
 interface StoredRow {
   id: number;
@@ -145,12 +129,7 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
     )
     .all(opts.profileId, ...(opts.ids ?? [])) as unknown as StoredRow[];
 
-  const update = opts.db.prepare(
-    `UPDATE scores SET ${UPDATE_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
-  );
-  const updateUnpriced = opts.db.prepare(
-    `UPDATE scores SET ${UNPRICED_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
-  );
+  const update = updater(opts.db);
   const updateRanked = opts.db.prepare(
     'UPDATE scores SET mods_ranked = ?, mods_ranked_by = ?, ranked = ? WHERE id = ?',
   );
@@ -174,49 +153,26 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
     const beatmap = opts.resolver.resolve(score.beatmapMD5);
     const mods = scoreMods(score, beatmap.osuPath);
     const pricing = scorePricing(score, beatmap.osuPath);
-    const modsRanked = await rankedByOsu(score, opts.official, beatmap.osuPath);
-    const countable = modsCountable(mods);
+    const computed = await priceAsPlayed(row.replay_path, beatmap, opts.official, pricing);
+    const { stripped, modsRanked } = await priceTheRest(score, row.replay_path, beatmap, mods, opts.official, pricing);
+    const values = pricedColumns({
+      mods,
+      beatmap,
+      computed,
+      stripped,
+      modsRanked,
+      calculatorVersion: opts.official.version,
+    });
 
-    const computed = beatmap.osuPath
-      ? await calculateScorePp(row.replay_path, beatmap.osuPath, opts.official, undefined, pricing)
-      : null;
-    const strippable = strippableMods(mods);
-    const stripped =
-      strippable.length > 0 && beatmap.osuPath
-        ? await calculateScorePp(row.replay_path, beatmap.osuPath, opts.official, strippable, pricing)
-        : null;
-
-    if (!beatmap.osuPath) {
+    if (beatmap.osuPath) {
+      update(row.id, values);
+      result.updated++;
+    } else {
       // Still worth writing the eligibility columns: without them the row stays "stale"
       // for ever and every recompute would examine it again. Its pricing stays as it was.
+      update(row.id, withoutBeatmapPricing(values));
       result.skipped++;
     }
-
-    const values: UpdateValues = {
-      mods_json: JSON.stringify(mods),
-      mods_label: modsLabel(mods),
-      stars: computed?.stars ?? null,
-      pp: computed?.pp ?? null,
-      pp_source: computed ? 'official' : null,
-      score_standard: computed?.standardisedScore ?? null,
-      score_classic: computed?.classicScore ?? null,
-      pp_nomod: stripped?.pp ?? null,
-      stars_nomod: stripped?.stars ?? null,
-      beatmap_max_combo: computed?.maxCombo ?? null,
-      map_status: beatmap.status ?? UNRESOLVED_STATUS,
-      mods_ranked: modsRanked === null ? null : modsRanked ? 1 : 0,
-      mods_ranked_by: modsRanked === null ? null : (opts.official.version ?? 'unknown'),
-      mods_countable: countable ? 1 : 0,
-      ranked: awardsPp(beatmap.status) && modsRanked === true ? 1 : 0,
-      beatmap_id: beatmap.beatmapId,
-      pp_parts: computed ? JSON.stringify(computed.breakdown) : null,
-      pp_nomod_parts: stripped ? JSON.stringify(stripped.breakdown) : null,
-      pp_version: computed?.version ?? null,
-    };
-    if (beatmap.osuPath) update.run(...UPDATE_COLUMNS.map((column) => values[column]), row.id);
-    else updateUnpriced.run(...UNPRICED_COLUMNS.map((column) => values[column]), row.id);
-
-    if (beatmap.osuPath) result.updated++;
     if (row.pp === null && computed?.pp != null) result.gainedPp++;
   }
 

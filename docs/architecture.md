@@ -376,7 +376,7 @@ osu! profile page has lazer scoring switch (on by default). Off = uncapped class
 
 **Stable scores listed with CL.** osu! adds Classic to every legacy score before scoring. `withClassicMod` (`src/calc/pp.ts`) adds it when building rows/cards. `mods_json` keeps what player chose.
 
-**Multi-column UPDATE generated from one list.** `UPDATE_COLUMNS` in `src/tracker/recompute.ts` builds SET clause. Never hand-align placeholders there.
+**Wide INSERT/UPDATE generated from the row.** Ingest's INSERT and recompute's UPDATE take their column lists from the row object itself, so no value can be bound to the wrong column. What pricing a replay decides - pp, stars, status, the ranked flags, pp parts - is one definition, `pricedColumns` in `src/tracker/pricing.ts`, shared by both; `BEATMAP_PRICED` is the part a recompute keeps when the `.osu` is gone. Never hand-align placeholders.
 
 ## Favorites: shared by default
 

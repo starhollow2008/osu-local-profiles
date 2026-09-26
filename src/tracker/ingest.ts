@@ -2,18 +2,12 @@ import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replayIdentity } from './online-import.ts';
 import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
+import type { SQLInputValue } from 'node:sqlite';
 import type { Db } from '../db/index.ts';
 import { parseReplay, type ReplayScore, type Ruleset } from '../osr.ts';
-import { awardsPp, UNRESOLVED_STATUS, type BeatmapResolver } from '../clients/beatmaps.ts';
-import {
-  calculateScorePp,
-  modsCountable,
-  modsLabel,
-  rankedByOsu,
-  scoreMods,
-  scorePricing,
-  strippableMods,
-} from '../calc/pp.ts';
+import { awardsPp, type BeatmapResolver } from '../clients/beatmaps.ts';
+import { scoreMods, scorePricing } from '../calc/pp.ts';
+import { priceAsPlayed, pricedColumns, priceTheRest } from './pricing.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { accuracy, gradeOf, passed } from '../calc/grade.ts';
 import { beatmapName, beatmapNameOriginal, resolvedNames } from '../calc/metadata.ts';
@@ -197,13 +191,9 @@ export async function ingestScore(
   const beatmap = ctx.resolver.resolve(score.beatmapMD5);
   const mods = scoreMods(score, beatmap.osuPath);
   const pricing = scorePricing(score, beatmap.osuPath);
-  const label = modsLabel(mods);
   const didPass = passed(score);
   const grade = gradeOf(score, mode, mods);
   const acc = accuracy(score, mode);
-
-  const mapRanked = awardsPp(beatmap.status);
-  const countable = modsCountable(mods);
 
   const named = describe(beatmap, score.beatmapMD5);
 
@@ -231,9 +221,7 @@ export async function ingestScore(
    * longer be on disk. Storing the number and deciding at query time makes including or
    * excluding a class of score instant and reversible.
    */
-  const computed = beatmap.osuPath
-    ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official, undefined, pricing)
-    : null;
+  const computed = await priceAsPlayed(replayPath, beatmap, ctx.official, pricing);
 
   // The filter's second half: the star rating as played, now that osu! has produced one. A
   // play whose rating could not be calculated is not rejected on it -- see filterRejects.
@@ -246,85 +234,80 @@ export async function ingestScore(
    * A second pass with Relax/Autopilot removed, which is what "count it as if the mod were
    * not on" means. osu!'s difficulty calculator is relax-aware, so this is a genuinely
    * different number and not a rescaling: 6.26 stars and 111pp as played, 7.83 and 239 with
-   * RX stripped, on the same replay.
+   * RX stripped, on the same replay. Asked with the ranked question after the filter, so a
+   * play it turns away costs no round trip.
    */
-  const strippable = strippableMods(mods);
-  const stripped =
-    strippable.length > 0 && beatmap.osuPath
-      ? await calculateScorePp(replayPath, beatmap.osuPath, ctx.official, strippable, pricing)
-      : null;
+  const { stripped, modsRanked } = await priceTheRest(score, replayPath, beatmap, mods, ctx.official, pricing);
+  const priced = pricedColumns({
+    mods,
+    beatmap,
+    computed,
+    stripped,
+    modsRanked,
+    calculatorVersion: ctx.official?.version ?? null,
+  });
 
-  // Asked of osu! after the filter, so a play it turns away costs no round trip.
-  const modsRanked = await rankedByOsu(score, ctx.official, beatmap.osuPath);
-  // What osu! itself would say. Kept as `ranked` so nothing downstream shifts meaning. Mods
-  // osu! could not be asked about are not ranked until a recompute asks again.
-  const eligible = mapRanked && modsRanked === true;
-
-  ctx.db
-    .prepare(
-      `INSERT INTO scores
-        (profile_id, dedupe_key, mode, beatmap_md5, beatmap_id, client, mods_json, mods_label,
-         count300, count100, count50, count_geki, count_katu, count_miss,
-         statistics_json, max_statistics_json,
-         accuracy, max_combo, total_score, score_standard, score_classic, passed, grade, stars, pp, pp_source,
-         pp_nomod, stars_nomod, beatmap_max_combo, map_status, mods_ranked, mods_ranked_by,
-         mods_countable, ranked, played_at, online_score_id, replay_path, pp_parts, pp_nomod_parts,
-         pp_version, player_name, player_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-    )
-    .run(
-      ctx.profileId, key, mode, score.beatmapMD5, beatmap.beatmapId, score.client,
-      JSON.stringify(mods), label,
-      score.count300, score.count100, score.count50, score.countGeki, score.countKatu, score.countMiss,
-      score.extras?.statistics ? JSON.stringify(score.extras.statistics) : null,
-      score.extras?.maximum_statistics ? JSON.stringify(score.extras.maximum_statistics) : null,
-      acc, score.maxCombo, score.totalScore,
-      // osu!'s own two scales, so the profile can be read on either without a recalculation.
-      computed?.standardisedScore ?? null, computed?.classicScore ?? null,
-      didPass ? 1 : 0, grade,
-      computed?.stars ?? null, computed?.pp ?? null, computed ? 'official' : null,
-      stripped?.pp ?? null, stripped?.stars ?? null,
-      computed?.maxCombo ?? null,
-      beatmap.status ?? UNRESOLVED_STATUS,
-      modsRanked === null ? null : modsRanked ? 1 : 0,
-      modsRanked === null ? null : (ctx.official?.version ?? 'unknown'),
-      countable ? 1 : 0,
-      eligible ? 1 : 0,
-      playedAt,
-      /*
-       * The id osu! gave the score, preferring lazer's own block over the legacy header --
-       * lazer writes 0 in the header and the real one inside. Reading only the header stored
-       * a 0 for every lazer play, which both hid whether the play was ever submitted and
-       * left the match against an imported osu! score leaning on its weaker fallback.
-       */
-      player.onlineId === null ? null : String(player.onlineId),
-      replayPath,
-      computed ? JSON.stringify(computed.breakdown) : null,
-      stripped ? JSON.stringify(stripped.breakdown) : null,
-      computed?.version ?? null,
-      // Recorded on the row so the clean-up and the identity inference never have to go back
-      // to a replay file that may no longer be on disk.
-      player.name,
-      player.userId,
-    );
-
-  const id = (ctx.db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;
+  /*
+   * The row by column name, and the INSERT generated from it, so no value can be bound to the
+   * wrong column -- this once counted out 42 placeholders by hand. The priced columns are the
+   * ones a recalculation rewrites (src/tracker/pricing.ts), defined in one place for both.
+   */
+  const row = {
+    profile_id: ctx.profileId,
+    dedupe_key: key,
+    mode,
+    beatmap_md5: score.beatmapMD5,
+    client: score.client,
+    count300: score.count300,
+    count100: score.count100,
+    count50: score.count50,
+    count_geki: score.countGeki,
+    count_katu: score.countKatu,
+    count_miss: score.countMiss,
+    statistics_json: score.extras?.statistics ? JSON.stringify(score.extras.statistics) : null,
+    max_statistics_json: score.extras?.maximum_statistics
+      ? JSON.stringify(score.extras.maximum_statistics)
+      : null,
+    accuracy: acc,
+    max_combo: score.maxCombo,
+    total_score: score.totalScore,
+    passed: didPass ? 1 : 0,
+    grade,
+    ...priced,
+    played_at: playedAt,
+    /*
+     * The id osu! gave the score, preferring lazer's own block over the legacy header --
+     * lazer writes 0 in the header and the real one inside. Reading only the header stored
+     * a 0 for every lazer play, which both hid whether the play was ever submitted and
+     * left the match against an imported osu! score leaning on its weaker fallback.
+     */
+    online_score_id: player.onlineId === null ? null : String(player.onlineId),
+    replay_path: replayPath,
+    // Recorded on the row so the clean-up and the identity inference never have to go back
+    // to a replay file that may no longer be on disk.
+    player_name: player.name,
+    player_id: player.userId,
+  };
+  const columns = Object.keys(row);
+  const { lastInsertRowid } = ctx.db
+    .prepare(`INSERT INTO scores (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
+    .run(...(Object.values(row) as SQLInputValue[]));
 
   return {
     status: 'added',
     score: {
-      id,
+      id: Number(lastInsertRowid),
       mode,
       ...named,
-      modsLabel: label,
+      modsLabel: priced.mods_label,
       accuracy: acc,
       grade,
-      pp: computed?.pp ?? null,
-      ppNomod: stripped?.pp ?? null,
-      ppSource: computed ? 'official' : null,
-      stars: computed?.stars ?? null,
-      ranked: eligible,
-      mapRanked,
+      pp: priced.pp,
+      ppNomod: priced.pp_nomod,
+      ppSource: priced.pp_source,
+      stars: priced.stars,
+      ranked: priced.ranked === 1,
+      mapRanked: awardsPp(beatmap.status),
       playedAt,
     },
   };

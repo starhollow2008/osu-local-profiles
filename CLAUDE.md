@@ -56,7 +56,9 @@ Each has its reasoning in `docs/architecture.md`.
   open in the browser could stop the app.
 - **`fs.watch` only gets paths through `watchablePath`.** On Windows a non-canonical path
   aborts the process. Watcher tests `await sleep(SETTLED_MS)` after `start()`.
-- **Recompute's UPDATE is generated from `UPDATE_COLUMNS`.** Never hand-align placeholders.
+- **A score's INSERT and recompute's UPDATE are generated from the row object** (`pricedColumns`
+  in `src/tracker/pricing.ts` for what pricing decides, shared by both). Never hand-align
+  placeholders.
 - **After changing `Program.cs`, run `npm run build:pp:local`.** A stale `tools/pp/` answers
   the old protocol silently.
 - **Web modules stay bundleable** (named imports, `export function/const/class`, no
