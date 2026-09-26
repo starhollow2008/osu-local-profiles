@@ -4,7 +4,7 @@
 import { escapeHtml, fmt, shortDate } from './format.js';
 import { medalBadge } from './badges.js';
 import { toast } from './ui.js';
-import { t } from './i18n.js';
+import { plural, t, tOwn } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -96,10 +96,12 @@ export function renderMedals(summary, mode) {
     // on, because "1 play was" and "2 plays were" differ in more than an "s" in most
     // languages, and in ways a suffix cannot express.
     const count = { n: fmt(summary.fcUnknown) };
-    note.textContent =
-      summary.fcUnknown === 1
-        ? t('medals.fcUnknownOne', count)
-        : t('medals.fcUnknownMany', count);
+    note.textContent = plural(
+      summary.fcUnknown,
+      () => t('medals.fcUnknownOne', count),
+      () => tOwn('medals.fcUnknownFew', count),
+      () => t('medals.fcUnknownMany', count),
+    );
   } else {
     note.hidden = true;
   }
@@ -140,10 +142,15 @@ function announceNewMedals(summary, mode) {
     // around them is translated.
     if (fresh.length === 1) toast(t('medals.unlockedOne', { name: fresh[0].name }));
     else if (fresh.length > 1) {
-      toast(t('medals.unlockedMany', {
-        n: fresh.length,
-        names: fresh.map((m) => m.name).join(', '),
-      }));
+      const unlocked = { n: fresh.length, names: fresh.map((m) => m.name).join(', ') };
+      toast(
+        plural(
+          fresh.length,
+          () => t('medals.unlockedOne', { name: fresh[0].name }),
+          () => tOwn('medals.unlockedFew', unlocked),
+          () => t('medals.unlockedMany', unlocked),
+        ),
+      );
     }
   }
   lastEarned = { mode, slugs };

@@ -26,11 +26,19 @@ export function currentLocale(): string;
 export function matchLocale(tags: readonly string[] | undefined): string | null;
 export function storedLocale(): string | null;
 export function t(key: string, vars?: Record<string, unknown>): string;
+export function tOwn(key: string, vars?: Record<string, unknown>): string | null;
+export function plural(
+  n: number,
+  one: () => string,
+  few: () => string | null,
+  many: () => string,
+): string;
 export function formatMessage(text: string, vars?: Record<string, unknown>): string;
 export function hasTranslation(key: string): boolean;
 export function installMessages(
-  active: Record<string, string>,
+  strings: Record<string, string>,
   english?: Record<string, string>,
+  code?: string,
 ): void;
 export function useLocale(code: string, root?: Document): Promise<string>;
 export function englishFromPage(root?: Document): Record<string, string>;

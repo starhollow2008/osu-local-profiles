@@ -38,8 +38,10 @@ import {
   currentLocale,
   knownLocale,
   matchLocale,
+  plural,
   storedLocale,
   t,
+  tOwn,
   useLocale,
 } from './i18n.js';
 import {
@@ -668,9 +670,12 @@ async function loadState() {
   playsFiltered = s.playsFiltered ?? 0;
   playsRefused = s.playsRefused ?? 0;
   $('optInfo').textContent =
-    (s.scoresThisSession === 1
-      ? t('menu.watchingOne', session)
-      : t('menu.watchingMany', session)) +
+    plural(
+      s.scoresThisSession,
+      () => t('menu.watchingOne', session),
+      () => tOwn('menu.watchingFew', session),
+      () => t('menu.watchingMany', session),
+    ) +
     // Only when there are any: a filter that is declining plays, or a replay taken for someone
     // else's, is the explanation for a score that never appeared, and it should not have to be
     // gone looking for.
@@ -756,11 +761,12 @@ function renderIndexing(state) {
     const waitingCount = { n: fmt(state.waiting) };
     const waiting =
       state.waiting > 0
-        ? ` ${
-            state.waiting === 1
-              ? t('index.waitingOne', waitingCount)
-              : t('index.waitingMany', waitingCount)
-          }`
+        ? ` ${plural(
+            state.waiting,
+            () => t('index.waitingOne', waitingCount),
+            () => tOwn('index.waitingFew', waitingCount),
+            () => t('index.waitingMany', waitingCount),
+          )}`
         : '';
     $('indexNotice').title =
       detail +
@@ -2569,11 +2575,12 @@ function offerRecompute() {
 
   const count = { n: fmt(staleScores) };
   const ok = confirm(
-    `${
-      staleScores === 1
-        ? t('recompute.staleOne', count)
-        : t('recompute.staleMany', count)
-    }\n\n` +
+    `${plural(
+      staleScores,
+      () => t('recompute.staleOne', count),
+      () => tOwn('recompute.staleFew', count),
+      () => t('recompute.staleMany', count),
+    )}\n\n` +
       `${t('recompute.ask')}\n\n` +
       t('recompute.nothingDeleted'),
   );
@@ -2597,10 +2604,12 @@ function renderPpCalculator() {
   const n = ppCalculator.outdated;
   $('ppCalculatorOutdated').hidden = !v || n === 0;
   const outdated = { n: fmt(n) };
-  $('ppCalculatorOutdated').textContent =
-    n === 1
-      ? t('recompute.outdatedOne', outdated)
-      : t('recompute.outdatedMany', outdated);
+  $('ppCalculatorOutdated').textContent = plural(
+    n,
+    () => t('recompute.outdatedOne', outdated),
+    () => tOwn('recompute.outdatedFew', outdated),
+    () => t('recompute.outdatedMany', outdated),
+  );
   $('ppCalculatorAll').hidden = !v;
   $('ppRecalculate').disabled = recomputing || ppCalculator.recalculating === true;
 }
@@ -2614,9 +2623,12 @@ $('ppRecalculate').onclick = () => {
 function recomputeDone(d) {
   const updated = { n: fmt(d.updated) };
   return (
-    (d.updated === 1
-      ? t('recompute.doneOne', updated)
-      : t('recompute.doneMany', updated)) +
+    plural(
+      d.updated,
+      () => t('recompute.doneOne', updated),
+      () => tOwn('recompute.doneFew', updated),
+      () => t('recompute.doneMany', updated),
+    ) +
     (d.gainedPp > 0
       ? t('recompute.gained', { n: fmt(d.gainedPp) })
       : '') +
@@ -2843,7 +2855,12 @@ $('restoreFile').onchange = async () => {
 
     const lines = staged.profiles.map((p) => {
       const values = { name: p.name, n: fmt(p.plays) };
-      return p.plays === 1 ? t('restore.profileOne', values) : t('restore.profileMany', values);
+      return plural(
+        p.plays,
+        () => t('restore.profileOne', values),
+        () => tOwn('restore.profileFew', values),
+        () => t('restore.profileMany', values),
+      );
     });
     if (!confirm(`${t('restore.ask')}\n\n${lines.join('\n')}\n\n${t('restore.nothingDeleted')}`)) {
       await fetch('/api/restore', { method: 'DELETE' });
@@ -3166,9 +3183,12 @@ $('backfillConfirm').onclick = async () => {
     );
     const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
     toast(
-      (total === 1
-        ? t('backfill.importedOne', { n: fmt(total) })
-        : t('backfill.importedMany', { n: fmt(total) })) +
+      plural(
+        total,
+        () => t('backfill.importedOne', { n: fmt(total) }),
+        () => tOwn('backfill.importedFew', { n: fmt(total) }),
+        () => t('backfill.importedMany', { n: fmt(total) }),
+      ) +
         (d.filtered > 0
           ? t('backfill.importedFiltered', {
               n: fmt(d.filtered),
@@ -3269,9 +3289,12 @@ $('resetConfirm').onclick = async () => {
   try {
     const data = await postJson('/api/profile/reset', { confirm: true }, 'reset failed');
     toast(
-      data.deleted === 1
-        ? t('reset.doneOne', { n: fmt(data.deleted) })
-        : t('reset.doneMany', { n: fmt(data.deleted) }),
+      plural(
+        data.deleted,
+        () => t('reset.doneOne', { n: fmt(data.deleted) }),
+        () => tOwn('reset.doneFew', { n: fmt(data.deleted) }),
+        () => t('reset.doneMany', { n: fmt(data.deleted) }),
+      ),
     );
   } catch (err) {
     toast(t('reset.failed', { error: err.message }));
@@ -3408,7 +3431,14 @@ on('caught-up', (e) => {
   const r = JSON.parse(e.data);
   const added = r.imported + r.unfinished + r.attempts;
   if (added > 0) {
-    toast(added === 1 ? t('catchUp.doneOne') : t('catchUp.doneMany', { n: fmt(added) }));
+    toast(
+      plural(
+        added,
+        () => t('catchUp.doneOne'),
+        () => tOwn('catchUp.doneFew', { n: fmt(added) }),
+        () => t('catchUp.doneMany', { n: fmt(added) }),
+      ),
+    );
   }
   loadProfile();
   loadState();

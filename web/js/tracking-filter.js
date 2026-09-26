@@ -21,7 +21,7 @@ import { modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS } from './mcosu-mods.js';
 import { hint, postJson, toast } from './ui.js';
-import { t } from './i18n.js';
+import { plural, t, tOwn } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -815,9 +815,12 @@ export function openTrackingFilter(options) {
   const filtered = { n: context.playsFiltered };
   $('filterSessionCount').textContent =
     context.playsFiltered > 0
-      ? context.playsFiltered === 1
-        ? t('filter.sessionCountOne', filtered)
-        : t('filter.sessionCountMany', filtered)
+      ? plural(
+          context.playsFiltered,
+          () => t('filter.sessionCountOne', filtered),
+          () => tOwn('filter.sessionCountFew', filtered),
+          () => t('filter.sessionCountMany', filtered),
+        )
       : '';
   filterHint(' ');
   renderBody();

@@ -101,12 +101,12 @@ export function stringsFromHtml(source) {
 /**
  * Every key the page's scripts ask for.
  *
- * Only a literal `t('key')` is found, which is the whole point: a key built at runtime
- * cannot be checked, so the page does not build any. A `t(variable)` would pass silently
- * here and fail on somebody's screen.
+ * Only a literal `t('key')` -- or `tOwn('key')`, the same without the English fallback -- is
+ * found, which is the whole point: a key built at runtime cannot be checked, so the page does
+ * not build any. A `t(variable)` would pass silently here and fail on somebody's screen.
  */
 export function keysFromJs(source) {
-  return [...source.matchAll(/\bt\(\s*'([\w.-]+)'/g)].map((m) => m[1]);
+  return [...source.matchAll(/\bt(?:Own)?\(\s*'([\w.-]+)'/g)].map((m) => m[1]);
 }
 
 function readWeb(rel) {

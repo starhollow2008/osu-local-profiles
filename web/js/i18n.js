@@ -177,6 +177,51 @@ export function formatMessage(text, vars) {
   return text.replace(/\{(\w+)\}/g, (whole, name) => (name in vars ? String(vars[name]) : whole));
 }
 
+/**
+ * A string in the language in use only -- no English fallback -- or null when it has none.
+ *
+ * For a form only some languages need: a Polish "few" sentence has no English counterpart
+ * worth showing, and falling back to it would put English in the middle of a Russian page.
+ */
+export function tOwn(key, vars) {
+  const text = messages[key];
+  return text === undefined ? null : formatMessage(text, vars);
+}
+
+/**
+ * The sentence for a count, by the language's own plural rules.
+ *
+ * Exactly 1 is `one`, as it always was: some of those sentences are written for exactly one
+ * ("One play brought in") and would be wrong for 21, which Russian calls "one" too. Otherwise
+ * a count the language puts in its "few" form (Polish 2-4, 22-24 ...) uses `few`, when the
+ * language has written one; everything else, and every language without one, uses `many`.
+ * English has no "few", so for it this is exactly the old `n === 1 ? one : many`.
+ *
+ * Each form is a function, so only the chosen sentence is built -- and so each key is still
+ * written out in full in a `t` or `tOwn` call at the call site, which is what the i18n check
+ * can see.
+ */
+export function plural(n, one, few, many) {
+  if (n === 1) return one();
+  if (pluralRules().select(n) === 'few') {
+    const text = few();
+    if (text !== null) return text;
+  }
+  return many();
+}
+
+let rules = null;
+function pluralRules() {
+  if (rules?.resolvedOptions().locale.toLowerCase() !== active.toLowerCase()) {
+    try {
+      rules = new Intl.PluralRules(active);
+    } catch {
+      rules = new Intl.PluralRules(DEFAULT_LOCALE);
+    }
+  }
+  return rules;
+}
+
 /** Whether a key has any translation at all, for a caller that wants to leave text alone. */
 export function hasTranslation(key) {
   return key in messages || key in fallback;
@@ -187,11 +232,13 @@ export function hasTranslation(key) {
  *
  * The seam between *how strings arrive* and *how they are used*. `useLocale` calls it after
  * fetching; a test calls it with `en.json` read off disk, which is how a module that builds
- * a sentence out of several keys can be checked without a browser.
+ * a sentence out of several keys can be checked without a browser -- with `code`, as that
+ * language, which is what decides its plural forms (`plural`).
  */
-export function installMessages(active, english = active) {
-  messages = active;
+export function installMessages(strings, english = strings, code = undefined) {
+  messages = strings;
   fallback = english;
+  if (code !== undefined) active = code;
 }
 
 async function fetchFile(code) {
