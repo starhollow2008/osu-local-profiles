@@ -271,6 +271,9 @@ export function startServer(opts: ServerOptions): http.Server {
    * unanswerable -- and that question is exactly what a too-tight filter produces.
    */
   opts.tracker.on('filtered', (play) => broadcast('filtered', play));
+  // A replay turned away as someone else's, or unreadable: the same reasoning. The tray
+  // launcher hides the console, so without this a wrongly refused play leaves no trace at all.
+  opts.tracker.on('refused', (play) => broadcast('refused', play));
   /*
    * A launch brought in what was played while the app was closed. Its own event rather than
    * `backfill`, because the page has to say so: this is the one import nobody pressed a
@@ -462,6 +465,9 @@ export function startServer(opts: ServerOptions): http.Server {
         // Plays the tracking filter has declined since the app started. They leave no row
         // anywhere, so this running count is the only record there is.
         playsFiltered: opts.tracker.playsFiltered,
+        // Replays refused as another player's or unreadable since the app started. The same:
+        // no row, so this count is the only record.
+        playsRefused: opts.tracker.playsRefused,
         // Whether that filter can actually turn a play away, decided by src/tracking-filter.ts
         // rather than by the page -- there is one definition of "this filter narrows something".
         filterNarrowing: filterNarrows(settings.trackingFilter),

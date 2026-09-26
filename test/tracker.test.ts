@@ -461,3 +461,52 @@ test('a play set while the app was closed is not tracked at launch', { timeout: 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+/*
+ * A replay that could not be read leaves no row, like one the filter declined -- so it has to
+ * be said, or the page cannot tell it from tracking having stopped. The tray launcher hides the
+ * console, so the event and the running count are the only trace the page gets.
+ */
+test('a replay that cannot be read is announced and counted, not dropped without a word', { timeout: 30_000 }, async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-refused-'));
+  const watchDir = path.join(tmp, 'watch');
+  fs.mkdirSync(watchDir);
+  const db = openDb(path.join(tmp, 'test.db'));
+  const profileId = getOrCreateProfile(db, 'Refusals');
+  const tracker = new Tracker({
+    db,
+    resolver: new BeatmapResolver(db, []),
+    installs: [{ kind: 'stable', root: tmp, replayDir: watchDir, beatmapRoots: [], onlineDb: null }],
+    profileId,
+    trackingSince: 0,
+    liveSince: 0,
+    official: null,
+  });
+
+  try {
+    const refused = new Promise<{ reason: string }>((resolve, reject) => {
+      tracker.on('refused', resolve);
+      tracker.on('score', () => reject(new Error('an unreadable replay was tracked')));
+      tracker.on('error', reject);
+      setTimeout(() => reject(new Error('nothing reported within 15s')), 15_000).unref();
+    });
+    tracker.start();
+    await new Promise((r) => setTimeout(r, 1200));
+
+    // A lazer replay's header and nothing after it: past the watcher's sniff, then unreadable.
+    const header = Buffer.alloc(5);
+    header.writeInt32LE(30000001, 1);
+    fs.writeFileSync(path.join(watchDir, 'truncated'), header);
+
+    assert.equal((await refused).reason, 'unparseable');
+    assert.equal(tracker.playsRefused, 1);
+    assert.equal(
+      (db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n,
+      0,
+    );
+  } finally {
+    tracker.stop();
+    db.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

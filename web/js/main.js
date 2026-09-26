@@ -218,6 +218,8 @@ let hiddenScoreCount = 0;
 /** Whether the play tracking filter can turn a play away, and how many it has. */
 let filterNarrowing = false;
 let playsFiltered = 0;
+/** Replays turned away since the app started, as another player's or unreadable. */
+let playsRefused = 0;
 /** Attempts osu! could not submit that this profile has recorded, counted or not. */
 let unsubmittedAttempts = 0;
 /** Which clients were found, so the page can say how the one being watched behaves. */
@@ -661,18 +663,23 @@ async function loadState() {
   renderStableNote();
   const kinds = installKinds.join(' + ') || t('menu.noClientFound');
   const session = { name: s.profile.name, kinds, n: s.scoresThisSession };
+  filterNarrowing = Boolean(s.filterNarrowing);
+  playsFiltered = s.playsFiltered ?? 0;
+  playsRefused = s.playsRefused ?? 0;
   $('optInfo').textContent =
     (s.scoresThisSession === 1
       ? t('menu.watchingOne', session)
       : t('menu.watchingMany', session)) +
-    // Only when there are any: a filter that is declining plays is the explanation for a score
-    // that never appeared, and it should not have to be gone looking for.
+    // Only when there are any: a filter that is declining plays, or a replay taken for someone
+    // else's, is the explanation for a score that never appeared, and it should not have to be
+    // gone looking for.
     (playsFiltered > 0
       ? t('menu.filteredOut', { n: playsFiltered })
+      : '') +
+    (playsRefused > 0
+      ? t('menu.notTracked', { n: playsRefused })
       : '');
 
-  filterNarrowing = Boolean(s.filterNarrowing);
-  playsFiltered = s.playsFiltered ?? 0;
   renderFilterMenu();
 
   setTracking(s.tracking);
@@ -3361,6 +3368,23 @@ on('filtered', (e) => {
     criterion: play.criterion,
     title: original(play.title, play.titleOriginal),
   }));
+  loadState();
+});
+/*
+ * A replay turned away as someone else's, or because it could not be read. Announced for the
+ * same reason: nothing is written, and a play of your own refused by mistake would otherwise
+ * just never appear. The name is the one in the replay, so a wrong one is recognisable.
+ */
+on('refused', (e) => {
+  const play = JSON.parse(e.data);
+  toast(
+    play.reason === 'another-player'
+      ? t('live.otherPlayer', {
+          player: play.player || t('live.someoneElse'),
+          title: original(play.title, play.titleOriginal),
+        })
+      : t('live.unreadable'),
+  );
   loadState();
 });
 on('tracking', (e) => setTracking(JSON.parse(e.data).tracking));

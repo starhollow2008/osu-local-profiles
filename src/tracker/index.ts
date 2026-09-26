@@ -68,7 +68,7 @@ export interface TrackerEvents {
    * counted, or -- `unsubmitted` -- one it had no token for and never counted.
    */
   incomplete: [IngestedIncomplete];
-  skip: [{ reason: string; detail?: string }];
+  skip: [{ reason: string }];
   /**
    * A play the profile's tracking filter turned away, which is deliberately not a `skip`: a
    * skip means the play was already here or could not be read, while this one is the user's
@@ -76,6 +76,14 @@ export interface TrackerEvents {
    * never written down, so it names the beatmap and the criterion.
    */
   filtered: [FilteredPlay];
+  /**
+   * A replay that arrived and was not tracked for a reason the user would want to hear about:
+   * someone else set it, or it could not be read. Its own event rather than a `skip` for the
+   * same reason as `filtered` -- nothing is written, so this is the only trace of it -- while
+   * the skips that are the app working as meant (a duplicate, a watched replay from before the
+   * launch) stay quiet.
+   */
+  refused: [RefusedPlay];
   error: [Error];
   /** How far the beatmap index has got; sent while it runs and once when it finishes. */
   indexing: [IndexState];
@@ -104,6 +112,19 @@ export interface FilteredPlay {
   kind: 'score' | 'incomplete';
   at: number;
 }
+
+/** A replay that was not tracked, and why. */
+export type RefusedPlay =
+  | {
+      reason: 'another-player';
+      /** The name written in the replay. */
+      player: string;
+      title: string;
+      /** The same beatmap in the song's own script, or null where it reads the same. */
+      titleOriginal: string | null;
+      at: number;
+    }
+  | { reason: 'unparseable'; at: number };
 
 /** The beatmap index, as the page shows it. */
 export interface IndexState extends IndexProgress {
@@ -192,6 +213,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   private added = 0;
   /** Plays the filter has turned away since the app started, so the dialog can say so. */
   private filtered = 0;
+  /** Replays turned away since the app started, as another player's or unreadable. */
+  private refused = 0;
   private index: IndexState = {
     active: false,
     visible: false,
@@ -257,6 +280,15 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    */
   get playsFiltered(): number {
     return this.filtered;
+  }
+
+  /**
+   * How many replays were not tracked since the app started because someone else set them or
+   * they could not be read. Running, like `playsFiltered`, and for the same reason: they leave
+   * no row, and a play the owner thinks was theirs must not just disappear.
+   */
+  get playsRefused(): number {
+    return this.refused;
   }
 
   /**
@@ -348,6 +380,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     this.opts.trackingSince = at;
     this.added = 0;
     this.filtered = 0;
+    this.refused = 0;
   }
 
   /**
@@ -362,6 +395,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       this.opts.trackingSince = trackingSince;
       this.added = 0;
       this.filtered = 0;
+      this.refused = 0;
     });
   }
 
@@ -905,8 +939,20 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           this.emit('score', result.score);
         } else if (result.status === 'filtered') {
           this.reportFiltered(result, 'score');
+        } else if (result.reason === 'another-player') {
+          this.refused++;
+          this.emit('refused', {
+            reason: result.reason,
+            player: result.player,
+            title: result.title,
+            titleOriginal: result.titleOriginal,
+            at: Date.now(),
+          });
+        } else if (result.reason === 'unparseable') {
+          this.refused++;
+          this.emit('refused', { reason: result.reason, at: Date.now() });
         } else {
-          this.emit('skip', { reason: result.reason, detail: result.player });
+          this.emit('skip', { reason: result.reason });
         }
       })
       .catch((e: unknown) => {

@@ -273,7 +273,12 @@ test("a replay somebody else set is never tracked, and says whose it was", async
       '/replays/mrekk.osr',
       ctx,
     );
-    assert.deepEqual(theirs, { status: 'skipped', reason: 'another-player', player: 'mrekk' });
+    // Named, map and all, because the page announces it: a refusal is the only skip that can be
+    // wrong, and a wrong one would otherwise be a play of your own that silently never arrived.
+    assert.equal(theirs.status, 'skipped');
+    assert.ok(theirs.status === 'skipped' && theirs.reason === 'another-player');
+    assert.equal(theirs.player, 'mrekk');
+    assert.ok(theirs.title.length > 0, 'the refusal says which map it was');
     assert.equal((h.db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n, 0);
 
     /*

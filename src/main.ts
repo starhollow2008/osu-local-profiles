@@ -314,14 +314,19 @@ async function main(): Promise<void> {
     console.log(`  [${time}] not tracked -- ${play.criterion.padEnd(13)} ${play.title}`);
   });
   /*
-   * A replay somebody else set. osu! caches the replays you watch beside the ones you play,
-   * so this is a normal thing to see -- but it has to be *seen*, because a profile quietly
-   * collecting other people's plays is exactly the failure this check exists to end.
+   * A replay somebody else set, or one that could not be read. osu! caches the replays you
+   * watch beside the ones you play, so the first is a normal thing to see -- but it has to be
+   * *seen*, because a profile quietly collecting other people's plays is exactly the failure
+   * the check exists to end, and a wrong refusal is a play of your own gone. The page says so
+   * too: the tray launcher hides this console.
    */
-  tracker.on('skip', (s) => {
-    if (s.reason !== 'another-player') return;
-    const time = new Date().toLocaleTimeString();
-    console.log(`  [${time}] not tracked -- set by ${s.detail || 'another player'}`);
+  tracker.on('refused', (play) => {
+    const time = new Date(play.at).toLocaleTimeString();
+    console.log(
+      play.reason === 'another-player'
+        ? `  [${time}] not tracked -- set by ${play.player || 'another player'}: ${play.title}`
+        : `  [${time}] not tracked -- a replay that could not be read`,
+    );
   });
   tracker.on('error', (e) => console.error(`  watcher error: ${explainWatchError(e)}`));
 

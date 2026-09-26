@@ -75,9 +75,19 @@ export type IngestOutcome =
   | { status: 'added'; score: IngestedScore }
   | {
       status: 'skipped';
-      reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed' | 'another-player';
-      /** Who set it, on `another-player`, so the console can name them rather than hint. */
-      player?: string;
+      reason: 'too-old' | 'duplicate' | 'deleted' | 'unparseable' | 'not-passed';
+    }
+  /**
+   * Set by somebody else. A skip, but the one skip that is a judgement rather than a fact, and
+   * a wrong one loses a real play -- so it carries who set it and which map, for the console
+   * and the page to say so rather than the play vanishing without a word.
+   */
+  | {
+      status: 'skipped';
+      reason: 'another-player';
+      player: string;
+      title: string;
+      titleOriginal: string | null;
     }
   /**
    * Turned away by the profile's play tracking filter, which is not the same event as a skip:
@@ -155,7 +165,12 @@ export async function ingestScore(
    */
   const player = replayPlayer(score);
   if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player) === false) {
-    return { status: 'skipped', reason: 'another-player', player: player.name.trim() };
+    return {
+      status: 'skipped',
+      reason: 'another-player',
+      player: player.name.trim(),
+      ...describe(ctx.resolver.resolve(score.beatmapMD5), score.beatmapMD5),
+    };
   }
 
   const key = dedupeKey(score);
