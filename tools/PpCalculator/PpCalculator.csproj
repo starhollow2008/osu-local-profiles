@@ -21,4 +21,13 @@
     <PackageReference Include="ppy.osu.Game.Rulesets.Catch" Version="2026.916.0" />
     <PackageReference Include="ppy.osu.Game.Rulesets.Mania" Version="2026.916.0" />
   </ItemGroup>
+  <!--
+    AutoMapper 13.0.1 comes from ppy.osu.Game, which uses it only to detach Realm objects. The
+    helper opens no Realm, so AutoMapper never runs here, and the advisory needs an attacker's
+    object graph mapped through it. Its fix (15.1.1) is not a drop-in: 15 changed licence and
+    API, and osu.Game is built against 13. Drop this when osu.Game moves past it.
+  -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+  </ItemGroup>
 </Project>
