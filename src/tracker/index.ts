@@ -6,8 +6,10 @@ import {
   BeatmapResolver,
   indexBeatmapFiles,
   indexOneFile,
+  refreshBeatmapStatuses,
   type IndexProgress,
   type IndexRoot,
+  type StatusRefresh,
 } from '../clients/beatmaps.ts';
 import { ReplayWatcher } from './watcher.ts';
 import { LogWatcher } from './log-watcher.ts';
@@ -877,6 +879,14 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       db.prepare('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(REDECODED_KEY, String(Date.now()));
     }
     return sum;
+  }
+
+  /**
+   * Bring played beatmaps' ranked status up to date with lazer's `online.db`, when it has
+   * changed since the last look -- see `refreshBeatmapStatuses`. Queued like every other write.
+   */
+  refreshStatuses(): Promise<StatusRefresh | null> {
+    return this.enqueue(async () => refreshBeatmapStatuses(this.opts.db, this.opts.resolver));
   }
 
   /** The osu! release the pp calculator comes from, or null when there is no calculator. */

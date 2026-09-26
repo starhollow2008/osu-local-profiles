@@ -71,6 +71,25 @@ export interface OnlineSetBeatmap {
   status: number | null;
 }
 
+/** What `online.db` knows of one beatmap. */
+export interface OnlineBeatmap {
+  beatmapId: number;
+  beatmapsetId: number;
+  status: number;
+}
+
+interface OnlineRow {
+  beatmap_id: number;
+  beatmapset_id: number;
+  approved: number;
+}
+
+const onlineBeatmap = (row: OnlineRow): OnlineBeatmap => ({
+  beatmapId: row.beatmap_id,
+  beatmapsetId: row.beatmapset_id,
+  status: row.approved,
+});
+
 export interface ResolvedBeatmap {
   md5: string;
   osuPath: string | null;
@@ -299,6 +318,90 @@ export function indexOneFile(db: Db, file: string): void {
   }
 }
 
+const ONLINE_STAMP_KEY = 'onlineDbStamp';
+
+/** What a status refresh changed. */
+export interface StatusRefresh {
+  /** Played beatmaps whose status, id or dates `online.db` now says something new about. */
+  beatmaps: number;
+  /** Tracked scores on them whose stored status, and so whether they count, was updated. */
+  scores: number;
+}
+
+/**
+ * Bring the ranked status of every played beatmap up to date with lazer's `online.db`.
+ *
+ * A beatmap's status is read from `online.db` once, when it is first played, and cached. But
+ * that file is a snapshot lazer downloads about once a month, so a map ranked since is not in
+ * it: the play was stored with no status -- counted like a never-submitted map, or greyed out
+ * on a profile that does not count those -- and it stayed that way after the snapshot had it.
+ *
+ * So when the file has changed since the last look (`onlineStamp`), every played beatmap is
+ * looked up again, in one opening of the file, and each one it now says something new about
+ * is updated with the scores on it. Their ranked dates are cleared to be read again the next
+ * time the play tracking filter needs them. pp is not touched: every play already has one,
+ * ranked or not, and status only decides whether it counts. Imported scores are left as osu!
+ * reported them. A beatmap the snapshot does not have keeps what it had.
+ *
+ * Synchronous, and one transaction: nothing can interleave with it on the shared connection.
+ * Null when there is no `online.db`, or it has not changed since the last time.
+ */
+export function refreshBeatmapStatuses(db: Db, resolver: BeatmapResolver): StatusRefresh | null {
+  const stamp = resolver.onlineStamp();
+  if (stamp === null) return null;
+  const seen = db.prepare('SELECT value FROM kv WHERE key = ?').get(ONLINE_STAMP_KEY) as
+    | { value: string }
+    | undefined;
+  if (seen?.value === stamp) return null;
+
+  const rows = db
+    .prepare('SELECT md5, beatmap_id, beatmapset_id, status, ranked_at FROM beatmaps')
+    .all() as {
+    md5: string;
+    beatmap_id: number | null;
+    beatmapset_id: number | null;
+    status: number | null;
+    ranked_at: number | null;
+  }[];
+  const online = resolver.onlineBeatmaps(rows.map((r) => r.md5));
+
+  const updateBeatmap = db.prepare(
+    `UPDATE beatmaps SET status = ?, beatmap_id = ?, beatmapset_id = ?, submitted_at = NULL, ranked_at = NULL
+      WHERE md5 = ?`,
+  );
+  const updateScores = db.prepare(
+    `UPDATE scores SET map_status = ?, ranked = CASE WHEN ? = 1 AND mods_ranked = 1 THEN 1 ELSE 0 END
+      WHERE beatmap_md5 = ? AND imported_at IS NULL AND (map_status IS NOT ? OR ranked IS NOT
+            (CASE WHEN ? = 1 AND mods_ranked = 1 THEN 1 ELSE 0 END))`,
+  );
+
+  const result: StatusRefresh = { beatmaps: 0, scores: 0 };
+  db.exec('BEGIN');
+  try {
+    for (const row of rows) {
+      const now = online.get(row.md5);
+      if (!now) continue;
+      const unchanged =
+        now.status === row.status &&
+        now.beatmapId === row.beatmap_id &&
+        now.beatmapsetId === row.beatmapset_id &&
+        // 0 is "looked, and online.db could not say": worth asking again now that it has the map.
+        row.ranked_at !== 0;
+      if (unchanged) continue;
+      updateBeatmap.run(now.status, now.beatmapId, now.beatmapsetId, row.md5);
+      const ranked = awardsPp(now.status) ? 1 : 0;
+      result.scores += Number(updateScores.run(now.status, ranked, row.md5, now.status, ranked).changes);
+      result.beatmaps++;
+    }
+    db.prepare('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(ONLINE_STAMP_KEY, stamp);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+  return result;
+}
+
 /**
  * Fill in the original-language artist and title for beatmaps cached before those columns
  * existed.
@@ -477,7 +580,7 @@ export function beatmapMode(file: string): Ruleset {
  *   local .osu index -> lazer's online.db -> the .osu file's own [Metadata] section.
  */
 export class BeatmapResolver {
-  private readonly onlineDbs: Db[] = [];
+  private readonly onlineDbPaths: string[] = [];
   private readonly db: Db;
 
   /**
@@ -489,16 +592,90 @@ export class BeatmapResolver {
    * src/calc/eligibility.ts.
    */
   get knowsStatus(): boolean {
-    return this.onlineDbs.length > 0;
+    return this.onlineDbPaths.length > 0;
   }
 
   constructor(db: Db, installs: OsuInstall[]) {
     this.db = db;
     for (const i of installs) {
       if (!i.onlineDb) continue;
+      // Opened once to prove it is a database this can read, and closed again: see fromOnline.
       const handle = openReadOnly(i.onlineDb);
-      if (handle) this.onlineDbs.push(handle);
+      if (!handle) continue;
+      handle.close();
+      this.onlineDbPaths.push(i.onlineDb);
     }
+  }
+
+  /**
+   * Ask each `online.db` in turn, opened for this one piece of work and closed straight after,
+   * until one answers (anything but `undefined`).
+   *
+   * Not held open for the app's lifetime, as it once was: an open handle stops lazer from
+   * refreshing the file. lazer rewrites it in place, asking Windows for exclusive access, once
+   * the copy is a month old -- and that fails while any other process has it open (measured).
+   * The app runs beside lazer for hours at a time, so the snapshot of ranked statuses it reads
+   * could simply never update. A lookup that meets the file mid-rewrite, or a layout without
+   * the table it asks for, finds nothing rather than failing the play being tracked.
+   */
+  private fromOnline<T>(lookup: (online: Db) => T | undefined): T | undefined {
+    for (const file of this.onlineDbPaths) {
+      const online = openReadOnly(file);
+      if (!online) continue;
+      try {
+        const answer = lookup(online);
+        if (answer !== undefined) return answer;
+      } catch {
+        /* being rewritten by lazer, or an older online.db without this table */
+      } finally {
+        online.close();
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * When each `online.db` was last written, or null with none: what says the snapshot of
+   * ranked statuses has changed since the app last read it (`refreshBeatmapStatuses`).
+   */
+  onlineStamp(): string | null {
+    if (this.onlineDbPaths.length === 0) return null;
+    return this.onlineDbPaths
+      .map((file) => {
+        try {
+          return `${file}@${fs.statSync(file).mtimeMs}`;
+        } catch {
+          return `${file}@missing`;
+        }
+      })
+      .join('|');
+  }
+
+  /**
+   * What `online.db` says about each of these beatmaps -- id, set and status -- for those it
+   * has, from one opening of each file however many there are.
+   */
+  onlineBeatmaps(md5s: readonly string[]): Map<string, OnlineBeatmap> {
+    const found = new Map<string, OnlineBeatmap>();
+    for (const file of this.onlineDbPaths) {
+      const online = openReadOnly(file);
+      if (!online) continue;
+      try {
+        const query = online.prepare(
+          'SELECT beatmap_id, beatmapset_id, approved FROM osu_beatmaps WHERE checksum = ?',
+        );
+        for (const md5 of md5s) {
+          if (found.has(md5)) continue;
+          const row = query.get(md5) as OnlineRow | undefined;
+          if (row) found.set(md5, onlineBeatmap(row));
+        }
+      } catch {
+        /* being rewritten by lazer: whatever it found so far stands */
+      } finally {
+        online.close();
+      }
+    }
+    return found;
   }
 
   /**
@@ -518,12 +695,13 @@ export class BeatmapResolver {
       .get(beatmapId) as { md5: string } | undefined;
     if (cached) return cached.md5;
 
-    for (const online of this.onlineDbs) {
-      const row = online
-        .prepare('SELECT checksum FROM osu_beatmaps WHERE beatmap_id = ?')
-        .get(beatmapId) as { checksum: string | null } | undefined;
-      if (row?.checksum) return row.checksum;
-    }
+    const online = this.fromOnline(
+      (o) =>
+        (o.prepare('SELECT checksum FROM osu_beatmaps WHERE beatmap_id = ?').get(beatmapId) as
+          | { checksum: string | null }
+          | undefined)?.checksum || undefined,
+    );
+    if (online) return online;
 
     // online.db is an optional downloaded cache. Local .osu metadata works on every platform.
     // An edited copy can retain BeatmapID with a different checksum, so reject ambiguity.
@@ -582,19 +760,15 @@ export class BeatmapResolver {
    * relying on a browser-ism holding in Node.
    */
   beatmapsetDates(beatmapsetId: number): BeatmapsetDates | null {
-    for (const online of this.onlineDbs) {
-      let row: { submit_date: string | null; approved_date: string | null } | undefined;
-      try {
-        row = online
+    return (
+      this.fromOnline((online) => {
+        const row = online
           .prepare('SELECT submit_date, approved_date FROM osu_beatmapsets WHERE beatmapset_id = ?')
-          .get(beatmapsetId) as typeof row;
-      } catch {
-        continue; // an older online.db with no such table
-      }
-      if (!row) continue;
-      return { submittedAt: parseOnlineDate(row.submit_date), rankedAt: parseOnlineDate(row.approved_date) };
-    }
-    return null;
+          .get(beatmapsetId) as { submit_date: string | null; approved_date: string | null } | undefined;
+        if (!row) return undefined;
+        return { submittedAt: parseOnlineDate(row.submit_date), rankedAt: parseOnlineDate(row.approved_date) };
+      }) ?? null
+    );
   }
 
   /**
@@ -603,7 +777,7 @@ export class BeatmapResolver {
    * ids, checksums, the `.osu` filename (which carries the difficulty name) and the status.
    */
   beatmapsInSet(beatmapsetId: number): OnlineSetBeatmap[] {
-    for (const online of this.onlineDbs) {
+    return this.fromOnline((online) => {
       const rows = online
         .prepare(
           `SELECT beatmap_id, checksum, filename, user_id, approved
@@ -616,7 +790,7 @@ export class BeatmapResolver {
         user_id: number | null;
         approved: number | null;
       }[];
-      if (rows.length === 0) continue;
+      if (rows.length === 0) return undefined;
       return rows.map((r) => ({
         beatmapId: r.beatmap_id,
         md5: r.checksum,
@@ -625,23 +799,19 @@ export class BeatmapResolver {
         userId: r.user_id,
         status: r.approved,
       }));
-    }
-    return [];
+    }) ?? [];
   }
 
   /** A mapper's username from `online.db`'s `users` table, or null. */
   username(userId: number): string | null {
-    for (const online of this.onlineDbs) {
-      try {
-        const row = online.prepare('SELECT username FROM users WHERE user_id = ?').get(userId) as
-          | { username: string }
-          | undefined;
-        if (row?.username) return row.username;
-      } catch {
-        /* an older online.db without the table */
-      }
-    }
-    return null;
+    return (
+      this.fromOnline(
+        (online) =>
+          (online.prepare('SELECT username FROM users WHERE user_id = ?').get(userId) as
+            | { username: string }
+            | undefined)?.username || undefined,
+      ) ?? null
+    );
   }
 
   /**
@@ -708,20 +878,11 @@ export class BeatmapResolver {
     };
 
     // online.db is authoritative for id and ranked status.
-    for (const online of this.onlineDbs) {
-      const row = online
-        .prepare(
-          'SELECT beatmap_id, beatmapset_id, approved FROM osu_beatmaps WHERE checksum = ?',
-        )
-        .get(md5) as
-        | { beatmap_id: number; beatmapset_id: number; approved: number }
-        | undefined;
-      if (row) {
-        result.beatmapId = row.beatmap_id;
-        result.beatmapsetId = row.beatmapset_id;
-        result.status = row.approved;
-        break;
-      }
+    const online = this.onlineBeatmaps([md5]).get(md5);
+    if (online) {
+      result.beatmapId = online.beatmapId;
+      result.beatmapsetId = online.beatmapsetId;
+      result.status = online.status;
     }
 
     // The .osu file fills in titles, and ids for maps online.db does not know about.

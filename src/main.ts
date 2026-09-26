@@ -392,6 +392,19 @@ async function main(): Promise<void> {
     }
 
     /*
+     * Ranked statuses brought up to date with lazer's online.db, a snapshot it downloads about
+     * once a month: a map ranked since the last one was stored with no status, and is put right
+     * once a newer snapshot has it. Only when the file has changed. See refreshBeatmapStatuses.
+     */
+    const statuses = await tracker.refreshStatuses().catch((e: Error) => {
+      console.log(`  ranked status refresh failed: ${e.message}`);
+      return null;
+    });
+    if (statuses && statuses.scores > 0) {
+      console.log(`  Ranked status updated for ${statuses.beatmaps} beatmap(s), from osu!lazer's newer beatmap list\n`);
+    }
+
+    /*
      * Plays stored wrongly by an older version, put right from their replays: ones on a
      * beatmap the index has only now found, and -- once -- stable plays whose mods were read
      * from part of their bitmask. After the index, which both need. See Tracker.repairScores.

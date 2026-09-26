@@ -16,6 +16,8 @@
 
 **`online.db`** is a plain SQLite file shipped by lazer: `osu_beatmaps(beatmap_id, beatmapset_id, checksum, approved, ...)`, ~234k rows, `checksum` = beatmap MD5. Open read-only, never write. Cross-platform; fetched asynchronously by lazer when absent, refreshed if >1 month old. Not guaranteed to exist on any platform.
 
+**Never hold `online.db` open.** lazer refreshes it in place with `File.OpenWrite` (exclusive), which on Windows fails while another process has it open - measured. The resolver once held it for the app's lifetime, so a snapshot could never update while the app ran beside lazer. `BeatmapResolver.fromOnline` opens it per lookup; `onlineBeatmaps` once per batch. Holds only ranked, approved and loved sets, so a map ranked after the snapshot has no status: `refreshBeatmapStatuses` re-reads every played beatmap when the file's mtime changes (`onlineDbStamp` in `kv`) and updates `scores.map_status`/`ranked`. No pp recalculation - pp exists for every play regardless of status.
+
 **A `.osu` section ends at the next line beginning with `[`, never at the next `[`** (`osuSection` in `src/clients/beatmaps.ts`). `[` is ordinary inside values - mappers like `cRyo[iceeicee]`, artists tagged `[CV. …]`, audio files named `[HD] …`. The old rule lost or corrupted 327 of 12,811 beatmap names here and filed 23 beatmaps under the wrong mode (roadmap 5.45).
 
 ## pp: osu!'s own code
