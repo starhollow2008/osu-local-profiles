@@ -487,7 +487,8 @@ language** - which are about the install rather than any one profile, and are sa
 
 ### Include pp for unranked mods
 
-Off by default. On, it counts plays osu! refuses to rank because of their mods:
+On by default for a profile made from 1.24.0; a profile from before then keeps osu!'s own rule
+(off) until you change it. On, it counts plays osu! refuses to rank because of their mods:
 
 - **Relax and Autopilot.**
 - **Customised rates** - DT at 1.45x, HT at 0.5x, and so on.
@@ -498,14 +499,15 @@ Relax and Autopilot can be priced two ways, and they are far apart:
 
 | | one real RX replay | one real AP replay |
 |---|---|---|
-| **As if the mod were off** (default) | 7.83 stars, 239pp | 4.45 stars, 101pp |
-| **As osu! scores them** | 6.26 stars, 111pp | 3.14 stars, 57pp |
+| **As osu! scores them** (default) | 6.26 stars, 111pp | 3.14 stars, 57pp |
+| **As if the mod were off** | 7.83 stars, 239pp | 4.45 stars, 101pp |
 
 Both numbers come from osu!'s own difficulty and performance calculators - osu!'s difficulty
 calculation is relax-aware, which is why the two disagree by more than 2x. The default is the
-first, because "relax counts as nomod, relax + DT counts as DT" is usually what people mean. It
-does flatter the score: a relax run reaches accuracy and combo the same player could not reach
-by hand.
+first: what osu!'s own calculator says the play is worth. The second makes "relax counts as
+nomod, relax + DT counts as DT" true, but it flatters the score: a relax run reaches accuracy and
+combo the same player could not reach by hand. A profile made before 1.25.0 keeps the second,
+which was the default then, until you change it.
 
 Both values are stored for every score, so switching between them is instant.
 

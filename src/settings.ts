@@ -39,12 +39,14 @@ export interface Settings {
   /**
    * How to price a Relax or Autopilot play once they are being counted.
    *
-   * `without-the-mod` scores the play's hits as if the mod had been off, which is what
-   * makes "relax counts as nomod, relax + DT counts as DT" true. `as-played` uses osu!'s
-   * own relax-aware difficulty and performance calculation instead. Both come from osu!'s
-   * code and both are stored, so switching is instant -- but they are far apart (111pp
+   * `as-played` is osu!'s own relax-aware difficulty and performance calculation, and the
+   * default: what osu!'s calculator says a play is worth is the answer until the user asks
+   * for another. `without-the-mod` scores the play's hits as if the mod had been off, which
+   * is what makes "relax counts as nomod, relax + DT counts as DT" true. Both come from
+   * osu!'s code and both are stored, so switching is instant -- but they are far apart (111pp
    * against 239pp on one real replay), because a relax play's accuracy and combo are not
-   * what the same player could reach by hand.
+   * what the same player could reach by hand. A profile from before this default keeps the
+   * one it had (`pinRelaxPricing` in src/db/index.ts).
    */
   unrankedModPp: 'without-the-mod' | 'as-played';
   /**
@@ -251,8 +253,8 @@ const DEFS: Defs = {
     coerce: (raw) => raw === true || raw === 'true' || raw === 1 || raw === '1',
   },
   unrankedModPp: {
-    default: 'without-the-mod',
-    coerce: (raw) => (raw === 'as-played' ? 'as-played' : 'without-the-mod'),
+    default: 'as-played',
+    coerce: (raw) => (raw === 'without-the-mod' ? 'without-the-mod' : 'as-played'),
   },
   aboutMe: {
     default: '',

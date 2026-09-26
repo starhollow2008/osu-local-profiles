@@ -273,3 +273,34 @@ test('a profile from before those defaults keeps counting what it counted, once 
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+/*
+ * Relax and Autopilot are priced as osu! prices them by default. A profile from before that
+ * default keeps "as if the mod were off", which it was made under: its relax plays' pp would
+ * otherwise roughly halve on an update it did not ask for.
+ */
+test('relax is priced as osu! prices it by default, and older profiles keep their pricing', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-settings-relax-'));
+  const file = path.join(tmp, 'test.db');
+  try {
+    let db = openDb(file);
+    const untouched = getOrCreateProfile(db, 'Never chose');
+    const chose = getOrCreateProfile(db, 'Chose osu! pricing');
+    updateSettings(db, chose, { unrankedModPp: 'as-played' });
+    db.prepare("DELETE FROM kv WHERE key = 'relaxPricingPinned'").run();
+    db.prepare("DELETE FROM profile_settings WHERE profile_id = ? AND key = 'unrankedModPp'").run(untouched);
+    db.close();
+
+    db = openDb(file);
+    assert.equal(getSettings(db, untouched).unrankedModPp, 'without-the-mod');
+    assert.equal(getSettings(db, chose).unrankedModPp, 'as-played');
+
+    const fresh = getOrCreateProfile(db, 'Made after the update');
+    db.close();
+    db = openDb(file);
+    assert.equal(getSettings(db, fresh).unrankedModPp, 'as-played');
+    db.close();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

@@ -104,6 +104,7 @@ function migrate(db: Db): void {
   // the loop above has added it, and schema.sql runs first.
   db.exec('CREATE INDEX IF NOT EXISTS osu_files_name ON osu_files (name)');
   pinCountingDefaults(db);
+  pinRelaxPricing(db);
 }
 
 const COUNTING_PINNED = 'countingDefaultsPinned';
@@ -130,6 +131,29 @@ function pinCountingDefaults(db: Db): void {
     pin.run('includeUnrankedMods', 'false');
     pin.run('includeUnrankedMaps', '[]');
     db.prepare('INSERT INTO kv (key, value) VALUES (?, ?)').run(COUNTING_PINNED, String(Date.now()));
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+const RELAX_PRICING_PINNED = 'relaxPricingPinned';
+
+/**
+ * Relax and Autopilot are priced as osu! prices them by default -- for a profile made from
+ * this version on. Until then the default was "as if the mod were off", and a profile that
+ * never chose keeps it, for the reason above: a relax play's pp roughly halving on an update
+ * is a change nobody asked for. Stored as a JSON string, as settings store every value.
+ */
+function pinRelaxPricing(db: Db): void {
+  if (db.prepare('SELECT 1 AS hit FROM kv WHERE key = ?').get(RELAX_PRICING_PINNED)) return;
+  db.exec('BEGIN');
+  try {
+    db.prepare(
+      'INSERT OR IGNORE INTO profile_settings (profile_id, key, value) SELECT id, ?, ? FROM profiles',
+    ).run('unrankedModPp', JSON.stringify('without-the-mod'));
+    db.prepare('INSERT INTO kv (key, value) VALUES (?, ?)').run(RELAX_PRICING_PINNED, String(Date.now()));
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');

@@ -510,7 +510,7 @@
   "setting.importWhileClosedHint": "Off by default. Closing the app is how you stop tracking, so a launch normally brings in nothing from the time it was shut. Turn this on and each launch imports what was played while it was closed - back to when it last ran, never further, and never past this profile's own start. The play tracking filter still applies, and Options → Import past plays is still there for one evening at a time.",
   "setting.noStatusSource": "No osu!lazer installation was found, and osu!stable does not record a beatmap’s status, so every beatmap already counts and these have no effect.",
   "setting.priceRelax": "Price relax plays",
-  "setting.priceRelaxHint": "Relax and Autopilot only. \"As if the mod were off\" makes relax count as nomod and relax + DT count as DT, which is usually what people mean - but it flatters the score, because a relax run reaches accuracy and combo the player could not by hand. Both numbers come from osu! itself and both are stored, so switching is instant.",
+  "setting.priceRelaxHint": "Relax and Autopilot only. \"As osu! scores them\" is osu!'s own pp calculator, which knows the mod was on. \"As if the mod were off\" makes relax count as nomod and relax + DT count as DT - but it flatters the score, because a relax run reaches accuracy and combo the player could not by hand. Both numbers come from osu! itself and both are stored, so switching is instant.",
   "setting.saved": "Settings saved",
   "setting.savedRejected": "Saved - {fields} was not valid and was cleared",
   "setting.showEveryAttempt": "show every attempt",

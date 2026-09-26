@@ -120,9 +120,10 @@ const SETTINGS_FIELDS = [
     type: 'choice',
     label: () => t('setting.priceRelax'),
     dependsOn: 'includeUnrankedMods',
+    // osu!'s own pricing first: it is the default, and the other is the one a user opts into.
     options: [
-      ['without-the-mod', () => t('setting.asIfModOff')],
       ['as-played', () => t('setting.asOsuScores')],
+      ['without-the-mod', () => t('setting.asIfModOff')],
     ],
     hint: () =>
       t('setting.priceRelaxHint'),

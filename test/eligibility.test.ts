@@ -54,8 +54,8 @@ test('a new profile counts every unranked mod and beatmap by default', () => {
   assert.deepEqual(rules({}), {
     ...VANILLA,
     includeUnrankedMods: true,
-    // Relax and Autopilot priced as if the mod were off, the basis the user asked for.
-    preferStrippedPp: true,
+    // Relax and Autopilot priced as osu!'s calculator prices them, until the user asks otherwise.
+    preferStrippedPp: false,
     // Every status there is: loved, qualified, pending, WIP, graveyard and never submitted.
     extraMapStatuses: [
       Status.GRAVEYARD, Status.WIP, Status.PENDING, Status.QUALIFIED, Status.LOVED, UNRESOLVED_STATUS,
@@ -68,11 +68,11 @@ test('the pp basis only applies while unranked mods are counted at all', () => {
   // osu!'s own rules in all but one respect: attempts osu! could not submit count by default,
   // because osu! never received them to count.
   assert.deepEqual(official({}), { ...VANILLA, countUnsubmitted: true });
-  // The default basis is the "as if the mod were off" one the user asked for.
-  assert.equal(rules({ includeUnrankedMods: true }).preferStrippedPp, true);
+  // The default basis is osu!'s own; "as if the mod were off" is the one a user picks.
+  assert.equal(rules({ includeUnrankedMods: true }).preferStrippedPp, false);
   assert.equal(
-    rules({ includeUnrankedMods: true, unrankedModPp: 'as-played' }).preferStrippedPp,
-    false,
+    rules({ includeUnrankedMods: true, unrankedModPp: 'without-the-mod' }).preferStrippedPp,
+    true,
   );
   // Off, the basis is irrelevant and must not leak into an otherwise-official profile.
   assert.equal(official({ unrankedModPp: 'without-the-mod' }).preferStrippedPp, false);
@@ -145,13 +145,13 @@ test('by default only what osu! would rank counts', () => {
   }
 });
 
-test('including unranked mods brings relax in at its stripped pp', () => {
+test('including unranked mods priced without them brings relax in at its stripped pp', () => {
   const h = harness();
   try {
     h.add({ md5: 'ranked', pp: 100 });
     h.add({ md5: 'relax', pp: 50, ppNomod: 400, modsRanked: false, mods: '[{"acronym":"RX"}]' });
 
-    const e = rules({ includeUnrankedMods: true });
+    const e = rules({ includeUnrankedMods: true, unrankedModPp: 'without-the-mod' });
     const top = topPlays(h.db, h.profileId, 0, 100, e);
     assert.deepEqual(top.map((p) => [p.beatmapMd5, p.pp]), [['relax', 400], ['ranked', 100]]);
     assert.equal(top[0]!.ppBasis, 'without-unranked-mods');
@@ -164,18 +164,12 @@ test('including unranked mods brings relax in at its stripped pp', () => {
   }
 });
 
-test('the as-played basis uses osu!s own relax pp instead', () => {
+test('by default relax is priced by osu!s own relax-aware calculator', () => {
   const h = harness();
   try {
     h.add({ md5: 'relax', pp: 50, ppNomod: 400, modsRanked: false, mods: '[{"acronym":"RX"}]' });
 
-    const top = topPlays(
-      h.db,
-      h.profileId,
-      0,
-      100,
-      rules({ includeUnrankedMods: true, unrankedModPp: 'as-played' }),
-    );
+    const top = topPlays(h.db, h.profileId, 0, 100, rules({ includeUnrankedMods: true }));
     assert.equal(top[0]!.pp, 50);
     assert.equal(top[0]!.ppBasis, 'as-played');
   } finally {
