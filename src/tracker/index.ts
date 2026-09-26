@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import path from 'node:path';
 import type { Db } from '../db/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
 import {
@@ -11,6 +12,7 @@ import {
 import { ReplayWatcher } from './watcher.ts';
 import { LogWatcher } from './log-watcher.ts';
 import { buildMcosuReplays, McosuWatcher } from './mcosu-watcher.ts';
+import { SongsWatcher } from './songs-watcher.ts';
 import { logDirOf, type ResolvedLoggedPlay, type SessionAttempt } from '../clients/lazer-log.ts';
 import {
   checkIncompletePlay,
@@ -26,10 +28,13 @@ import { scanForReplays, type BackfillScan } from './backfill.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
 import {
   countStale,
+  foundBeatmapIds,
   markRecalculatedFor,
+  misdecodedIds,
   recalculatedFor,
   recalculationBatches,
   recomputeScores,
+  toBatches,
   type RecomputeResult,
 } from './recompute.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
@@ -112,6 +117,9 @@ export interface FilteredPlay {
   kind: 'score' | 'incomplete';
   at: number;
 }
+
+/** Recorded once the stored stable mods have been decoded again with every bit. */
+const REDECODED_KEY = 'legacyModsRedecoded';
 
 /** A replay that was not tracked, and why. */
 export type RefusedPlay =
@@ -205,6 +213,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   private watcher: ReplayWatcher | null = null;
   private logWatcher: LogWatcher | null = null;
   private mcosuWatchers: McosuWatcher[] = [];
+  private songsWatcher: SongsWatcher | null = null;
   private enabled = false;
   /** When this run started watching. Zero until `start()` -- see `liveCutoff`. */
   private liveSince = 0;
@@ -456,6 +465,26 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       void watcher.start();
     }
 
+    /*
+     * osu!stable's Songs folder, so a beatmap downloaded mid-session is indexed before a play
+     * on it needs its file. lazer's new beatmaps land in the store watched above. McOsu reads
+     * a stable Songs folder, usually stable's own, so each folder is watched once.
+     */
+    const songs = this.opts.installs
+      .filter((i) => i.kind !== 'lazer')
+      .flatMap((i) => i.beatmapRoots)
+      .filter((p, n, all) => all.findIndex((o) => path.resolve(o).toLowerCase() === path.resolve(p).toLowerCase()) === n);
+    if (songs.length > 0) {
+      const songsWatcher = new SongsWatcher({
+        db: this.opts.db,
+        roots: songs,
+        onError: (e) => this.emit('error', e),
+      });
+      songsWatcher.start();
+      this.songsWatcher = songsWatcher;
+      this.opts.resolver.onMiss = () => songsWatcher.flush();
+    }
+
     this.enabled = true;
   }
 
@@ -466,6 +495,9 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     this.logWatcher = null;
     for (const w of this.mcosuWatchers) w.stop();
     this.mcosuWatchers = [];
+    this.songsWatcher?.stop();
+    this.songsWatcher = null;
+    this.opts.resolver.onMiss = null;
     this.enabled = false;
   }
 
@@ -807,6 +839,44 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     const result = await this.recalculate(true);
     markRecalculatedFor(this.opts.db, release);
     return { release, result };
+  }
+
+  /**
+   * Put right, from the replays, what an older version stored wrongly. Run after the beatmap
+   * index, because both repairs depend on it:
+   *
+   * - every launch, plays on a beatmap whose file the index has found since they were stored
+   *   as unknown -- see `foundBeatmapIds`;
+   * - once, osu!stable and McOsu plays whose mods were decoded from only part of their
+   *   bitmask, ScoreV2 among them -- see `misdecodedIds`.
+   *
+   * Queued a step at a time like a recalculation, so a play set meanwhile is not held up, and
+   * unannounced on the page: it touches only the rows that were wrong. Null with no calculator,
+   * which leaves the once-only pass for a launch that has one.
+   */
+  async repairScores(): Promise<RecomputeResult | null> {
+    const official = this.opts.official;
+    if (!official) return null;
+    const db = this.opts.db;
+    const redecode = db.prepare('SELECT 1 AS hit FROM kv WHERE key = ?').get(REDECODED_KEY) === undefined;
+    const rows = [...foundBeatmapIds(db), ...(redecode ? misdecodedIds(db) : [])].sort(
+      (a, b) => a.profile_id - b.profile_id,
+    );
+
+    const sum: RecomputeResult = { considered: 0, updated: 0, skipped: 0, gainedPp: 0 };
+    for (const batch of toBatches(rows)) {
+      const step = await this.enqueue(() =>
+        recomputeScores({ db, resolver: this.opts.resolver, profileId: batch.profileId, official, ids: batch.ids }),
+      );
+      sum.considered += step.considered;
+      sum.updated += step.updated;
+      sum.skipped += step.skipped;
+      sum.gainedPp += step.gainedPp;
+    }
+    if (redecode) {
+      db.prepare('INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)').run(REDECODED_KEY, String(Date.now()));
+    }
+    return sum;
   }
 
   /** The osu! release the pp calculator comes from, or null when there is no calculator. */

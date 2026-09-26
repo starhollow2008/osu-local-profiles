@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import type { Db } from '../db/index.ts';
-import { parseReplay, type LazerMod } from '../osr.ts';
+import { parseReplay, parseReplayHeader, type LazerMod } from '../osr.ts';
 import { awardsPp, UNRESOLVED_STATUS, type BeatmapResolver } from '../clients/beatmaps.ts';
 import {
   calculateScorePp,
+  decodeLegacyMods,
   modsCountable,
   modsLabel,
   rankedByOsu,
@@ -213,8 +214,8 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
  * judged by the old hand-kept list, and stale for ever: the page would keep offering a
  * recompute that can never finish it.
  *
- * An osu!stable score's stored mods are what decodeLegacyMods reads, which leaves out mania's
- * key-count and Random bits. The replay, when there is one, carries them all.
+ * An osu!stable score's stored mods are what decodeLegacyMods read when it was tracked; the
+ * replay, when there is one, is the authority.
  */
 async function recheckStoredMods(
   row: StoredRow,
@@ -272,9 +273,88 @@ export function recalculationBatches(db: Db, outdatedFor: string | null): Recalc
           .prepare(`SELECT s.id, s.profile_id FROM scores s WHERE ${outdatedPpSql('s')} ORDER BY s.profile_id, s.played_at`)
           .all(outdatedFor)
   ) as { id: number; profile_id: number }[];
+  return toBatches(rows);
+}
 
+/* ------------------------------------------------ repairs, from the replays */
+
+/**
+ * Scores stored without their beatmap's file, whose file the index has found since.
+ *
+ * A play on a beatmap the index did not have yet -- one osu!stable extracted mid-session,
+ * before anything watched its Songs folder -- was stored as an unknown beatmap with no pp,
+ * and nothing ever looked again. Now `BeatmapResolver.resolve` does look again, so
+ * recalculating these is all it takes. Cheap enough to ask on every launch: it is one query,
+ * and it finds nothing once they are put right.
+ */
+export function foundBeatmapIds(db: Db): { id: number; profile_id: number }[] {
+  return db
+    .prepare(
+      `SELECT s.id, s.profile_id FROM scores s JOIN beatmaps b ON b.md5 = s.beatmap_md5
+        WHERE b.osu_path IS NULL AND s.replay_path IS NOT NULL AND s.imported_at IS NULL
+          AND EXISTS (SELECT 1 FROM osu_files f WHERE f.md5 = s.beatmap_md5)
+        ORDER BY s.profile_id, s.played_at`,
+    )
+    .all() as { id: number; profile_id: number }[];
+}
+
+/**
+ * osu!stable and McOsu scores whose stored mods an older version decoded wrongly.
+ *
+ * `decodeLegacyMods` once read only the first fifteen bits and ignored the ruleset, so a
+ * ScoreV2 play was stored as nomod and a mania one lost its key count. Which scores that
+ * touched is decided from each replay's own bitmask -- the old reading is the new one given
+ * only those fifteen bits in osu!standard, which has a mod for every one of them -- so only
+ * the rows it actually changes are recalculated. Reads a few hundred bytes of each replay.
+ */
+export function misdecodedIds(
+  db: Db,
+  readHeader: (file: string) => { mode: number; legacyMods: number } | null = readReplayHeader,
+): { id: number; profile_id: number }[] {
+  const rows = db
+    .prepare(
+      `SELECT id, profile_id, replay_path FROM scores
+        WHERE client IN ('stable', 'mcosu') AND replay_path IS NOT NULL AND imported_at IS NULL
+        ORDER BY profile_id, played_at`,
+    )
+    .all() as { id: number; profile_id: number; replay_path: string }[];
+  const label = (mods: LazerMod[]) => mods.map((m) => m.acronym).join(',');
+  return rows.filter((row) => {
+    const header = readHeader(row.replay_path);
+    if (header === null) return false;
+    const before = decodeLegacyMods(header.legacyMods & 0x7fff, 0);
+    return label(before) !== label(decodeLegacyMods(header.legacyMods, header.mode));
+  });
+}
+
+/** A replay file's ruleset and mod bitmask, from its first bytes; null when it cannot be read. */
+export function readReplayHeader(file: string): { mode: number; legacyMods: number } | null {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const buf = Buffer.alloc(512);
+    const read = fs.readSync(fd, buf, 0, buf.length, 0);
+    return parseReplayHeader(buf.subarray(0, read));
+  } catch {
+    return null;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        fs.closeSync(fd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+}
+
+/** Rows as recalculation steps, one profile at a time, in the order given. Duplicates are dropped. */
+export function toBatches(rows: { id: number; profile_id: number }[]): RecalculateBatch[] {
+  const seen = new Set<number>();
   const batches: RecalculateBatch[] = [];
   for (const row of rows) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
     const last = batches.at(-1);
     if (last && last.profileId === row.profile_id && last.ids.length < RECALCULATE_BATCH) {
       last.ids.push(row.id);

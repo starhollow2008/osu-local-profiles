@@ -130,6 +130,22 @@ function inflateLzma(block: Buffer): Promise<string> {
 }
 
 /**
+ * A replay's ruleset and stable mod bitmask, read from its first few hundred bytes -- the
+ * fields before the life bar, which is where a replay stops having a bounded size. For a pass
+ * over many stored replays that needs only their mods, without reading each one whole.
+ */
+export function parseReplayHeader(buf: Buffer): { mode: Ruleset; version: number; legacyMods: number } {
+  const c = new Cursor(buf);
+  const mode = c.byte() as Ruleset;
+  const version = c.int();
+  c.string();                       // beatmap MD5
+  c.string();                       // player name
+  c.string();                       // replay MD5
+  c.skip(6 * 2 + 4 + 2 + 1);        // judgement counts, total score, max combo, perfect
+  return { mode, version, legacyMods: c.int() };
+}
+
+/**
  * Parse a replay. Replay *frames* are skipped entirely -- pp needs only the score
  * summary, and the frame stream is the bulk of the file.
  */

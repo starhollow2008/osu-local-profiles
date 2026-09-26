@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb, getOrCreateProfile } from '../src/db/index.ts';
-import { BeatmapResolver, indexBeatmapFiles, type IndexProgress } from '../src/clients/beatmaps.ts';
+import { BeatmapResolver, indexBeatmapFiles, indexOneFile, type IndexProgress } from '../src/clients/beatmaps.ts';
 import { Tracker, type IndexState } from '../src/tracker/index.ts';
 
 /*
@@ -228,6 +229,56 @@ test('nothing queued behind the index runs before it has finished', async () => 
     assert.equal(h.count('osu_files'), 1);
     // The page is told when it ends, so the notice can go.
     assert.equal(states[states.length - 1]!.active, false);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * A beatmap looked up before its file was indexed used to stay unknown for good: the miss was
+ * cached like an answer, so a play on a map osu!stable had just extracted -- every multiplayer
+ * pick you did not have -- kept "Unknown beatmap" and no pp through every restart.
+ */
+test('a beatmap missing when first looked up is found once its file is indexed', () => {
+  const h = harness();
+  try {
+    const content = `${OSU('Fresh Download', 77)}Artist:Someone\r\nCreator:mapper\r\nVersion:Insane\r\n`;
+    const md5 = crypto.createHash('md5').update(content).digest('hex');
+    const resolver = new BeatmapResolver(h.db, []);
+
+    assert.equal(resolver.resolve(md5).osuPath, null, 'nothing indexed yet');
+
+    const file = h.file('Songs/1 Someone - Fresh Download/map.osu', content);
+    indexOneFile(h.db, file);
+    const found = resolver.resolve(md5);
+    assert.equal(found.osuPath, file);
+    assert.equal(found.title, 'Fresh Download');
+    assert.equal(found.beatmapId, 77);
+    // And the cache now holds the answer, not the miss.
+    assert.equal(new BeatmapResolver(h.db, []).resolve(md5).osuPath, file);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a miss gives the resolver one chance to index what has just arrived', () => {
+  const h = harness();
+  try {
+    const content = OSU('Just Extracted');
+    const md5 = crypto.createHash('md5').update(content).digest('hex');
+    const file = h.file('Songs/2 Set/map.osu', content);
+    const resolver = new BeatmapResolver(h.db, []);
+    let asked = 0;
+    resolver.onMiss = () => {
+      asked++;
+      indexOneFile(h.db, file);
+    };
+
+    assert.equal(resolver.resolve(md5).osuPath, file);
+    assert.equal(asked, 1);
+    // Found now, so a second lookup does not ask again.
+    resolver.resolve(md5);
+    assert.equal(asked, 1);
   } finally {
     h.cleanup();
   }

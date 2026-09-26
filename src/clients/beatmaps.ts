@@ -644,11 +644,40 @@ export class BeatmapResolver {
     return null;
   }
 
+  /**
+   * Asked before a beatmap is given up as having no local file, so whatever has just arrived on
+   * disk can be indexed first. The tracker points it at the Songs watcher (`SongsWatcher.flush`):
+   * osu!stable's `Songs` is not watched for replays, so a map downloaded moments before it is
+   * played -- constantly, in multiplayer -- may not be in the index yet.
+   */
+  onMiss: (() => void) | null = null;
+
+  /** The indexed `.osu` for this MD5, after giving `onMiss` one chance to index it. */
+  private localFile(md5: string): string | null {
+    const find = () =>
+      (this.db.prepare('SELECT path FROM osu_files WHERE md5 = ? LIMIT 1').get(md5) as
+        | { path: string }
+        | undefined)?.path ?? null;
+    const found = find();
+    if (found !== null || !this.onMiss) return found;
+    this.onMiss();
+    return find();
+  }
+
   resolve(md5: string): ResolvedBeatmap {
     const cached = this.db.prepare('SELECT * FROM beatmaps WHERE md5 = ?').get(md5) as
       | Record<string, string | number | null>
       | undefined;
-    if (cached) {
+    /*
+     * A beatmap with no local file is cached too -- online.db may still know its id and status
+     * -- but a miss is not the last word. It used to be: a map downloaded mid-session and played
+     * before the index had it stayed "Unknown beatmap" with no pp for good, through every restart
+     * and every recalculation. Now a cached miss is looked up again, and resolved properly the
+     * moment its file is indexed.
+     */
+    const osuPath =
+      cached && cached['osu_path'] !== null ? (cached['osu_path'] as string) : this.localFile(md5);
+    if (cached && (cached['osu_path'] !== null || osuPath === null)) {
       return {
         md5,
         osuPath: (cached['osu_path'] as string | null) ?? null,
@@ -664,13 +693,9 @@ export class BeatmapResolver {
       };
     }
 
-    const fileRow = this.db
-      .prepare('SELECT path FROM osu_files WHERE md5 = ? LIMIT 1')
-      .get(md5) as { path: string } | undefined;
-
     const result: ResolvedBeatmap = {
       md5,
-      osuPath: fileRow?.path ?? null,
+      osuPath,
       beatmapId: null,
       beatmapsetId: null,
       status: null,

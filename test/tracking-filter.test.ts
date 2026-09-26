@@ -163,6 +163,18 @@ test('an osu!stable play is matched on what the player chose, without Classic', 
   assert.equal(filterRejects(exactDt, { ...facts, mods: [{ acronym: 'DT' }] }), null);
 });
 
+/*
+ * A stable ScoreV2 play now carries SV2 in its mods. The page never offers ScoreV2 in the
+ * filter, so it cannot turn a play into "a play with mods" and have the nomod chip decline it.
+ */
+test('ScoreV2 is not a mod as far as the filter is concerned', () => {
+  const onlyNomod = filter({ noMod: 'required' });
+  assert.equal(filterRejects(onlyNomod, { ...facts, mods: [{ acronym: 'SV2' }] }), null);
+  assert.equal(filterRejects(onlyNomod, { ...facts, mods: [{ acronym: 'HD' }, { acronym: 'SV2' }] }), 'mods');
+  const neverNomod = filter({ noMod: 'excluded' });
+  assert.equal(filterRejects(neverNomod, { ...facts, mods: [{ acronym: 'SV2' }] }), 'mods');
+});
+
 test('how a mod was configured is not part of the comparison', () => {
   const dt = filter({ mods: { DT: 'required' } });
   const customised = [{ acronym: 'DT', settings: { speed_change: 1.35 } }];

@@ -455,7 +455,8 @@ export function mcosuMods(legacyMods: number, facts: McosuFacts, base: BaseDiffi
     if (speed !== SLOWER.default) rate = speed;
   }
   const bits = (legacyMods & ~(DT | NC | HT | NIGHTMARE_BIT)) | rateBit;
-  const mods: LazerMod[] = decodeLegacyMods(bits).map((m) =>
+  // McOsu is osu!standard only.
+  const mods: LazerMod[] = decodeLegacyMods(bits, 0).map((m) =>
     rate !== null && (m.acronym === 'DT' || m.acronym === 'NC' || m.acronym === 'HT')
       ? { acronym: m.acronym, settings: { speed_change: rate } }
       : m,

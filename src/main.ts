@@ -392,6 +392,22 @@ async function main(): Promise<void> {
     }
 
     /*
+     * Plays stored wrongly by an older version, put right from their replays: ones on a
+     * beatmap the index has only now found, and -- once -- stable plays whose mods were read
+     * from part of their bitmask. After the index, which both need. See Tracker.repairScores.
+     */
+    const repaired = await tracker.repairScores().catch((e: Error) => {
+      console.log(`  score repair failed: ${e.message}`);
+      return null;
+    });
+    if (repaired && repaired.considered > 0) {
+      console.log(
+        `  Put right ${repaired.considered} score(s) stored before this version could read them fully` +
+          `${repaired.gainedPp > 0 ? ` (${repaired.gainedPp} now have pp)` : ''}\n`,
+      );
+    }
+
+    /*
      * An update that brings a new osu! release -- a pp rework, typically -- reprices what the
      * old one priced, on its first launch, so no profile ranks scores from two algorithms
      * against each other. After the index for the reason above: a beatmap not yet indexed

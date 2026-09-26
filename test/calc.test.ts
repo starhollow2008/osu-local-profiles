@@ -66,15 +66,42 @@ test('level derives from total score', () => {
 });
 
 test('legacy mod bitmask decodes, collapsing implied bits', () => {
-  assert.deepEqual(decodeLegacyMods(0), []);
-  assert.deepEqual(decodeLegacyMods(8).map((m) => m.acronym), ['HD']);
-  assert.deepEqual(decodeLegacyMods(8 | 64).map((m) => m.acronym), ['HD', 'DT']);
+  assert.deepEqual(decodeLegacyMods(0, 0), []);
+  assert.deepEqual(decodeLegacyMods(8, 0).map((m) => m.acronym), ['HD']);
+  assert.deepEqual(decodeLegacyMods(8 | 64, 0).map((m) => m.acronym), ['HD', 'DT']);
   // Nightcore sets the DoubleTime bit too; only NC should surface.
-  assert.deepEqual(decodeLegacyMods(64 | 512).map((m) => m.acronym), ['NC']);
+  assert.deepEqual(decodeLegacyMods(64 | 512, 0).map((m) => m.acronym), ['NC']);
   // Perfect sets SuddenDeath; only PF should surface.
-  assert.deepEqual(decodeLegacyMods(32 | 16384).map((m) => m.acronym), ['PF']);
+  assert.deepEqual(decodeLegacyMods(32 | 16384, 0).map((m) => m.acronym), ['PF']);
+  // Cinema sets Autoplay; only CN should surface, as osu! reads it.
+  assert.deepEqual(decodeLegacyMods((1 << 22) | (1 << 11), 0).map((m) => m.acronym), ['CN']);
   // 8256 is the DT+AP combination seen in the real replay corpus.
-  assert.deepEqual(decodeLegacyMods(8256).map((m) => m.acronym), ['DT', 'AP']);
+  assert.deepEqual(decodeLegacyMods(8256, 0).map((m) => m.acronym), ['DT', 'AP']);
+});
+
+/*
+ * Every bit, not only the first fifteen. Stopping at Perfect dropped ScoreV2 -- a stable
+ * ScoreV2 play was stored as a nomod one, then greyed out by osu!'s (correct) answer that it
+ * is unranked, with nothing on the page to say why.
+ */
+test('stable ScoreV2 and the mania-only bits are decoded, per ruleset as osu! reads them', () => {
+  const SV2 = 1 << 29;
+  assert.deepEqual(decodeLegacyMods(SV2, 0).map((m) => m.acronym), ['SV2']);
+  assert.deepEqual(decodeLegacyMods(1 | SV2, 1).map((m) => m.acronym), ['NF', 'SV2']);
+
+  // Mania: 7K, Fade In, Random and Mirror (bits 18, 20, 21, 30), and Co-op as Dual Stages.
+  const mania = (1 << 18) | (1 << 20) | (1 << 21) | (1 << 30) | (1 << 25);
+  assert.deepEqual(decodeLegacyMods(mania, 3).map((m) => m.acronym), ['7K', 'FI', 'RD', 'DS', 'MR']);
+  // The same bits mean nothing in osu!standard, where osu! has no mod for them.
+  assert.deepEqual(decodeLegacyMods(mania, 0), []);
+
+  // Relax exists in taiko and catch but not mania; Spun Out, Autopilot, Touch Device and
+  // Target Practice only in osu!standard.
+  const RX = 1 << 7, SO = 1 << 12, AP = 1 << 13, TD = 1 << 2, TP = 1 << 23;
+  assert.deepEqual(decodeLegacyMods(RX, 1).map((m) => m.acronym), ['RX']);
+  assert.deepEqual(decodeLegacyMods(RX, 3), []);
+  assert.deepEqual(decodeLegacyMods(SO | AP | TD | TP, 2), []);
+  assert.deepEqual(decodeLegacyMods(SO | AP | TD | TP, 0).map((m) => m.acronym), ['TD', 'SO', 'AP', 'TP']);
 });
 
 test('osu! scores a stable play with Classic, and the page says so', () => {

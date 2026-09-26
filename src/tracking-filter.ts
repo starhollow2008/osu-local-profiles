@@ -313,8 +313,16 @@ function outsideDates(at: number | null, range: DateRange, includeUnknown: boole
   return range.to !== null && at > range.to;
 }
 
+/**
+ * Mods the filter has nothing to say about. ScoreV2 is a scoring system, not something the
+ * page offers to require or exclude (`HIDDEN_MODS` in web/js/tracking-filter.js), so it must
+ * not turn a stable ScoreV2 play into "a play with mods" behind the user's back: a fact the
+ * filter cannot express never rejects a play.
+ */
+const UNFILTERED_MODS = new Set(['SV2']);
+
 function modsRejected(filter: TrackingFilter, mods: readonly LazerMod[]): boolean {
-  const present = new Set(mods.map((m) => m.acronym));
+  const present = new Set(mods.map((m) => m.acronym).filter((a) => !UNFILTERED_MODS.has(a)));
   if (filter.noMod === 'required' && present.size > 0) return true;
   if (filter.noMod === 'excluded' && present.size === 0) return true;
   for (const [acronym, state] of Object.entries(filter.mods)) {

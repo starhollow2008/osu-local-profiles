@@ -57,8 +57,8 @@ export async function rankedByOsu(
 ): Promise<boolean | null> {
   if (!official) return null;
   // The same choice as scoreMods: a lazer replay's own mod list, else stable's bitmask, which
-  // osu! converts itself -- including the key-count and Random bits decodeLegacyMods skips. A
-  // McOsu play is its mods as osu! would write them, a custom rate or McOsu's own MC included.
+  // osu! converts itself, so the question never depends on this app's decoding. A McOsu
+  // play is its mods as osu! would write them, a custom rate or McOsu's own MC included.
   const mods = score.mcosu ? scoreMods(score, osuPath) : score.extras?.mods;
   const result = await official.ranked(
     mods ? { ruleset: score.mode, mods } : { ruleset: score.mode, legacyMods: score.legacyMods },
@@ -84,19 +84,47 @@ export function strippableMods(mods: LazerMod[]): string[] {
 }
 
 /** Legacy bitmask -> acronyms, for stable replays with no extended block. */
+/**
+ * osu!stable's mod bits, as osu! numbers them (`LegacyMods`), and lazer's acronym for each.
+ *
+ * All 31 of them. The first version stopped at Perfect (bit 14), which quietly dropped
+ * ScoreV2, mania's key counts, Fade In, Random and Mirror: a stable ScoreV2 play was stored,
+ * labelled and judged as a plain nomod one -- while osu!, asked about the raw bitmask, rightly
+ * called it unranked, so it read as greyed out for no reason anyone could see.
+ */
 const LEGACY_MOD_BITS: readonly string[] = [
   'NF', 'EZ', 'TD', 'HD', 'HR', 'SD', 'DT', 'RX', 'HT', 'NC', 'FL', 'AT', 'SO', 'AP', 'PF',
+  '4K', '5K', '6K', '7K', '8K', 'FI', 'RD', 'CN', 'TP', '9K', 'DS', '1K', '3K', '2K', 'SV2', 'MR',
 ];
 
-export function decodeLegacyMods(bitmask: number): LazerMod[] {
+/** Everything a bit can mean in every ruleset, so each one lists only what it does not have. */
+const NOT_IN_RULESET: Readonly<Record<number, ReadonlySet<string>>> = {
+  0: new Set(['4K', '5K', '6K', '7K', '8K', '9K', '1K', '2K', '3K', 'DS', 'FI', 'RD', 'MR']),
+  1: new Set(['TD', 'SO', 'AP', 'TP', '4K', '5K', '6K', '7K', '8K', '9K', '1K', '2K', '3K', 'DS', 'FI', 'RD', 'MR']),
+  2: new Set(['TD', 'SO', 'AP', 'TP', '4K', '5K', '6K', '7K', '8K', '9K', '1K', '2K', '3K', 'DS', 'FI', 'RD', 'MR']),
+  3: new Set(['TD', 'RX', 'SO', 'AP', 'TP']),
+};
+
+/**
+ * A stable bitmask as the mods osu! itself reads it for that ruleset: each ruleset's
+ * `ConvertFromLegacyMods`, so a bit a ruleset has no mod for (Random outside mania, Relax in
+ * it) is dropped exactly where osu! drops it. Kept in bit order, which is how every label
+ * stored so far reads.
+ */
+export function decodeLegacyMods(bitmask: number, ruleset: number): LazerMod[] {
+  const absent = NOT_IN_RULESET[ruleset] ?? NOT_IN_RULESET[0]!;
   const out: LazerMod[] = [];
   for (let i = 0; i < LEGACY_MOD_BITS.length; i++) {
-    if (bitmask & (1 << i)) out.push({ acronym: LEGACY_MOD_BITS[i]! });
+    const acronym = LEGACY_MOD_BITS[i]!;
+    if (bitmask & (1 << i) && !absent.has(acronym)) out.push({ acronym });
   }
-  // NC implies DT and PF implies SD in the bitmask; keep only the visible one.
+  // NC implies DT, PF implies SD and CN implies AT in the bitmask; keep only the visible one.
   const acronyms = new Set(out.map((m) => m.acronym));
   return out.filter(
-    (m) => !(m.acronym === 'DT' && acronyms.has('NC')) && !(m.acronym === 'SD' && acronyms.has('PF')),
+    (m) =>
+      !(m.acronym === 'DT' && acronyms.has('NC')) &&
+      !(m.acronym === 'SD' && acronyms.has('PF')) &&
+      !(m.acronym === 'AT' && acronyms.has('CN')),
   );
 }
 
@@ -108,7 +136,7 @@ export function decodeLegacyMods(bitmask: number): LazerMod[] {
  */
 export function scoreMods(score: ReplayScore, osuPath: string | null = null): LazerMod[] {
   if (score.mcosu) return mcosuModsFor(score, osuPath).mods;
-  return score.extras?.mods ?? decodeLegacyMods(score.legacyMods);
+  return score.extras?.mods ?? decodeLegacyMods(score.legacyMods, score.mode);
 }
 
 function mcosuModsFor(score: ReplayScore, osuPath: string | null) {
