@@ -6,7 +6,7 @@ import path from 'node:path';
 import { openDb, getOrCreateProfile } from '../src/db/index.ts';
 import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { parseReplay, parseReplayHeader } from '../src/osr.ts';
-import { foundBeatmapIds, misdecodedIds, readReplayHeader } from '../src/tracker/recompute.ts';
+import { foundBeatmapIds, misdecodedIds, readReplayHeader, recomputeScores } from '../src/tracker/recompute.ts';
 import { Tracker } from '../src/tracker/index.ts';
 import { OfficialCalculator } from '../src/calc/official.ts';
 
@@ -146,6 +146,36 @@ test('a stored stable ScoreV2 play is relabelled, and the repair runs only once'
     assert.equal(row.mods_ranked, 0, 'osu! does not rank ScoreV2');
 
     assert.equal((await tracker.repairScores())?.considered, 0, 'recorded as done');
+  } finally {
+    official.dispose();
+    h.cleanup();
+  }
+});
+
+/*
+ * A recalculation after a pp rework once wrote pp = NULL for every score whose beatmap file
+ * had gone -- erasing it for good -- while one whose replay had gone was left alone.
+ */
+test('recalculating a score whose beatmap is gone keeps its pp', { timeout: 120_000 }, async (t) => {
+  const official = await OfficialCalculator.create();
+  if (!official) return t.skip('osu-pp helper not built (run: npm run build:pp:local)');
+  const h = harness();
+  try {
+    const id = h.score('gone', 0, SV2 | HD);
+    h.db
+      .prepare(`UPDATE scores SET pp = 123.4, stars = 5.5, pp_source = 'official', pp_version = 'old' WHERE id = ?`)
+      .run(id);
+
+    const result = await recomputeScores({
+      db: h.db,
+      resolver: new BeatmapResolver(h.db, []),
+      profileId: h.profileId,
+      official,
+      ids: [id],
+    });
+    assert.equal(result.skipped, 1, 'no beatmap file to price it against');
+    const row = h.db.prepare('SELECT pp, stars, pp_source, pp_version, mods_label FROM scores WHERE id = ?').get(id);
+    assert.deepEqual({ ...row }, { pp: 123.4, stars: 5.5, pp_source: 'official', pp_version: 'old', mods_label: 'HDSV2' });
   } finally {
     official.dispose();
     h.cleanup();

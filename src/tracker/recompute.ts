@@ -113,6 +113,18 @@ const UPDATE_COLUMNS = [
 
 type UpdateValues = Record<(typeof UPDATE_COLUMNS)[number], string | number | null>;
 
+/**
+ * The columns only a beatmap file can produce. A score whose `.osu` is gone -- the map deleted
+ * since, or its file not found -- keeps these as they were rather than having them wiped: a
+ * recalculation after a pp rework once erased the pp of every such score for good, while a
+ * score whose *replay* was gone was deliberately left alone.
+ */
+const PRICED_COLUMNS: ReadonlySet<string> = new Set([
+  'stars', 'pp', 'pp_source', 'score_standard', 'score_classic', 'pp_nomod', 'stars_nomod',
+  'beatmap_max_combo', 'pp_parts', 'pp_nomod_parts', 'pp_version',
+]);
+const UNPRICED_COLUMNS = UPDATE_COLUMNS.filter((c) => !PRICED_COLUMNS.has(c));
+
 interface StoredRow {
   id: number;
   replay_path: string;
@@ -135,6 +147,9 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
 
   const update = opts.db.prepare(
     `UPDATE scores SET ${UPDATE_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
+  );
+  const updateUnpriced = opts.db.prepare(
+    `UPDATE scores SET ${UNPRICED_COLUMNS.map((c) => `${c} = ?`).join(', ')} WHERE id = ?`,
   );
   const updateRanked = opts.db.prepare(
     'UPDATE scores SET mods_ranked = ?, mods_ranked_by = ?, ranked = ? WHERE id = ?',
@@ -173,7 +188,7 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
 
     if (!beatmap.osuPath) {
       // Still worth writing the eligibility columns: without them the row stays "stale"
-      // for ever and every recompute would examine it again.
+      // for ever and every recompute would examine it again. Its pricing stays as it was.
       result.skipped++;
     }
 
@@ -198,7 +213,8 @@ export async function recomputeScores(opts: RecomputeOptions): Promise<Recompute
       pp_nomod_parts: stripped ? JSON.stringify(stripped.breakdown) : null,
       pp_version: computed?.version ?? null,
     };
-    update.run(...UPDATE_COLUMNS.map((column) => values[column]), row.id);
+    if (beatmap.osuPath) update.run(...UPDATE_COLUMNS.map((column) => values[column]), row.id);
+    else updateUnpriced.run(...UNPRICED_COLUMNS.map((column) => values[column]), row.id);
 
     if (beatmap.osuPath) result.updated++;
     if (row.pp === null && computed?.pp != null) result.gainedPp++;
