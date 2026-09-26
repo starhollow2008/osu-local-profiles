@@ -52,7 +52,7 @@ test("lazer's store is sniffed by content, since its files have no names", async
     const result = await indexBeatmapFiles(h.db, [{ path: path.join(h.tmp, 'files'), byExtension: false }], (p) =>
       seen.push(p),
     );
-    assert.deepEqual(result, { scanned: 2, indexed: 1 });
+    assert.deepEqual(result, { scanned: 2, indexed: 1, removed: 0 });
     assert.equal(h.count('osu_files'), 1);
     assert.equal(h.count('not_beatmaps'), 1, 'the audio is remembered, so it is never opened again');
 
@@ -63,7 +63,7 @@ test("lazer's store is sniffed by content, since its files have no names", async
     const again: IndexProgress[] = [];
     assert.deepEqual(
       await indexBeatmapFiles(h.db, [{ path: path.join(h.tmp, 'files'), byExtension: false }], (p) => again.push(p)),
-      { scanned: 2, indexed: 0 },
+      { scanned: 2, indexed: 0, removed: 0 },
     );
     assert.equal(again[again.length - 1]!.firstRun, false);
   } finally {
@@ -156,7 +156,7 @@ test("osu!stable's Songs opens only .osu files -- the audio and images are never
     h.file('Songs/1 Artist - Title/broken.osu', 'nothing here');
 
     const result = await indexBeatmapFiles(h.db, [{ path: path.join(h.tmp, 'Songs'), byExtension: true }]);
-    assert.deepEqual(result, { scanned: 3, indexed: 2 }, 'only the three .osu names were looked at');
+    assert.deepEqual(result, { scanned: 3, indexed: 2, removed: 0 }, 'only the three .osu names were looked at');
     assert.equal(h.count('osu_files'), 2);
     assert.equal(h.count('not_beatmaps'), 1, 'the mp3 and jpg were skipped by name, not opened and recorded');
   } finally {
@@ -279,6 +279,61 @@ test('a miss gives the resolver one chance to index what has just arrived', () =
     // Found now, so a second lookup does not ask again.
     resolver.resolve(md5);
     assert.equal(asked, 1);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * The index only ever grew: lazer removes store files nothing uses, stable players delete sets,
+ * and their rows stayed -- a beatmap indexed at two paths could be looked up at the dead one.
+ */
+test('files deleted since the last walk leave the index, and a cached beatmap looks again', async () => {
+  const h = harness();
+  try {
+    const songs = path.join(h.tmp, 'Songs');
+    const kept = h.file('Songs/1 Kept/kept.osu', OSU('Kept'));
+    const doomed = h.file('Songs/2 Doomed/doomed.osu', OSU('Doomed'));
+    const roots = [{ path: songs, byExtension: true }];
+    await indexBeatmapFiles(h.db, roots);
+    assert.equal(h.count('osu_files'), 2);
+
+    // A played beatmap cached with the file about to go.
+    const md5 = (h.db.prepare('SELECT md5 FROM osu_files WHERE path = ?').get(doomed) as { md5: string }).md5;
+    new BeatmapResolver(h.db, []).resolve(md5);
+
+    fs.rmSync(path.dirname(doomed), { recursive: true });
+    const result = await indexBeatmapFiles(h.db, roots);
+    assert.equal(result.removed, 1);
+    assert.deepEqual(
+      (h.db.prepare('SELECT path FROM osu_files').all() as { path: string }[]).map((r) => r.path),
+      [kept],
+    );
+    assert.equal(
+      (h.db.prepare('SELECT osu_path FROM beatmaps WHERE md5 = ?').get(md5) as { osu_path: string | null }).osu_path,
+      null,
+      'the cache no longer points at the deleted file',
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * An unplugged drive, or a Songs folder that cannot be read, yields nothing -- which is not
+ * evidence that anything was deleted, and must not cost the whole index.
+ */
+test('a root that yields nothing keeps everything indexed under it', async () => {
+  const h = harness();
+  try {
+    const songs = path.join(h.tmp, 'Songs');
+    h.file('Songs/1 Set/a.osu', OSU('A'));
+    await indexBeatmapFiles(h.db, [{ path: songs, byExtension: true }]);
+    fs.renameSync(songs, path.join(h.tmp, 'Unplugged'));
+
+    const result = await indexBeatmapFiles(h.db, [{ path: songs, byExtension: true }]);
+    assert.equal(result.removed, 0);
+    assert.equal(h.count('osu_files'), 1);
   } finally {
     h.cleanup();
   }

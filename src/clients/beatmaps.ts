@@ -208,20 +208,25 @@ export async function indexBeatmapFiles(
   db: Db,
   roots: IndexRoot[],
   onProgress?: (progress: IndexProgress) => void,
-): Promise<{ scanned: number; indexed: number }> {
+): Promise<{ scanned: number; indexed: number; removed: number }> {
+  /*
+   * Every path the index holds, taken off as the walk meets it -- so what is left at the end is
+   * what has gone from disk, at no memory beyond this one set.
+   */
   const known = new Set<string>();
-  const indexed = db.prepare('SELECT path, beatmap_id, name FROM osu_files').all() as {
+  // Older rows have no id or name metadata. Re-read each once to backfill both.
+  const backfill = new Set<string>();
+  for (const r of db.prepare('SELECT path, beatmap_id, name FROM osu_files').all() as {
     path: string;
     beatmap_id: number | null;
     name: string | null;
-  }[];
-  for (const r of indexed) {
-    // Older rows have no id or name metadata. Re-read each once to backfill both.
-    if (r.beatmap_id !== null && r.name !== null) known.add(r.path);
+  }[]) {
+    known.add(r.path);
+    if (r.beatmap_id === null || r.name === null) backfill.add(r.path);
   }
-  // Counted before the backfill filter: an upgrade re-reads every row, but the index has
-  // been built before and must not be announced as a first run.
-  const firstRun = indexed.length === 0;
+  // Before the not-beatmaps: an upgrade re-reads every row, but the index has been built
+  // before and must not be announced as a first run.
+  const firstRun = known.size === 0;
   for (const r of db.prepare('SELECT path FROM not_beatmaps').all() as { path: string }[]) {
     known.add(r.path);
   }
@@ -230,11 +235,22 @@ export async function indexBeatmapFiles(
     'INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, name, size, indexed_at) VALUES (?, ?, ?, ?, ?, ?)',
   );
   const insertSkip = db.prepare('INSERT OR REPLACE INTO not_beatmaps (path, size) VALUES (?, ?)');
+  const forgetOsu = db.prepare('DELETE FROM osu_files WHERE path = ?');
+  const forgetSkip = db.prepare('DELETE FROM not_beatmaps WHERE path = ?');
+  // A played beatmap cached with this file must look again: another copy may be indexed.
+  const uncache = db.prepare('UPDATE beatmaps SET osu_path = NULL WHERE osu_path = ?');
 
   const progress: IndexProgress = { phase: 'counting', scanned: 0, total: 0, indexed: 0, firstRun };
+  /** Files each root yielded on the last walk: a root that yielded none is not trusted to prune. */
+  const yielded = roots.map(() => 0);
   const candidates = function* (): Generator<string> {
-    for (const root of roots) {
-      for (const file of walk(root.path)) if (!root.byExtension || isOsuName(file)) yield file;
+    yielded.fill(0);
+    for (const [i, root] of roots.entries()) {
+      for (const file of walk(root.path)) {
+        if (root.byExtension && !isOsuName(file)) continue;
+        yielded[i]!++;
+        yield file;
+      }
     }
   };
 
@@ -250,6 +266,7 @@ export async function indexBeatmapFiles(
     await breathe();
     sliceStart = performance.now();
   };
+  let removed = 0;
   const write = (statement: typeof insertOsu, ...values: (string | number)[]) => {
     if (!inTransaction) {
       db.exec('BEGIN');
@@ -269,7 +286,8 @@ export async function indexBeatmapFiles(
     progress.phase = 'indexing';
     for (const file of candidates()) {
       progress.scanned++;
-      if (!known.has(file)) {
+      const wasKnown = known.delete(file);
+      if (!wasKnown || backfill.has(file)) {
         let size = -1;
         try {
           size = fs.statSync(file).size;
@@ -292,6 +310,29 @@ export async function indexBeatmapFiles(
       }
       await pauseIfDue();
     }
+
+    /*
+     * What the index holds and the walk did not find: deleted since. lazer removes store files
+     * nothing uses any more, and a stable player deletes sets, so without this the index only
+     * ever grew -- and a beatmap indexed at two paths could be looked up at the dead one.
+     *
+     * Only under a root that yielded something this time. An unplugged drive, a folder that
+     * cannot be read, or a moved install yields nothing, and pruning then would throw its whole
+     * index away. A path under no current root is left too: that is a folder no longer
+     * configured, which is not evidence that anything was deleted. A file missed because its
+     * own folder could not be read is simply indexed again when it can.
+     */
+    const pruned = roots
+      .filter((_, i) => yielded[i]! > 0)
+      .map((root) => path.join(root.path, path.sep));
+    for (const gone of known) {
+      if (!pruned.some((prefix) => gone.startsWith(prefix))) continue;
+      write(forgetOsu, gone);
+      write(forgetSkip, gone);
+      write(uncache, gone);
+      removed++;
+      await pauseIfDue();
+    }
     if (inTransaction) db.exec('COMMIT');
   } catch (e) {
     if (inTransaction) db.exec('ROLLBACK');
@@ -300,7 +341,7 @@ export async function indexBeatmapFiles(
   // A folder can change while it is walked; the bar ends full either way.
   progress.total = progress.scanned;
   onProgress?.({ ...progress });
-  return { scanned: progress.scanned, indexed: progress.indexed };
+  return { scanned: progress.scanned, indexed: progress.indexed, removed };
 }
 
 /** Add a single newly-seen file to the index (used by the watcher). */
