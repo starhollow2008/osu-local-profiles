@@ -1,8 +1,7 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import type { Db } from './db/index.ts';
 import type { ReplayScore } from './osr.ts';
 import type { OsuInstall } from './clients/detect.ts';
+import { detectLocalSessions } from './clients/session.ts';
 import { getSettings } from './settings.ts';
 
 /**
@@ -28,6 +27,8 @@ import { getSettings } from './settings.ts';
  *   account this was built on has two.
  * - **Not knowing means not filtering.** A profile that cannot say who it belongs to tracks
  *   everything, exactly as it always has.
+ * - **Who you are is who osu! says is signed in here**, not an account linked for its
+ *   pictures -- see `resolveIdentity`.
  *
  * A lazer replay also carries a numeric `user_id`, which settles it outright when both sides
  * have one: ids do not change when a name does.
@@ -36,8 +37,17 @@ import { getSettings } from './settings.ts';
 /** lazer's name for the local user when nobody is signed in. Never a downloaded replay. */
 const GUEST_NAME = 'guest';
 
-/** Where the answer came from, so the page can say how sure it is. */
-export type IdentitySource = 'linked' | 'stable-config' | 'tracked-plays' | 'unknown';
+/**
+ * Where the answer came from, so the app can say how sure it is.
+ *
+ * - `signed-in`: the account osu! itself says is signed in on this machine.
+ * - `linked`: the same, confirmed by an osu! account linked to the profile -- which then adds
+ *   its user id and previous usernames. A link to anyone *else* decides nothing: see
+ *   `resolveIdentity`.
+ * - `tracked-plays`: nobody is signed in, so the name behind most of the profile's own plays.
+ * - `unknown`: none of those, so nothing is refused.
+ */
+export type IdentitySource = 'linked' | 'signed-in' | 'tracked-plays' | 'unknown';
 
 export interface PlayerIdentity {
   /** osu!'s numeric id, when it is known. Only lazer replays can be matched against it. */
@@ -73,41 +83,11 @@ export function identityKnown(identity: PlayerIdentity): boolean {
 }
 
 /**
- * osu!stable's own record of who is signed in.
- *
- * `osu!.<windows user>.cfg` in the install root holds `Username = <osu! account>`, written by
- * the game itself. Local, free, and needs no account link -- which makes it the answer for
- * the stable player who has never pressed Import from osu!.
- */
-export function stableConfigUsername(install: OsuInstall): string | null {
-  if (install.kind !== 'stable') return null;
-  let names: string[];
-  try {
-    names = fs.readdirSync(install.root);
-  } catch {
-    return null;
-  }
-  for (const name of names) {
-    if (!/^osu!\..+\.cfg$/i.test(name)) continue;
-    let text: string;
-    try {
-      text = fs.readFileSync(path.join(install.root, name), 'latin1');
-    } catch {
-      continue;
-    }
-    // `Username = foo`. Stable writes one per line, and the file is small.
-    const match = /^\s*Username\s*=\s*(.+?)\s*$/im.exec(text);
-    const username = match?.[1];
-    if (username !== undefined && username !== '') return username;
-  }
-  return null;
-}
-
-/**
  * The name most of this profile's own tracked plays were set under.
  *
- * The last resort, for a lazer player who has never linked an account -- lazer keeps no
- * config file naming its user. It reads the profile's own rows rather than the store, so it
+ * The last resort, for when no client says who is signed in -- lazer only remembers the name
+ * with "remember username" on, and stable only with its own. It reads the profile's own rows
+ * rather than the store, so it
  * costs one indexed query rather than a walk of 63,000 files, and it only answers when one
  * name is behind at least four fifths of the plays. Below that there is no clear owner and
  * it says so, because a profile with two players' replays in it is the very thing being
@@ -140,44 +120,54 @@ export function dominantTrackedName(
 }
 
 /**
- * Who this profile's plays belong to: the linked account, else osu!stable's own config, else
- * the name behind its own tracked plays.
+ * Who this profile's plays belong to: whoever osu! says is signed in on this machine, else
+ * the name behind the profile's own tracked plays, else nobody in particular.
  *
- * In that order because that is the order of certainty. A linked account is stated by the
- * user and brings a numeric id and every previous name with it; stable's config is written
- * by the game; the tracked plays are an inference, and the weakest thing here.
+ * **Signed in** is read from each client's own config (`detectLocalSessions`): lazer's
+ * `game.ini` and stable's `osu!.<user>.cfg`, both `Username = ...`, both written by the game.
+ * With both clients signed in as different accounts, both are yours.
+ *
+ * **A linked osu! account decides nothing by itself.** It is how a profile borrows a name,
+ * avatar, banner and the rest -- and people link someone else's for exactly that: an alt, a
+ * friend, a player whose banner they like. When a link also meant "these are that account's
+ * plays", every play of your own osu! had submitted was refused as a stranger's, while your
+ * fails (read from lazer's log, which names nobody) were kept. So a link counts only when it
+ * *is* the account signed in here -- its name or a previous name matches -- and then it adds
+ * what the configs cannot: osu!'s list of previous usernames, and the numeric id.
+ *
+ * The id only when every signed-in client is that account. An id settles a play outright,
+ * whatever its name, which would refuse the lazer plays of a second account signed in on the
+ * other client; with the id left out those are matched by name.
  */
 export function resolveIdentity(
   db: Db,
   profileId: number,
   installs: readonly OsuInstall[],
 ): PlayerIdentity {
-  const settings = getSettings(db, profileId);
-  const names = new Set<string>();
-
-  if (settings.linkedUserId > 0 || settings.linkedUsername !== '') {
-    if (settings.linkedUsername !== '') names.add(settings.linkedUsername.toLowerCase());
-    for (const previous of settings.linkedPreviousNames) names.add(previous.toLowerCase());
-    return {
-      userId: settings.linkedUserId > 0 ? settings.linkedUserId : null,
-      names,
-      displayName: settings.linkedUsername,
-      namesComplete: settings.linkedNamesKnown,
-      source: 'linked',
-    };
-  }
-
-  for (const install of installs) {
-    const username = stableConfigUsername(install);
-    if (username !== null) {
+  const signedIn = detectLocalSessions(installs).map((s) => s.username);
+  if (signedIn.length > 0) {
+    const names = new Set(signedIn.map((name) => name.toLowerCase()));
+    const settings = getSettings(db, profileId);
+    const linkedNames = [settings.linkedUsername, ...settings.linkedPreviousNames]
+      .filter((name) => name !== '')
+      .map((name) => name.toLowerCase());
+    if (linkedNames.some((name) => names.has(name))) {
+      const allTheLinkedAccount = [...names].every((name) => linkedNames.includes(name));
       return {
-        userId: null,
-        names: new Set([username.toLowerCase()]),
-        displayName: username,
-        namesComplete: false,
-        source: 'stable-config',
+        userId: allTheLinkedAccount && settings.linkedUserId > 0 ? settings.linkedUserId : null,
+        names: new Set([...names, ...linkedNames]),
+        displayName: settings.linkedUsername,
+        namesComplete: settings.linkedNamesKnown,
+        source: 'linked',
       };
     }
+    return {
+      userId: null,
+      names,
+      displayName: signedIn[0]!,
+      namesComplete: false,
+      source: 'signed-in',
+    };
   }
 
   const tracked = dominantTrackedName(db, profileId);

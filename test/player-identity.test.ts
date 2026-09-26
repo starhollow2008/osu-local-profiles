@@ -13,7 +13,6 @@ import {
   ownsPlay,
   replayPlayer,
   resolveIdentity,
-  stableConfigUsername,
   sweepForeignScores,
   UNKNOWN_IDENTITY,
   type PlayerIdentity,
@@ -113,10 +112,10 @@ test('an identity nothing could establish never refuses a play', () => {
 });
 
 test('only a linked identity is ever confident enough to remove a stored play', () => {
-  // A name read from osu!stable's config, or inferred from the plays already tracked, has no
+  // A name read from a client's config, or inferred from the plays already tracked, has no
   // list of previous usernames behind it -- so it may refuse new plays but must never take
   // out ones already here.
-  for (const source of ['stable-config', 'tracked-plays', 'unknown'] as const) {
+  for (const source of ['signed-in', 'tracked-plays', 'unknown'] as const) {
     const guessed: PlayerIdentity = {
       userId: null,
       names: new Set(['tangy']),
@@ -132,29 +131,91 @@ test('only a linked identity is ever confident enough to remove a stored play', 
   }
 });
 
-test("osu!stable's own config names the signed-in account", () => {
+/** An install whose own config says who is signed in, as each client writes it. */
+function signedIn(kind: 'lazer' | 'stable', username: string | null): { install: OsuInstall; cleanup: () => void } {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-cfg-'));
+  if (username !== null) {
+    if (kind === 'lazer') fs.writeFileSync(path.join(dir, 'game.ini'), `Username = ${username}\r\nSavePassword = True\r\n`);
+    else fs.writeFileSync(path.join(dir, 'osu!.someone.cfg'), `BeatmapDirectory = Songs\r\nUsername = ${username}\r\n`);
+  }
+  return {
+    install: { kind, root: dir, replayDir: path.join(dir, 'files'), beatmapRoots: [], onlineDb: null },
+    cleanup: () => fs.rmSync(dir, { recursive: true, force: true }),
+  };
+}
+
+test('whoever either client says is signed in owns the profile', () => {
+  const h = harness();
+  const stable = signedIn('stable', 'Tangy');
+  const lazer = signedIn('lazer', 'Tangy');
+  const nobody = signedIn('lazer', null);
   try {
-    const install: OsuInstall = {
-      kind: 'stable',
-      root: dir,
-      replayDir: path.join(dir, 'Data', 'r'),
-      beatmapRoots: [],
-      onlineDb: null,
-    };
-    assert.equal(stableConfigUsername(install), null, 'no config yet');
-
-    fs.writeFileSync(
-      path.join(dir, 'osu!.someone.cfg'),
-      'BeatmapDirectory = Songs\r\nUsername = Tangy\r\nVolumeUniversal = 40\r\n',
-      'latin1',
-    );
-    assert.equal(stableConfigUsername(install), 'Tangy');
-
-    // lazer has no such file, and must not be asked for one.
-    assert.equal(stableConfigUsername({ ...install, kind: 'lazer' }), null);
+    for (const install of [stable.install, lazer.install]) {
+      const identity = resolveIdentity(h.db, h.profileId, [install]);
+      assert.equal(identity.source, 'signed-in', install.kind);
+      assert.deepEqual([...identity.names], ['tangy']);
+    }
+    // A client that remembers no name says nothing: nothing to go on, so nothing is refused.
+    assert.equal(resolveIdentity(h.db, h.profileId, [nobody.install]).source, 'unknown');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    for (const x of [stable, lazer, nobody]) x.cleanup();
+    h.cleanup();
+  }
+});
+
+/*
+ * The bug this replaced. A profile linked to another osu! account -- for its avatar and banner,
+ * or an alt's name -- took that account as the owner, so every play of your own that osu! had
+ * submitted was refused as a stranger's, on every map, while your fails (from lazer's log, which
+ * names nobody) were kept. "Finished maps never show up; failed ones do."
+ */
+test('an account linked for its pictures does not decide whose plays are yours', () => {
+  const h = harness();
+  const lazer = signedIn('lazer', 'Remyria');
+  try {
+    updateSettings(h.db, h.profileId, {
+      linkedUserId: 7562902,
+      linkedUsername: 'mrekk',
+      linkedPreviousNames: [],
+      linkedNamesKnown: true,
+    });
+    const identity = resolveIdentity(h.db, h.profileId, [lazer.install]);
+    assert.equal(identity.source, 'signed-in');
+    assert.equal(identity.userId, null);
+    assert.equal(ownsPlay(identity, player('Remyria', 12_345_678)), true, 'your own submitted play');
+    assert.equal(ownsPlay(identity, player('mrekk', 7562902)), false, "a replay you watched of the linked account's");
+    assert.equal(certainlySomeoneElse(identity, player('mrekk', 7562902)), false, 'and nothing is removed on it');
+  } finally {
+    lazer.cleanup();
+    h.cleanup();
+  }
+});
+
+/*
+ * Two accounts signed in on the two clients are both yours. The linked one's id must not
+ * settle plays then: an id outranks a name, and would refuse the other account's lazer plays.
+ */
+test('a second account signed in on the other client stays yours', () => {
+  const h = harness();
+  const lazer = signedIn('lazer', 'Tangy');
+  const stable = signedIn('stable', 'TangyAlt');
+  try {
+    updateSettings(h.db, h.profileId, {
+      linkedUserId: 3119700,
+      linkedUsername: 'Tangy',
+      linkedPreviousNames: [],
+      linkedNamesKnown: true,
+    });
+    const identity = resolveIdentity(h.db, h.profileId, [lazer.install, stable.install]);
+    assert.equal(identity.source, 'linked');
+    assert.equal(identity.userId, null);
+    assert.equal(ownsPlay(identity, player('TangyAlt', 999)), true);
+    assert.equal(ownsPlay(identity, player('Tangy', 3119700)), true);
+    assert.equal(ownsPlay(identity, player('mrekk', 7562902)), false);
+  } finally {
+    lazer.cleanup();
+    stable.cleanup();
+    h.cleanup();
   }
 });
 
@@ -205,8 +266,9 @@ function replay(over: Partial<ReplayScore> = {}): ReplayScore {
   };
 }
 
-test('a linked profile knows its own names, previous ones included', () => {
+test('a link to the signed-in account adds its id and previous names', () => {
   const h = harness();
+  const lazer = signedIn('lazer', 'Tangy');
   try {
     updateSettings(h.db, h.profileId, {
       linkedUserId: 3119700,
@@ -214,18 +276,22 @@ test('a linked profile knows its own names, previous ones included', () => {
       linkedPreviousNames: ['blizzardshiver', 'A wild Tangy'],
       linkedNamesKnown: true,
     });
-    const identity = resolveIdentity(h.db, h.profileId, []);
+    // Without anyone signed in, the link alone is not ownership.
+    assert.notEqual(resolveIdentity(h.db, h.profileId, []).source, 'linked');
+
+    const identity = resolveIdentity(h.db, h.profileId, [lazer.install]);
     assert.equal(identity.source, 'linked');
     assert.equal(identity.userId, 3119700);
     assert.equal(identity.displayName, 'Tangy');
     assert.equal(identity.namesComplete, true);
     assert.deepEqual([...identity.names].sort(), ['a wild tangy', 'blizzardshiver', 'tangy']);
   } finally {
+    lazer.cleanup();
     h.cleanup();
   }
 });
 
-test("an unlinked profile falls back to the plays it has already tracked", () => {
+test("with nobody signed in, a profile falls back to the plays it has already tracked", () => {
   const h = harness();
   try {
     // Nothing linked, no osu!stable config: the only evidence is the profile's own rows.
@@ -391,7 +457,7 @@ test('the sweep does nothing at all without a linked account', async () => {
       names: new Set(['tangy']),
       displayName: 'Tangy',
       namesComplete: false,
-      source: 'stable-config',
+      source: 'signed-in',
     };
     const sweep = await sweepForeignScores(h.db, h.profileId, guessed, async () => null);
     assert.equal(sweep.hidden, 0);

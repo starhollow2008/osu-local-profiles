@@ -96,7 +96,9 @@ An attempt has no beatmap id (no submission request), so it is matched by the lo
 - **A play osu! never accepted.** osu!stable's username is a line in a config file: anyone can set `Username = Cat` and play offline, and the replay then says `Cat` - possibly a real player's name. But a replay you *downloaded* is by definition a score osu! put on a leaderboard, so it always carries a score id. One with none was never on a leaderboard, so it cannot have been downloaded, so it was set here. Measured: **all 91 replays by other players carried an id; 258 of the owner's own - 164 stable, 94 lazer - did not.**
 - **Not knowing.** An identity nothing could establish never refuses anything.
 
-**Who am I?**, in order of certainty (`resolveIdentity`): the linked osu! account (numeric id + every previous name) → osu!stable's own `osu!.*.cfg` `Username` → the name behind ≥80% of the profile's own tracked plays, over at least 10. A lazer replay's `user_id` settles it outright and survives renames; stable records none.
+**Who am I?** (`resolveIdentity`): whoever osu! says is signed in here - lazer's `game.ini` and stable's `osu!.*.cfg`, both `Username`, via `detectLocalSessions`; both, if the two clients are signed in as different accounts → else the name behind ≥80% of the profile's own tracked plays, over at least 10 → else nobody, and nothing is refused. A lazer replay's `user_id` settles it outright and survives renames; stable records none.
+
+**A linked account is not ownership.** Import from osu! and linking are how a profile borrows a name, avatar and banner - often someone else's. When the link *was* the owner, a profile linked to another account refused every submitted play of the real player, on every map, while keeping their fails (read from lazer's log, which names nobody). Now a link counts only when its name or a previous name matches a signed-in name; it then adds osu!'s previous usernames, and its id - the id only when every signed-in client is that account, or it would refuse the lazer plays of a second account signed in on the other client.
 
 `scores.player_name` / `player_id` record who set each play at ingest, so nothing later has to reopen a replay file that may be gone.
 
@@ -104,7 +106,7 @@ An attempt has no beatmap id (no submission request), so it is matched by the lo
 
 ### Removing ones already tracked
 
-Runs once per profile (`kv` `foreignScoresSwept:<id>`), and **only on a linked account whose previous-name list was actually fetched** - `linkedNamesKnown`, because an empty list cannot be told from one nobody asked for, and an older version never asked. A profile that fails that test is left *unmarked*, so the next launch after an Import from osu! does it properly.
+Runs once per profile (`kv` `foreignScoresSwept:<id>`), and **only on a linked account that is the one signed in, and whose previous-name list was actually fetched** - `linkedNamesKnown`, because an empty list cannot be told from one nobody asked for, and an older version never asked. A profile that fails that test is left *unmarked*, so the next launch after an Import from osu! does it properly.
 
 Every removal is a **hide**, the same one the `···` menu performs: the row stays, appears under Removed scores, and goes back with one click. That is what makes doing it unprompted defensible. Measured on the test profile: 84 removed, 0 of 2,327 own plays, 0 of 3 nameless, 0 of 1 `Guest`; total pp 16,109 → 7,394.
 

@@ -576,7 +576,7 @@ async function main(): Promise<void> {
   const identity = tracker.playerIdentity;
   if (identity.source === 'unknown') {
     console.log('  Not sure whose plays these are, so every replay found is tracked.');
-    console.log('  Options -> Import from osu! links an account and settles it.');
+    console.log("  Signing in to osu! with 'remember username' on settles it.");
   } else {
     const earlier = identity.names.size - 1;
     console.log(

@@ -213,6 +213,12 @@ the account, one per picture, and one per hundred favorites. No login and no API
 signed in on this machine, its username is offered, read from the client's own config file with
 no network at all.
 
+Importing from someone else's account - an alt, a friend, a player whose banner you like - is
+fine: it never decides which plays are yours. That is whoever osu! says is signed in on this
+machine, and replays other players set (ones you watched) are left out on that basis. Plays with
+no name, lazer's `Guest`, and plays osu! never accepted are always yours, whatever name they
+carry.
+
 ## The me! section
 
 The description box from osu!'s own profile, at the top of the page. Click it to write
