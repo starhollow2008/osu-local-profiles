@@ -103,8 +103,57 @@ function migrate(db: Db): void {
   // Here rather than in schema.sql: on an existing database the column does not exist until
   // the loop above has added it, and schema.sql runs first.
   db.exec('CREATE INDEX IF NOT EXISTS osu_files_name ON osu_files (name)');
+  rebuildNotBeatmaps(db);
   pinCountingDefaults(db);
   pinRelaxPricing(db);
+}
+
+/** Past this much free space inside the file, a rebuild gives it back to the disk. */
+const RECLAIM_BYTES = 32 * 1024 * 1024;
+
+/**
+ * `not_beatmaps` as a WITHOUT ROWID table, rebuilt once from the ordinary one earlier
+ * versions made.
+ *
+ * Its only column that matters is its primary key, a path, and an ordinary table keeps that
+ * twice: once in the row and again in the index behind `PRIMARY KEY`. For lazer it holds every
+ * file in the store that is not a beatmap -- a million rows for a large library -- so this was
+ * most of the index: measured 241MB -> 118MB at a million rows, and the whole index
+ * 351MB -> 229MB beside 250,000 beatmaps. `osu_files` stays as it is: its three other indexes
+ * would each have to carry the path in place of a row number, which costs what it saves.
+ */
+function rebuildNotBeatmaps(db: Db): void {
+  const table = db
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'not_beatmaps'")
+    .get() as { sql: string } | undefined;
+  if (!table || /WITHOUT\s+ROWID/i.test(table.sql)) return;
+
+  db.exec('BEGIN');
+  try {
+    db.exec(`CREATE TABLE not_beatmaps_rebuilt (path TEXT PRIMARY KEY, size INTEGER NOT NULL) WITHOUT ROWID;
+             INSERT INTO not_beatmaps_rebuilt (path, size) SELECT path, size FROM not_beatmaps ORDER BY path;
+             DROP TABLE not_beatmaps;
+             ALTER TABLE not_beatmaps_rebuilt RENAME TO not_beatmaps;`);
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+
+  /*
+   * A dropped table's pages stay inside the file, free for SQLite to reuse, so without this the
+   * rebuild would save nothing anyone could see. Once, and only when it is worth rewriting the
+   * file for. Another process holding the database -- a script run beside the app -- makes it
+   * fail, which is harmless: the space is reused as the index grows.
+   */
+  const free = (db.prepare('PRAGMA freelist_count').get() as { freelist_count: number }).freelist_count;
+  const page = (db.prepare('PRAGMA page_size').get() as { page_size: number }).page_size;
+  if (free * page < RECLAIM_BYTES) return;
+  try {
+    db.exec('VACUUM');
+  } catch {
+    /* see above */
+  }
 }
 
 const COUNTING_PINNED = 'countingDefaultsPinned';

@@ -338,3 +338,35 @@ test('a root that yields nothing keeps everything indexed under it', async () =>
     h.cleanup();
   }
 });
+
+/*
+ * not_beatmaps holds every non-beatmap file in lazer's store -- a million rows for a large
+ * library -- and an ordinary table kept each path twice. An older database is rebuilt once.
+ */
+test('an older not_beatmaps is rebuilt WITHOUT ROWID, keeping every row', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-rebuild-'));
+  const file = path.join(tmp, 'test.db');
+  try {
+    let db = openDb(file);
+    db.exec(`DROP TABLE not_beatmaps;
+             CREATE TABLE not_beatmaps (path TEXT PRIMARY KEY, size INTEGER NOT NULL);
+             INSERT INTO not_beatmaps VALUES ('C:/osu/files/b/bb/bbbb', 2), ('C:/osu/files/a/aa/aaaa', 1);`);
+    db.close();
+
+    db = openDb(file);
+    const sql = (db.prepare("SELECT sql FROM sqlite_master WHERE name = 'not_beatmaps'").get() as { sql: string }).sql;
+    assert.match(sql, /WITHOUT ROWID/);
+    assert.deepEqual(
+      (db.prepare('SELECT path, size FROM not_beatmaps ORDER BY path').all() as { path: string; size: number }[]).map((r) => ({ ...r })),
+      [{ path: 'C:/osu/files/a/aa/aaaa', size: 1 }, { path: 'C:/osu/files/b/bb/bbbb', size: 2 }],
+    );
+    db.close();
+
+    // And a database already rebuilt is left alone.
+    db = openDb(file);
+    assert.equal((db.prepare('SELECT COUNT(*) AS n FROM not_beatmaps').get() as { n: number }).n, 2);
+    db.close();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

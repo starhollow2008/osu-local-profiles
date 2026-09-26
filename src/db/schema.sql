@@ -167,10 +167,12 @@ CREATE TABLE IF NOT EXISTS osu_files (
 CREATE INDEX IF NOT EXISTS osu_files_md5 ON osu_files (md5);
 
 -- Paths already examined and found not to be .osu files, so rescans stay cheap.
+-- WITHOUT ROWID, so the path is kept once rather than in the row and again in its index: for
+-- lazer this holds every non-beatmap file in the store. See rebuildNotBeatmaps.
 CREATE TABLE IF NOT EXISTS not_beatmaps (
   path TEXT PRIMARY KEY,
   size INTEGER NOT NULL
-);
+) WITHOUT ROWID;
 
 -- Plays osu! counted that left no replay behind: a quit, a retry, or an HP fail outside
 -- multiplayer. lazer imports a score only for a map played to the end, so these exist
