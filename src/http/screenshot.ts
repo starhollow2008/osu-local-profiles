@@ -16,8 +16,13 @@ import path from 'node:path';
  * controls, the editable affordances.
  */
 
-/** Where a Chromium-based browser usually lives, most preferred first. */
-function browserCandidates(): string[] {
+/**
+ * Where a Chromium-based browser usually lives, most preferred first -- only the ones that
+ * exist, and lazily, so the search stops at the first. The PATH part is the expensive one: on
+ * Windows every name is tried in every PATH folder with every PATHEXT extension, which was
+ * 1,320 failed checks and 44ms on one real machine.
+ */
+function* browserCandidates(): Generator<string> {
   const candidates: string[] = [];
 
   if (process.platform === 'win32') {
@@ -48,6 +53,8 @@ function browserCandidates(): string[] {
     );
   }
 
+  for (const candidate of candidates) if (fs.existsSync(candidate)) yield candidate;
+
   /*
    * Then whatever is simply on PATH.
    *
@@ -57,10 +64,8 @@ function browserCandidates(): string[] {
    */
   for (const name of ['google-chrome', 'chromium', 'chromium-browser', 'microsoft-edge']) {
     const found = onPath(name);
-    if (found) candidates.push(found);
+    if (found) yield found;
   }
-
-  return candidates.filter((c) => fs.existsSync(c));
 }
 
 /** Resolve a command through PATH, the way a shell would. Windows needs the extensions. */
@@ -82,8 +87,21 @@ function onPath(name: string): string | null {
   return null;
 }
 
+/** How long an answer is trusted: long enough for every request between, short enough to notice an install. */
+const BROWSER_TTL_MS = 5 * 60_000;
+let browserCache: { at: number; found: string | null } | null = null;
+
+/**
+ * The browser a screenshot would use, or null. Remembered for a few minutes, because the page
+ * asks through `/api/state` after nearly every event -- and the search is synchronous file
+ * system checks, which held the whole app up for each of those requests.
+ */
 export function findBrowser(): string | null {
-  return browserCandidates()[0] ?? null;
+  const now = Date.now();
+  if (browserCache && now - browserCache.at < BROWSER_TTL_MS) return browserCache.found;
+  const found = browserCandidates().next().value ?? null;
+  browserCache = { at: now, found };
+  return found;
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
