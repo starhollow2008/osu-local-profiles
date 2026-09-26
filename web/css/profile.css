@@ -4517,45 +4517,48 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
 
 /*
  * Shown while the beatmap index runs on a first launch, or when a routine re-check turns out
- * slow. It sticks to the top of the window so it is there wherever the page is scrolled --
- * someone who has just set a score and is looking at Recent Plays is exactly who needs it.
+ * slow. Deliberately small: the page works the whole time, and a banner across it read as
+ * the app being unusable. It sits in the cover's top-right corner, just under the row of
+ * buttons (10px padding + 26px pills), and scrolls away with the header.
+ *
+ * z-index 1 keeps it above the cover's shading but below `.profile-info__bg-actions` (2),
+ * so the Options and language menus open over it rather than behind it.
  */
 .index-notice {
-  position: sticky;
-  top: 0;
-  z-index: 45;
-  padding-block: 10px;
-  background-color: hsl(var(--hsl-b4));
-  border-bottom: 2px solid hsl(var(--hsl-h1));
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-}
-
-.index-notice__inner {
+  position: absolute;
+  top: 44px;
+  right: var(--gutter);
+  z-index: 1;
   display: grid;
-  gap: 6px;
+  gap: 4px;
+  width: min(220px, calc(100% - 2 * var(--gutter)));
+  padding: 6px 10px 7px;
+  border-radius: var(--radius-large);
+  background-color: hsla(var(--hsl-b6), 0.75);
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-small-2);
+  line-height: 1.2;
 }
 
 .index-notice__head {
   display: flex;
-  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 4px 12px;
+  gap: 8px;
 }
 
 .index-notice__title {
-  font-size: var(--fs-title-small);
+  min-width: 0;
 }
 
 .index-notice__detail {
+  flex: none;
   color: hsl(var(--hsl-l1));
-  font-size: var(--fs-normal-2);
   font-variant-numeric: tabular-nums;
 }
 
-.index-notice__note {
-  color: hsl(var(--hsl-l1));
-  font-size: var(--fs-normal);
+.index-notice__bar {
+  height: 3px;
 }
 
 /* While the files are still being counted there is no percentage yet: the bar sweeps. */

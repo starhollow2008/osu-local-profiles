@@ -731,7 +731,10 @@ function renderIndexing(state) {
       ? t('index.finding')
       : t('index.updating');
     const done = state.total > 0 ? Math.min(1, state.scanned / state.total) : 0;
+    // The notice is small, so it carries just a number; the sentence is in its tooltip.
     $('indexDetail').textContent =
+      state.phase === 'counting' ? fmt(state.total) : `${Math.floor(done * 100)}%`;
+    const detail =
       state.phase === 'counting'
         ? t('index.counting', {
             n: fmt(state.total),
@@ -751,7 +754,9 @@ function renderIndexing(state) {
               : t('index.waitingMany', waitingCount)
           }`
         : '';
-    $('indexNote').textContent =
+    $('indexNotice').title =
+      detail +
+      '\n' +
       (state.firstRun
         ? t('index.firstRun')
         : t('index.newBeatmaps')) +
