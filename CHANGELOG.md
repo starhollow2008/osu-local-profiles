@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.26.0
+
+- **Your finished plays are tracked even if you imported someone else's osu! account.**
+  Importing an account's avatar, banner or name - an alt's, a friend's - used to make the app
+  treat that account as the profile's owner, so your own finished plays were turned away while
+  your fails still showed. Whose plays count is now decided by who osu! says is signed in on
+  this computer. Plays refused this way are still in osu!, and **Import past plays** brings
+  them back.
+
+- **Newly ranked maps get their ranked status.** A map ranked after osu!lazer last downloaded
+  its list of beatmaps showed as never submitted, and stayed that way. Plays on it are updated
+  the first time the app starts after osu!lazer has a newer list - and osu!lazer can now update
+  that list while this app is open, which it could not before.
+
+- **Recalculating pp no longer erases it for maps you've deleted.** A recalculation, including
+  the one after a pp rework, used to wipe the pp of any score whose beatmap was no longer
+  installed. Those scores now keep the pp they had.
+
+- **A smaller beatmap index.** For a large osu!lazer library it is about a third smaller
+  (365MB -> 221MB for 250,000 beatmaps). The first start after updating tidies it once, which
+  takes a few seconds on a very large library. Beatmaps you delete now leave the index too.
+
+- **Less work each time the page updates.** The app no longer searches every folder on your
+  PATH for a browser whenever the page checks in, which took about 40ms each time on Windows.
+
+- Counts of 2-4 read correctly in Polish.
+
 ## 1.25.0
 
 - **Beatmaps downloaded while the app is open are found** (osu!stable and McOsu). A play on a
