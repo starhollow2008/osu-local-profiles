@@ -130,6 +130,8 @@ App watches for a new `.osr` replay file:
                           store → recompute profile → live update
 ```
 
+Stable's `Songs` folder is watched too, so a beatmap downloaded while the app is open is found before the play.
+
 ## Incomplete plays (fail, quit, retry) - *lazer only*
 
 App reads from lazer's session log to track incomplete plays:
@@ -172,7 +174,7 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
 
 ## Known limitations
 
-- The official osu! pp calculator adds ~70MB to the download (it bundles its own .NET 10 runtime)
+- The official osu! pp calculator adds ~25MB to the download (~58MB unzipped), because it bundles its own .NET 10 runtime
 - pp reworks require manual updates
 - Global rank is an estimate and requires manual refreshes. It is interpolated from a pp->rank curve built
   from a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase
