@@ -51,6 +51,11 @@ Each has its reasoning in `docs/architecture.md`.
   refuses in a source checkout, and never relaunches the app anywhere it cannot be stopped
   from. The tray launcher restarts it itself (`test/launcher.test.ts`); the swapper only ever
   starts a launcher, never the runtime (`test/relaunch.test.ts`).
+- **A waiting update installs only when asked, and only at a deliberate quit or a start**
+  (roadmap 5.66): "When I quit" or Auto-update (off by default), never on a metered
+  connection by itself, once per build (`attempts`). Never on stdin closing without
+  `{"quit":true}` - that is the launcher dying or the system shutting down. Every swapper keeps
+  `--no-relaunch`: an older app hands the swap to the newer one's.
 - **The app never outlives its tray launcher.** It stops when the launcher closes its stdin
   (`stopWhenLauncherCloses`). `start.sh` and the `.command` keep their names: 1.14-1.16
   launchers run them again after an update.

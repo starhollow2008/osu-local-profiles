@@ -1,9 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { appVersion, installDir } from '../config.ts';
-import { assetFor, compareVersions, fetchLatestRelease, parseRepo, type Release } from './github.ts';
+import { appVersion, dataDir as defaultDataDir, installDir } from '../config.ts';
+import { assetFor, compareVersions, fetchLatestRelease, namedAsset, parseRepo, type Release } from './github.ts';
 import { extractZip } from './zip.ts';
+import { launcherNameFor, manifestAssetName, parseManifest, planParts, ridFor } from './parts.ts';
+import { CHANGELOG_URL, notesBetween, notesFromBody, nudgeFor, parseNotes, type VersionNotes } from './notes.ts';
 
 /**
  * The one-click update.
@@ -23,6 +26,10 @@ import { extractZip } from './zip.ts';
  * It also refuses to run against a source checkout. `start.bat` runs `node src/main.ts` from
  * the repository, and an "update" there would overwrite someone's working tree with a
  * release zip.
+ *
+ * Since 5.66 a build can also be downloaded ahead of time -- by Auto-update, or by "When I
+ * quit" -- and wait, checked, in `data/update/<version>`, to be installed when the app is quit
+ * or next starts. Only the parts of it that changed are downloaded (`./parts.ts`).
  */
 
 /**
@@ -70,6 +77,25 @@ export interface UpdateState {
   checkedAt: string | null;
   /** Set while a download or swap is in flight, so a second click cannot start another. */
   applying: boolean;
+  /** What is new: each version after this one up to the newest, newest first. */
+  notes: VersionNotes[];
+  changelogUrl: string;
+  /** How loudly to say an update is waiting (`nudgeFor`); the page decides whether to show it. */
+  nudge: 'important' | 'behind' | null;
+  /** A newer build downloaded and checked, waiting in `data/update/` to be installed. */
+  ready: string | null;
+  /** That build installs when the app is quit, or next starts: asked for, or Auto-update. */
+  installOnQuit: boolean;
+  /** Downloading one ahead of time, in the background. */
+  preparing: boolean;
+  /** Why the last download ahead of time failed. */
+  prepareError: string | null;
+  /** What the last download cost, in bytes, once there has been one. */
+  downloadedBytes: number | null;
+  /** The tray launcher's word on the connection: metered, or not; null when nobody has said. */
+  metered: boolean | null;
+  /** Options -> Auto-update. */
+  autoUpdate: boolean;
 }
 
 const state: UpdateState = {
@@ -81,7 +107,32 @@ const state: UpdateState = {
   error: null,
   checkedAt: null,
   applying: false,
+  notes: [],
+  changelogUrl: CHANGELOG_URL,
+  nudge: null,
+  ready: null,
+  installOnQuit: false,
+  preparing: false,
+  prepareError: null,
+  downloadedBytes: null,
+  metered: null,
+  autoUpdate: false,
 };
+
+/** What the update needs from config.json, read on every use so a change applies at once. */
+interface UpdateSettings {
+  autoUpdate: () => boolean;
+  checking: () => boolean;
+}
+
+let settings: UpdateSettings = { autoUpdate: () => false, checking: () => true };
+let dataRoot = defaultDataDir();
+
+export function configureUpdates(next: Partial<UpdateSettings> & { dataDir?: string }): void {
+  settings = { ...settings, ...next };
+  if (next.dataDir !== undefined) dataRoot = next.dataDir;
+  refreshReady();
+}
 
 /** The repository to check, taken from `package.json` rather than written down again. */
 export function repoFromPackage(dir = installDir()): string | null {
@@ -121,7 +172,7 @@ export function blockedReason(
 }
 
 export function updateState(): UpdateState {
-  return { ...state };
+  return { ...state, autoUpdate: settings.autoUpdate(), notes: [...state.notes] };
 }
 
 /**
@@ -133,24 +184,53 @@ export function offeredVersion(s: UpdateState = state): string | null {
 }
 
 /*
- * Who hears about a newly found update: the page's live feed. Told once per version, so a
- * daily check that finds the same release again says nothing new.
+ * Who hears when anything here changes: the page's live feed, and the console. `found` is set
+ * once per version, so a daily check that finds the same release again announces nothing.
  */
-const foundListeners = new Set<(s: UpdateState) => void>();
+type UpdateListener = (s: UpdateState, found: boolean) => void;
+const listeners = new Set<UpdateListener>();
 let announced: string | null = null;
 
-export function onUpdateFound(listener: (s: UpdateState) => void): () => void {
-  foundListeners.add(listener);
-  return () => foundListeners.delete(listener);
+export function onUpdateChange(listener: UpdateListener): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-function announce(): void {
+function changed(): void {
   const version = offeredVersion();
-  if (version === null || version === announced) return;
-  announced = version;
+  const found = version !== null && version !== announced;
+  if (found) announced = version;
   const s = updateState();
-  for (const listener of foundListeners) listener(s);
+  for (const listener of listeners) listener(s, found);
 }
+
+/* ------------------------------------------------------------ patch notes */
+
+/** Each newest version's notes, fetched once rather than on every daily check. */
+let notesCache: { version: string; notes: VersionNotes[] } | null = null;
+
+/** The notes every release since 1.27.0 carries (`notesJson` in scripts/release-notes.mjs). */
+export const notesAssetName = (version: string): string => `osu-local-profiles-${version}-notes.json`;
+
+async function releaseNotesFor(release: Release): Promise<VersionNotes[]> {
+  if (notesCache?.version === release.version) return notesCache.notes;
+  let notes: VersionNotes[] = [];
+  const asset = namedAsset(release, notesAssetName(release.version));
+  if (asset !== null) {
+    try {
+      notes = parseNotes(JSON.parse((await download(asset.url, 0, 20_000, 2 * 1024 * 1024)).toString('utf8')));
+    } catch {
+      /* the release page's own lines, below, are nearly as good */
+    }
+  }
+  if (notes.length === 0) notes = notesFromBody(release.body, release.version, release.publishedAt);
+  notesCache = { version: release.version, notes };
+  return notes;
+}
+
+const changelogUrlFor = (repo: string): string => `https://github.com/${repo}/blob/main/CHANGELOG.md`;
+
+/* ------------------------------------------------------------------ check */
 
 /**
  * Ask GitHub what the newest release is.
@@ -168,8 +248,10 @@ export async function checkForUpdate(): Promise<UpdateState> {
   if (repo === null) {
     state.error = 'no GitHub repository is recorded in package.json';
     state.checkedAt = new Date().toISOString();
+    changed();
     return updateState();
   }
+  state.changelogUrl = changelogUrlFor(repo);
 
   try {
     const release: Release = await fetchLatestRelease(repo);
@@ -188,13 +270,18 @@ export async function checkForUpdate(): Promise<UpdateState> {
     } else {
       state.available = newer;
     }
+
+    state.notes = state.available ? notesBetween(await releaseNotesFor(release), current, release.version) : [];
+    state.nudge = nudgeFor(state.notes, Date.now());
   } catch (e) {
     state.error = (e as Error).message;
     state.available = false;
   }
 
   state.checkedAt = new Date().toISOString();
-  announce();
+  refreshReady();
+  changed();
+  maybePrepare();
   return updateState();
 }
 
@@ -223,12 +310,12 @@ export function checkDue(s: Pick<UpdateState, 'checkedAt' | 'error'>, now: numbe
  *
  * One request a day to GitHub's releases API; its unauthenticated limit is 60 an hour. The
  * reason there is no polling loop (docs/reference-links.md) is osu!'s API guidance, which
- * covers osu!, not this.
+ * covers osu!, not this. Nothing is asked while `checkForUpdates` is off.
  */
 export function keepCheckingForUpdates(check: () => Promise<unknown> = checkForUpdate): () => void {
   let inFlight = false;
   const look = () => {
-    if (inFlight || state.applying || !checkDue(state, Date.now())) return;
+    if (inFlight || state.applying || !settings.checking() || !checkDue(state, Date.now())) return;
     inFlight = true;
     void check().finally(() => {
       inFlight = false;
@@ -238,6 +325,32 @@ export function keepCheckingForUpdates(check: () => Promise<unknown> = checkForU
   const timer = setInterval(look, LOOK_EVERY_MS);
   timer.unref();
   return () => clearInterval(timer);
+}
+
+/* -------------------------------------------------------------- downloads */
+
+/**
+ * One file from a release, whole, in memory. `size` (0: unknown) is checked before anything
+ * is unpacked: a truncated download unpacks into a plausible-looking partial tree.
+ */
+async function download(url: string, size: number, timeoutMs: number, maxBytes = Infinity): Promise<Buffer> {
+  const response = await fetch(url, {
+    headers: { 'user-agent': 'osu-local-profiles' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) throw new Error(`downloading ${path.basename(new URL(url).pathname)} failed (${response.status})`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (size > 0 && bytes.length !== size) throw new Error(`the download was ${bytes.length} bytes, expected ${size}`);
+  if (bytes.length > maxBytes) throw new Error('the download was far larger than it should be');
+  return bytes;
+}
+
+async function hashFile(file: string): Promise<string | null> {
+  try {
+    return createHash('sha256').update(await fs.promises.readFile(file)).digest('hex');
+  } catch {
+    return null;
+  }
 }
 
 /** Everything an install needs; a staged tree missing any of it is not one. */
@@ -256,8 +369,7 @@ function verifyStaged(dir: string, expectedVersion: string, platform: string): v
   }
 
   // What starts the app again once the swap is done (scripts/apply-update.mjs, launcherName).
-  const launcher =
-    platform === 'win32' ? 'osu! local profiles.exe' : platform === 'darwin' ? 'osu! local profiles.app' : 'osu-local-profiles';
+  const launcher = launcherNameFor(platform);
   if (!fs.existsSync(path.join(dir, launcher))) {
     throw new Error(`the downloaded build has no ${launcher}`);
   }
@@ -270,6 +382,243 @@ function verifyStaged(dir: string, expectedVersion: string, platform: string): v
   }
 }
 
+/**
+ * The release assembled from its parts: those that changed downloaded, the rest copied from
+ * this install, and then every file checked against the manifest. Throws on anything short
+ * of that, and the full zip is used instead. Returns the bytes downloaded.
+ */
+export async function stageFromParts(
+  release: Release,
+  stagedDir: string,
+  work: string,
+  install = installDir(),
+  platform: string = process.platform,
+  arch: string = process.arch,
+): Promise<number> {
+  const rid = ridFor(platform, arch);
+  const manifestAsset = namedAsset(release, manifestAssetName(release.version, rid));
+  if (manifestAsset === null) throw new Error(`${release.version} was not published in parts`);
+  const raw = await download(manifestAsset.url, manifestAsset.size, 60_000, 16 * 1024 * 1024);
+  const manifest = parseManifest(JSON.parse(raw.toString('utf8')), release.version, rid);
+
+  const here = new Map<string, string | null>();
+  for (const f of manifest.files) here.set(f.path, await hashFile(path.join(install, f.path)));
+  const plan = planParts(manifest, (p) => here.get(p) ?? null);
+
+  let bytes = raw.length;
+  for (const part of plan.download) {
+    const info = manifest.parts[part]!;
+    const asset = namedAsset(release, info.asset);
+    if (asset === null) throw new Error(`${release.version} has no ${info.asset}`);
+    const zipped = await download(asset.url, info.size, 30 * 60_000);
+    bytes += zipped.length;
+    const zip = path.join(work, asset.name);
+    fs.writeFileSync(zip, zipped);
+    try {
+      extractZip(zip, stagedDir, 1);
+    } finally {
+      fs.rmSync(zip, { force: true });
+    }
+  }
+
+  for (const f of plan.reuse) {
+    const to = path.join(stagedDir, f.path);
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    // copyFile keeps the mode, so a runtime copied from this install is still executable.
+    fs.copyFileSync(path.join(install, f.path), to);
+  }
+
+  // The staged tree is the whole release or nothing: every file, byte for byte.
+  for (const f of manifest.files) {
+    if ((await hashFile(path.join(stagedDir, f.path))) !== f.sha256) {
+      throw new Error(`${f.path} did not come out as the release has it`);
+    }
+  }
+  return bytes;
+}
+
+/** The release from its one full zip: what every update did before 5.66. */
+async function stageFromZip(release: Release, stagedDir: string, work: string): Promise<number> {
+  const asset = assetFor(release, process.platform, process.arch);
+  if (asset === null) {
+    throw new Error(`${release.version} has no build for ${process.platform}-${process.arch}`);
+  }
+  const bytes = await download(asset.url, asset.size, 30 * 60_000);
+  const archive = path.join(work, asset.name);
+  fs.writeFileSync(archive, bytes);
+  try {
+    const written = extractZip(archive, stagedDir, 1);
+    if (written < 10) throw new Error(`the archive held only ${written} files`);
+  } finally {
+    fs.rmSync(archive, { force: true });
+  }
+  return bytes.length;
+}
+
+/** Download, unpack and check a release into `data/update/<version>`. */
+async function stage(release: Release, data: string): Promise<string> {
+  const work = path.join(data, 'update');
+  const stagedDir = path.join(work, release.version);
+  fs.mkdirSync(work, { recursive: true });
+
+  let bytes: number;
+  try {
+    fs.rmSync(stagedDir, { recursive: true, force: true });
+    bytes = await stageFromParts(release, stagedDir, work);
+  } catch (e) {
+    console.log(`  update: downloading the whole of ${release.version} (${(e as Error).message})`);
+    fs.rmSync(stagedDir, { recursive: true, force: true });
+    bytes = await stageFromZip(release, stagedDir, work);
+  }
+  verifyStaged(stagedDir, release.version, process.platform);
+  state.downloadedBytes = bytes;
+  console.log(`  update: ${release.version} downloaded (${(bytes / 1024 / 1024).toFixed(1)}MB) and checked`);
+  return stagedDir;
+}
+
+/* ------------------------------------------------ a build waiting to install */
+
+const READY_FILE = 'ready.json';
+
+interface ReadyRecord {
+  version: string;
+  /** Downloaded by Auto-update, or because someone pressed "When I quit". */
+  requested: 'auto' | 'user';
+  /** Installs started from it. One that did not take is not tried again. */
+  attempts: number;
+}
+
+function readReady(data = dataRoot): ReadyRecord | null {
+  try {
+    const r = JSON.parse(fs.readFileSync(path.join(data, 'update', READY_FILE), 'utf8')) as Partial<ReadyRecord>;
+    if (typeof r.version !== 'string') return null;
+    return {
+      version: r.version,
+      requested: r.requested === 'user' ? 'user' : 'auto',
+      attempts: typeof r.attempts === 'number' ? r.attempts : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function writeReady(record: ReadyRecord, data = dataRoot): void {
+  fs.writeFileSync(path.join(data, 'update', READY_FILE), `${JSON.stringify(record)}\n`);
+}
+
+function dropReady(data = dataRoot): void {
+  const ready = readReady(data);
+  fs.rmSync(path.join(data, 'update', READY_FILE), { force: true });
+  if (ready !== null) fs.rmSync(path.join(data, 'update', ready.version), { recursive: true, force: true });
+}
+
+/** The waiting build, if it is newer than this one and still on disk. */
+function usableReady(data = dataRoot): ReadyRecord | null {
+  const ready = readReady(data);
+  const current = appVersion();
+  if (ready === null || current === null || compareVersions(current, ready.version) >= 0) return null;
+  if (!fs.existsSync(path.join(data, 'update', ready.version, 'package.json'))) return null;
+  return ready;
+}
+
+function refreshReady(): void {
+  const ready = usableReady();
+  state.ready = ready?.version ?? null;
+  state.installOnQuit = ready !== null && (ready.requested === 'user' || settings.autoUpdate());
+}
+
+let preparing: Promise<void> | null = null;
+let failedPrepare: { version: string | null; at: number } | null = null;
+
+/**
+ * Download the newest release ahead of time, to be installed when the app is quit or next
+ * starts. `user` is "When I quit" in the update dialog; `auto` is Auto-update. Errors are
+ * kept in `prepareError` for the page, and thrown for a caller that waits.
+ */
+export function prepareUpdate(requested: 'auto' | 'user'): Promise<void> {
+  if (preparing !== null) {
+    // Already downloading: someone asking for it outranks Auto-update having started it.
+    return preparing.then(() => {
+      const ready = readReady();
+      if (requested === 'user' && ready !== null && ready.requested !== 'user') {
+        writeReady({ ...ready, requested: 'user' });
+        refreshReady();
+        changed();
+      }
+    });
+  }
+
+  preparing = (async () => {
+    state.preparing = true;
+    state.prepareError = null;
+    changed();
+    try {
+      const blocked = blockedReason();
+      if (blocked !== null) throw new Error(blocked);
+      const repo = repoFromPackage();
+      if (repo === null) throw new Error('no GitHub repository is recorded in package.json');
+
+      const release = await fetchLatestRelease(repo);
+      const current = appVersion();
+      if (current === null || compareVersions(current, release.version) >= 0) {
+        throw new Error(`already on ${current ?? 'an unknown version'}`);
+      }
+
+      const ready = usableReady();
+      if (ready?.version !== release.version) {
+        dropReady();
+        await stage(release, dataRoot);
+      }
+      writeReady({
+        version: release.version,
+        requested: requested === 'user' || ready?.requested === 'user' ? 'user' : 'auto',
+        attempts: 0,
+      });
+      failedPrepare = null;
+    } catch (e) {
+      state.prepareError = (e as Error).message;
+      failedPrepare = { version: state.latestVersion, at: Date.now() };
+      throw e;
+    } finally {
+      state.preparing = false;
+      preparing = null;
+      refreshReady();
+      changed();
+    }
+  })();
+  return preparing;
+}
+
+/**
+ * Auto-update's half: download a newer release ahead of time, unless the connection is
+ * metered, or one already waits, or the last attempt at this version failed within the hour.
+ */
+function maybePrepare(): void {
+  if (!settings.autoUpdate() || !state.available || state.blocked !== null) return;
+  if (state.metered === true || state.applying || preparing !== null) return;
+  if (state.ready === state.latestVersion) return;
+  if (failedPrepare?.version === state.latestVersion && Date.now() - failedPrepare.at < RETRY_FAILED_MS) return;
+  void prepareUpdate('auto').catch(() => {});
+}
+
+/** Options -> Auto-update changed. Turned off, a build it downloaded is not installed. */
+export function autoUpdateChanged(): void {
+  if (!settings.autoUpdate() && readReady()?.requested === 'auto') dropReady();
+  refreshReady();
+  changed();
+  maybePrepare();
+}
+
+/** What the tray launcher says about the connection, as it changes. */
+export function setMetered(metered: boolean | null): void {
+  if (state.metered === metered) return;
+  state.metered = metered;
+  changed();
+  maybePrepare();
+}
+
+/* -------------------------------------------------------------- the swap */
+
 export interface ApplyResult {
   version: string;
   stagedDir: string;
@@ -278,15 +627,54 @@ export interface ApplyResult {
 }
 
 /**
- * Download the newest release, unpack it, check it, and hand the swap to a detached process.
+ * Hand a staged build to a detached swapper. The swap cannot happen in this process: on
+ * Windows the running `node.exe` is locked by the very process that would replace it. So the
+ * *staged* build's own runtime runs the *staged* build's updater script, waits for this
+ * process to exit, and does the work. That also means a release always installs itself with
+ * its own updater rather than with whatever the older version happened to ship.
  *
- * The swap cannot happen in this process: on Windows the running `node.exe` is locked by
- * the very process that would replace it. So the *staged* build's own runtime runs the
- * *staged* build's updater script, waits for this process to exit, and does the work. That
- * also means a release always installs itself with its own updater rather than with
- * whatever the older version happened to ship.
+ * `relaunch: false` is an install at quit: the swapper starts nothing afterwards, because
+ * nobody asked for the app to come back (`--no-relaunch`, known to every swapper since 5.66,
+ * which is every one this can hand to).
  */
-export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
+function handOff(stagedDir: string, version: string, relaunch: boolean): ApplyResult {
+  verifyStaged(stagedDir, version, process.platform);
+  const runtime = path.join(stagedDir, process.platform === 'win32' ? 'node.exe' : 'node');
+  const script = path.join(stagedDir, 'scripts', 'apply-update.mjs');
+  if (!fs.existsSync(script)) {
+    throw new Error(`${version} does not know how to install itself (no updater script)`);
+  }
+
+  const restarts = relaunch && launcherRestarts();
+  const child = spawn(
+    runtime,
+    [
+      script,
+      '--install', installDir(),
+      '--staged', stagedDir,
+      '--pid', String(process.pid),
+      // The swapper then leaves the relaunch to the launcher instead of starting a copy
+      // of its own. Only a swapper newer than this one ever reads it.
+      ...(restarts ? ['--launcher-restarts'] : []),
+      ...(relaunch ? [] : ['--no-relaunch']),
+    ],
+    { detached: true, stdio: 'ignore', windowsHide: true },
+  );
+  child.unref();
+
+  // What the launcher waits on. data/ is the one place the swap does not move.
+  if (child.pid !== undefined) {
+    fs.writeFileSync(path.join(path.dirname(stagedDir), SWAPPER_PID_FILE), `${child.pid}\n`);
+  }
+
+  return { version, stagedDir, exitCode: restarts ? RESTART_EXIT_CODE : 0 };
+}
+
+/**
+ * Update now: install the newest release and restart. A build already waiting for it is used
+ * as it is; otherwise it is downloaded, unpacked and checked first.
+ */
+export async function applyUpdate(dataDir: string = dataRoot): Promise<ApplyResult> {
   if (state.applying) throw new Error('an update is already in progress');
 
   const blocked = blockedReason();
@@ -296,73 +684,76 @@ export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
   if (repo === null) throw new Error('no GitHub repository is recorded in package.json');
 
   state.applying = true;
+  changed();
   try {
+    await preparing?.catch(() => {});
+    const waiting = usableReady(dataDir);
+    if (waiting !== null && (state.latestVersion === null || waiting.version === state.latestVersion)) {
+      writeReady({ ...waiting, attempts: waiting.attempts + 1 }, dataDir);
+      return handOff(path.join(dataDir, 'update', waiting.version), waiting.version, true);
+    }
+
     const release = await fetchLatestRelease(repo);
     const current = state.currentVersion ?? appVersion();
     if (current === null || compareVersions(current, release.version) >= 0) {
       throw new Error(`already on ${current ?? 'an unknown version'}`);
     }
-
-    const asset = assetFor(release, process.platform, process.arch);
-    if (asset === null) {
-      throw new Error(`${release.version} has no build for ${process.platform}-${process.arch}`);
-    }
-
-    const work = path.join(dataDir, 'update');
-    const stagedDir = path.join(work, release.version);
-    const archive = path.join(work, asset.name);
-    fs.rmSync(stagedDir, { recursive: true, force: true });
-    fs.mkdirSync(work, { recursive: true });
-
-    const download = await fetch(asset.url, {
-      headers: { 'user-agent': 'osu-local-profiles' },
-      signal: AbortSignal.timeout(30 * 60_000),
-    });
-    if (!download.ok) throw new Error(`downloading the release failed (${download.status})`);
-    const bytes = Buffer.from(await download.arrayBuffer());
-
-    // A truncated download unpacks into a plausible-looking partial tree, so the size is
-    // checked before anything is unpacked rather than after.
-    if (asset.size > 0 && bytes.length !== asset.size) {
-      throw new Error(`the download was ${bytes.length} bytes, expected ${asset.size}`);
-    }
-    fs.writeFileSync(archive, bytes);
-
-    const written = extractZip(archive, stagedDir, 1);
-    if (written < 10) throw new Error(`the archive held only ${written} files`);
-    verifyStaged(stagedDir, release.version, process.platform);
-
-    const runtime = path.join(stagedDir, process.platform === 'win32' ? 'node.exe' : 'node');
-    const script = path.join(stagedDir, 'scripts', 'apply-update.mjs');
-    if (!fs.existsSync(script)) {
-      throw new Error(`${release.version} does not know how to install itself (no updater script)`);
-    }
-
-    const restarts = launcherRestarts();
-    const child = spawn(
-      runtime,
-      [
-        script,
-        '--install', installDir(),
-        '--staged', stagedDir,
-        '--pid', String(process.pid),
-        '--archive', archive,
-        // The swapper then leaves the relaunch to the launcher instead of starting a copy
-        // of its own. Only a swapper newer than this one ever reads it.
-        ...(restarts ? ['--launcher-restarts'] : []),
-      ],
-      { detached: true, stdio: 'ignore', windowsHide: true },
-    );
-    child.unref();
-
-    // What the launcher waits on. data/ is the one place the swap does not move.
-    if (child.pid !== undefined) {
-      fs.writeFileSync(path.join(work, SWAPPER_PID_FILE), `${child.pid}\n`);
-    }
-
-    return { version: release.version, stagedDir, exitCode: restarts ? RESTART_EXIT_CODE : 0 };
+    dropReady(dataDir);
+    const stagedDir = await stage(release, dataDir);
+    return handOff(stagedDir, release.version, true);
   } finally {
     state.applying = false;
+    refreshReady();
+    changed();
+  }
+}
+
+/**
+ * The waiting build to install now, at startup or at quit, or null.
+ *
+ * Installed only when someone asked for it: "When I quit", or Auto-update still on. And only
+ * once: a build whose install did not take -- the app is starting on the old version again
+ * -- is dropped rather than tried at every start, which would never let the app start at all.
+ */
+function installable(when: 'start' | 'quit'): ReadyRecord | null {
+  if (blockedReason() !== null) return null;
+  const ready = usableReady();
+  if (ready === null || !(ready.requested === 'user' || settings.autoUpdate())) return null;
+  if (ready.attempts > 0) {
+    if (when === 'start') {
+      state.prepareError = `the update to ${ready.version} did not install; data/update.log says why`;
+      dropReady();
+      refreshReady();
+    }
+    return null;
+  }
+  return ready;
+}
+
+/** At startup: install a waiting build and restart into it, or null to start as usual. */
+export function installAtStart(): ApplyResult | null {
+  const ready = installable('start');
+  if (ready === null) return null;
+  try {
+    writeReady({ ...ready, attempts: ready.attempts + 1 });
+    return handOff(path.join(dataRoot, 'update', ready.version), ready.version, true);
+  } catch (e) {
+    console.log(`  update: could not install ${ready.version} (${(e as Error).message})`);
+    return null;
+  }
+}
+
+/** At a deliberate quit: install a waiting build, and start nothing afterwards. */
+export function installAtQuit(): string | null {
+  const ready = installable('quit');
+  if (ready === null) return null;
+  try {
+    writeReady({ ...ready, attempts: ready.attempts + 1 });
+    handOff(path.join(dataRoot, 'update', ready.version), ready.version, false);
+    return ready.version;
+  } catch (e) {
+    console.log(`  update: could not install ${ready.version} (${(e as Error).message})`);
+    return null;
   }
 }
 
@@ -378,6 +769,9 @@ export async function applyUpdate(dataDir: string): Promise<ApplyResult> {
  * - **`data/update/`**, where the release was unpacked before being swapped in. The swap
  *   cannot delete this itself: it is *running from it*, and on Windows its own `node.exe`
  *   is locked for as long as it lives. So the app that comes back afterwards does it.
+ *
+ * A build downloaded ahead of time and still newer than this one is kept, with its
+ * `ready.json`: it is waiting to be installed, not left over.
  *
  * Failure is ignored on purpose. A locked file is not worth refusing to start over, and
  * the next launch tries again.
@@ -425,7 +819,18 @@ export function pruneUpdateLeftovers(
 
   // `data/update.log` is a *file* and is deliberately kept: it is the record of what the
   // last update did. Only the `update/` directory beside it goes.
-  drop(path.join(data, 'update'), 'data/update');
+  const keep = usableReady(data)?.version ?? null;
+  if (keep === null) {
+    drop(path.join(data, 'update'), 'data/update');
+  } else {
+    try {
+      for (const name of fs.readdirSync(path.join(data, 'update'))) {
+        if (name !== keep && name !== READY_FILE) drop(path.join(data, 'update', name), `data/update/${name}`);
+      }
+    } catch {
+      /* see above */
+    }
+  }
 
   return { removed, bytes };
 }

@@ -329,6 +329,106 @@
   box-shadow: var(--box-shadow);
 }
 
+/*
+ * An update that has waited two weeks, or one marked important (roadmap 5.66). Fixed at the
+ * foot of the window, so it is seen wherever the page is scrolled and moves nothing, and put
+ * away with its cross -- for a week, or until something important comes out.
+ *
+ * Bottom left, because toasts take the bottom right; and beneath both toasts and dialogs
+ * (the backdrop is 50), since it is the one message here that can wait.
+ */
+.update-nudge {
+  position: fixed;
+  bottom: 18px;
+  left: 18px;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(560px, calc(100vw - 36px));
+  padding: 10px 10px 10px 16px;
+  border-radius: 10px;
+  border-left: 4px solid var(--yellow);
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
+  font-size: var(--fs-normal);
+}
+
+.update-nudge--important {
+  border-left-color: var(--rank-d);
+}
+
+.update-nudge__text {
+  min-width: 0;
+}
+
+.update-nudge__open {
+  flex: none;
+  border-radius: 10000px;
+  padding: 4px 12px;
+  font-weight: 700;
+  color: hsl(var(--hsl-b6));
+  background-color: var(--yellow);
+}
+
+.update-nudge__open:hover {
+  background-color: var(--yellow-light);
+}
+
+.update-nudge__close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  color: hsl(var(--hsl-c2));
+  background: none;
+}
+
+.update-nudge__close:hover {
+  color: hsl(var(--hsl-c1));
+  background-color: hsl(var(--hsl-b4));
+}
+
+/* What is new, or what changed: a short list a version, scrolled when there are many. */
+.update-notes {
+  max-height: min(45vh, 360px);
+  overflow-y: auto;
+  margin: 0 0 12px;
+}
+
+.update-notes:empty {
+  display: none;
+}
+
+.update-notes h4 {
+  margin: 10px 0 2px;
+  font-size: var(--fs-normal);
+  font-weight: 700;
+  color: hsl(var(--hsl-c1));
+}
+
+.update-notes h4:first-child {
+  margin-top: 0;
+}
+
+.update-notes .update-notes__important {
+  margin-left: 6px;
+  color: var(--rank-d);
+}
+
+.modal .update-notes ul {
+  margin: 2px 0 0;
+}
+
+.update-links:empty,
+.update-auto[hidden] {
+  display: none;
+}
+
 .update-pill::before {
   content: "↓";
   font-weight: 700;
@@ -1672,6 +1772,7 @@
 .export-mode .tracking-pill,
 .export-mode .quit-pill,
 .export-mode .stopped-notice,
+.export-mode .update-nudge,
 .export-mode .section-order,
 .export-mode .play-detail__menu,
 .export-mode .play-detail__grip,
@@ -5162,7 +5263,7 @@ s.bbcode-editor__glyph {
 /* language picker: a copy carries the one language it was saved in.         */
 /* ======================================================================== */
 
-.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
+.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
   #aboutEdit, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;

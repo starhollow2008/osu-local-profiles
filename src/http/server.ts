@@ -54,8 +54,17 @@ import {
   setActiveProfile,
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
-import { appVersion } from '../config.ts';
-import { applyUpdate, checkForUpdate, offeredVersion, onUpdateFound, updateState } from '../update/index.ts';
+import { appVersion, installDir } from '../config.ts';
+import {
+  applyUpdate,
+  checkForUpdate,
+  offeredVersion,
+  onUpdateChange,
+  prepareUpdate,
+  updateState,
+} from '../update/index.ts';
+import { nudgeShown } from '../update/notes.ts';
+import { dismissNudge, markSeen, nudgeDismissal, whatsNew } from '../update/whats-new.ts';
 import { filterNarrows } from '../tracking-filter.ts';
 import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
 import { MAX_REPLAY_BYTES, releaseUploadedReplay, storeUploadedReplay } from '../uploaded-replays.ts';
@@ -242,6 +251,8 @@ export interface AppConfig {
   language?: string;
   /** Show beatmap artists and titles in the song's own script, as osu!'s own option does. */
   originalMetadata?: boolean;
+  /** Options -> Auto-update: download new versions and install them at quit or next start. */
+  autoUpdate?: boolean;
 }
 
 export function startServer(opts: ServerOptions): http.Server {
@@ -314,8 +325,16 @@ export function startServer(opts: ServerOptions): http.Server {
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
-  // A newer release found while the app runs: the page shows its button without a reload.
-  const stopUpdateFeed = onUpdateFound((u) => broadcast('update', u));
+  /*
+   * The update's state, for the page: what the updater knows, plus whether the notice above
+   * the page shows, which depends on what dismissed it last (kept in the database).
+   */
+  const updateView = () => {
+    const u = updateState();
+    return { ...u, nudgeShown: nudgeShown(u.nudge, u.notes, nudgeDismissal(opts.db), Date.now()) };
+  };
+  // A newer release found while the app runs, or a download finishing: the page follows live.
+  const stopUpdateFeed = onUpdateChange((_, found) => broadcast('update', { ...updateView(), found }));
 
   /*
    * The profile page's expensive half, remembered until the database changes.
@@ -436,6 +455,8 @@ export function startServer(opts: ServerOptions): http.Server {
         tracking: opts.tracker.isTracking,
         // The tray launcher polls this, and offers the update from its menu.
         update: offeredVersion(),
+        // Downloading and installing now, for the tray's status line.
+        updating: updateState().applying,
       });
     }
 
@@ -463,7 +484,9 @@ export function startServer(opts: ServerOptions): http.Server {
         // as an unknown version rather than inventing one.
         app: {
           version: appVersion(),
-          update: updateState(),
+          update: updateView(),
+          // What this version brought, once, after an update.
+          whatsNew: whatsNew(opts.db, appVersion(), installDir(), opts.dataDir),
           config: opts.appConfig.get(),
           launcher: opts.launcher ?? null,
           platform: process.platform,
@@ -677,7 +700,7 @@ export function startServer(opts: ServerOptions): http.Server {
 
       return readBody(req, res, (body) => {
         const patch: Partial<AppConfig> = {};
-        for (const key of ['openBrowser', 'sharedFavorites', 'originalMetadata'] as const) {
+        for (const key of ['openBrowser', 'sharedFavorites', 'originalMetadata', 'autoUpdate'] as const) {
           if (!(key in body)) continue;
           if (typeof body[key] !== 'boolean') return json(res, { error: `${key} must be true or false` }, 400);
           patch[key] = body[key];
@@ -1725,8 +1748,8 @@ export function startServer(opts: ServerOptions): http.Server {
      * at startup and then daily (`keepCheckingForUpdates`).
      */
     if (url.pathname === '/api/update') {
-      if (req.method !== 'POST') return json(res, updateState());
-      return void checkForUpdate().then((s) => json(res, s));
+      if (req.method !== 'POST') return json(res, updateView());
+      return void checkForUpdate().then(() => json(res, updateView()));
     }
 
     /*
@@ -1736,6 +1759,34 @@ export function startServer(opts: ServerOptions): http.Server {
      * is happening while it still has something to be told by. The exit is deliberate and
      * is what the detached updater is waiting for -- see scripts/apply-update.mjs.
      */
+    if (url.pathname.startsWith('/api/update/') && req.method === 'POST' && !isOwnPage(req.headers.origin, req.socket.localPort)) {
+      // Another website open in the browser must not be able to download or install anything.
+      return json(res, { error: "only this app's own page can update it" }, 403);
+    }
+
+    /*
+     * "When I quit": download it now, install it at the next deliberate quit or start. Answered
+     * at once; the download's progress and outcome reach the page on the live feed.
+     */
+    if (url.pathname === '/api/update/later' && req.method === 'POST') {
+      void prepareUpdate('user').catch(() => {});
+      return json(res, { ok: true });
+    }
+
+    // What changed, after an update: seen, so it is not shown again.
+    if (url.pathname === '/api/update/seen' && req.method === 'POST') {
+      markSeen(opts.db, appVersion());
+      return json(res, { ok: true });
+    }
+
+    // The notice above the page, put away for NUDGE_QUIET_DAYS or an important release.
+    if (url.pathname === '/api/update/dismiss' && req.method === 'POST') {
+      const latest = updateState().latestVersion;
+      if (latest !== null) dismissNudge(opts.db, latest);
+      broadcast('update', { ...updateView(), found: false });
+      return json(res, { ok: true });
+    }
+
     if (url.pathname === '/api/update/apply' && req.method === 'POST') {
       return void applyUpdate(opts.dataDir).then(
         (result) => {

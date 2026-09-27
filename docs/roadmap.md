@@ -3178,3 +3178,52 @@ and tell them in the app.
 - **Installs already running an older version cannot be reached by this.** It ships in the
   new version; a 1.23 left open never re-checks, and shows its button the next time it starts.
 - `checkForUpdates: false` still turns every check off.
+
+## 5.66 - Updating made easier to see, smaller, and optionally automatic
+
+**Status:** done -- unreleased.
+
+The user's request, after 5.65: show short patch notes before and after updating, with a link
+to the changelog; the version on the button; Auto-update as its own row in Options, which can
+always be turned off; install at quit or next start rather than mid-session; smaller downloads;
+Update and restart from the tray; a dot on the tray icon; and nothing downloaded by itself on
+a metered connection. Balanced against the user's autonomy and data plans throughout.
+
+- **Auto-update is off by default** and its own switch in Options (`config.autoUpdate`).
+  Switching it on turns `checkForUpdates` back on too. It downloads ahead of time and installs
+  at a deliberate quit or the next start, never mid-session; switched off, a build it
+  downloaded is dropped rather than installed.
+- **When I quit**, in the update dialog, is the same for one update, asked for by hand.
+- **Parts**: app, runtime, pp helper, launcher, and a manifest of every file's hash. See
+  docs/architecture.md. The full zip stays, for new installs and every update from before this.
+- **Patch notes** come from the CHANGELOG through `release-notes.mjs --json`: a release asset
+  before an update, `release-notes.json` in the package after one. `<!-- important -->` in a
+  version's section marks it important.
+- **The notice at the foot of the page** only for an update waiting 14 days, or an important
+  one; dismissed for 7 days. The button carries the version the rest of the time.
+- **Tray**: a dot on the icon, **Update to X and restart** (the page's own endpoint), and
+  **What's new in X**. No pop-up: it would take focus from osu! mid-play.
+- **Metered**: Windows and Linux (NetworkManager) are asked; macOS is not, since its answer only
+  comes from Network.framework's asynchronous monitor, which could not be built or checked here.
+
+### Verified (2026-09-27)
+
+- `npm run check`: 649 tests, 641 passing, 8 skipped (the macOS and Linux shell-script tests);
+  the launcher's Go tests run, and `go vet` passes for Windows and Linux. The macOS launcher
+  (cgo) is CI's to build.
+- **Two real packages**, 1.27.0 and a throwaway 1.27.1, built here with `npm run package`: the
+  pp helper and the runtime came out byte-identical, so the update was the app and launcher
+  parts, **4.4MB against a 62MB full zip**.
+- **End to end, 18/18**: 1.27.1 staged from its parts served over local HTTP into a running
+  1.27.0 install, then Quit: swapped with nothing relaunched, `data/` intact. A 1.27.0 install
+  with 1.27.1 waiting, started through its own launcher: installed before tracking, came back
+  as 1.27.1 with what changed on offer, no leftovers. A waiting build that had failed once:
+  dropped, the app started on the old version, and the page told why.
+- **The page, 23/23**, in headless Chrome against a packaged install pretending to be 1.25.0:
+  GitHub's real 1.26.0 found, its release page's lines listed (it predates notes files),
+  `?update=1` opening the dialog, the button naming the version, the Options switch saving
+  `autoUpdate`, then Auto-update downloading 1.26.0 in full (a release without parts) and the
+  dialog saying it installs at quit; switched off, the build dropped and quitting installed
+  nothing. After the update to 1.27.1, what changed shown once and marked seen when closed.
+- The screenshots found the notice colliding with toasts and sitting over dialogs; it moved
+  to the bottom left, beneath both.

@@ -70,7 +70,17 @@ func notice(title, message string) {
 
 func trayAvailable() bool { return true }
 
-func setTrayIcon() { systray.SetTemplateIcon(templatePNG, trayPNG) }
+func setTrayIcon(update bool) {
+	if update {
+		systray.SetTemplateIcon(templateUpdatePNG, trayUpdatePNG)
+	} else {
+		systray.SetTemplateIcon(templatePNG, trayPNG)
+	}
+}
+
+// meteredConnection is not asked on macOS: its answer (Low Data Mode, an expensive path) comes
+// only from Network.framework's asynchronous monitor. Not known, so Auto-update goes ahead.
+func meteredConnection() (metered, known bool) { return false, false }
 
 func trayReadyPlatform() { C.hideFromDock() }
 

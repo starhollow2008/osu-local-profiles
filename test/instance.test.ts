@@ -176,6 +176,49 @@ test('the app stops once, when the tray launcher closes its end', () => {
   );
 });
 
+/*
+ * Roadmap 5.66: Quit says so before closing stdin, and only that stop installs an update
+ * waiting for the quit -- not the launcher dying, which is also how the computer shutting down
+ * looks from here.
+ */
+test('a Quit from the tray is told apart from the launcher going away', async () => {
+  const run = (write: (stdin: PassThrough) => void) =>
+    new Promise<{ deliberate: boolean; messages: unknown[] }>((resolve) => {
+      const stdin = new PassThrough();
+      const messages: unknown[] = [];
+      stopWhenLauncherCloses(stdin, (deliberate) => resolve({ deliberate, messages }), (m) => messages.push(m));
+      write(stdin);
+    });
+
+  const quit = await run((s) => {
+    s.write('{"quit":true}\n');
+    s.end();
+  });
+  assert.equal(quit.deliberate, true);
+
+  const died = await run((s) => s.end());
+  assert.equal(died.deliberate, false);
+
+  // Lines arrive in whatever pieces the pipe gives them; anything unreadable is passed over.
+  const metered = await run((s) => {
+    s.write('{"mete');
+    s.write('red":true}\nnot json\n{"metered":null}\n');
+    s.end();
+  });
+  assert.deepEqual(metered.messages, [{ metered: true }, { metered: null }]);
+  assert.equal(metered.deliberate, false);
+});
+
+test('only the app’s own page can download or install an update', async () => {
+  await withServer(undefined, async (port) => {
+    for (const route of ['/api/update/apply', '/api/update/later', '/api/update/seen', '/api/update/dismiss']) {
+      assert.equal(await post(port, route, { origin: 'https://example.com' }), 403, route);
+    }
+    const app = (await (await fetch(`http://127.0.0.1:${port}/api/app`)).json()) as { updating: boolean };
+    assert.equal(app.updating, false);
+  });
+});
+
 test('the tray launcher restarts the app after an update, as the terminal loop does', () => {
   assert.equal(launcherRestarts({ [LAUNCHER_ENV]: 'tray' }), true);
   assert.equal(launchedFromTray({ [LAUNCHER_ENV]: 'tray' }), true);

@@ -719,6 +719,29 @@ who is calling. So the server refuses anything that is not coming from this mach
 is no setting that changes that. (Versions before 1.5.0 had an opt-in `shareOnNetwork`
 setting; an old `config.json` that still has it is simply ignored.)
 
+## Updating
+
+The app asks GitHub whether there is a newer version when it starts, and once a day while it
+stays open. When there is:
+
+- **Update to 1.x.x** appears at the top of the page, and the tray icon gets a dot. The
+  dialog lists what each new version changes, with a link to the full changelog.
+- **Update and restart** installs it now. **When I quit** downloads it now and installs it when
+  you quit the app, so a session is never interrupted. The tray menu has **Update to ... and
+  restart** and **What's new** too.
+- After an update, the first start shows what it brought, once.
+- An update that has been waiting two weeks, or one marked as an important fix, is also said
+  at the foot of the page. Dismissed, it stays away for a week.
+
+**Options → Auto-update** does it for you: new versions download in the background and install
+when you quit the app, or when it next starts - never in the middle of a session. It is off
+until you turn it on, and it never downloads on a connection Windows or Linux says is metered
+(macOS is not asked). An update you start yourself still downloads there.
+
+Updates download only the parts of the app that changed, usually a few MB, instead of the
+whole package; your `data/` is never touched. `"checkForUpdates": false` in `config.json` turns
+every check off.
+
 ## What it contacts
 
 No osu! API credentials are needed, and none are used. There is no OAuth application, no
@@ -733,7 +756,7 @@ Every host it contacts is public, unauthenticated and optional:
 | `assets.ppy.sh` | beatmap cover art, and medal icons | a drawn placeholder shows instead |
 | `b.ppy.sh` | a favourite's audio preview, only when you press play | no preview |
 | `osu.ppy.sh` | **Look up** in Profiles, importing favorites, and one request per new favourite | it says so; type a name and upload an image instead |
-| GitHub | a check for a newer release at startup and once a day while the app runs (`checkForUpdates`), and the download when you press update | no update notice |
+| GitHub | a check for a newer release at startup and once a day while the app runs (`checkForUpdates`), its patch notes, and the download when you update or Auto-update is on | no update notice |
 | `data.ppy.sh` | the rank-curve dumps, only when `npm run rank:refresh` is run by hand | nothing; the checked-in curves keep working |
 
 The profile lookup reads the public profile page - the same user object osu!'s API returns for

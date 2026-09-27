@@ -2,7 +2,7 @@ import { syncFavoriteSharing } from './favorites.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { offerWelcome } from './welcome.ts';
-import { loadConfig, saveConfig, dataDir, type Config } from './config.ts';
+import { appVersion, loadConfig, saveConfig, dataDir, type Config } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { discoverInstalls, type DiscoveryResult } from './clients/discover.ts';
 import { osuFolderService } from './clients/folders.ts';
@@ -16,16 +16,22 @@ import { catchUpSince, HEARTBEAT_MS, lastRunAt, markRunning } from './tracker/ca
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
 import {
+  autoUpdateChanged,
+  configureUpdates,
+  installAtQuit,
+  installAtStart,
   keepCheckingForUpdates,
   launchedFromTray,
-  onUpdateFound,
+  onUpdateChange,
   pruneUpdateLeftovers,
+  setMetered,
   RESTART_EXIT_CODE,
   SWAPPER_PID_FILE,
 } from './update/index.ts';
 import { applyPendingRestore } from './backup.ts';
 import { recalculatedFor, recalculationBatches } from './tracker/recompute.ts';
 import { runningInstance, stopWhenLauncherCloses } from './instance.ts';
+import { seedSeenVersion } from './update/whats-new.ts';
 import { OfficialCalculator } from './calc/official.ts';
 import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
@@ -115,6 +121,27 @@ async function main(): Promise<void> {
     }
   }
 
+  // Read on every use, so the page's Auto-update switch applies without a restart.
+  configureUpdates({
+    autoUpdate: () => config.autoUpdate === true,
+    checking: () => config.checkForUpdates !== false,
+    dataDir: dataDir(),
+  });
+
+  /*
+   * A newer build downloaded ahead of time -- by Auto-update, or "When I quit" -- that the
+   * last run did not get to install at its quit: install it now, before anything is tracked,
+   * and come back as the new version (roadmap 5.66).
+   */
+  if (!checkOnly) {
+    const install = installAtStart();
+    if (install !== null) {
+      banner(`Installing update ${install.version}...`);
+      console.log('  It was downloaded earlier; the app starts again once it is in place.\n');
+      process.exit(install.exitCode);
+    }
+  }
+
   /*
    * Where osu! is.
    *
@@ -198,6 +225,7 @@ async function main(): Promise<void> {
   }
   const firstRun = !fs.existsSync(dbFile);
   const db = openDb(dbFile);
+  seedSeenVersion(db, appVersion(), dataDir());
   /*
    * A restored database remembers the app last running when the backup was made. Left alone,
    * `importPlaysWhileClosed` would read everything since then as a gap the app was closed for
@@ -472,7 +500,7 @@ async function main(): Promise<void> {
     tagline: config.tagline,
     dataDir: dataDir(),
     port: config.port,
-    onQuit: () => shutdown(),
+    onQuit: () => shutdown(0, true),
     /*
      * Only the tray launcher: it starts the app again on the updater's exit code, and with no
      * update in progress there is no swap to wait for. `start.sh`'s terminal loop would too,
@@ -492,6 +520,7 @@ async function main(): Promise<void> {
         sharedFavorites: config.sharedFavorites,
         language: config.language,
         originalMetadata: config.originalMetadata,
+        autoUpdate: config.autoUpdate === true,
       }),
       set: (patch) => {
         const current = loadConfig();
@@ -505,7 +534,16 @@ async function main(): Promise<void> {
           // Merge or copy the lists now, so the next request already reads the right one.
           syncFavoriteSharing(db, patch.sharedFavorites);
         }
+        /*
+         * Auto-update needs the check it acts on, so switching it on turns checking back on
+         * too: a switch that did nothing because of a key in config.json would be worse.
+         */
+        if (patch.autoUpdate !== undefined) {
+          current.autoUpdate = config.autoUpdate = patch.autoUpdate;
+          if (patch.autoUpdate) current.checkForUpdates = config.checkForUpdates = true;
+        }
         saveConfig(current);
+        if (patch.autoUpdate !== undefined) autoUpdateChanged();
       },
     },
     /*
@@ -676,12 +714,12 @@ async function main(): Promise<void> {
   }
   // Asked again once a day while the app runs, not only at startup: plenty of people never
   // close it, and would otherwise stay on whatever version they last launched.
-  let stopUpdateChecks = () => {};
-  if (config.checkForUpdates) {
-    onUpdateFound((u) => console.log(`  Update available: ${u.latestVersion} (see the page)
-`));
-    stopUpdateChecks = keepCheckingForUpdates();
-  }
+  // Nothing is asked while `checkForUpdates` is off; the loop reads it each time, so turning
+  // Auto-update on from the page starts it.
+  onUpdateChange((u, found) => {
+    if (found) console.log(`  Update available: ${u.latestVersion} (see the page)\n`);
+  });
+  const stopUpdateChecks = keepCheckingForUpdates();
 
   // Reachable four ways now -- Ctrl+C, a signal, the page's Quit and the tray -- and two can
   // arrive together, so only the first one stops anything.
@@ -694,11 +732,20 @@ async function main(): Promise<void> {
   const heartbeat = setInterval(() => markRunning(db), HEARTBEAT_MS);
   heartbeat.unref();
 
+  /*
+   * `deliberate`: Quit from the page or the tray, or Ctrl+C -- not the launcher dying or the
+   * system stopping the app. Only then does an update waiting for the quit install: a swap
+   * started as the computer shuts down could be cut off half way (see stopWhenLauncherCloses).
+   */
   let stopping = false;
-  const shutdown = (code = 0) => {
+  const shutdown = (code = 0, deliberate = false) => {
     if (stopping) return;
     stopping = true;
     console.log('\n  stopping...');
+    if (deliberate && code === 0) {
+      const installing = installAtQuit();
+      if (installing !== null) console.log(`  installing update ${installing}; it is there the next time the app starts`);
+    }
     clearInterval(heartbeat);
     stopUpdateChecks();
     tracker.stop();
@@ -715,9 +762,17 @@ async function main(): Promise<void> {
     }
     process.exit(code);
   };
-  process.on('SIGINT', () => shutdown());
+  process.on('SIGINT', () => shutdown(0, true));
   process.on('SIGTERM', () => shutdown());
-  if (fromTray) stopWhenLauncherCloses(process.stdin, () => shutdown());
+  if (fromTray) {
+    stopWhenLauncherCloses(
+      process.stdin,
+      (deliberate) => shutdown(0, deliberate),
+      (message) => {
+        if ('metered' in message) setMetered(message.metered ?? null);
+      },
+    );
+  }
 }
 
 await main();

@@ -12,6 +12,8 @@
  * - tray.png       Linux's tray, which scales one image itself.
  * - template.png   macOS's menu bar: black on transparent, which the bar tints for light or
  *                  dark. A menu bar item in colour is the exception there, not the rule.
+ * - tray-update.ico, tray-update.png, template-update.png
+ *                  The same three with a dot, while an update is waiting.
  * - app.png        The Windows executable's icon, turned into a resource by go-winres.
  * - app.icns       The macOS bundle's icon, 16px to 1024px.
  */
@@ -34,6 +36,22 @@ const housePath = /<path[^>]*\sd="([^"]+)"/.exec(favicon)?.[1];
 if (!housePath) throw new Error('web/favicon.svg has no house path to cut out of the template');
 const template = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <mask id="m"><circle cx="32" cy="32" r="30" fill="#fff"/><path fill="#000" d="${housePath}"/></mask>
+  <rect width="64" height="64" fill="#000" mask="url(#m)"/>
+</svg>`;
+
+/*
+ * The same, with a dot: an update is waiting (roadmap 5.66). The Update button's yellow, ringed
+ * in the page's darkest colour so it stays apart from the disc at 16px. The template cannot
+ * colour it, so there the ring is cut out of the disc instead.
+ */
+const DOT = { cx: 48, cy: 16, r: 12, ring: 4 };
+const faviconWithDot = favicon.replace(
+  '</svg>',
+  `<circle cx="${DOT.cx}" cy="${DOT.cy}" r="${DOT.r + DOT.ring / 2}" fill="#ffcc22" stroke="#1c1719" stroke-width="${DOT.ring}"/></svg>`,
+);
+const templateWithDot = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <mask id="m"><circle cx="32" cy="32" r="30" fill="#fff"/><path fill="#000" d="${housePath}"/>
+    <circle cx="${DOT.cx}" cy="${DOT.cy}" r="${DOT.r + DOT.ring}" fill="#000"/><circle cx="${DOT.cx}" cy="${DOT.cy}" r="${DOT.r}" fill="#fff"/></mask>
   <rect width="64" height="64" fill="#000" mask="url(#m)"/>
 </svg>`;
 
@@ -126,6 +144,12 @@ try {
   fs.writeFileSync(path.join(out, 'tray.png'), colour(64));
   // 36px is the menu bar's 18pt at 2x; the bar draws it at its own height.
   fs.writeFileSync(path.join(out, 'template.png'), render(template, 36));
+  fs.writeFileSync(
+    path.join(out, 'tray-update.ico'),
+    ico([16, 20, 24, 32, 40, 48].map((size) => ({ size, png: render(faviconWithDot, size) }))),
+  );
+  fs.writeFileSync(path.join(out, 'tray-update.png'), render(faviconWithDot, 64));
+  fs.writeFileSync(path.join(out, 'template-update.png'), render(templateWithDot, 36));
   fs.writeFileSync(path.join(out, 'app.png'), colour(256));
   fs.writeFileSync(
     path.join(out, 'app.icns'),

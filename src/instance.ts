@@ -35,21 +35,56 @@ export async function runningInstance(
   }
 }
 
+/** What the tray launcher says down the app's stdin: a JSON object a line (tools/launcher). */
+export interface LauncherMessage {
+  /** Sent just before Quit closes stdin, so the app can tell Quit from the launcher dying. */
+  quit?: boolean;
+  /** Whether the connection is metered, as the system reports it; null when it cannot say. */
+  metered?: boolean | null;
+}
+
 /**
  * Stop when the tray launcher goes away.
  *
- * The launcher holds the write end of this process's stdin and never writes to it. Closing it
- * is how Quit in the tray asks the app to stop, and the operating system closes it too when
- * the launcher dies for any other reason -- killed, crashed, logged out -- so the app can
- * never outlive the only icon that says it is running.
+ * The launcher holds the write end of this process's stdin. Closing it is how Quit in the
+ * tray asks the app to stop, and the operating system closes it too when the launcher dies
+ * for any other reason -- killed, crashed, logged out, the computer shutting down -- so the
+ * app can never outlive the only icon that says it is running.
+ *
+ * `deliberate` tells the two apart: Quit writes `{"quit":true}` first. Only a deliberate stop
+ * installs an update waiting for it -- a swap started as the computer shuts down could be cut
+ * off half way. Other lines are handed to `onMessage`; anything unreadable is ignored.
  */
-export function stopWhenLauncherCloses(stdin: NodeJS.ReadableStream, stop: () => void): void {
+export function stopWhenLauncherCloses(
+  stdin: NodeJS.ReadableStream,
+  stop: (deliberate: boolean) => void,
+  onMessage: (message: LauncherMessage) => void = () => {},
+): void {
   let stopped = false;
+  let deliberate = false;
+  let pending = '';
   const once = () => {
     if (stopped) return;
     stopped = true;
-    stop();
+    stop(deliberate);
   };
+  stdin.on('data', (chunk: Buffer | string) => {
+    pending += chunk.toString();
+    const lines = pending.split('\n');
+    pending = lines.pop() ?? '';
+    if (pending.length > 65_536) pending = '';
+    for (const line of lines) {
+      let message: LauncherMessage;
+      try {
+        message = JSON.parse(line) as LauncherMessage;
+      } catch {
+        continue;
+      }
+      if (message === null || typeof message !== 'object') continue;
+      if (message.quit === true) deliberate = true;
+      onMessage(message);
+    }
+  });
   stdin.on('end', once);
   stdin.on('close', once);
   stdin.on('error', once);

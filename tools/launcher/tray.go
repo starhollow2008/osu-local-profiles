@@ -16,6 +16,14 @@ var (
 	trayPNG []byte
 	//go:embed icon/template.png
 	templatePNG []byte
+
+	// The same with a dot, while an update is waiting (roadmap 5.66).
+	//go:embed icon/tray-update.ico
+	trayUpdateICO []byte
+	//go:embed icon/tray-update.png
+	trayUpdatePNG []byte
+	//go:embed icon/template-update.png
+	templateUpdatePNG []byte
 )
 
 // runWithTray shows the icon and runs the app under it until Quit.
@@ -28,7 +36,7 @@ func (l *launcher) runWithTray() {
 }
 
 func (l *launcher) trayReady() {
-	setTrayIcon()
+	setTrayIcon(false)
 	trayReadyPlatform()
 	systray.SetTooltip("osu! local profiles")
 
@@ -38,9 +46,11 @@ func (l *launcher) trayReady() {
 	openLog := systray.AddMenuItem("Open log", "What the app has printed since it started")
 	again := systray.AddMenuItem("Start again", "Start the app again")
 	again.Hide()
-	// Found by the app's daily check. Opens the page's update dialog, which installs it.
-	update := systray.AddMenuItem("", "Open the page to install the new version")
-	update.Hide()
+	// Found by the app's daily check: install it from here, or read what is new on the page first.
+	install := systray.AddMenuItem("", "Download what changed, install it and start again")
+	install.Hide()
+	notes := systray.AddMenuItem("", "Open the page at what the new version changes")
+	notes.Hide()
 	systray.AddSeparator()
 	quit := systray.AddMenuItem("Quit osu! local profiles", "Stop tracking and close the app")
 
@@ -50,15 +60,22 @@ func (l *launcher) trayReady() {
 	}
 
 	l.mu.Lock()
-	l.changed = func(state appState, tracking bool, version string) {
-		status.SetTitle(statusText(state, tracking, l.port))
-		systray.SetTooltip(tooltipText(state, tracking, l.port, version))
-		if text, shown := updateText(state, version); shown {
-			update.SetTitle(text)
-			update.Show()
+	l.changed = func(v trayView) {
+		state := v.state
+		status.SetTitle(statusLine(v, l.port))
+		systray.SetTooltip(tooltipText(v, l.port))
+		if installText, notesText, shown := updateItems(v); shown {
+			install.SetTitle(installText)
+			notes.SetTitle(notesText)
+			install.Show()
+			notes.Show()
 		} else {
-			update.Hide()
+			install.Hide()
+			notes.Hide()
 		}
+		// Seen without opening the menu, which is the point: the menu is only read by someone
+		// who already went looking. Redraws come only with a change, so this is not repeated.
+		setTrayIcon(v.update != "")
 		if state == stateFailed {
 			again.Show()
 		} else {
@@ -73,7 +90,9 @@ func (l *launcher) trayReady() {
 			select {
 			case <-open.ClickedCh:
 				openPage()
-			case <-update.ClickedCh:
+			case <-install.ClickedCh:
+				go l.installUpdate()
+			case <-notes.ClickedCh:
 				_ = openPath(pageURL(l.port) + "/?update=1")
 			case <-openLog.ClickedCh:
 				current, _ := logFiles(l.root)

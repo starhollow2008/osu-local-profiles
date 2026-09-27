@@ -42,6 +42,23 @@ test('a launcher that restarts the app is left to do it', () => {
   }
 });
 
+test('an update installed as the app was quit starts nothing afterwards', () => {
+  // Roadmap 5.66: the app was stopped on purpose, so it stays stopped -- whatever started it.
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    for (const launcherRestarts of [true, false]) {
+      const plan = relaunchPlan({
+        platform,
+        installDir: '/opt/olp',
+        launcherRestarts,
+        noRelaunch: true,
+        exists: () => true,
+        env: { DISPLAY: ':0' },
+      });
+      assert.ok('skip' in plan, `${platform}: relaunched after a quit`);
+    }
+  }
+});
+
 test('Windows starts the tray launcher itself, which has no console to lose', () => {
   const exe = 'C:\\Program Files (x86)\\olp\\osu! local profiles.exe';
   const plan = relaunchPlan({

@@ -28,4 +28,21 @@ declare module '*/release-notes.mjs' {
    * Throws when CHANGELOG.md has nothing for the version.
    */
   export function releaseNotes(changelog: string, version: string, assets?: string[]): string;
+
+  /** The line that marks a version everyone should have. */
+  export const IMPORTANT_MARK: string;
+  export function isImportant(changelog: string, version: string): boolean;
+  /** Every version with a section, newest first. */
+  export function changelogVersions(changelog: string): string[];
+  export function notesAssetName(version: string): string;
+  export const MAX_NOTES_VERSIONS: number;
+  /** Every version's highlights as data, for the app. */
+  export function notesJson(
+    changelog: string,
+    dates?: Record<string, string>,
+  ): {
+    versions: { version: string; date: string | null; important: boolean; highlights: string[] }[];
+  };
+  /** Each tagged version's day. */
+  export function tagDates(cwd?: string): Record<string, string>;
 }

@@ -56,8 +56,34 @@ func trayAvailable() bool {
 	return err == nil && has
 }
 
-func setTrayIcon()       { systray.SetIcon(trayPNG) }
+func setTrayIcon(update bool) {
+	if update {
+		systray.SetIcon(trayUpdatePNG)
+	} else {
+		systray.SetIcon(trayPNG)
+	}
+}
+
 func trayReadyPlatform() {}
+
+// meteredConnection asks NetworkManager, on the system bus, whether the connection is metered.
+// Not known without NetworkManager, which leaves Auto-update to go ahead.
+func meteredConnection() (metered, known bool) {
+	conn, err := dbus.SystemBus()
+	if err != nil {
+		return false, false
+	}
+	v, err := conn.Object("org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager").
+		GetProperty("org.freedesktop.NetworkManager.Metered")
+	if err != nil {
+		return false, false
+	}
+	value, ok := v.Value().(uint32)
+	if !ok {
+		return false, false
+	}
+	return meteredFromNM(value)
+}
 
 func releaseQuarantine(string)       {}
 func leaveTranslocation(string) bool { return false }

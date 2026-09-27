@@ -20,6 +20,7 @@ import {
   offeredVersion,
   pruneUpdateLeftovers,
   RETRY_FAILED_MS,
+  updateState,
   type UpdateState,
 } from '../src/update/index.ts';
 
@@ -70,6 +71,8 @@ test('a release with no build for this platform offers nothing', () => {
     version: '1.5.0',
     releaseUrl: 'https://example.invalid',
     assets: [{ name: 'osu-local-profiles-1.5.0-win-x64.zip', url: 'https://example.invalid', size: 1 }],
+    body: '',
+    publishedAt: null,
   };
   assert.equal(assetFor(release, 'win32', 'x64')?.name, 'osu-local-profiles-1.5.0-win-x64.zip');
   // A macOS user must not be handed a Windows build because it was the only asset there.
@@ -318,14 +321,11 @@ test('a running app checks at once, then leaves it to the clock', async () => {
 
 test('only an update this install can take is offered to the tray', () => {
   const base: UpdateState = {
+    ...updateState(),
     currentVersion: '1.26.0',
     latestVersion: '1.27.0',
     available: true,
-    releaseUrl: null,
     blocked: null,
-    error: null,
-    checkedAt: null,
-    applying: false,
   };
   assert.equal(offeredVersion(base), '1.27.0');
   assert.equal(offeredVersion({ ...base, available: false }), null);

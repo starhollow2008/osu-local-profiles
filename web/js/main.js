@@ -830,6 +830,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('welcomeModal').hidden) closeWelcome();
   if (!$('shareModal').hidden) closeShare();
   if (!$('updateModal').hidden) closeUpdate();
+  if (!$('whatsNewModal').hidden) closeWhatsNew();
 });
 
 /* ---------------------------------------------------------- lazer scoring */
@@ -879,8 +880,155 @@ $('optLazerScoring').onclick = async () => {
 function renderUpdate() {
   const u = app.update ?? {};
   $('updateBtn').hidden = !u.available || u.blocked !== null;
+  // Which version, on the button itself: a reason to press it, where "Update available" is not.
+  if (!$('updateBtn').hidden && u.latestVersion) {
+    $('updateBtn').textContent = t('update.button', { version: u.latestVersion });
+  }
+  $('optAutoUpdate').setAttribute('aria-checked', String(app.config?.autoUpdate === true));
+  renderNudge();
+  if (!$('updateModal').hidden) renderUpdateProgress();
   openUpdateFromLink();
+  showWhatsNew();
 }
+
+/** Past this many lines, the rest of what changed is left to the changelog. */
+const MAX_NOTE_LINES = 12;
+
+/**
+ * A version's changes, a line each, newest version first (src/update/notes.ts). The lines are
+ * the CHANGELOG's own, escaped; only its `code` spans become markup.
+ */
+function notesHtml(notes) {
+  let left = MAX_NOTE_LINES;
+  let cut = false;
+  const out = [];
+  for (const n of notes ?? []) {
+    const lines = n.highlights.slice(0, Math.max(left, 0));
+    left -= lines.length;
+    if (lines.length < n.highlights.length) cut = true;
+    if (lines.length === 0 && !n.important) continue;
+    const important = n.important
+      ? `<span class="update-notes__important">${escapeHtml(t('update.important'))}</span>`
+      : '';
+    const items = lines
+      .map((l) => `<li>${escapeHtml(l).replace(/`([^`]+)`/g, '<code>$1</code>')}</li>`)
+      .join('');
+    out.push(`<h4>${escapeHtml(n.version)}${important}</h4>${items ? `<ul>${items}</ul>` : ''}`);
+  }
+  if (cut) out.push(`<p>${escapeHtml(t('update.moreInChangelog'))}</p>`);
+  return out.join('');
+}
+
+/** The release page and the full changelog, at the version's own entry. */
+function updateLinks(releaseUrl, changelogUrl, version) {
+  const link = (href, label) =>
+    `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer noopener">${escapeHtml(label)}</a>`;
+  const links = [];
+  if (releaseUrl) links.push(link(releaseUrl, t('update.releaseNotes')));
+  if (changelogUrl) {
+    links.push(link(`${changelogUrl}${version ? `#${version.replace(/\./g, '')}` : ''}`, t('update.changelog')));
+  }
+  return links.join(' &middot; ');
+}
+
+/** Set while this page's Update and restart runs, so the live feed does not talk over it. */
+let applyingHere = false;
+
+/*
+ * The dialog's line under the notes, and its buttons: downloading, downloaded and waiting for
+ * the quit, or why a download did not happen. From the live feed, so it follows a download
+ * started in the background without anyone having to reopen anything.
+ */
+function renderUpdateProgress() {
+  const u = app.update ?? {};
+  const waiting = u.ready != null && u.ready === u.latestVersion;
+  $('updateLater').hidden = waiting && u.installOnQuit;
+  $('updateLater').disabled = Boolean(u.preparing);
+  if (applyingHere) return;
+  let hintText = '';
+  if (u.preparing) hintText = t('update.preparing');
+  else if (waiting && u.installOnQuit) hintText = t('update.installsOnQuit', { version: u.ready });
+  else if (waiting) hintText = t('update.downloaded', { version: u.ready });
+  else if (u.prepareError) hintText = u.prepareError;
+  else if (u.metered && app.config?.autoUpdate) hintText = t('update.metered');
+  if (hintText) $('updateHint').textContent = hintText;
+  else $('updateHint').innerHTML = '&nbsp;';
+}
+
+/* ----------------------------------------------------- the notice above */
+
+/** Put away on this page at once, before the server has heard. */
+let nudgeClosedHere = false;
+
+/*
+ * Only for an update that has waited two weeks, or one marked important; the server decides
+ * (`nudgeShown`), since what dismissed it last is kept in the database for every tab.
+ */
+function renderNudge() {
+  const u = app.update ?? {};
+  const show = !isStatic && !nudgeClosedHere && Boolean(u.nudgeShown) && !$('updateBtn').hidden;
+  $('updateNudge').hidden = !show;
+  if (!show) return;
+  const important = u.nudge === 'important';
+  $('updateNudge').classList.toggle('update-nudge--important', important);
+  $('updateNudgeText').textContent = important
+    ? t('updateNudge.important', { version: u.latestVersion })
+    : t('updateNudge.behind', { version: u.latestVersion });
+}
+
+$('updateNudgeOpen').onclick = () => openUpdate();
+$('updateNudgeClose').onclick = () => {
+  nudgeClosedHere = true;
+  $('updateNudge').hidden = true;
+  postJson('/api/update/dismiss', {}, 'dismissing that failed').catch(() => {});
+};
+
+/* ----------------------------------------------- after an update: what changed */
+
+/** Shown once a page load: closing it tells the server, which then stops offering it. */
+let whatsNewShown = false;
+
+function showWhatsNew() {
+  const w = app.whatsNew;
+  if (isStatic || !w || whatsNewShown) return;
+  whatsNewShown = true;
+  $('whatsNewTitle').textContent = t('whatsNew.title', { version: w.to });
+  $('whatsNewNotes').innerHTML = w.notes?.length ? notesHtml(w.notes) : `<p>${escapeHtml(t('whatsNew.noNotes'))}</p>`;
+  $('whatsNewLinks').innerHTML = updateLinks(null, app.update?.changelogUrl, w.to);
+  $('whatsNewModal').hidden = false;
+  $('whatsNewClose').focus();
+}
+
+function closeWhatsNew() {
+  $('whatsNewModal').hidden = true;
+  app = { ...app, whatsNew: null };
+  postJson('/api/update/seen', {}, 'saving that failed').catch(() => {});
+}
+
+$('whatsNewClose').onclick = closeWhatsNew;
+
+/* ------------------------------------------------------------- auto-update */
+
+/*
+ * Options -> Auto-update: its own row, as the user asked, not a setting inside a dialog. Off
+ * by default; on, a new version downloads in the background -- never on a metered connection
+ * -- and installs when the app is quit or next starts (roadmap 5.66).
+ */
+$('optAutoUpdate').onclick = async () => {
+  const next = app.config?.autoUpdate !== true;
+  app = { ...app, config: { ...app.config, autoUpdate: next } };
+  renderUpdate();
+  try {
+    const c = await postJson('/api/app-config', { autoUpdate: next }, 'saving that failed');
+    app = { ...app, config: c.config };
+    renderUpdate();
+    toast(next ? t('autoUpdate.on') : t('autoUpdate.off'));
+  } catch (err) {
+    app = { ...app, config: { ...app.config, autoUpdate: !next } };
+    renderUpdate();
+    toast(err.message);
+  }
+};
 
 /*
  * `?update=1` is where the tray icon's "Update to ..." item lands: straight into the dialog,
@@ -900,16 +1048,30 @@ function openUpdate() {
   const u = app.update ?? {};
   $('updateVersions').innerHTML =
     `<b>${escapeHtml(u.currentVersion ?? '?')}</b> &rarr; <b>${escapeHtml(u.latestVersion ?? '?')}</b>`;
-  $('updateNotes').innerHTML = u.releaseUrl
-    ? `<a href="${escapeHtml(u.releaseUrl)}" target="_blank" rel="noreferrer noopener">${escapeHtml(
-        t('update.releaseNotes'),
-      )}</a>`
-    : '';
+  $('updateWhatsNew').innerHTML = notesHtml(u.notes);
+  $('updateNotes').innerHTML = updateLinks(u.releaseUrl, u.changelogUrl, u.latestVersion);
+  $('updateAuto').hidden = app.config?.autoUpdate === true;
   $('updateHint').innerHTML = '&nbsp;';
   $('updateConfirm').disabled = false;
+  renderUpdateProgress();
   $('updateModal').hidden = false;
   $('updateCancel').focus();
 }
+
+/*
+ * When I quit: download now, install at the next quit (or start). The page is told how the
+ * download goes on the live feed, which redraws the line under the notes.
+ */
+$('updateLater').onclick = async () => {
+  $('updateLater').disabled = true;
+  try {
+    await postJson('/api/update/later', {}, 'the download could not start');
+    $('updateHint').textContent = t('update.preparing');
+  } catch (err) {
+    $('updateHint').textContent = err.message;
+    $('updateLater').disabled = false;
+  }
+};
 
 const closeUpdate = () => { $('updateModal').hidden = true; };
 
@@ -924,14 +1086,18 @@ $('updateModal').onclick = (e) => {
  * this page ever makes: a dropped connection after a 200 is the update working, not failing.
  */
 $('updateConfirm').onclick = async () => {
+  applyingHere = true;
   $('updateConfirm').disabled = true;
+  $('updateLater').disabled = true;
   $('updateHint').textContent = t('update.downloading');
   try {
     const d = await postJson('/api/update/apply', {}, 'the update failed');
     $('updateHint').textContent = `${d.message} ${t('update.startYourself')}`;
   } catch (err) {
+    applyingHere = false;
     $('updateHint').textContent = err.message;
     $('updateConfirm').disabled = false;
+    $('updateLater').disabled = false;
   }
 };
 
@@ -4170,6 +4336,7 @@ on('identity', () => loadState());
 // A second tab should read the install's options as they now are.
 on('app-config', (e) => {
   app = { ...app, config: JSON.parse(e.data) };
+  renderUpdate();
 });
 // Pin, unpin and remove all change what the page should be showing.
 // Another tab favouriting or unfavouriting changes this one's cards and menus.
@@ -4193,9 +4360,15 @@ on('recompute-progress', (e) => {
  * the button that appears is easy to miss on a page that has been open for days.
  */
 on('update', (e) => {
-  app = { ...app, update: JSON.parse(e.data) };
+  const before = app.update ?? {};
+  const { found, ...update } = JSON.parse(e.data);
+  app = { ...app, update };
   renderUpdate();
-  if (!$('updateBtn').hidden) toast(t('update.found', { version: app.update.latestVersion }));
+  if (found && !$('updateBtn').hidden) toast(t('update.found', { version: update.latestVersion }));
+  // Downloaded by Auto-update or When I quit: said once, since nothing else on screen changes.
+  else if (update.ready && update.ready !== before.ready && update.installOnQuit) {
+    toast(t('update.installsOnQuit', { version: update.ready }));
+  }
 });
 // Every profile's scores recalculated: from Other settings, or by itself after an update.
 on('recompute', (e) => {

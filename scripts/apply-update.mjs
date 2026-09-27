@@ -20,7 +20,11 @@
  * so `test/relaunch.test.ts` can check how it relaunches.
  *
  *   node scripts/apply-update.mjs --install <dir> --staged <dir> --pid <n>
- *     [--archive <zip>] [--launcher-restarts]
+ *     [--archive <zip>] [--launcher-restarts] [--no-relaunch]
+ *
+ * `--no-relaunch` is an install at quit (roadmap 5.66): the app was stopped on purpose, so
+ * nothing starts it again. Every later swapper must keep understanding it, because it is the
+ * *new* release's swapper that an older app hands this to.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -59,7 +63,10 @@ export function launcherName(platform) {
  * Reached only from a launcher that does not restart: releases up to 1.13.2 on macOS and
  * Linux, up to 1.16 on Windows, and the runtime started by hand from a packaged folder.
  */
-export function relaunchPlan({ platform, installDir, launcherRestarts, exists, env }) {
+export function relaunchPlan({ platform, installDir, launcherRestarts, noRelaunch = false, exists, env }) {
+  if (noRelaunch) {
+    return { skip: 'installed as the app was quit, so it stays closed until it is started' };
+  }
   if (launcherRestarts) {
     return { skip: 'the launcher that started the app is waiting to start it again' };
   }
@@ -134,6 +141,7 @@ async function run() {
   const parentPid = Number(arg('pid'));
   const archive = arg('archive');
   const launcherRestarts = process.argv.includes('--launcher-restarts');
+  const noRelaunch = process.argv.includes('--no-relaunch');
 
   if (!installDir || !stagedDir || !Number.isFinite(parentPid)) {
     console.error('usage: apply-update.mjs --install <dir> --staged <dir> --pid <n>');
@@ -165,6 +173,7 @@ async function run() {
       platform: process.platform,
       installDir,
       launcherRestarts,
+      noRelaunch,
       exists: fs.existsSync,
       env: process.env,
     });

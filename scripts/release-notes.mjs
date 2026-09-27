@@ -10,6 +10,7 @@
  * Kept short on purpose: GitHub puts the downloads *under* the notes, so a whole CHANGELOG
  * section there meant scrolling past it to reach them. The detail is one link away.
  */
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,14 +34,38 @@ const GENERIC_HEADINGS = new Set(['fixed', 'removed']);
 /** Subheadings of changes for people building the app, not using it. */
 const CONTRIBUTOR_HEADINGS = new Set(['development', 'for contributors']);
 
-/** The text under `## <version>` in CHANGELOG.md, up to the next version's heading. */
-export function changelogSection(changelog, version) {
+/**
+ * Written on a line of its own in a version's CHANGELOG section, it marks a release everyone
+ * should have -- a fix for lost or wrong data, say. An install missing one says so more loudly
+ * than the Update button (roadmap 5.66). Invisible where GitHub renders the CHANGELOG.
+ */
+export const IMPORTANT_MARK = '<!-- important -->';
+
+/** A version's lines, marks included: under `## <version>`, up to the next heading. */
+function sectionLines(changelog, version) {
   const lines = changelog.replace(/\r\n/g, '\n').split('\n');
   const start = lines.findIndex((l) => l.trim() === `## ${version}`);
   if (start < 0) return null;
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((l) => l.startsWith('## '));
-  return (end < 0 ? rest : rest.slice(0, end)).join('\n').trim();
+  return end < 0 ? rest : rest.slice(0, end);
+}
+
+/** The text under `## <version>` in CHANGELOG.md, up to the next version's heading. */
+export function changelogSection(changelog, version) {
+  const lines = sectionLines(changelog, version);
+  if (lines === null) return null;
+  return lines.filter((l) => l.trim() !== IMPORTANT_MARK).join('\n').trim();
+}
+
+/** Whether a version's section carries `IMPORTANT_MARK`. */
+export function isImportant(changelog, version) {
+  return (sectionLines(changelog, version) ?? []).some((l) => l.trim() === IMPORTANT_MARK);
+}
+
+/** Every version with a section, newest first, as the CHANGELOG lists them. */
+export function changelogVersions(changelog) {
+  return [...changelog.replace(/\r\n/g, '\n').matchAll(/^## (\d+\.\d+\.\d+(?:-[\w.]+)?)\s*$/gm)].map((m) => m[1]);
 }
 
 /** The archives the packager names, one per platform the workflow builds on. */
@@ -156,11 +181,64 @@ Everything in this release: [CHANGELOG.md](${CHANGELOG_URL}#${anchor})
 `;
 }
 
+/** The notes the app shows before and after an update, attached to every release. */
+export const notesAssetName = (version) => `osu-local-profiles-${version}-notes.json`;
+
+/** Enough history for any install worth updating; the rest is a link away. */
+export const MAX_NOTES_VERSIONS = 60;
+
+/**
+ * The patch notes as data, for the app rather than a release page: `release-notes.json` in
+ * every package (what changed, after an update) and the `-notes.json` asset of every release
+ * (what is new, before one). `dates` is each version's release day where it is known.
+ */
+export function notesJson(changelog, dates = {}) {
+  return {
+    versions: changelogVersions(changelog)
+      .slice(0, MAX_NOTES_VERSIONS)
+      .map((version) => ({
+        version,
+        date: dates[version] ?? null,
+        important: isImportant(changelog, version),
+        highlights: highlights(changelogSection(changelog, version) ?? '').filter((h) => !isHowToUpdate(h)),
+      })),
+  };
+}
+
+/**
+ * Each released version's day, from its tag. Empty where there are no tags to read -- a
+ * shallow checkout -- which leaves the dates null rather than wrong.
+ */
+export function tagDates(cwd = root) {
+  const out = spawnSync('git', ['for-each-ref', 'refs/tags', '--format=%(refname:short) %(creatordate:short)'], {
+    cwd,
+    encoding: 'utf8',
+  });
+  const dates = {};
+  for (const line of (out.stdout ?? '').split('\n')) {
+    const [tag, date] = line.trim().split(' ');
+    if (tag && /^\d{4}-\d{2}-\d{2}$/.test(date ?? '')) dates[tag.replace(/^v/, '')] = date;
+  }
+  return dates;
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const version = (process.argv[2] ?? '').replace(/^v/, '');
+  const json = process.argv.includes('--json');
+  const version = (process.argv.slice(2).find((a) => a !== '--json') ?? '').replace(/^v/, '');
   if (!version) {
-    console.error('usage: node scripts/release-notes.mjs <version>');
+    console.error('usage: node scripts/release-notes.mjs [--json] <version>');
     process.exit(1);
   }
-  process.stdout.write(releaseNotes(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'), version));
+  const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
+  if (json) {
+    if (changelogSection(changelog, version) === null) {
+      console.error(`CHANGELOG.md has no "## ${version}" section`);
+      process.exit(1);
+    }
+    // The version being released is dated today when its tag is not there to ask yet.
+    const dates = { [version]: new Date().toISOString().slice(0, 10), ...tagDates() };
+    process.stdout.write(`${JSON.stringify(notesJson(changelog, dates), null, 1)}\n`);
+  } else {
+    process.stdout.write(releaseNotes(changelog, version));
+  }
 }

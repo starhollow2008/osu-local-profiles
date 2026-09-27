@@ -56,14 +56,17 @@ export interface Config {
   /** What to call the playstyle under the profile name, e.g. "left hand, mouse only". */
   tagline: string;
   /**
-   * Ask GitHub once at startup whether a newer release exists.
-   *
-   * One request, when the app starts, and never again while it runs -- the same rule the
-   * osu! API guidance imposes and this project follows everywhere else. Set false and the
-   * app makes no network request of its own at all; the check can still be run by hand from
-   * the page.
+   * Ask GitHub whether a newer release exists: at startup, then once a day while the app runs
+   * (roadmap 5.65). Set false and the app makes no network request of its own at all; the
+   * check can still be run by hand from the page.
    */
   checkForUpdates: boolean;
+  /**
+   * Options -> Auto-update (roadmap 5.66): download a newer release in the background and
+   * install it when the app is quit or next starts. Off by default -- downloading and running
+   * new code is something to be asked for -- and never on a metered connection.
+   */
+  autoUpdate: boolean;
   /**
    * One Favorite Beatmaps list for every profile, rather than one each. On by default, at
    * the user's request. Install-level because it is about how profiles relate, not any one
@@ -84,6 +87,7 @@ const DEFAULTS: Config = {
   country: '',
   tagline: '',
   checkForUpdates: true,
+  autoUpdate: false,
   sharedFavorites: true,
 };
 

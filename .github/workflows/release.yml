@@ -1,7 +1,8 @@
 name: Release
 
-# Pushing a version tag builds the app on each platform it ships for and attaches the three
-# archives to that version's GitHub release.
+# Pushing a version tag builds the app on each platform it ships for and attaches the archives
+# to that version's GitHub release: the full zip per platform, the same build in parts with its
+# manifest (src/update/parts.ts), and the patch notes the app shows (roadmap 5.66).
 #
 # A package can only be built on the system it is for -- it bundles the Node binary that
 # built it (see scripts/package.mjs) -- so each archive comes from a runner of its own OS.
@@ -85,7 +86,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.rid }}
-          path: dist/*.zip
+          # The full zip, its parts, and the manifest the updater picks the parts with.
+          path: |
+            dist/*.zip
+            dist/*.json
           if-no-files-found: error
 
   release:
@@ -100,6 +104,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.tag || github.ref }}
+          # Every tag, so the patch notes can date each version (tagDates).
+          fetch-depth: 0
 
       - uses: actions/download-artifact@v4
         with:
@@ -113,13 +119,15 @@ jobs:
         run: |
           tag="${{ inputs.tag || github.ref_name }}"
           version="${tag#v}"
+          # What the app shows before an update, a line per change (src/update/notes.ts).
+          node scripts/release-notes.mjs --json "$version" > "assets/osu-local-profiles-$version-notes.json"
           ls -l assets
           if gh release view "$tag" > /dev/null 2>&1; then
             # Written by hand already: keep its notes, replace any builds of the same name.
-            gh release upload "$tag" assets/*.zip --clobber
+            gh release upload "$tag" assets/*.zip assets/*.json --clobber
           else
             node scripts/release-notes.mjs "$version" > notes.md
-            gh release create "$tag" assets/*.zip \
+            gh release create "$tag" assets/*.zip assets/*.json \
               --title "osu! local profiles $version" \
               --notes-file notes.md \
               --verify-tag

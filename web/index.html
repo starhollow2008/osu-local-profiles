@@ -61,6 +61,11 @@
                   aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale." data-i18n-attr="title:optLazerScoring.title">
             <span data-i18n="optLazerScoring.lazerScoring">Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
           </button>
+          <!-- Install-level, in config.json: see autoUpdate in src/config.ts (roadmap 5.66). -->
+          <button id="optAutoUpdate" class="menu__toggle" type="button" role="menuitemcheckbox"
+                  aria-checked="false" title="Download new versions in the background and install them when you quit the app, or when it next starts. Never on a metered connection." data-i18n-attr="title:optAutoUpdate.title">
+            <span data-i18n="optAutoUpdate.autoUpdate">Auto-update</span><span class="menu__switch" aria-hidden="true"></span>
+          </button>
           <button id="optShare" type="button" data-i18n="optShare">Share &amp; back up</button>
           <div class="sep"></div>
           <div class="note" id="optInfo">&nbsp;</div>
@@ -270,6 +275,17 @@
   The app is not running: stopped with Quit, or from its tray icon, or on its way back from an
   update. Nothing on the page can work meanwhile, so it says so rather than failing quietly.
 -->
+<!--
+  An update that has waited a long time, or one marked important: said above the page, once,
+  until dismissed (nudgeFor and nudgeShown in src/update/notes.ts). The button alone is enough
+  the rest of the time.
+-->
+<div class="update-nudge" id="updateNudge" role="status" hidden>
+  <span class="update-nudge__text" id="updateNudgeText"></span>
+  <button class="update-nudge__open" id="updateNudgeOpen" type="button" data-i18n="updateNudge.open">See what's new</button>
+  <button class="update-nudge__close" id="updateNudgeClose" type="button" title="Dismiss" aria-label="Dismiss" data-i18n-attr="title:updateNudge.dismiss;aria-label:updateNudge.dismiss">&times;</button>
+</div>
+
 <div class="stopped-notice" id="stoppedNotice" role="status" hidden>
   <strong id="stoppedTitle">osu! local profiles is not running.</strong>
   <span id="stoppedText">This page picks up again when it starts.</span>
@@ -1053,17 +1069,33 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="updateTitle">
     <h3 id="updateTitle" data-i18n="updateTitle">Update available</h3>
     <p class="update-versions" id="updateVersions"></p>
+    <!-- What is new, a line per change, from the release's notes (src/update/notes.ts). -->
+    <div class="update-notes" id="updateWhatsNew"></div>
+    <p class="update-links" id="updateNotes"></p>
     <p data-i18n-html="updateModal.yourTrackedScoresSettingsAnd">
       Your tracked scores, settings and profile pictures are kept - they live in
       <code>data/</code>, which an update never touches. The files being replaced are set
       aside until the new version is in place, so an update that is interrupted can be
       undone rather than leaving a half-installed app.
     </p>
-    <p id="updateNotes"></p>
+    <p class="update-auto" id="updateAuto" data-i18n="updateModal.autoHint">To have new versions installed by themselves, turn on Options → Auto-update.</p>
     <div class="profile-hint" id="updateHint">&nbsp;</div>
     <div class="actions">
       <button id="updateCancel" type="button" data-i18n="updateCancel">Not now</button>
+      <button id="updateLater" type="button" data-i18n="updateLater">When I quit</button>
       <button id="updateConfirm" class="primary" type="button" data-i18n="updateConfirm">Update and restart</button>
+    </div>
+  </div>
+</div>
+
+<!-- After an update: what it brought, once (src/update/whats-new.ts). -->
+<div class="backdrop" id="whatsNewModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="whatsNewTitle">
+    <h3 id="whatsNewTitle">Updated</h3>
+    <div class="update-notes" id="whatsNewNotes"></div>
+    <p class="update-links" id="whatsNewLinks"></p>
+    <div class="actions">
+      <button id="whatsNewClose" class="primary" type="button" data-i18n="whatsNewClose">Got it</button>
     </div>
   </div>
 </div>

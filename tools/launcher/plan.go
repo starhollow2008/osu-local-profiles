@@ -113,6 +113,8 @@ type appInfo struct {
 	// The newer release the app's daily check found, or empty (offeredVersion in
 	// src/update/index.ts). An app from before 1.27 never sends it.
 	Update string `json:"update"`
+	// Downloading and installing it now: Update to ... and restart, from here or the page.
+	Updating bool `json:"updating"`
 }
 
 func parseAppInfo(raw []byte) (appInfo, bool) {
@@ -175,23 +177,99 @@ func statusText(state appState, tracking bool, port int) string {
 	}
 }
 
-// updateText is the menu item offering an update, and whether to show it: only while the app
-// is up to install it, since the page is where it is installed from.
-func updateText(state appState, version string) (string, bool) {
-	if version == "" || state != stateRunning {
-		return "", false
+// trayView is everything the icon and its menu show.
+type trayView struct {
+	state    appState
+	tracking bool
+	// The update the app offers, or empty.
+	update string
+	// The app is downloading and installing it now.
+	updating bool
+}
+
+// statusLine is the menu's first line: statusText, or the update being installed.
+func statusLine(v trayView, port int) string {
+	if v.state == stateRunning && v.updating {
+		if v.update != "" {
+			return "Downloading update " + v.update + "..."
+		}
+		return "Downloading an update..."
 	}
-	return "Update to " + version + "...", true
+	return statusText(v.state, v.tracking, port)
+}
+
+// updateItems are the two menu items offering an update -- install it now, or read what is new
+// on the page first -- and whether to show them: only while the app is up to install it, and
+// not while it already is.
+func updateItems(v trayView) (install, notes string, shown bool) {
+	if v.update == "" || v.state != stateRunning || v.updating {
+		return "", "", false
+	}
+	return "Update to " + v.update + " and restart", "What's new in " + v.update, true
 }
 
 // tooltipText is what hovering the icon says. An update is mentioned there too, because the
 // menu is only seen by someone who opens it.
-func tooltipText(state appState, tracking bool, port int, update string) string {
-	text := "osu! local profiles - " + statusText(state, tracking, port)
-	if _, shown := updateText(state, update); shown {
-		text += " - update " + update + " available"
+func tooltipText(v trayView, port int) string {
+	text := "osu! local profiles - " + statusLine(v, port)
+	if _, _, shown := updateItems(v); shown {
+		text += " - update " + v.update + " available"
 	}
 	return text
+}
+
+// The lines the launcher writes down the app's stdin, as stopWhenLauncherCloses in
+// src/instance.ts reads them: one JSON object a line.
+const quitLine = "{\"quit\":true}\n"
+
+func meteredLine(metered, known bool) string {
+	switch {
+	case !known:
+		return "{\"metered\":null}\n"
+	case metered:
+		return "{\"metered\":true}\n"
+	default:
+		return "{\"metered\":false}\n"
+	}
+}
+
+// meteredFromHint reads Windows' NL_NETWORK_CONNECTIVITY_HINT: a cost of 1 is unrestricted, 2
+// fixed and 3 variable (both metered), 0 unknown. Near, over or roaming counts as metered
+// whatever the cost says -- Windows Update's own reading.
+func meteredFromHint(cost int32, approaching, over, roaming bool) (metered, known bool) {
+	if approaching || over || roaming {
+		return true, true
+	}
+	switch cost {
+	case 1:
+		return false, true
+	case 2, 3:
+		return true, true
+	}
+	return false, false
+}
+
+// meteredFromNM reads NetworkManager's NMMetered: 1 yes and 3 guessed yes, 2 no and 4 guessed
+// no, 0 unknown.
+func meteredFromNM(value uint32) (metered, known bool) {
+	switch value {
+	case 1, 3:
+		return true, true
+	case 2, 4:
+		return false, true
+	}
+	return false, false
+}
+
+// applyError is why /api/update/apply said no, from its JSON, or its status when it gave none.
+func applyError(status int, raw []byte) string {
+	var body struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal(raw, &body) == nil && body.Error != "" {
+		return body.Error
+	}
+	return "the app answered " + itoa(status)
 }
 
 func itoa(n int) string {

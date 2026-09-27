@@ -1,10 +1,9 @@
 /**
  * Finding out whether a newer release exists.
  *
- * One unauthenticated request to the public releases API, made because a button was
- * pressed or once when the app starts -- never on a timer. That is the same rule the osu!
- * API notes in docs/reference-links.md impose, applied here for the same reason: this app
- * is not entitled to somebody else's bandwidth just because it is running.
+ * One unauthenticated request to the public releases API: when the app starts, then once a
+ * day while it runs (`keepCheckingForUpdates`), or when a button is pressed. GitHub allows 60
+ * an hour; the no-polling rule in docs/reference-links.md is osu!'s, and covers osu!.
  *
  * Everything here takes what it needs as an argument rather than reading `process`, so the
  * asset a Linux build would look for can be checked from Windows -- the lesson from
@@ -22,6 +21,9 @@ export interface Release {
   version: string;
   releaseUrl: string;
   assets: ReleaseAsset[];
+  /** The release page's text: its notes, for a release that has no `-notes.json`. */
+  body: string;
+  publishedAt: string | null;
 }
 
 /** `https://github.com/owner/repo.git` -> `owner/repo`. Null if it is not a GitHub URL. */
@@ -107,6 +109,8 @@ export async function fetchLatestRelease(repo: string, timeoutMs = 10_000): Prom
     version: tag.replace(/^v/, ''),
     releaseUrl:
       typeof body.html_url === 'string' ? body.html_url : `https://github.com/${repo}/releases`,
+    body: typeof body.body === 'string' ? body.body : '',
+    publishedAt: typeof body.published_at === 'string' ? body.published_at : null,
     assets: assets.flatMap((raw): ReleaseAsset[] => {
       const a = raw as Record<string, unknown>;
       if (typeof a.name !== 'string' || typeof a.browser_download_url !== 'string') return [];
@@ -119,4 +123,9 @@ export async function fetchLatestRelease(repo: string, timeoutMs = 10_000): Prom
       ];
     }),
   };
+}
+
+/** A release's own file, by name, or null. */
+export function namedAsset(release: Release, name: string): ReleaseAsset | null {
+  return release.assets.find((a) => a.name.toLowerCase() === name.toLowerCase()) ?? null;
 }

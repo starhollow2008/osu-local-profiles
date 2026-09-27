@@ -2,11 +2,26 @@
 
 ## 1.27.0
 
-- **The app now checks for updates while it's open, not just when it starts.** Once a day, so
-  leaving it running for weeks no longer leaves you on an old version. When a new version is
-  found, **Update available** appears on the page without reloading it, and the tray icon's
-  menu gains **Update to ...**, which opens the page straight to the update.
-  `"checkForUpdates": false` in `config.json` still turns every check off.
+- **Updates are easier to notice, smaller to download, and can install themselves if you
+  want.**
+  - **The app checks for updates while it's open, not just when it starts** - once a day, so
+    leaving it running for weeks no longer leaves you on an old version. A new version appears
+    on the page without reloading it.
+  - **See what's new before you update**, and what changed after: the update dialog lists each
+    new version's changes, with a link to the full changelog, and the first start after an
+    update shows what it brought, once.
+  - **The button says which version**: **Update to 1.28.0**.
+  - **Auto-update**, a new switch in **Options**: new versions download in the background and
+    install when you quit the app, or when it next starts. Off unless you turn it on, and it
+    never downloads on a connection Windows or Linux says is metered.
+  - **When I quit**, in the update dialog: download now, install when you're done playing.
+  - **Updates download only what changed** - usually a few MB instead of the whole app.
+    Starts with the update *from* this version, since it's the first to publish its parts.
+  - **The tray icon shows a dot** when an update is waiting, and its menu can **Update to
+    ... and restart** or show **What's new**, without opening the page.
+  - **An update that has waited two weeks, or one that fixes something important, says so**
+    at the foot of the page. Dismiss it and it stays away for a week.
+  - `"checkForUpdates": false` in `config.json` still turns every check off.
 
 - **See every play the app didn't track, and bring one back.** **Options -> Other settings ->
   Plays not tracked** lists each play the app turned away - declined by your play tracking

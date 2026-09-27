@@ -20,6 +20,8 @@ declare module '*/apply-update.mjs' {
     installDir: string;
     /** The app was started by a launcher that will start it again after the swap. */
     launcherRestarts: boolean;
+    /** Installed as the app was quit: nothing is started afterwards. */
+    noRelaunch?: boolean;
     exists: (file: string) => boolean;
     env: Record<string, string | undefined>;
   }): RelaunchPlan;

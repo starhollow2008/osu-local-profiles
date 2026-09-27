@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"unsafe"
 
 	"fyne.io/systray"
 	"golang.org/x/sys/windows"
@@ -65,8 +66,41 @@ func alert(title, message string)  { messageBox(title, message, windows.MB_ICONE
 func notice(title, message string) { messageBox(title, message, windows.MB_ICONINFORMATION) }
 
 func trayAvailable() bool { return true }
-func setTrayIcon()        { systray.SetIcon(trayICO) }
 func trayReadyPlatform()  {}
+
+func setTrayIcon(update bool) {
+	if update {
+		systray.SetIcon(trayUpdateICO)
+	} else {
+		systray.SetIcon(trayICO)
+	}
+}
+
+// Windows 10 2004 and later. Found at run time, so an older Windows only goes without the answer.
+var procConnectivityHint = windows.NewLazySystemDLL("iphlpapi.dll").NewProc("GetNetworkConnectivityHint")
+
+// NL_NETWORK_CONNECTIVITY_HINT, as netioapi.h lays it out.
+type connectivityHint struct {
+	level       int32
+	cost        int32
+	approaching uint8
+	over        uint8
+	roaming     uint8
+	_           uint8
+}
+
+// meteredConnection asks Windows whether the connection is metered: the setting under Wi-Fi or
+// Ethernet properties that Windows Update and OneDrive also respect.
+func meteredConnection() (metered, known bool) {
+	if procConnectivityHint.Find() != nil {
+		return false, false
+	}
+	var hint connectivityHint
+	if r, _, _ := procConnectivityHint.Call(uintptr(unsafe.Pointer(&hint))); r != 0 {
+		return false, false
+	}
+	return meteredFromHint(hint.cost, hint.approaching != 0, hint.over != 0, hint.roaming != 0)
+}
 
 func releaseQuarantine(string)       {}
 func leaveTranslocation(string) bool { return false }
