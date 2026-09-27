@@ -319,4 +319,17 @@ CREATE TABLE IF NOT EXISTS imported_standing (
   PRIMARY KEY (profile_id, mode)
 );
 
+-- The medals an osu! account holds, copied by an import from osu! that asked for them: only the
+-- ones this app awards (src/calc/medals.ts), each with the moment osu! awarded it. Borrowed, like
+-- imported_standing: a profile's own plays still earn medals as ever, and computeMedals shows a
+-- medal earned when either says so, from the earlier of the two. Replaced whole by each import
+-- that asks for medals, and cleared by a reset. See src/imported-medals.ts.
+CREATE TABLE IF NOT EXISTS imported_medals (
+  profile_id    INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  slug          TEXT    NOT NULL,
+  achieved_at   INTEGER NOT NULL,
+  imported_at   INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, slug)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

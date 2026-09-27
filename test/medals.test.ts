@@ -4,7 +4,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openDb, getOrCreateProfile } from '../src/db/index.ts';
-import { computeMedals, earnedMedalCount, earnsIntroMedal, type Medal } from '../src/calc/medals.ts';
+import { computeMedals, earnedMedalCount, earnsIntroMedal, isAppMedal, type Medal } from '../src/calc/medals.ts';
+import { clearImportedMedals, saveImportedMedals } from '../src/imported-medals.ts';
+import { earnedMedals } from '../src/clients/osu-web.ts';
 import { medalEvents } from '../src/calc/history.ts';
 import { VANILLA } from '../src/calc/eligibility.ts';
 import { applyScoreAction } from '../src/scores.ts';
@@ -213,6 +215,7 @@ test('a rank medal carries no date, so it never slides to the top of Recent', ()
     dated: false,
     earnedOn: null,
     earnedOnOriginal: null,
+    fromOsu: false,
   };
   assert.deepEqual(medalEvents([rank]), []);
 });
@@ -561,6 +564,124 @@ test('Mod Introduction medals are earned from any mode, and only by passes', () 
     const distinct = new Set([0, 1, 2, 3].flatMap((mode) => earned(h.medals(mode).medals)));
     assert.ok(distinct.has('all-intro-hidden'));
     assert.equal(earnedMedalCount(h.db, h.profileId, VANILLA), distinct.size);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/* ------------------------------------------------------ imported from osu! */
+
+/*
+ * An import from osu! can copy the medals the account already holds: the 1- to 8-star ones
+ * earned years ago on maps that are not among its best performances, which no play here could
+ * ever award. Borrowed beside the derived ones, never instead of them.
+ */
+test("osu!'s medals are read from the profile page, by the slug its own list gives each id", () => {
+  const medals = earnedMedals({
+    achievements: [
+      { id: 55, slug: 'osu-skill-pass-1' },
+      { id: 201, slug: 'all-skill-dc-1' },
+    ],
+    user: {
+      user_achievements: [
+        { achievement_id: 55, achieved_at: '2014-02-01T10:00:00Z' },
+        { achievement_id: 201, achieved_at: '2026-06-22T23:27:37Z' },
+        // Not in the list, or with no date: left out rather than guessed at.
+        { achievement_id: 999, achieved_at: '2020-01-01T00:00:00Z' },
+        { achievement_id: 55, achieved_at: 'whenever' },
+      ],
+    },
+  });
+  assert.deepEqual(medals, [
+    { slug: 'osu-skill-pass-1', achievedAt: Date.parse('2014-02-01T10:00:00Z') },
+    { slug: 'all-skill-dc-1', achievedAt: Date.parse('2026-06-22T23:27:37Z') },
+  ]);
+  assert.deepEqual(earnedMedals({}), []);
+});
+
+test('only the medals this app awards are ever kept', () => {
+  assert.equal(isAppMedal('osu-skill-pass-3'), true);
+  assert.equal(isAppMedal('mania-skill-fc-2'), true);
+  assert.equal(isAppMedal('osu-combo-500'), true);
+  assert.equal(isAppMedal('all-skill-highranker-1'), true);
+  assert.equal(isAppMedal('all-intro-hidden'), true);
+  // A medal group this app does not award, and a slug osu! does not have.
+  assert.equal(isAppMedal('all-skill-dc-1'), false);
+  assert.equal(isAppMedal('all-packs-mappersguild-07'), false);
+  assert.equal(isAppMedal('osu-skill-pass-11'), false);
+});
+
+test('a medal imported from osu! is earned on its osu! date, and says where it came from', () => {
+  const h = harness();
+  try {
+    const at = Date.parse('2014-02-01T10:00:00Z');
+    saveImportedMedals(h.db, h.profileId, [
+      { slug: 'osu-skill-pass-1', achievedAt: at },
+      { slug: 'osu-skill-pass-2', achievedAt: at + 1000 },
+      { slug: 'all-skill-highranker-1', achievedAt: at + 2000 },
+    ]);
+    // A 9-star pass here, which earns the 9-star medal alone.
+    h.add({ stars: 9.2, combo: 1 });
+
+    const medals = h.medals().medals;
+    assert.deepEqual(
+      earned(medals).filter((s) => s.includes('skill-pass')),
+      ['osu-skill-pass-1', 'osu-skill-pass-2', 'osu-skill-pass-9'],
+    );
+    const one = find(medals, 'osu-skill-pass-1');
+    assert.equal(one.achievedAt, at);
+    assert.equal(one.fromOsu, true);
+    assert.equal(one.dated, true);
+    assert.equal(find(medals, 'osu-skill-pass-9').fromOsu, false);
+    // A rank medal osu! awarded has a real date, where one read off the estimated rank does not.
+    const rank = find(medals, 'all-skill-highranker-1');
+    assert.equal(rank.achievedAt, at + 2000);
+    assert.equal(rank.dated, true);
+    // And each is in the Recent feed on the day osu! gave it.
+    assert.ok(medalEvents(medals).some((e) => e.type === 'medal' && e.slug === 'osu-skill-pass-1' && e.at === at));
+    // They count in every mode's header figure, once.
+    assert.equal(earnedMedalCount(h.db, h.profileId, VANILLA), earned(medals).length + earned(h.medals(1).medals).length - 1);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('whichever earned a medal first, a play here or osu!, is the date it shows', () => {
+  const h = harness();
+  try {
+    h.add({ stars: 3.5, combo: 1, at: 2_000_000_000_000 });
+    h.add({ stars: 4.5, combo: 1, at: 1_000_000_000_000 });
+    saveImportedMedals(h.db, h.profileId, [
+      // Earned on osu! before the play here: osu!'s date.
+      { slug: 'osu-skill-pass-3', achievedAt: 1_500_000_000_000 },
+      // Earned here first: the play keeps it.
+      { slug: 'osu-skill-pass-4', achievedAt: 1_900_000_000_000 },
+    ]);
+    const medals = h.medals().medals;
+    assert.equal(find(medals, 'osu-skill-pass-3').achievedAt, 1_500_000_000_000);
+    assert.equal(find(medals, 'osu-skill-pass-3').fromOsu, true);
+    assert.equal(find(medals, 'osu-skill-pass-4').achievedAt, 1_000_000_000_000);
+    assert.equal(find(medals, 'osu-skill-pass-4').fromOsu, false);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('importing medals again replaces what the last import copied, and a reset clears them', () => {
+  const h = harness();
+  try {
+    assert.equal(saveImportedMedals(h.db, h.profileId, [{ slug: 'osu-skill-pass-1', achievedAt: 1 }]), 1);
+    assert.equal(
+      saveImportedMedals(h.db, h.profileId, [
+        { slug: 'osu-skill-pass-2', achievedAt: 2 },
+        { slug: 'osu-skill-pass-3', achievedAt: 3 },
+      ]),
+      2,
+    );
+    assert.deepEqual(earned(h.medals().medals), ['osu-skill-pass-2', 'osu-skill-pass-3']);
+
+    clearImportedMedals(h.db, h.profileId);
+    assert.deepEqual(earned(h.medals().medals), []);
   } finally {
     h.cleanup();
   }

@@ -55,7 +55,7 @@ import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './m
 import { bindOsuFolders, closeOsuFolders, installName, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
-import { renderMedals } from './medals.js';
+import { forgetAnnouncedMedals, renderMedals } from './medals.js';
 import { setPopupCards } from './beatmaps-popup.js';
 import {
   closeTrackingFilter,
@@ -1862,11 +1862,11 @@ $('identityFile').onchange = async () => {
  */
 const IMPORT_DEFAULTS = {
   avatar: true, cover: true, country: true, aboutMe: true,
-  favorites: false, bestPerformances: false, pinnedScores: false,
+  favorites: false, bestPerformances: false, pinnedScores: false, medals: false,
 };
 const IMPORT_FAVORITES_ONLY = {
   avatar: false, cover: false, country: false, aboutMe: false,
-  favorites: true, bestPerformances: false, pinnedScores: false,
+  favorites: true, bestPerformances: false, pinnedScores: false, medals: false,
 };
 
 const importHint = (message, isError) => hint('importHint', message, isError);
@@ -1903,6 +1903,9 @@ function renderImportNote() {
   }
   if (choices.bestPerformances || choices.pinnedScores) {
     notes.push(t('import.noDuplicates'));
+  }
+  if (choices.medals) {
+    notes.push(t('import.medals'));
   }
   $('importNote').textContent = notes.join(' ');
   $('importGo').disabled = !Object.values(choices).some(Boolean);
@@ -2011,6 +2014,8 @@ $('importGo').onclick = async () => {
   try {
     const d = await identityAction({ action: 'import', query, ...choices });
     settings = d.settings;
+    // Medals copied from osu! arrive by the dozen, and they are not the moment of unlocking any.
+    if (choices.medals) forgetAnnouncedMedals();
     await Promise.all([loadState(), loadProfile()]);
     renderAbout();
     const what = d.done.length ? `Imported ${joinList(d.done)} from ${d.user.username}` : `Linked to ${d.user.username}`;
@@ -4426,6 +4431,11 @@ on('app-config', (e) => {
 // Pin, unpin and remove all change what the page should be showing.
 // Another tab favouriting or unfavouriting changes this one's cards and menus.
 on('favorites', () => loadProfile());
+// Medals copied from osu!: shown, never announced as unlocked -- see forgetAnnouncedMedals.
+on('medals', () => {
+  forgetAnnouncedMedals();
+  loadProfile();
+});
 on('scores', () => {
   loadProfile();
   loadState();

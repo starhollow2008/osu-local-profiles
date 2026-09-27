@@ -236,7 +236,7 @@ Flags from Twemoji (CC-BY 4.0, same source as osu!). Generated: `web/js/mod-defi
 
 Page shows no text for a medal (icons only, groups: Mod Introduction then Skill & Dedication per `ordering`). Hover card: `#medalTooltip`, one shared element positioned in window coords. Header medals figure = account-wide `earnedMedalCount`. Earned medal = Recent-feed event (`medalEvents`) - except rank medals (`dated: false`).
 
-Medals derived from scores on every request, never stored. Full combo needs `beatmap_max_combo` (lazer drops slider ends without breaking combo - "no misses" alone awards FC to a run dropping hundreds). Rows without it: unknown, never guessed.
+Medals derived from scores on every request, never stored - except what an Import from osu! with Medals ticked copies (`imported_medals`, `src/imported-medals.ts`): only slugs `isAppMedal` knows, replaced whole per import, cleared by a reset. `computeMedals` takes whichever of derived and imported is earlier, marking the imported ones `fromOsu` (the card says so). The server broadcasts `medals` before any other event of that import, so pages rebase their unlock announcements instead of toasting dozens of old medals. Full combo needs `beatmap_max_combo` (lazer drops slider ends without breaking combo - "no misses" alone awards FC to a run dropping hundreds). Rows without it: unknown, never guessed.
 
 ## Global rank: estimated from sampled curve
 

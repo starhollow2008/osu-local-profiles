@@ -43,6 +43,39 @@ export interface OsuWebUser {
    * See `src/player-identity.ts`.
    */
   previousUsernames: string[];
+  /**
+   * Every medal the account holds, by osu!'s slug, with when osu! awarded it. All of them, as
+   * osu! lists them: which ones this app has any use for is decided where they are kept.
+   */
+  medals: EarnedMedal[];
+}
+
+export interface EarnedMedal {
+  slug: string;
+  achievedAt: number;
+}
+
+/**
+ * The medals an account holds, from the profile page's payload: `user.user_achievements` names
+ * each by osu!'s numeric id, and the page's own `achievements` list -- every medal osu! has --
+ * turns the id into the slug the rest of this app knows it by. One the list does not name, or
+ * with no readable date, is left out rather than guessed at.
+ */
+export function earnedMedals(payload: { achievements?: unknown; user?: Record<string, unknown> }): EarnedMedal[] {
+  const slugs = new Map<number, string>();
+  for (const a of Array.isArray(payload.achievements) ? payload.achievements : []) {
+    const { id, slug } = (a ?? {}) as { id?: unknown; slug?: unknown };
+    if (typeof id === 'number' && typeof slug === 'string') slugs.set(id, slug);
+  }
+  const held = payload.user?.['user_achievements'];
+  const out: EarnedMedal[] = [];
+  for (const u of Array.isArray(held) ? held : []) {
+    const { achievement_id: id, achieved_at: at } = (u ?? {}) as { achievement_id?: unknown; achieved_at?: unknown };
+    const slug = typeof id === 'number' ? slugs.get(id) : undefined;
+    const achievedAt = typeof at === 'string' ? Date.parse(at) : NaN;
+    if (slug !== undefined && Number.isFinite(achievedAt)) out.push({ slug, achievedAt });
+  }
+  return out;
 }
 
 /**
@@ -106,9 +139,9 @@ function extractUser(html: string): OsuWebUser | null {
 
   const json = decodeInitialData(match[1]!);
 
-  let payload: { user?: Record<string, unknown> };
+  let payload: { user?: Record<string, unknown>; achievements?: unknown };
   try {
-    payload = JSON.parse(json) as { user?: Record<string, unknown> };
+    payload = JSON.parse(json) as { user?: Record<string, unknown>; achievements?: unknown };
   } catch {
     return null;
   }
@@ -133,6 +166,7 @@ function extractUser(html: string): OsuWebUser | null {
     previousUsernames: Array.isArray(user['previous_usernames'])
       ? user['previous_usernames'].filter((n): n is string => typeof n === 'string' && n !== '')
       : [],
+    medals: earnedMedals(payload),
   };
 }
 

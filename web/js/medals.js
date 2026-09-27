@@ -50,6 +50,14 @@ export const medalFor = (slug) => medalsBySlug.get(slug);
 let lastEarned = { mode: null, slugs: new Set() };
 
 /**
+ * Start over from what the next render shows, announcing none of it: medals imported from osu!
+ * were earned long ago, and a toast naming forty of them is no one's moment of unlocking.
+ */
+export function forgetAnnouncedMedals() {
+  lastEarned = { mode: null, slugs: new Set() };
+}
+
+/**
  * The card's content, osu-web's `tooltip-achievement`: the group, then the icon, name and
  * description on a darker panel, then when it was achieved -- or "Locked".
  *
@@ -65,6 +73,8 @@ function medalCard(medal) {
   } else {
     achieved = `${t('medals.achievedOn')} <time datetime="${new Date(medal.achievedAt).toISOString()}"
       title="${escapeHtml(new Date(medal.achievedAt).toLocaleString())}">${escapeHtml(shortDate(medal.achievedAt))}</time>`;
+    // Borrowed from the osu! account an import copied it from, and said so.
+    if (medal.fromOsu) achieved += `<br>${escapeHtml(t('medals.fromOsu'))}`;
   }
 
   return `<div class="medal-tooltip__grouping">${escapeHtml(groupTitle(medal.grouping ?? 'Skill & Dedication'))}</div>

@@ -36,7 +36,8 @@ const MODE_LABELS = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'] as const;
 
 /** The most rows one request may ask a section for: see `MAX_PAGE_ROWS`. */
 const MAX_PAGE = MAX_PAGE_ROWS;
-import { computeMedals, earnedMedalCount } from '../calc/medals.ts';
+import { computeMedals, earnedMedalCount, isAppMedal } from '../calc/medals.ts';
+import { clearImportedMedals, saveImportedMedals } from '../imported-medals.ts';
 import { estimateRank, rankTable } from '../calc/rank.ts';
 import {
   activeProfileId,
@@ -1167,6 +1168,17 @@ export function startServer(opts: ServerOptions): http.Server {
               }
 
               /*
+               * Medals, when asked for: the ones this app awards, as osu! awarded them, in place
+               * of what an earlier import copied. They join the medals this profile's plays earn
+               * rather than replacing them -- see src/imported-medals.ts.
+               */
+              const wantMedals = want('medals', false);
+              if (wantMedals) {
+                const kept = saveImportedMedals(opts.db, id, user.medals.filter((m) => isAppMedal(m.slug)));
+                done.push(`${kept} medal${kept === 1 ? '' : 's'}`);
+              }
+
+              /*
                * Best performances and pinned scores, which are the only part of an import
                * that writes plays rather than decoration.
                *
@@ -1220,6 +1232,9 @@ export function startServer(opts: ServerOptions): http.Server {
                 }
               }
 
+              // First, so every open page takes the medals osu! already awarded as its starting
+              // point before anything below makes it render them as newly unlocked.
+              if (wantMedals) broadcast('medals', { action: 'import' });
               broadcast('identity', { linked: user.id });
               broadcast('settings', settingsFor(id));
               if (favouritesAdded > 0) broadcast('favorites', { action: 'import' });
@@ -1573,6 +1588,7 @@ export function startServer(opts: ServerOptions): http.Server {
           // And what it borrowed from osu!: a profile with no scores left must not still be
           // priced against an account none of them came from any more.
           clearStanding(opts.db, current());
+          clearImportedMedals(opts.db, current());
           opts.db
             .prepare('UPDATE profiles SET tracking_since = ? WHERE id = ?')
             .run(now, current());

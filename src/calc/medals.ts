@@ -6,6 +6,7 @@ import { bonusPp, isCustomised, weightedTotal } from './pp.ts';
 import type { LazerMod } from '../osr.ts';
 import definitions from './medal-definitions.json' with { type: 'json' };
 import { Status } from '../clients/beatmaps.ts';
+import { importedMedals } from '../imported-medals.ts';
 import { beatmapName, beatmapNameOriginal, NAME_COLUMNS, names } from './metadata.ts';
 
 /**
@@ -26,6 +27,11 @@ import { beatmapName, beatmapNameOriginal, NAME_COLUMNS, names } from './metadat
  * - **Rank** medals use the estimated pp-to-rank curve, so they inherit its approximation.
  * - **FC** medals need the beatmap's own maximum combo, which is only stored for scores
  *   ingested since that column existed. Older scores can be filled in by a recompute.
+ *
+ * One thing is stored after all, and only when asked for: the medals an osu! account already
+ * holds, copied by an import from osu! (src/imported-medals.ts). They are osu!'s record, not
+ * this profile's plays, so they sit beside the derived ones -- a medal is earned when either
+ * says so, from whichever is earlier -- and a reset clears them.
  */
 
 export type MedalFamily = 'combo' | 'plays' | 'hits' | 'pass' | 'fc' | 'rank' | 'intro';
@@ -53,6 +59,8 @@ export interface Medal {
   earnedOnOriginal: string | null;
   /** osu!'s group for it -- what the section and its medal card are headed. */
   grouping: MedalGrouping;
+  /** Earned by the osu! account an import copied it from, rather than by a play here. */
+  fromOsu: boolean;
 }
 
 /** osu!'s groups for the medals this app can award, in the order osu!'s page lists them. */
@@ -107,6 +115,19 @@ const TABLE = definitions as {
   intro: IntroDefinition[];
   modTypes: ModTypes;
 };
+
+/** Every medal this app awards, in any mode: what an import from osu! may copy, and nothing else. */
+const APP_MEDALS: ReadonlySet<string> = new Set(
+  [
+    ...TABLE.rank,
+    ...TABLE.intro,
+    ...Object.values(TABLE.modes).flatMap((m) => Object.values(m).flat() as Definition[]),
+  ].map((d) => d.slug),
+);
+
+export function isAppMedal(slug: string): boolean {
+  return APP_MEDALS.has(slug);
+}
 
 /**
  * Does this passed score earn this Mod Introduction medal? osu!'s own rules, from
@@ -233,6 +254,7 @@ function introMedals(db: Db, profileId: number): Medal[] {
       earnedOn: row ? beatmapName(names(row)) || null : null,
       earnedOnOriginal: row ? beatmapNameOriginal(names(row)) : null,
       grouping: 'Mod Introduction' as const,
+      fromOsu: false,
     };
   });
 }
@@ -410,6 +432,7 @@ export function computeMedals(
         earnedOn: row ? title(row) : null,
         earnedOnOriginal: row ? beatmapNameOriginal(names(row)) : null,
         grouping: 'Skill & Dedication',
+        fromOsu: false,
       });
     }
   };
@@ -430,6 +453,7 @@ export function computeMedals(
         earnedOn: null,
         earnedOnOriginal: null,
         grouping: 'Skill & Dedication',
+        fromOsu: false,
       });
     }
   };
@@ -445,6 +469,23 @@ export function computeMedals(
   add(family.hits, 'hits', hitsAt);
   add(family.pass, 'pass', passAt);
   add(family.fc, 'fc', fcAt);
+
+  /*
+   * The medals the osu! account held when it was imported. One earned here first keeps its
+   * play; otherwise osu!'s date stands, and it is a real one -- so a borrowed rank medal is
+   * dated like any other, where one decided from the estimated rank is not.
+   */
+  const borrowed = importedMedals(db, profileId);
+  for (const medal of medals) {
+    const at = borrowed.get(medal.slug);
+    if (at === undefined) continue;
+    if (medal.achievedAt !== null && medal.dated && medal.achievedAt <= at) continue;
+    medal.achievedAt = at;
+    medal.dated = true;
+    medal.earnedOn = null;
+    medal.earnedOnOriginal = null;
+    medal.fromOsu = true;
+  }
 
   return {
     medals,

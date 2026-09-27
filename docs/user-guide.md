@@ -210,9 +210,17 @@ profile, press **Look up**, tick what to copy, and press **Import**.
 | Flag | yes |
 | me! | yes - it replaces this profile's me! |
 | Favorite beatmaps | no - they are added to the list |
+| Medals | no - see below |
 
 It can also copy the account's **best performances and pinned scores**, so a profile's pp and
 accuracy match the website even for plays set on another PC.
+
+**Medals** copies the medals the account already holds, with the dates osu! awarded them - only
+the ones this app has (see [Medals](#medals)); osu!'s other groups are left out. Best
+performances alone cannot bring those back: a 1★ pass medal earned years ago is on a map that is
+nowhere near the account's best. They join the medals your plays here earn rather than replacing
+them - a medal shows whichever came first - and their cards say *Imported from osu!*. Importing
+again replaces what the last import copied, and resetting the profile clears them.
 
 Importing also links the profile to that account. It is never automatic. A brand-new install
 offers this once, as a welcome marked optional; Skip, the close button, Escape or clicking
@@ -350,6 +358,12 @@ What exists is **not the same in every mode**, and that is osu!'s doing:
 | Beatmap full combo | 1★ to 10★ | 1★ to 8★ |
 | Rank | top 50,000 / 10,000 / 5,000 / 1,000 | the same four |
 
+A star medal is for its own star rating and nothing below it, as on osu!: a 5.4★ pass earns the
+5★ pass medal alone. The rating is the one with your mods, and as osu! does, it only counts a
+ranked or approved map (never qualified or loved), with no Easy, No Fail, Half Time, Daycore,
+Spun Out, Relax, Autopilot or other mod that makes a map easier or plays it for you - and on
+osu!mania, no key mod or Dual Stages.
+
 **Mod Introduction** is one set shared by every mode, as on osu!: your first pass with a mod on
 its own at its default settings - Easy, No Fail, Half Time, Hard Rock, Sudden Death, Perfect,
 Double Time, Nightcore, Hidden, Flashlight, and Spun Out (osu!standard only). Two more go to
@@ -357,7 +371,8 @@ lazer's **Conversion** and **Fun** mods, which osu!stable does not have. Classic
 as a second mod, Nightcore is not Double Time, and a failed play earns nothing.
 
 Medals are **derived from the scores, never stored**: removing a score that earned one takes the
-medal with it. Two families are only as good as their inputs, and say so:
+medal with it. The one exception is medals imported from osu!, which are osu!'s record rather
+than your plays here. Two families are only as good as their inputs, and say so:
 
 - **Rank** medals use the estimated pp-to-rank curve, so they inherit its approximation.
 - **Full combo** needs the beatmap's own maximum combo. A lazer score can drop slider ends

@@ -1599,11 +1599,12 @@ check(
   true,
 );
 check(
-  'the four decorative choices are ticked; the three that write plays or lists are not',
+  'the four decorative choices are ticked; the four that write plays, lists or medals are not',
   await evaluate(`JSON.stringify(Object.fromEntries(
     [...document.querySelectorAll('#importSection [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
-  // Favorites, best performances and pinned scores all start off: the first adds to a list
-  // shared across profiles, and the other two write plays that move pp and accuracy.
+  // Favorites, best performances, pinned scores and medals all start off: the first adds to a
+  // list shared across profiles, the next two write plays that move pp and accuracy, and medals
+  // borrows osu!'s record of them.
   JSON.stringify({
     avatar: true,
     cover: true,
@@ -1612,7 +1613,21 @@ check(
     favorites: false,
     bestPerformances: false,
     pinnedScores: false,
+    medals: false,
   }),
+);
+check(
+  'ticking Medals says what it copies',
+  await evaluate(`(() => {
+    const box = document.querySelector('#importSection [data-import=medals]');
+    box.checked = true;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    const said = document.getElementById('importNote').textContent.includes('Medals copies');
+    box.checked = false;
+    box.dispatchEvent(new Event('change', { bubbles: true }));
+    return said;
+  })()`),
+  true,
 );
 check(
   'nothing is asked of osu! until a button is pressed',
