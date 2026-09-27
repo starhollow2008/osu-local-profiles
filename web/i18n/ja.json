@@ -588,6 +588,7 @@
   "time.mShort": "{n}分",
   "time.now": "今",
   "update.downloading": "ダウンロード中…",
+  "update.found": "バージョン {version} が公開されました。上部のボタンから更新してください",
   "update.releaseNotes": "GitHub のリリースノート",
   "update.startYourself": "戻ってこない場合は、自分で起動してください。",
   "updateBtn": "アップデートがあります",

@@ -879,6 +879,21 @@ $('optLazerScoring').onclick = async () => {
 function renderUpdate() {
   const u = app.update ?? {};
   $('updateBtn').hidden = !u.available || u.blocked !== null;
+  openUpdateFromLink();
+}
+
+/*
+ * `?update=1` is where the tray icon's "Update to ..." item lands: straight into the dialog,
+ * once the state that says there is an update has arrived. Taken out of the address after, so
+ * a reload does not open it again.
+ */
+function openUpdateFromLink() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('update') !== '1' || $('updateBtn').hidden) return;
+  params.delete('update');
+  const query = params.toString();
+  history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+  openUpdate();
 }
 
 function openUpdate() {
@@ -4172,6 +4187,15 @@ on('recompute-progress', (e) => {
       percent: p.percent,
     }));
   }
+});
+/*
+ * A newer release, found by the daily check while the app has been running. Said once, since
+ * the button that appears is easy to miss on a page that has been open for days.
+ */
+on('update', (e) => {
+  app = { ...app, update: JSON.parse(e.data) };
+  renderUpdate();
+  if (!$('updateBtn').hidden) toast(t('update.found', { version: app.update.latestVersion }));
 });
 // Every profile's scores recalculated: from Other settings, or by itself after an update.
 on('recompute', (e) => {

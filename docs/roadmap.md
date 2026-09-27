@@ -988,6 +988,8 @@ either side of it is exercised -- see **What was actually tested** below.
   exactly what the first attempt did.
 - **One request, at startup.** Not a timer, for the reason in `docs/reference-links.md`.
   `checkForUpdates: false` in `config.json` turns off the app's only outgoing request.
+  (Superseded by 5.65: daily while the app runs. That reason is osu!'s API guidance, and
+  GitHub is not osu!.)
 - **A failed check shows nothing.** No network, a private repository and a rate limit are
   all ordinary; none is a reason to put an error where a button would go.
 
@@ -3151,3 +3153,28 @@ shared pages included; View on osu! in the row's menu.
   Escape closing only the top one, a non-link refused, the form waiting for a beatmap, a search
   with no match, the row tag and its explanation, View on osu! only where osu! has the score).
   The one failure is the existing McOsu badge check. Rows, the menu and both dialogs looked at.
+
+## 5.65 - Checking for updates while the app runs
+
+**Status:** done -- unreleased.
+
+The user's request: people who never close the app, or their computer, stayed on old versions
+(1.23 among them), because the only check was at startup. Check periodically while it is open,
+and tell them in the app.
+
+- **Daily, by the wall clock** (`keepCheckingForUpdates`, `checkDue` in `src/update/index.ts`).
+  Looked at every 10 minutes, due 24h after the last check, or 1h after a failed one -- an app
+  started at login often starts before the network is up. Not one 24h timer: a timer does not
+  count time asleep, and a PC that sleeps nightly might never reach it. One request a day to
+  GitHub, whose unauthenticated limit is 60 an hour; the no-polling rule in
+  `docs/reference-links.md` is osu!'s API guidance and still stands for osu!.
+- **The page is told live**: an `update` SSE event, sent once per version (`onUpdateFound`),
+  shows the Update available button and a toast, no reload needed.
+- **The tray icon offers it**, since someone who never closes the app may not look at the page
+  either: `/api/app` carries `update` (`offeredVersion`: newer, built for this platform, and an
+  install that can take it), which the launcher already polls every 5 seconds. The menu gains
+  **Update to X...**, opening the page at `?update=1`, straight into the update dialog; the
+  tooltip says so too. **No pop-up**: a message box would take focus from osu! mid-play.
+- **Installs already running an older version cannot be reached by this.** It ships in the
+  new version; a 1.23 left open never re-checks, and shows its button the next time it starts.
+- `checkForUpdates: false` still turns every check off.

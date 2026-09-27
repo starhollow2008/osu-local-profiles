@@ -588,6 +588,7 @@
   "time.mShort": "{n} min",
   "time.now": "nu",
   "update.downloading": "Laddar ned…",
+  "update.found": "Version {version} är ute - uppdatera med knappen högst upp",
   "update.releaseNotes": "Versionsinformation på GitHub",
   "update.startYourself": "Om den inte kommer tillbaka, starta den själv.",
   "updateBtn": "Uppdatering tillgänglig",

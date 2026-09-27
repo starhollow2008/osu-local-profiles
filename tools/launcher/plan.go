@@ -110,6 +110,9 @@ type appInfo struct {
 	App      string `json:"app"`
 	Version  string `json:"version"`
 	Tracking bool   `json:"tracking"`
+	// The newer release the app's daily check found, or empty (offeredVersion in
+	// src/update/index.ts). An app from before 1.27 never sends it.
+	Update string `json:"update"`
 }
 
 func parseAppInfo(raw []byte) (appInfo, bool) {
@@ -170,6 +173,25 @@ func statusText(state appState, tracking bool, port int) string {
 	default:
 		return "Stopped with an error"
 	}
+}
+
+// updateText is the menu item offering an update, and whether to show it: only while the app
+// is up to install it, since the page is where it is installed from.
+func updateText(state appState, version string) (string, bool) {
+	if version == "" || state != stateRunning {
+		return "", false
+	}
+	return "Update to " + version + "...", true
+}
+
+// tooltipText is what hovering the icon says. An update is mentioned there too, because the
+// menu is only seen by someone who opens it.
+func tooltipText(state appState, tracking bool, port int, update string) string {
+	text := "osu! local profiles - " + statusText(state, tracking, port)
+	if _, shown := updateText(state, update); shown {
+		text += " - update " + update + " available"
+	}
+	return text
 }
 
 func itoa(n int) string {

@@ -588,6 +588,7 @@
   "time.mShort": "{n} 分",
   "time.now": "現在",
   "update.downloading": "正在下載……",
+  "update.found": "版本 {version} 已推出，請使用上方的按鈕更新",
   "update.releaseNotes": "GitHub 上的更新說明",
   "update.startYourself": "如果它沒有回來，請自行啟動。",
   "updateBtn": "有可用更新",

@@ -36,7 +36,9 @@ type launcher struct {
 	exitCode int
 
 	// The tray's redraw; nil with no tray.
-	changed func(appState, bool)
+	changed func(appState, bool, string)
+	// The update /api/app last offered, or empty.
+	update string
 	// How the launcher goes away: systray.Quit, or ending runWithoutTray.
 	finished func()
 	once     sync.Once
@@ -110,10 +112,10 @@ func (l *launcher) start() error {
 	run := l.run
 	l.stdin, l.proc, l.quitting = stdin, cmd.Process, false
 	l.state = stateStarting
-	redraw := l.changed
+	redraw, update := l.changed, l.update
 	l.mu.Unlock()
 	if redraw != nil {
-		redraw(stateStarting, false)
+		redraw(stateStarting, false, update)
 	}
 
 	go l.poll(run)
@@ -143,10 +145,25 @@ func (l *launcher) move(run int, from func(appState) bool, to appState, tracking
 		return
 	}
 	l.state, l.tracking = to, tracking
-	redraw := l.changed
+	redraw, update := l.changed, l.update
 	l.mu.Unlock()
 	if redraw != nil {
-		redraw(to, tracking)
+		redraw(to, tracking, update)
+	}
+}
+
+// offer records the update the app says is available, and redraws if that changed.
+func (l *launcher) offer(run int, version string) {
+	l.mu.Lock()
+	if l.run != run || l.update == version {
+		l.mu.Unlock()
+		return
+	}
+	l.update = version
+	redraw, state, tracking := l.changed, l.state, l.tracking
+	l.mu.Unlock()
+	if redraw != nil {
+		redraw(state, tracking, version)
 	}
 }
 
@@ -172,6 +189,7 @@ func (l *launcher) poll(run int) {
 		wait := time.Second
 		if info, ok := probe(l.port); ok {
 			l.move(run, live, stateRunning, info.Tracking)
+			l.offer(run, info.Update)
 			wait = 5 * time.Second
 		}
 		time.Sleep(wait)

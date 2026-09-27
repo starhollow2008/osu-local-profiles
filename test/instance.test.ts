@@ -98,9 +98,15 @@ test('nothing on the port, or something else on it, is not the app', async () =>
 
 test('/api/app names the app, so a stranger on the port is never taken for it', async () => {
   await withServer(undefined, async (port) => {
-    const body = (await (await fetch(`http://127.0.0.1:${port}/api/app`)).json()) as { app: string; pid: number };
+    const body = (await (await fetch(`http://127.0.0.1:${port}/api/app`)).json()) as {
+      app: string;
+      pid: number;
+      update: string | null;
+    };
     assert.equal(body.app, APP_ID);
     assert.equal(body.pid, process.pid);
+    // What the tray launcher offers from its menu; nothing, until a check has found a release.
+    assert.equal(body.update, null);
   });
 });
 

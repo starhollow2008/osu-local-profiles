@@ -91,6 +91,44 @@ func TestStatusText(t *testing.T) {
 	}
 }
 
+// The daily check's result reaches the icon through /api/app; an older app sends no update.
+func TestParseAppInfoReadsTheOfferedUpdate(t *testing.T) {
+	info, _ := parseAppInfo([]byte(`{"app":"osu-local-profiles","version":"1.26.0","tracking":true,"update":"1.27.0"}`))
+	if info.Update != "1.27.0" {
+		t.Errorf("update: %q", info.Update)
+	}
+	for _, raw := range []string{
+		`{"app":"osu-local-profiles","version":"1.26.0","update":null}`,
+		`{"app":"osu-local-profiles","version":"1.23.0"}`,
+	} {
+		if info, _ := parseAppInfo([]byte(raw)); info.Update != "" {
+			t.Errorf("%s offered %q", raw, info.Update)
+		}
+	}
+}
+
+// Offered only while the app is up to install it: not while starting, stopping, updating or
+// failed, and not with nothing to offer.
+func TestUpdateOfferedOnlyWhileRunning(t *testing.T) {
+	if text, shown := updateText(stateRunning, "1.27.0"); !shown || !strings.Contains(text, "1.27.0") {
+		t.Errorf("running: %q %v", text, shown)
+	}
+	for _, state := range []appState{stateStarting, stateStopping, stateUpdating, stateFailed} {
+		if _, shown := updateText(state, "1.27.0"); shown {
+			t.Errorf("offered in state %d", state)
+		}
+	}
+	if _, shown := updateText(stateRunning, ""); shown {
+		t.Error("offered with no version")
+	}
+	if got := tooltipText(stateRunning, true, 7272, "1.27.0"); !strings.Contains(got, "1.27.0") {
+		t.Errorf("tooltip: %q", got)
+	}
+	if got := tooltipText(stateRunning, true, 7272, ""); got != "osu! local profiles - Tracking at localhost:7272" {
+		t.Errorf("tooltip with no update: %q", got)
+	}
+}
+
 func TestLastLinesKeepsTheEndOfTheLog(t *testing.T) {
 	log := "\r\n  osu! local profiles\r\n  -------------------\r\n\r\n  No osu! installation found.\r\n  Set installRoots\r\n"
 	if got := lastLines(log, 2); got != "No osu! installation found.\nSet installRoots" {

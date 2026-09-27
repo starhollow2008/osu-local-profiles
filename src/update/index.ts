@@ -125,6 +125,34 @@ export function updateState(): UpdateState {
 }
 
 /**
+ * The version to offer, or null: newer, built for this platform, and an install that can take
+ * it. What the tray launcher reads from `/api/app`, so the page and the icon agree.
+ */
+export function offeredVersion(s: UpdateState = state): string | null {
+  return s.available && s.blocked === null ? s.latestVersion : null;
+}
+
+/*
+ * Who hears about a newly found update: the page's live feed. Told once per version, so a
+ * daily check that finds the same release again says nothing new.
+ */
+const foundListeners = new Set<(s: UpdateState) => void>();
+let announced: string | null = null;
+
+export function onUpdateFound(listener: (s: UpdateState) => void): () => void {
+  foundListeners.add(listener);
+  return () => foundListeners.delete(listener);
+}
+
+function announce(): void {
+  const version = offeredVersion();
+  if (version === null || version === announced) return;
+  announced = version;
+  const s = updateState();
+  for (const listener of foundListeners) listener(s);
+}
+
+/**
  * Ask GitHub what the newest release is.
  *
  * Failure is recorded and returned, never thrown at the caller: no network, a private
@@ -166,7 +194,50 @@ export async function checkForUpdate(): Promise<UpdateState> {
   }
 
   state.checkedAt = new Date().toISOString();
+  announce();
   return updateState();
+}
+
+/**
+ * How often a running app asks GitHub again: once a day, and an hour after a check that
+ * failed, since an app started at login often starts before the network is up.
+ *
+ * Checked against the wall clock rather than by one long timer, because a timer does not
+ * count time the computer spent asleep: a PC that sleeps every night might never reach 24
+ * hours of awake time, and those left open for weeks are exactly who this is for.
+ */
+export const CHECK_EVERY_MS = 24 * 60 * 60_000;
+export const RETRY_FAILED_MS = 60 * 60_000;
+const LOOK_EVERY_MS = 10 * 60_000;
+
+export function checkDue(s: Pick<UpdateState, 'checkedAt' | 'error'>, now: number): boolean {
+  if (s.checkedAt === null) return true;
+  const last = Date.parse(s.checkedAt);
+  // A clock set backwards would otherwise hold the next check off for however far it moved.
+  if (!Number.isFinite(last) || last > now) return true;
+  return now - last >= (s.error === null ? CHECK_EVERY_MS : RETRY_FAILED_MS);
+}
+
+/**
+ * Check now, and again whenever one is due, for as long as the app runs. Returns a stop.
+ *
+ * One request a day to GitHub's releases API; its unauthenticated limit is 60 an hour. The
+ * reason there is no polling loop (docs/reference-links.md) is osu!'s API guidance, which
+ * covers osu!, not this.
+ */
+export function keepCheckingForUpdates(check: () => Promise<unknown> = checkForUpdate): () => void {
+  let inFlight = false;
+  const look = () => {
+    if (inFlight || state.applying || !checkDue(state, Date.now())) return;
+    inFlight = true;
+    void check().finally(() => {
+      inFlight = false;
+    });
+  };
+  look();
+  const timer = setInterval(look, LOOK_EVERY_MS);
+  timer.unref();
+  return () => clearInterval(timer);
 }
 
 /** Everything an install needs; a staged tree missing any of it is not one. */

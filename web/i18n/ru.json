@@ -588,6 +588,7 @@
   "time.mShort": "{n} мин",
   "time.now": "сейчас",
   "update.downloading": "Загрузка…",
+  "update.found": "Вышла версия {version} - обновите кнопкой вверху",
   "update.releaseNotes": "Описание выпуска на GitHub",
   "update.startYourself": "Если он не вернётся, запустите его сами.",
   "updateBtn": "Доступно обновление",

@@ -12,7 +12,16 @@ import {
   type Release,
 } from '../src/update/github.ts';
 import { extractZip, readZipEntries } from '../src/update/zip.ts';
-import { blockedReason, pruneUpdateLeftovers } from '../src/update/index.ts';
+import {
+  blockedReason,
+  CHECK_EVERY_MS,
+  checkDue,
+  keepCheckingForUpdates,
+  offeredVersion,
+  pruneUpdateLeftovers,
+  RETRY_FAILED_MS,
+  type UpdateState,
+} from '../src/update/index.ts';
 
 /*
  * The update path replaces the app's own files, so the parts of it that can be checked
@@ -271,4 +280,55 @@ test('a missing install directory is not a startup failure', () => {
   const result = pruneUpdateLeftovers(path.join(dir, 'gone'), path.join(dir, 'gone', 'data'));
   assert.deepEqual(result.removed, []);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/* ---------------------------------------------------------- checking again */
+
+/*
+ * The app is left open for weeks by exactly the people who most need an update, so it asks
+ * again while it runs. By the wall clock: a timer does not count the hours a PC spent asleep.
+ */
+test('an update check is due once a day, or an hour after one that failed', () => {
+  const now = Date.parse('2026-09-26T12:00:00Z');
+  const ago = (ms: number) => new Date(now - ms).toISOString();
+
+  assert.equal(checkDue({ checkedAt: null, error: null }, now), true, 'never checked');
+  assert.equal(checkDue({ checkedAt: ago(CHECK_EVERY_MS - 60_000), error: null }, now), false);
+  assert.equal(checkDue({ checkedAt: ago(CHECK_EVERY_MS), error: null }, now), true);
+  // Asleep for a week counts as a week.
+  assert.equal(checkDue({ checkedAt: ago(7 * CHECK_EVERY_MS), error: null }, now), true);
+
+  // Started at login before the network was up: asked again soon, not tomorrow.
+  assert.equal(checkDue({ checkedAt: ago(RETRY_FAILED_MS - 60_000), error: 'offline' }, now), false);
+  assert.equal(checkDue({ checkedAt: ago(RETRY_FAILED_MS), error: 'offline' }, now), true);
+
+  // A clock set back must not postpone the next check by however far it moved.
+  assert.equal(checkDue({ checkedAt: ago(-CHECK_EVERY_MS), error: null }, now), true);
+});
+
+test('a running app checks at once, then leaves it to the clock', async () => {
+  let checks = 0;
+  const stop = keepCheckingForUpdates(async () => {
+    checks++;
+  });
+  stop();
+  await Promise.resolve();
+  assert.equal(checks, 1);
+});
+
+test('only an update this install can take is offered to the tray', () => {
+  const base: UpdateState = {
+    currentVersion: '1.26.0',
+    latestVersion: '1.27.0',
+    available: true,
+    releaseUrl: null,
+    blocked: null,
+    error: null,
+    checkedAt: null,
+    applying: false,
+  };
+  assert.equal(offeredVersion(base), '1.27.0');
+  assert.equal(offeredVersion({ ...base, available: false }), null);
+  // A source checkout is told about nothing it could not install.
+  assert.equal(offeredVersion({ ...base, blocked: 'this copy is running from a source checkout' }), null);
 });

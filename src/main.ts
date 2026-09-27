@@ -16,8 +16,9 @@ import { catchUpSince, HEARTBEAT_MS, lastRunAt, markRunning } from './tracker/ca
 import { explainWatchError } from './tracker/watcher.ts';
 import { startServer } from './http/server.ts';
 import {
-  checkForUpdate,
+  keepCheckingForUpdates,
   launchedFromTray,
+  onUpdateFound,
   pruneUpdateLeftovers,
   RESTART_EXIT_CODE,
   SWAPPER_PID_FILE,
@@ -673,11 +674,13 @@ async function main(): Promise<void> {
 `,
     );
   }
+  // Asked again once a day while the app runs, not only at startup: plenty of people never
+  // close it, and would otherwise stay on whatever version they last launched.
+  let stopUpdateChecks = () => {};
   if (config.checkForUpdates) {
-    void checkForUpdate().then((u) => {
-      if (u.available) console.log(`  Update available: ${u.latestVersion} (see the page)
-`);
-    });
+    onUpdateFound((u) => console.log(`  Update available: ${u.latestVersion} (see the page)
+`));
+    stopUpdateChecks = keepCheckingForUpdates();
   }
 
   // Reachable four ways now -- Ctrl+C, a signal, the page's Quit and the tray -- and two can
@@ -697,6 +700,7 @@ async function main(): Promise<void> {
     stopping = true;
     console.log('\n  stopping...');
     clearInterval(heartbeat);
+    stopUpdateChecks();
     tracker.stop();
     // The last thing written before the database closes: everything after this instant
     // happened while the app was shut, which is exactly what the next launch may bring in.

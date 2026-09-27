@@ -588,6 +588,7 @@
   "time.mShort": "{n}분",
   "time.now": "지금",
   "update.downloading": "내려받는 중…",
+  "update.found": "버전 {version}이(가) 나왔습니다. 위쪽 버튼으로 업데이트하세요",
   "update.releaseNotes": "GitHub의 릴리스 노트",
   "update.startYourself": "돌아오지 않으면 직접 실행하세요.",
   "updateBtn": "업데이트 있음",

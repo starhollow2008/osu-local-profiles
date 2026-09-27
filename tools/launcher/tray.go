@@ -38,6 +38,9 @@ func (l *launcher) trayReady() {
 	openLog := systray.AddMenuItem("Open log", "What the app has printed since it started")
 	again := systray.AddMenuItem("Start again", "Start the app again")
 	again.Hide()
+	// Found by the app's daily check. Opens the page's update dialog, which installs it.
+	update := systray.AddMenuItem("", "Open the page to install the new version")
+	update.Hide()
 	systray.AddSeparator()
 	quit := systray.AddMenuItem("Quit osu! local profiles", "Stop tracking and close the app")
 
@@ -47,10 +50,15 @@ func (l *launcher) trayReady() {
 	}
 
 	l.mu.Lock()
-	l.changed = func(state appState, tracking bool) {
-		text := statusText(state, tracking, l.port)
-		status.SetTitle(text)
-		systray.SetTooltip("osu! local profiles - " + text)
+	l.changed = func(state appState, tracking bool, version string) {
+		status.SetTitle(statusText(state, tracking, l.port))
+		systray.SetTooltip(tooltipText(state, tracking, l.port, version))
+		if text, shown := updateText(state, version); shown {
+			update.SetTitle(text)
+			update.Show()
+		} else {
+			update.Hide()
+		}
 		if state == stateFailed {
 			again.Show()
 		} else {
@@ -65,6 +73,8 @@ func (l *launcher) trayReady() {
 			select {
 			case <-open.ClickedCh:
 				openPage()
+			case <-update.ClickedCh:
+				_ = openPath(pageURL(l.port) + "/?update=1")
 			case <-openLog.ClickedCh:
 				current, _ := logFiles(l.root)
 				_ = openPath(current)

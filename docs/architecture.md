@@ -335,7 +335,7 @@ macOS and Linux written, CI-covered, never run against real osu! install. Since 
 
 **Update leaves two ~200MB copies.** Rollback is visible one; other is staged tree in `data/update/`. Swap deletes its own rollback but cannot delete staged tree (running from it; `node.exe` locked). `pruneUpdateLeftovers` at startup clears both. Keeps `data/update.log`.
 
-**One request at startup, never a timer.** `checkForUpdates: false` turns off the app's only outgoing request. Failed check shows nothing.
+**Checked at startup, then daily while running** (`keepCheckingForUpdates`, roadmap 5.65). By the wall clock, looked at every 10 minutes, since a timer does not count sleep: due 24h after a check, 1h after a failed one. A newer release found is broadcast once (`update` SSE event) and offered by the tray from `/api/app`'s `update` (`offeredVersion`). `checkForUpdates: false` turns all of it off. Failed check shows nothing.
 
 ## Launcher: a tray icon
 

@@ -55,7 +55,7 @@ import {
 } from '../profiles.ts';
 import { getSettings, updateSettings, type Settings } from '../settings.ts';
 import { appVersion } from '../config.ts';
-import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
+import { applyUpdate, checkForUpdate, offeredVersion, onUpdateFound, updateState } from '../update/index.ts';
 import { filterNarrows } from '../tracking-filter.ts';
 import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
 import { MAX_REPLAY_BYTES, releaseUploadedReplay, storeUploadedReplay } from '../uploaded-replays.ts';
@@ -314,6 +314,8 @@ export function startServer(opts: ServerOptions): http.Server {
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
+  // A newer release found while the app runs: the page shows its button without a reload.
+  const stopUpdateFeed = onUpdateFound((u) => broadcast('update', u));
 
   /*
    * The profile page's expensive half, remembered until the database changes.
@@ -432,6 +434,8 @@ export function startServer(opts: ServerOptions): http.Server {
         version: appVersion(),
         pid: process.pid,
         tracking: opts.tracker.isTracking,
+        // The tray launcher polls this, and offers the update from its menu.
+        update: offeredVersion(),
       });
     }
 
@@ -1717,8 +1721,8 @@ export function startServer(opts: ServerOptions): http.Server {
     /*
      * The update check and the update itself.
      *
-     * A GET reports what the last check found; a POST re-runs it. Both are cheap and
-     * neither is on a timer -- the automatic check happens once, at startup.
+     * A GET reports what the last check found; a POST re-runs it. The automatic check is
+     * at startup and then daily (`keepCheckingForUpdates`).
      */
     if (url.pathname === '/api/update') {
       if (req.method !== 'POST') return json(res, updateState());
@@ -1959,6 +1963,7 @@ export function startServer(opts: ServerOptions): http.Server {
     });
   });
 
+  server.on('close', stopUpdateFeed);
   server.listen(opts.port);
   return server;
 }

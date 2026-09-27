@@ -696,6 +696,7 @@
   "time.mShort": "{n}m",
   "time.now": "now",
   "update.downloading": "Downloading...",
+  "update.found": "Version {version} is out - update from the button at the top",
   "update.releaseNotes": "Release notes on GitHub",
   "update.startYourself": "If it does not come back, start it yourself.",
   "updateBtn": "Update available",

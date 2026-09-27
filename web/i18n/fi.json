@@ -588,6 +588,7 @@
   "time.mShort": "{n} min",
   "time.now": "nyt",
   "update.downloading": "Ladataan…",
+  "update.found": "Versio {version} on julkaistu - päivitä yläreunan painikkeesta",
   "update.releaseNotes": "Julkaisutiedot GitHubissa",
   "update.startYourself": "Jos se ei palaa, käynnistä se itse.",
   "updateBtn": "Päivitys saatavilla",

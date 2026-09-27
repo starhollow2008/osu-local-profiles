@@ -78,4 +78,5 @@ optional rather than the mechanism:
 > times. Please consume respectfully.
 
 Anything added later that talks to osu! - the optional account link in `docs/roadmap.md`
-§5.5, the medal artwork in §5.8 - is one request, cached to disk, never on a timer.
+§5.5, the medal artwork in §5.8 - is one request, cached to disk, never on a timer. This is
+about osu! only: the daily update check (§5.65) asks GitHub.

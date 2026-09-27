@@ -733,7 +733,7 @@ Every host it contacts is public, unauthenticated and optional:
 | `assets.ppy.sh` | beatmap cover art, and medal icons | a drawn placeholder shows instead |
 | `b.ppy.sh` | a favourite's audio preview, only when you press play | no preview |
 | `osu.ppy.sh` | **Look up** in Profiles, importing favorites, and one request per new favourite | it says so; type a name and upload an image instead |
-| GitHub | one check at startup for a newer release (`checkForUpdates`), and the download when you press update | no update notice |
+| GitHub | a check for a newer release at startup and once a day while the app runs (`checkForUpdates`), and the download when you press update | no update notice |
 | `data.ppy.sh` | the rank-curve dumps, only when `npm run rank:refresh` is run by hand | nothing; the checked-in curves keep working |
 
 The profile lookup reads the public profile page - the same user object osu!'s API returns for

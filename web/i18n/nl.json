@@ -588,6 +588,7 @@
   "time.mShort": "{n} min",
   "time.now": "nu",
   "update.downloading": "Downloaden…",
+  "update.found": "Versie {version} is uit - werk bij met de knop bovenaan",
   "update.releaseNotes": "Release-opmerkingen op GitHub",
   "update.startYourself": "Als hij niet terugkomt, start hem dan zelf.",
   "updateBtn": "Update beschikbaar",

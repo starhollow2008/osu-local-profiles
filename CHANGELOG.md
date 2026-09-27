@@ -2,6 +2,12 @@
 
 ## 1.27.0
 
+- **The app now checks for updates while it's open, not just when it starts.** Once a day, so
+  leaving it running for weeks no longer leaves you on an old version. When a new version is
+  found, **Update available** appears on the page without reloading it, and the tray icon's
+  menu gains **Update to ...**, which opens the page straight to the update.
+  `"checkForUpdates": false` in `config.json` still turns every check off.
+
 - **See every play the app didn't track, and bring one back.** **Options -> Other settings ->
   Plays not tracked** lists each play the app turned away - declined by your play tracking
   filter, set by another player, or a replay it couldn't read - with whose it was and why, so

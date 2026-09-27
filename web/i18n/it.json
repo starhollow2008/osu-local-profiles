@@ -588,6 +588,7 @@
   "time.mShort": "{n} min",
   "time.now": "ora",
   "update.downloading": "Download in corso…",
+  "update.found": "È uscita la versione {version}: aggiorna con il pulsante in alto",
   "update.releaseNotes": "Note di rilascio su GitHub",
   "update.startYourself": "Se non torna, avvialo tu.",
   "updateBtn": "Aggiornamento disponibile",
