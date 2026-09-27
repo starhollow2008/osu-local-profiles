@@ -36,6 +36,18 @@ function maybeLink(href, inner, className) {
  * profile is configured.
  */
 export function countingNoteText(counting) {
+  /*
+   * Priced by the player's own osu! source rather than an osu! release (roadmap 5.70). Said
+   * first, and always beside "not comparable": it is the formula itself that differs.
+   */
+  const rest = countingNoteRest(counting);
+  if (!counting?.ppSource) return rest;
+  const source = t('note.ppSource', { version: counting.ppSource.replace(/^source /, '') });
+  const comparable = rest.includes(t('note.notComparable')) ? '' : ` ${t('note.notComparable')}`;
+  return `${source}${comparable}${rest ? ` ${rest}` : ''}`;
+}
+
+function countingNoteRest(counting) {
   // The play count's own departure from osu!, said beside whatever the pp note says -- or on
   // its own, since counting these changes no pp at all.
   // Only once something is actually counted: on by default, it would otherwise be said to

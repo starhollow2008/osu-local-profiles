@@ -3317,3 +3317,43 @@ clear the 21 files from 1.27.0, which nothing depended on.
 - 1.27.0 installs look for the parts and the notes file, find neither, and fall back as designed:
   the full zip, and the newest release page's lines.
 - 1.27.0's CHANGELOG entry says the parts were withdrawn, rather than promising them.
+
+## 5.70 - pp from the player's own osu! source
+
+**Status:** done -- unreleased.
+
+A player running osu! from source (5.68) asked for its plays to be priced by that source's
+calculator rather than the bundled release -- for their own pp changes, and for mods of their own,
+which the release knows only as UnknownMod. Offered with two changes to that framing, which the
+user accepted: it prices **the whole app**, not only the development client's plays, and it
+**never falls back**. The user chose the whole app over a per-profile choice.
+
+- **Build.** `src/calc/source-helper.ts` generates the helper's project with `ProjectReference`s to
+  the clone's `osu.Game` and four ruleset projects in place of the NuGet packages (osu-tools'
+  UseLocalOsu), and `dotnet publish`es this app's own `Program.cs` into `data/pp-source/<version>/`.
+  Packages now ship `tools/PpCalculator/Program.cs`. `checkOsuSource` names the likeliest mistake,
+  osu!'s data folder, as such. Built for this machine's platform only and pruned by the shipped
+  helper's own lists (now `src/calc/helper-prune.ts`), the intermediate copy deleted: 49MB on
+  disk, where the first build left 1.3GB (every platform's natives, the game's resources, and a
+  second unpruned copy).
+- **Version.** A source build reports `0.0.0`, so pp is labelled `source <commit>`, with
+  `+<hash>` of every change git sees; an uncommitted formula edit changes the label, and with it
+  what a recalculation picks up. Shown as "osu! source 325c8f5" on the score card and in the
+  footer.
+- **Switching** (Settings -> pp calculator, `src/pp-source.ts`): builds when the source's label
+  has no helper yet, starts it, and `Tracker.switchCalculator` swaps it in between two ingests and
+  reprices **every** score with a replay -- including those the release priced at nothing -- then
+  marks the version done. Back to the release the same way. One switch at a time, none while a
+  recalculation runs, `config.ppSource` written only once the new calculator is pricing.
+- **No fallback.** A failed build or start changes nothing. At launch, a configured source with no
+  working helper means no calculator at all (`startupCalculator`), said in the console and on the
+  panel.
+- **Said.** The counting note says pp comes from the player's source and is not comparable; the
+  rank's tooltip says the estimate is against release pp.
+
+Checked against a real clone (325c8f5, 49 seconds to a first build): 20 real plays across osu! and
+mania, NM/DT/NF/SV2/DA, priced identically by the release helper and the source's, the formula
+being unchanged between them. A throwaway copy with the total doubled built as
+`source 325c8f5+0983c51` and doubled every osu!standard play's pp exactly, stars unchanged. Driven
+from the page on a copy of the real database: built, switched, 442 scores recalculated, the total
+from 723.93 to 1,373.87, and back to 723.926 exactly on switching back.

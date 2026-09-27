@@ -43,47 +43,15 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { PRUNE_ASSEMBLIES, PRUNE_NATIVES, nativePattern } from '../src/calc/helper-prune.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/**
- * Managed assemblies safe to drop. Named exactly, because a managed assembly is called the
- * same thing on every platform.
+/*
+ * The full helper's prune lists -- the resources assembly, and natives such as BASS, ffmpeg and
+ * SDL that a pp calculator never calls -- are shared with the helper built from a player's own
+ * osu! source, so they live in src/calc/helper-prune.ts. What follows is the slim helper's own.
  */
-const PRUNE_ASSEMBLIES = [
-  // Fonts, textures and audio samples: 125MB, and the single biggest win.
-  'osu.Game.Resources.dll',
-];
-
-/**
- * Native libraries the calculator never calls, by *base* name.
- *
- * Matched by pattern rather than by filename because the same library is called three
- * different things: `bass.dll`, `libbass.dylib`, `libbass.so`, and ffmpeg carries its
- * version in a different place on each (`avcodec-58.dll` against `libavcodec.so.58`).
- * Listing every spelling would mean guessing at names on platforms this was written on
- * none of -- and a guess that missed would silently ship a 273MB helper instead of a 114MB
- * one, and ship BASS with it.
- *
- * BASS is the reason this is not merely a size question. It is un4seen's commercial
- * library, free for non-commercial use but *not* freely redistributable, and this app never
- * plays a sound. The pattern has to catch it on every platform, not just the one that was
- * tested.
- *
- * The *managed* wrapper `ppy.ManagedBass.dll` must stay -- osu.Framework references it
- * directly and the helper will not start without it -- which is why these match a whole
- * filename and never a substring.
- */
-const PRUNE_NATIVES = [
-  // Audio.
-  'bass', 'bass_fx', 'bassmix', 'basswasapi',
-  // Video decoding: nothing here ever plays a beatmap background.
-  'avcodec', 'avformat', 'avutil', 'swscale', 'swresample',
-  // Windowing, image loading and shader compilation: no window is ever opened.
-  'SDL2', 'SDL3', 'veldrid-spirv', 'stbi',
-  // Debug symbol reader.
-  'Microsoft.DiaSymReader.Native.amd64', 'Microsoft.DiaSymReader.Native.x86',
-];
 
 /**
  * Natives removed from the *slim* helper only, which ships only past the parity check.
@@ -119,17 +87,6 @@ export const SLIM_PUBLISH_ARGS = [
   '-p:SuppressTrimAnalysisWarnings=true',
 ];
 
-const escape = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/*
- * `[lib]<name>[-1.2][.dll|.dylib|.so][.3]`, anchored at both ends.
- *
- * Anchoring is what keeps `ppy.ManagedBass.dll` and `osu.Framework.dll` safe: a substring
- * test would take both. The two version slots cover where each platform puts it --
- * `avcodec-58.dll`, `libavcodec.58.dylib`, `libavcodec.so.58`, `libSDL2-2.0.so.0`.
- */
-const nativePattern = (name) =>
-  new RegExp(`^(lib)?${escape(name)}([-.][0-9][0-9.]*)?\\.(dll|dylib|so)(\\.[0-9][0-9.]*)?$`, 'i');
 const NATIVE_PATTERNS = PRUNE_NATIVES.map(nativePattern);
 const SLIM_PATTERNS = [...SLIM_PRUNE_NATIVES.map(nativePattern), ...SLIM_VERSIONED_NATIVES];
 

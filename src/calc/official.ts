@@ -126,14 +126,19 @@ const REQUEST_TIMEOUT_MS = 30_000;
  * started by double-clicking, so the process can begin in any directory at all. Getting
  * this wrong is quiet -- the app runs, tracks scores, and simply records no pp.
  */
-function candidates(): Array<{ command: string; args: string[] }> {
+export interface HelperCandidate {
+  command: string;
+  args: string[];
+}
+
+function candidates(): HelperCandidate[] {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
   const selfContained = path.join(root, 'tools', 'pp', process.platform === 'win32' ? 'osu-pp.exe' : 'osu-pp');
   const built = path.join(root, 'tools', 'PpCalculator', 'bin', 'Release', 'net10.0');
   const exe = path.join(built, process.platform === 'win32' ? 'osu-pp.exe' : 'osu-pp');
   const dll = path.join(built, 'osu-pp.dll');
 
-  const out: Array<{ command: string; args: string[] }> = [];
+  const out: HelperCandidate[] = [];
   if (fs.existsSync(selfContained)) out.push({ command: selfContained, args: [] });
   if (fs.existsSync(exe)) out.push({ command: exe, args: [] });
   if (fs.existsSync(dll)) out.push({ command: 'dotnet', args: [dll] });
@@ -181,8 +186,16 @@ export class OfficialCalculator {
     child.on('error', die);
   }
 
-  /** Returns null when the helper is not built or cannot start. */
-  static async create(): Promise<OfficialCalculator | null> {
+  /**
+   * Returns null when the helper is not built or cannot start.
+   *
+   * With no arguments, the bundled helper -- see `candidates`. With `only`, that one helper
+   * and nothing else: a helper built from the player's osu! source (src/calc/source-helper.ts),
+   * which must never fall through to the bundled one, since that would price the profile with
+   * a formula nobody chose. `version` then names it in place of the one it reports, which for
+   * a build from source is osu!'s placeholder `0.0.0`.
+   */
+  static async create(only?: HelperCandidate, version?: string): Promise<OfficialCalculator | null> {
     /*
      * The candidate list is a convenience for development, where a packaged helper and a
      * plain `dotnet build` output can both exist. It is also a trap: a broken packaged
@@ -193,7 +206,7 @@ export class OfficialCalculator {
      * silently.
      */
     let attempt = 0;
-    for (const { command, args } of candidates()) {
+    for (const { command, args } of only ? [only] : candidates()) {
       if (attempt++ > 0) {
         console.warn(`  note: falling back to ${path.basename(path.dirname(command))} -- the preferred pp helper failed to start`);
       }
@@ -222,7 +235,7 @@ export class OfficialCalculator {
           });
         });
 
-        if (ready) return new OfficialCalculator(child, lines, ready.version);
+        if (ready) return new OfficialCalculator(child, lines, version ?? ready.version);
         child.kill();
       } catch {
         /* try the next candidate */

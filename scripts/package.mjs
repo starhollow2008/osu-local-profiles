@@ -102,6 +102,17 @@ if (process.env.GITHUB_ACTIONS) {
   console.log(`::${pruned.slim ? 'notice' : 'warning'} title=pp helper (${target})::${pruned.slim ? 'slim' : 'full'} helper, ${mb(pruned.after)}: ${pruned.reason}`);
 }
 
+/*
+ * The helper's source, beside it: Settings can build the same helper against a player's own
+ * osu! source (src/calc/source-helper.ts, roadmap 5.70), and a package has nothing else to
+ * build it from. One file, and the one the shipped helper was built from.
+ */
+fs.mkdirSync(path.join(out, 'tools', 'PpCalculator'), { recursive: true });
+fs.copyFileSync(
+  path.join(root, 'tools', 'PpCalculator', 'Program.cs'),
+  path.join(out, 'tools', 'PpCalculator', 'Program.cs'),
+);
+
 /* ------------------------------------------------------- 2. the Node runtime */
 
 console.log('  copying the Node runtime...');

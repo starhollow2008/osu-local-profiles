@@ -38,6 +38,7 @@ const MODE_LABELS = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'] as const;
 const MAX_PAGE = MAX_PAGE_ROWS;
 import { computeMedals, earnedMedalCount, isAppMedal } from '../calc/medals.ts';
 import { clearImportedMedals, saveImportedMedals } from '../imported-medals.ts';
+import type { PpSourceService } from '../pp-source.ts';
 import { estimateRank, rankTable } from '../calc/rank.ts';
 import {
   activeProfileId,
@@ -212,6 +213,11 @@ export interface ServerOptions {
   onRestart?: () => void;
   /** What started the app, so the page can say where else it can be stopped from. */
   launcher?: 'tray' | 'terminal';
+  /**
+   * Settings -> pp calculator: price with the player's osu! source instead of the release
+   * (src/pp-source.ts). Absent -- as in the tests -- the page offers only the release.
+   */
+  ppSource?: PpSourceService;
 }
 
 /** The osu! folders on this machine, as the page sees them. */
@@ -322,6 +328,8 @@ export function startServer(opts: ServerOptions): http.Server {
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
+  // A build of the player's osu! source can take minutes; every open page follows it.
+  opts.ppSource?.onChange((state) => broadcast('pp-source', state));
   /*
    * The update's state, for the page: what the updater knows, plus whether the notice above
    * the page shows, which depends on what dismissed it last (kept in the database).
@@ -517,6 +525,9 @@ export function startServer(opts: ServerOptions): http.Server {
          */
         ppCalculator: {
           version: opts.tracker.calculatorVersion,
+          // The player's own osu! source, when that is what prices (roadmap 5.70); null when the
+          // page cannot offer it at all.
+          source: opts.ppSource?.state() ?? null,
           // A page opened half-way through a recalculation holds its button rather than start a second.
           recalculating: opts.tracker.recalculating,
           outdated:
@@ -599,7 +610,12 @@ export function startServer(opts: ServerOptions): http.Server {
         stats,
         // What the profile is counting, so the page can say when it is not scoring the way
         // osu! would rather than quietly showing an inflated number.
-        counting: e,
+        counting: {
+          ...e,
+          // Priced by the player's own osu! source rather than a release: the one departure
+          // from osu! that is about the formula itself, so the note has to say it.
+          ppSource: opts.ppSource && opts.ppSource.state().source !== '' ? opts.tracker.calculatorVersion : null,
+        },
         // Estimated offline from a data.ppy.sh sample, and null when no curve has been
         // built for this mode. Country rank has no equivalent: 10,000 users split across
         // ~200 countries is far too thin to interpolate per country.
@@ -722,6 +738,25 @@ export function startServer(opts: ServerOptions): http.Server {
         const config = opts.appConfig.get();
         broadcast('app-config', config);
         return json(res, { ok: true, config });
+      });
+    }
+
+    /*
+     * Settings -> pp calculator. GET says what is in use, and whether the source has changed
+     * since it was built; POST with a folder builds from it (when needed) and switches every
+     * profile to it, and with '' switches back to the release. Answered at once: a build takes
+     * minutes, and `pp-source` events follow it, then the recalculation's own.
+     */
+    if (url.pathname === '/api/pp-source') {
+      const service = opts.ppSource;
+      if (!service) return json(res, { error: 'this app cannot use an osu! source' }, 404);
+      if (req.method !== 'POST') return json(res, service.view());
+      return readBody(req, res, (body) => {
+        const source = typeof body['source'] === 'string' ? body['source'].trim() : null;
+        if (source === null) return json(res, { error: 'source must be a folder, or empty for the release' }, 400);
+        void (source === '' ? service.useRelease() : service.use(source));
+        // Whatever the switch decided before its first wait -- a refusal, or a build begun.
+        return json(res, service.state());
       });
     }
 

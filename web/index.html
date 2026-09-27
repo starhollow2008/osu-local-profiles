@@ -725,6 +725,27 @@
         </p>
         <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate every score</button>
       </div>
+
+      <!--
+        The player's own osu! source, in place of the release (roadmap 5.70). The same helper,
+        built against their clone of ppy/osu, so their pp changes and their own mods are priced.
+        For every profile at once, and every score recalculated each way: pp from two formulas
+        never share a total. Filled in by renderPpSource; hidden where the app cannot offer it.
+      -->
+      <div class="pp-source" id="ppSource" hidden>
+        <p class="setting__hint" data-i18n="ppSource.hint">
+          Run osu! from source? Build this app's calculator against your clone of ppy/osu, and
+          every score in every profile is priced by your code - your pp changes and your own mods
+          included. Needs git and the .NET 10 SDK. Switching recalculates every score, and so
+          does switching back.
+        </p>
+        <div class="identity-link">
+          <input type="text" id="ppSourcePath" placeholder="the folder you cloned ppy/osu into" data-i18n-attr="placeholder:ppSourcePath.placeholder">
+          <button type="button" id="ppSourceUse" data-i18n="ppSourceUse">Build and use</button>
+        </div>
+        <p class="setting__hint pp-source__status" id="ppSourceStatus" hidden></p>
+        <button type="button" id="ppSourceRelease" data-i18n="ppSourceRelease" hidden>Use the release calculator again</button>
+      </div>
     </div>
 
     <div class="profile-hint" id="settingsHint">&nbsp;</div>

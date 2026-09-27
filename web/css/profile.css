@@ -4970,6 +4970,44 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
   background-color: hsl(var(--hsl-b2));
 }
 
+/* The player's own osu! source: the folder, and what building or using it has come to. */
+.pp-source {
+  margin-top: 14px;
+}
+
+.pp-source .identity-link {
+  margin-top: 8px;
+}
+
+/* A build's progress and a compiler's errors keep their own lines, and never widen the dialog. */
+.pp-source__status {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.pp-source__line {
+  display: block;
+  margin-top: 4px;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: var(--fs-small, 11px);
+  opacity: 0.8;
+}
+
+.pp-source__status.is-error {
+  color: hsl(var(--hsl-red-1, 0 60% 70%));
+}
+
+#ppSourceRelease {
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+}
+
+#ppSourceRelease:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
 /* ======================================================================== */
 /* me!: osu!'s BBCode and its editor (values from osu-web's bbcode.less,     */
 /* bbcode-editor.less, bbcode-spoilerbox.less, imagemap.less, btn-circle)    */

@@ -696,6 +696,30 @@ When some of this profile's scores are still priced by another release, this say
 **Recalculate every score** does the whole thing on demand, for every score in every profile,
 whatever priced it.
 
+#### pp from your own osu! source
+
+If you run osu! from source - a clone of [ppy/osu](https://github.com/ppy/osu), perhaps with your
+own pp changes or mods - the app can price every score with **your** code instead of the release
+it ships. Type the folder you cloned ppy/osu into (the one with `osu.Game` in it - not
+`%APPDATA%osu-development`, which only holds settings and replays) and press **Build and use**,
+twice to confirm. It needs git and the .NET 10 SDK, which anyone building osu! already has.
+
+- The app builds its own calculator against your clone, into `data/pp-source/` (about 50MB). The
+  first build compiles osu! and takes a minute or so; the page shows how far it has got. It writes osu!'s
+  usual build output (`bin/`, `obj/`) inside your clone, which git ignores.
+- **Every score in every profile is then recalculated with it.** Your pp changes apply to your
+  whole history, and plays on a mod only your source has - which the release cannot price at all -
+  get their pp.
+- Each score says what priced it: **osu! source 325c8f5** on its details card and in the footer,
+  with `+` and a short code when your clone had uncommitted changes. Change your source and the
+  panel offers **Rebuild**; a rebuild with different code recalculates everything again.
+- The profile says pp comes from your source, and the estimated rank says it is measured against
+  release pp, so it means little.
+- **Use the release calculator again** switches back and recalculates everything with the release.
+- It is all or nothing, by design: there is never a profile adding pp from two formulas. If your
+  source will not build or start, nothing changes and the panel says why. If it will not start
+  at a launch, no pp is stored until it does - the release is never quietly used in its place.
+
 ### Recalculating older scores
 
 Scores tracked before a setting existed have no pp for anything osu! would not rank - there was

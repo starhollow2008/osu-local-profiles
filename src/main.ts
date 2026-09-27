@@ -2,7 +2,7 @@ import { syncFavoriteSharing } from './favorites.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { offerWelcome } from './welcome.ts';
-import { appVersion, loadConfig, saveConfig, dataDir, type Config } from './config.ts';
+import { appVersion, loadConfig, saveConfig, dataDir, installDir, type Config } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { discoverInstalls, type DiscoveryResult } from './clients/discover.ts';
 import { osuFolderService } from './clients/folders.ts';
@@ -33,6 +33,7 @@ import { recalculatedFor, recalculationBatches } from './tracker/recompute.ts';
 import { runningInstance, stopWhenLauncherCloses } from './instance.ts';
 import { seedSeenVersion } from './update/whats-new.ts';
 import { OfficialCalculator } from './calc/official.ts';
+import { ppSourceService, startupCalculator } from './pp-source.ts';
 import { computeStats } from './calc/stats.ts';
 import { estimateRank } from './calc/rank.ts';
 import { eligibilityOf } from './calc/eligibility.ts';
@@ -265,10 +266,19 @@ async function main(): Promise<void> {
   }
 
   // There is no fallback calculator on purpose: a second implementation would disagree
-  // by a few percent and leave one profile holding scores computed two different ways.
-  const official = await OfficialCalculator.create();
-  if (official) {
+  // by a few percent and leave one profile holding scores computed two different ways. The
+  // same goes for one built from the player's osu! source (roadmap 5.70): when it will not
+  // start, nothing prices in its place.
+  const { calculator: official, problem: sourceProblem } = await startupCalculator(config.ppSource, dataDir());
+  if (official && config.ppSource !== '') {
+    console.log(`  pp: osu!'s calculator from your osu! source at ${config.ppSource} (${official.version})`);
+  } else if (official) {
     console.log("  pp: osu!'s official calculator");
+  } else if (sourceProblem) {
+    console.log('');
+    console.log(`  WARNING: ${sourceProblem}.`);
+    console.log('  Scores will still be tracked, but with no pp or star rating.');
+    console.log('  Build it again from Settings -> pp calculator, or switch back to the release there.');
   } else {
     console.log('');
     console.log('  WARNING: the pp calculator is not available.');
@@ -553,6 +563,23 @@ async function main(): Promise<void> {
      * they should not have to edit JSON to be heard. Writes `config.json` through the same
      * re-read-then-save as above, so a hand edit made while the app runs survives.
      */
+    /*
+     * Settings -> pp calculator: the player's osu! source, or the release (src/pp-source.ts).
+     * Written through the same re-read-then-save as above.
+     */
+    ppSource: ppSourceService({
+      tracker,
+      dataDir: dataDir(),
+      program: path.join(installDir(), 'tools', 'PpCalculator', 'Program.cs'),
+      // Said on the page too, not only in the console: pp has stopped, and Settings is the fix.
+      startupProblem: sourceProblem,
+      getSource: () => config.ppSource,
+      setSource: (source) => {
+        const current = loadConfig();
+        current.ppSource = config.ppSource = source;
+        saveConfig(current);
+      },
+    }),
     osuFolders: osuFolderService({
       config,
       save: (next) => {
@@ -753,7 +780,8 @@ async function main(): Promise<void> {
     // The last thing written before the database closes: everything after this instant
     // happened while the app was shut, which is exactly what the next launch may bring in.
     markRunning(db);
-    official?.dispose();
+    // Whichever is pricing now: Settings can have switched it since the launch.
+    tracker.calculator?.dispose();
     server.close();
     db.close();
     if (code === RESTART_EXIT_CODE) {

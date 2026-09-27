@@ -404,7 +404,9 @@ function renderRank(data) {
         ? t('rank.sampleSize', { n: fmt(data.rankSource.sampled) })
         : '') +
       '. ' +
-      t('rank.approximate');
+      t('rank.approximate') +
+      // The ladder is release pp; pp from the player's own source is measured against it anyway.
+      (data.counting?.ppSource ? ` ${t('rank.fromSource')}` : '');
   } else {
     el.textContent = '-';
     el.title = stats?.totalPp > 0
@@ -2558,6 +2560,7 @@ function openSettings() {
   void renderDeclinedPlays();
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
+  void loadPpSource();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   $('originalMetadataSetting').checked = preferOriginalMetadata();
   settingsHint(' ');
@@ -3015,9 +3018,11 @@ function renderPpCalculator() {
   const v = ppCalculator.version;
   $('footerPp').hidden = $('footerPpSep').hidden = v === null;
   $('footerPp').textContent = v ? `pp: osu! ${v}` : '';
-  $('ppCalculatorVersion').textContent = v
-    ? t('recompute.calculatorVersion', { version: v })
-    : t('recompute.noCalculator');
+  $('ppCalculatorVersion').textContent = !v
+    ? t('recompute.noCalculator')
+    : v.startsWith('source ')
+      ? t('ppSource.inUse', { version: sourceCommit(v) })
+      : t('recompute.calculatorVersion', { version: v });
   const n = ppCalculator.outdated;
   $('ppCalculatorOutdated').hidden = !v || n === 0;
   const outdated = { n: fmt(n) };
@@ -3029,7 +3034,100 @@ function renderPpCalculator() {
   );
   $('ppCalculatorAll').hidden = !v;
   $('ppRecalculate').disabled = recomputing || ppCalculator.recalculating === true;
+  renderPpSource();
 }
+
+/*
+ * The player's own osu! source, in place of the release (roadmap 5.70). `ppCalculator.source`
+ * says what is in use and under way; `ppSourceNow` is what the folder would be labelled if it
+ * were built now, asked for when Settings opens (it costs a call to git), so the page can offer
+ * a rebuild once the source has changed.
+ */
+let ppSourceNow = null;
+
+async function loadPpSource() {
+  if (!ppCalculator.source) return;
+  try {
+    const r = await fetch('/api/pp-source');
+    if (!r.ok) return;
+    const d = await r.json();
+    ppCalculator = { ...ppCalculator, source: d };
+    ppSourceNow = d.now ?? null;
+    renderPpSource();
+  } catch {
+    /* the panel shows what it already had */
+  }
+}
+
+function renderPpSource() {
+  const s = ppCalculator.source;
+  $('ppSource').hidden = !s;
+  if (!s) return;
+  const inUse = s.source !== '';
+  const path = $('ppSourcePath');
+  // The folder in use, unless the player is typing another one in.
+  if (inUse && document.activeElement !== path && !path.value) path.value = s.source;
+
+  const status = $('ppSourceStatus');
+  status.classList.toggle('is-error', Boolean(s.error) && !s.building);
+  let text = '';
+  if (s.building) {
+    text = t('ppSource.building', { source: s.building.source });
+  } else if (s.error) {
+    text = t('ppSource.failed', { error: s.error });
+  } else if (inUse && ppSourceNow && s.version && ppSourceNow !== s.version) {
+    // What is in use is said above, by the calculator's own line; this is only what is new.
+    text = t('ppSource.changed');
+  }
+  status.hidden = text === '';
+  status.textContent = text;
+  if (s.building?.line) {
+    const line = document.createElement('span');
+    line.className = 'pp-source__line';
+    line.textContent = s.building.line;
+    status.append(line);
+  }
+
+  const busy = Boolean(s.building) || recomputing || ppCalculator.recalculating === true;
+  const same = inUse && path.value.trim() !== '' && samePath(path.value, s.source);
+  const button = $('ppSourceUse');
+  if (button.dataset.armed !== '1') {
+    button.textContent = same ? t('ppSource.rebuild') : t('ppSourceUse');
+  }
+  // In use and unchanged: there is nothing to build.
+  button.disabled = busy || path.value.trim() === '' || (same && (!ppSourceNow || ppSourceNow === s.version) && !s.error);
+  $('ppSourceRelease').hidden = !inUse;
+  $('ppSourceRelease').disabled = busy;
+}
+
+/** A source's label without its prefix, where the sentence around it already says "source". */
+const sourceCommit = (version) => version.replace(/^source /, '');
+
+/** The same folder, however it was typed: case and trailing slashes aside. */
+const samePath = (a, b) => {
+  const norm = (p) => p.trim().replaceAll('\\', '/').replace(/\/+$/, '').toLowerCase();
+  return norm(a) === norm(b);
+};
+
+$('ppSourcePath').oninput = () => renderPpSource();
+
+/** Switching recalculates every score in every profile, so it takes a second press to mean it. */
+async function switchPpSource(button, source, question) {
+  if (!armed(button, question)) return;
+  button.dataset.armed = '0';
+  button.classList.remove('is-armed');
+  try {
+    const d = await postJson('/api/pp-source', { source }, 'could not switch the calculator');
+    ppCalculator = { ...ppCalculator, source: d };
+  } catch (err) {
+    ppCalculator = { ...ppCalculator, source: { ...ppCalculator.source, error: err.message } };
+  }
+  renderPpSource();
+}
+
+$('ppSourceUse').onclick = () =>
+  switchPpSource($('ppSourceUse'), $('ppSourcePath').value.trim(), t('ppSource.confirmUse'));
+$('ppSourceRelease').onclick = () => switchPpSource($('ppSourceRelease'), '', t('ppSource.confirmRelease'));
 
 $('ppRecalculate').onclick = () => {
   closeSettings();
@@ -4466,6 +4564,20 @@ on('update', (e) => {
   }
 });
 // Every profile's scores recalculated: from Other settings, or by itself after an update.
+/*
+ * A build of the player's osu! source, and the switch after it: every open page follows along.
+ * Once it has finished -- built and in use, or not -- the calculator the page names is read again.
+ */
+on('pp-source', (e) => {
+  const d = JSON.parse(e.data);
+  const finished = ppCalculator.source?.building && !d.building;
+  ppCalculator = { ...ppCalculator, source: { ...ppCalculator.source, ...d } };
+  renderPpSource();
+  if (finished || (!d.building && d.error === null)) {
+    void loadState();
+    if (!$('settingsModal').hidden) void loadPpSource();
+  }
+});
 on('recompute', (e) => {
   const d = JSON.parse(e.data);
   if (!d.everyProfile) return;

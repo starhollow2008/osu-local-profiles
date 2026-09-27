@@ -470,15 +470,20 @@ check(
   withChoice(await evaluate("[...document.querySelectorAll('#backfillInstalls input')].map((b) => b.checked).join()")),
   Array(installCount).fill('true').join(),
 );
-await evaluate(`(() => {
-  for (const box of document.querySelectorAll('#backfillInstalls input')) box.checked = false;
-  document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
-})()`);
+// Only with a choice on screen: with one install or none there are no boxes to untick.
+if (installCount >= 2) {
+  await evaluate(`(() => {
+    for (const box of document.querySelectorAll('#backfillInstalls input')) box.checked = false;
+    document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+}
 check('Check is refused with nowhere to look', withChoice(await evaluate("document.getElementById('backfillCheck').disabled")), true);
-await evaluate(`(() => {
-  document.querySelector('#backfillInstalls input').checked = true;
-  document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
-})()`);
+if (installCount >= 2) {
+  await evaluate(`(() => {
+    document.querySelector('#backfillInstalls input').checked = true;
+    document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+}
 check('and allowed again once one is ticked', await evaluate("document.getElementById('backfillCheck').disabled"), false);
 
 await evaluate(
@@ -1677,13 +1682,28 @@ check('options menu closed behind it', await shown('optionsMenu'), 'none');
  */
 check(
   'Recalculate every score is offered beside the calculator it uses',
-  await evaluate(`(() => {
-    const hasCalculator = document.getElementById('ppCalculatorVersion').textContent.includes('osu! 20');
+  await evaluate(`(async () => {
+    // A release (osu! 2026.916.0) or the player's own source (roadmap 5.70): either prices.
+    const hasCalculator = (await (await fetch('/api/state')).json()).ppCalculator.version !== null;
     const row = document.getElementById('ppCalculatorAll');
     const button = document.getElementById('ppRecalculate');
     return hasCalculator === !row.hidden && button.textContent === 'Recalculate every score' &&
       getComputedStyle(row).display === (hasCalculator ? 'flex' : 'none');
   })()`),
+  true,
+);
+
+/*
+ * pp from the player's own osu! source (roadmap 5.70): offered wherever the app can build it, and
+ * Build and use refused until there is a folder to build from.
+ */
+const sourceOffered = await evaluate("(async () => (await (await fetch('/api/state')).json()).ppCalculator.source != null)()");
+check('the pp calculator offers your own osu! source where it can', await shown('ppSource'), sourceOffered ? 'block' : 'none');
+// Only with the box empty: a source in use fills it in.
+const noFolder = sourceOffered && (await evaluate("document.getElementById('ppSourcePath').value.trim() === ''"));
+check(
+  'Build and use waits for a folder',
+  noFolder ? await evaluate("document.getElementById('ppSourceUse').disabled") : SKIP,
   true,
 );
 

@@ -1108,6 +1108,36 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     return this.opts.official?.version ?? null;
   }
 
+  /** The calculator pricing plays now, so whoever stops the app can stop it too. */
+  get calculator(): OfficialCalculator | null {
+    return this.opts.official;
+  }
+
+  /**
+   * Price with another calculator from now on -- the bundled release's, or one built from the
+   * player's osu! source (src/pp-source.ts) -- and recalculate every score in every profile with
+   * it, so no profile ever ranks scores from two formulas against each other.
+   *
+   * Every score with a replay, not only those priced by another version: a play the old
+   * calculator could not price at all -- a mod only the player's source has -- is exactly the
+   * one the new one can. Swapped between two ingests, never during one, and the old calculator
+   * stopped. Recorded as done for the new version (`markRecalculatedFor`), so the next launch
+   * does not do it again. `onSwapped` is told the moment the new one is pricing, before the
+   * recalculation, so whoever names the calculator never names the old one as the new.
+   */
+  async switchCalculator(next: OfficialCalculator, onSwapped?: () => void): Promise<RecomputeResult> {
+    if (this.recalculation) throw new Error('scores are already being recalculated');
+    await this.enqueue(async () => {
+      const old = this.opts.official;
+      this.opts.official = next;
+      if (old !== next) old?.dispose();
+    });
+    onSwapped?.();
+    const result = await this.recalculate(false);
+    if (next.version !== null) markRecalculatedFor(this.opts.db, next.version);
+    return result;
+  }
+
   /**
    * Build the replays for McOsu's plays since `since`, so an import's scan finds them where it
    * finds every other replay. The preview does it too, or it would count none of them: this

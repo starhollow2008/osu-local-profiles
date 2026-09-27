@@ -118,6 +118,9 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
   and repriced here offline, never osu!'s pp re-fetched (roadmap 5.64). Built replays are
   never offered for download
 - No fallback calc (`rosu-pp` removed). Helper down = store no pp, say so
+- The only other calculator is the same helper built from the player's osu! source
+  (`src/calc/source-helper.ts`, roadmap 5.70): for the whole app, every score recalculated on a
+  switch either way, never beside the release and never in its place when it fails
 - Slim (partially trimmed, extra natives pruned) only through `buildCheckedPpHelper`, which
   ships it only when `scripts/pp-parity.mjs` finds every answer identical to the full helper
   on that platform, and the full helper otherwise (roadmap 5.60). Its plays are generated

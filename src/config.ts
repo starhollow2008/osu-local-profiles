@@ -73,6 +73,13 @@ export interface Config {
    * of them; see syncFavoriteSharing in favorites.ts for what switching it does.
    */
   sharedFavorites: boolean;
+  /**
+   * The osu! source folder -- a clone of ppy/osu -- whose calculator prices every score, in
+   * place of the bundled release's (roadmap 5.70). Empty is the release, as always. Set from
+   * Settings only once a helper built from it has started, so it never names one that cannot
+   * price anything; see src/pp-source.ts.
+   */
+  ppSource: string;
 }
 
 const DEFAULTS: Config = {
@@ -89,6 +96,7 @@ const DEFAULTS: Config = {
   checkForUpdates: true,
   autoUpdate: false,
   sharedFavorites: true,
+  ppSource: '',
 };
 
 /**
