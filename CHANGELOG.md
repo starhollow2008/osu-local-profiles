@@ -1,5 +1,47 @@
 # Changelog
 
+## 1.28.0
+
+- **Export your scores to a spreadsheet.** **Share & back up -> Export** has a **.csv** and an
+  **.xlsx** button. The .csv is every score in the profile, highest pp first, one row each, with
+  the beatmap, difficulty, mapper, stars, pp, accuracy, grade, mods, date and some 40 more
+  columns - delete the ones you don't want. The .xlsx has the same scores, then a sheet for
+  each game mode, the profile's totals, most played beatmaps, favorite beatmaps and medals,
+  each with filters ready to sort by. Headers are in the language the page is in.
+
+- **Import your medals from osu!.** **Import from osu!** can now copy the medals your account
+  already has - tick **Medals** - so the star medals you earned years ago show here with their
+  dates, not only the ones your imported best performances earn. Only the medals this app has
+  are copied. Unticked unless you choose it.
+
+- **Star medals follow osu!'s own rules.** Passing a 5-star map earns the 5-star medal alone,
+  not every medal below it too, and a star medal needs a ranked map (not loved or qualified)
+  and no mod that makes it easier - No Fail, Easy, Half Time and the like. Medals the old rule
+  gave out are taken back the first time this version starts.
+
+- **Imported scores find their replays on this computer.** After **Import from osu!** or a score
+  link, every osu! install is searched for the replays of those plays, and each one found takes
+  its score's place - so it can be watched and downloaded, and no longer says "No replay file".
+  Importing from osu! again does this for scores imported before.
+
+- **Choose which osu! installs Import past plays looks in.** With more than one found - osu!lazer,
+  osu!stable, McOsu, osu!'s development client - **Look in** lists them all, ticked; untick any
+  this import should leave out.
+
+- **The mode switcher shows osu!'s mode icons**, as osu!'s own profile page does, with each
+  mode's name when you hover over it.
+
+- **Run osu! from source? Price every score with your own code.** **Options -> Other settings ->
+  pp calculator** can build this app's calculator against your clone of ppy/osu, so your own pp
+  changes and mods are priced. It applies to every profile and recalculates every score, and so
+  does switching back. Needs git and the .NET 10 SDK.
+
+- **View osu! score link** is the new name for **View on osu!** in a score's **···** menu.
+
+- The JSON export no longer includes scores you removed from the profile.
+
+- **Everything new in this release is translated** into all 15 languages.
+
 ## 1.27.0
 
 - **Updates are easier to notice, and can install themselves if you want.**
