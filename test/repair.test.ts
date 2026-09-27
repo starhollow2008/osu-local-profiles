@@ -68,11 +68,16 @@ function harness() {
 
 const ids = (rows: { id: number }[]) => rows.map((r) => r.id);
 
-test('the replay header gives the same mods and ruleset as the whole replay', async () => {
+test('the replay header gives the same mods, ruleset and beatmap as the whole replay', async () => {
   const buf = stableReplay(3, SV2 | HD | (1 << 18));
   const whole = await parseReplay(buf);
   const header = parseReplayHeader(buf.subarray(0, 200));
-  assert.deepEqual(header, { mode: whole.mode, version: whole.version, legacyMods: whole.legacyMods });
+  assert.deepEqual(header, {
+    mode: whole.mode,
+    version: whole.version,
+    beatmapMD5: whole.beatmapMD5,
+    legacyMods: whole.legacyMods,
+  });
   assert.equal(header.legacyMods, SV2 | HD | (1 << 18));
 });
 

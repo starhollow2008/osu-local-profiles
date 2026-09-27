@@ -92,7 +92,7 @@ export interface ScanOptions {
   onOtherPlayer?: OtherPlayerFound;
 }
 
-function readHead(file: string, n: number): Buffer | null {
+export function readHead(file: string, n: number): Buffer | null {
   let fd: number | undefined;
   try {
     fd = fs.openSync(file, 'r');
@@ -112,7 +112,7 @@ function readHead(file: string, n: number): Buffer | null {
   }
 }
 
-function* walk(dir: string): Generator<{ path: string; mtimeMs: number }> {
+export function* walk(dir: string): Generator<{ path: string; mtimeMs: number }> {
   let entries: fs.Dirent[];
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true });

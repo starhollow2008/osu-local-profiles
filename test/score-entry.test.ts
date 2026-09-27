@@ -125,7 +125,7 @@ test('a score link is read the way osu! numbers scores, and never confused', () 
   assert.equal(parseScoreLink('https://example.com/scores/1'), null);
   assert.equal(parseScoreLink('https://osu.ppy.sh/users/3119700'), null);
 
-  // And back out again, for View on osu!.
+  // And back out again, for View osu! score link.
   const url = (o: Partial<Parameters<typeof scoreUrl>[0]>) =>
     scoreUrl({ mode: 0, client: 'stable', onlineScoreId: null, legacyScoreId: null, ...o });
   assert.equal(url({ client: 'lazer', onlineScoreId: '5542633708' }), 'https://osu.ppy.sh/scores/5542633708');

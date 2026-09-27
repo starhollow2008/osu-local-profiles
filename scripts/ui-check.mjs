@@ -452,11 +452,35 @@ const sources = JSON.parse(await evaluate(`(() => {
   });
 })()`));
 check('a score with no replay says so, and why', sources.tags === 0 ? SKIP : `${sources.titled}|${sources.known}`, 'true|true');
-check('a score osu! has offers View on osu!', sources.linked === null ? SKIP : sources.linked, true);
+check('a score osu! has offers View osu! score link', sources.linked === null ? SKIP : sources.linked, true);
 check('one osu! never had does not', sources.unlinked === null ? SKIP : sources.unlinked, false);
 
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optBackfill').click()");
+
+/*
+ * Look in: one ticked box per osu! install, offered only when there are two or more to choose
+ * between, and Check refused while none is ticked -- an import that looks nowhere finds nothing.
+ */
+const installCount = await evaluate("(async () => (await (await fetch('/api/state')).json()).installs.length)()");
+const withChoice = (value) => (installCount < 2 ? SKIP : value);
+check('Look in is offered only with a choice to make', await shown('backfillInstallsField'), installCount < 2 ? 'none' : 'flex');
+check(
+  'every install is listed, ticked',
+  withChoice(await evaluate("[...document.querySelectorAll('#backfillInstalls input')].map((b) => b.checked).join()")),
+  Array(installCount).fill('true').join(),
+);
+await evaluate(`(() => {
+  for (const box of document.querySelectorAll('#backfillInstalls input')) box.checked = false;
+  document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
+})()`);
+check('Check is refused with nowhere to look', withChoice(await evaluate("document.getElementById('backfillCheck').disabled")), true);
+await evaluate(`(() => {
+  document.querySelector('#backfillInstalls input').checked = true;
+  document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
+})()`);
+check('and allowed again once one is ticked', await evaluate("document.getElementById('backfillCheck').disabled"), false);
+
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );

@@ -60,7 +60,7 @@ import {
 import { nudgeShown } from '../update/notes.ts';
 import { dismissNudge, markSeen, nudgeDismissal, whatsNew } from '../update/whats-new.ts';
 import { filterNarrows } from '../tracking-filter.ts';
-import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
+import { REPLAYS_ONLY, type BackfillSources, type InstallChoice } from '../tracker/index.ts';
 import { MAX_REPLAY_BYTES, releaseUploadedReplay, storeUploadedReplay } from '../uploaded-replays.ts';
 import {
   checkScoreLink,
@@ -960,7 +960,21 @@ export function startServer(opts: ServerOptions): http.Server {
     if (url.pathname === '/api/score-link' && req.method === 'POST') {
       return readBody(req, res, async (body) => {
         try {
-          return json(res, entryAnswer(await importScoreLink(entryDeps(), String(body['link'] ?? ''))));
+          const profileId = current();
+          const result = await importScoreLink(entryDeps(profileId), String(body['link'] ?? ''));
+          if (result.status !== 'added' || result.outcome.status !== 'added') return json(res, entryAnswer(result));
+          /*
+           * The replay osu! wrote for it, if this computer still has it: it takes the place of
+           * the one just built from the link, and is priced from it -- so the pp the page
+           * announces is read back rather than the built replay's.
+           */
+          const score = result.outcome.score;
+          const { attached } = await opts.tracker.attachLocalReplays(profileId, [score.id]);
+          if (attached === 0) return json(res, { ...entryAnswer(result), replay: false });
+          const priced = opts.db.prepare('SELECT pp FROM scores WHERE id = ?').get(score.id) as
+            { pp: number | null } | undefined;
+          broadcast('scores', { action: 'import' });
+          return json(res, { status: 'added', score: { ...score, pp: priced?.pp ?? null }, replay: true });
         } catch (e) {
           return json(res, { error: (e as Error).message }, 400);
         }
@@ -1186,6 +1200,15 @@ export function startServer(opts: ServerOptions): http.Server {
                 const pins = scores.reduce((n, r) => n + r.pinned, 0);
                 if (wantBest && added > 0) done.push(`${added} score${added === 1 ? '' : 's'}`);
                 if (wantPinned && pins > 0) done.push(`${pins} pinned`);
+                /*
+                 * The replays osu! wrote for these plays, where this computer still has them:
+                 * each takes its play's place, so it has a replay to watch and download and is
+                 * priced from it. First, so what is left is all the next step has to build.
+                 */
+                if (scores.length > 0) {
+                  const { attached } = await opts.tracker.attachLocalReplays(id);
+                  if (attached > 0) done.push(`${attached} replay${attached === 1 ? '' : 's'} from this computer`);
+                }
                 /*
                  * Then priced here: each built into a replay from what osu! handed over, so a
                  * pp rework reprices it with everything else. A beatmap not installed is
@@ -1584,6 +1607,7 @@ export function startServer(opts: ServerOptions): http.Server {
           let confirmed = false;
           let applyFilter = true;
           let sources: BackfillSources = REPLAYS_ONLY;
+          let installs: InstallChoice = null;
           try {
             const parsed = JSON.parse(body) as {
               since?: number;
@@ -1591,6 +1615,7 @@ export function startServer(opts: ServerOptions): http.Server {
               confirm?: boolean;
               sources?: unknown;
               applyFilter?: boolean;
+              installs?: unknown;
             };
             since = Number(parsed.since);
             // The end of the range. Absent or null means now, which is what an import was
@@ -1609,6 +1634,11 @@ export function startServer(opts: ServerOptions): http.Server {
                 unfinished: named.has('unfinished'),
                 attempts: named.has('attempts'),
               };
+            }
+            // Which osu! installs to look in, by root. Absent means every one, as before it
+            // could be chosen; a root this app is not tracking is dropped (`InstallChoice`).
+            if (Array.isArray(parsed.installs)) {
+              installs = parsed.installs.filter((r): r is string => typeof r === 'string');
             }
           } catch {
             return json(res, { error: 'expected a JSON body with a "since" timestamp' }, 400);
@@ -1632,10 +1662,13 @@ export function startServer(opts: ServerOptions): http.Server {
           if (!preview && !confirmed) {
             return json(res, { error: 'importing requires an explicit confirmation' }, 400);
           }
+          if (installs !== null && !opts.installs.some((i) => installs.includes(i.root))) {
+            return json(res, { error: 'choose at least one osu! install to look in' }, 400);
+          }
 
           try {
             if (preview) {
-              const scan = await opts.tracker.previewBackfill(since, applyFilter, until);
+              const scan = await opts.tracker.previewBackfill(since, applyFilter, until, installs);
               // The candidate list carries absolute paths; the page only needs the counts.
               return json(res, {
                 since,
@@ -1656,7 +1689,7 @@ export function startServer(opts: ServerOptions): http.Server {
               });
             }
 
-            const result = await opts.tracker.backfill(since, sources, applyFilter, 'import', until);
+            const result = await opts.tracker.backfill(since, sources, applyFilter, 'import', until, installs);
             broadcast('backfill', result);
             console.log(
               `\n  imported ${result.imported} past play(s) ` +

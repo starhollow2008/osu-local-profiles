@@ -27,8 +27,9 @@ import {
   type IncompleteContext,
   type IngestedIncomplete,
 } from './incomplete.ts';
-import { dedupeKey, describe, ingestReplayFile, type IngestedScore, type IngestOutcome } from './ingest.ts';
+import { dedupeKey, describe, ingestReplayFile, ingestScore, type IngestedScore, type IngestOutcome } from './ingest.ts';
 import { scanForReplays, type BackfillScan, type OtherPlayerFound } from './backfill.ts';
+import { findLocalReplays } from './replay-search.ts';
 import { declineToTrack, forgetDeclineById, recordDecline, type DeclineSource } from './declined.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
 import { parseReplay } from '../osr.ts';
@@ -195,6 +196,13 @@ export interface BackfillSources {
 
 /** Replays alone: what an import meant before it read logs, and what naming nothing still gets. */
 export const REPLAYS_ONLY: BackfillSources = { replays: true, unfinished: false, attempts: false };
+
+/**
+ * Which osu! installs an import looks in, by root as `installs` lists them. Null is every one,
+ * which is what an import did before it could be told; a root the tracker does not have is
+ * ignored rather than looked in, so a page can never point an import somewhere new.
+ */
+export type InstallChoice = readonly string[] | null;
 
 /**
  * What Track anyway came to. `tracked` and `already` take the play off the list; the others
@@ -545,18 +553,23 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * Preview what an import would bring in, without changing anything. `until` ends the range,
    * null meaning now; `since` 0 reaches every play on this computer.
    */
-  previewBackfill(since: number, applyFilter = true, until: number | null = null): Promise<BackfillPreview> {
+  previewBackfill(
+    since: number,
+    applyFilter = true,
+    until: number | null = null,
+    installs: InstallChoice = null,
+  ): Promise<BackfillPreview> {
     return this.enqueue(async () => {
       const filter = this.importFilter(applyFilter);
-      await this.buildMcosuReplays(since);
-      const replays = await scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since, {
+      await this.buildMcosuReplays(since, installs);
+      const replays = await scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(installs), since, {
         until,
         // So the preview counts what the import will actually decline, rather than promising
         // plays the same filter is about to turn away.
         filtering: { resolver: this.opts.resolver, filter },
         owner: this.currentIdentity(),
       });
-      return { ...replays, log: this.previewLogs(since, until, filter) };
+      return { ...replays, log: this.previewLogs(since, until, filter, installs) };
     });
   }
 
@@ -564,8 +577,13 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * The logs' half of a preview. Every play goes through the check its import runs before
    * writing, so each number here is one the import reproduces.
    */
-  private previewLogs(since: number, until: number | null, filter: TrackingFilter): LogBackfillPreview {
-    const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since, until);
+  private previewLogs(
+    since: number,
+    until: number | null,
+    filter: TrackingFilter,
+    installs: InstallChoice,
+  ): LogBackfillPreview {
+    const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(installs), since, until);
     const ctx = this.importContext(since, filter);
     const preview: LogBackfillPreview = {
       unfinished: 0,
@@ -624,7 +642,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * replays alone, which is what an import meant before it read logs.
    *
    * What it turns away is recorded, as coming from `origin`, so Settings can list it. `until`
-   * ends the range, null meaning now, exactly as for the preview.
+   * ends the range, null meaning now, and `installs` says where to look, exactly as for the
+   * preview.
    */
   backfill(
     since: number,
@@ -632,6 +651,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     applyFilter = true,
     origin: DeclineSource = 'import',
     until: number | null = null,
+    installs: InstallChoice = null,
   ): Promise<BackfillResult> {
     return this.enqueue(async () => {
       let imported = 0;
@@ -649,8 +669,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       const owner = this.currentIdentity();
 
       if (sources.replays) {
-        await this.buildMcosuReplays(since);
-        const scan = await scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since, {
+        await this.buildMcosuReplays(since, installs);
+        const scan = await scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(installs), since, {
           until,
           owner,
           onOtherPlayer: this.recordOtherPlayer(origin),
@@ -687,7 +707,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       }
 
       if (sources.unfinished || sources.attempts) {
-        const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since, until);
+        const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(installs), since, until);
         const ctx = this.importContext(since, filter, origin);
         const tally = (status: 'added' | 'skipped' | 'filtered'): boolean => {
           if (status === 'filtered') {
@@ -762,6 +782,38 @@ export class Tracker extends EventEmitter<TrackerEvents> {
         this.emit('score', result.score);
       }
       return result;
+    });
+  }
+
+  /**
+   * Put the replays osu! wrote in place of plays a profile holds without one: those imported
+   * from an osu! profile or a score's link, all of them or only the rows named in `only`. See
+   * src/tracker/replay-search.ts.
+   *
+   * Every install is looked in, whatever an import of past plays was last told: these plays
+   * are already in the profile, and this only finds a better record of each. For the same
+   * reason neither the filter nor the owner check has a say -- the play was never the replay's
+   * to add, and a replay carrying osu!'s own id for it is that play -- and nothing is announced.
+   * The replay takes the row's place through the ingest every replay goes through (`replaces`),
+   * keeping its id, pin and removal.
+   */
+  attachLocalReplays(profileId: number, only?: readonly number[]): Promise<{ attached: number }> {
+    return this.enqueue(async () => {
+      const matches = await findLocalReplays(this.opts.db, profileId, this.replayDirs(), only);
+      let attached = 0;
+      for (const match of matches) {
+        const result = await ingestScore(match.score, match.file, {
+          db: this.opts.db,
+          resolver: this.opts.resolver,
+          profileId,
+          trackingSince: 0,
+          official: this.opts.official,
+          filter: defaultTrackingFilter(),
+          identity: UNKNOWN_IDENTITY,
+        });
+        if (result.status === 'added') attached++;
+      }
+      return { attached };
     });
   }
 
@@ -1061,8 +1113,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * finds every other replay. The preview does it too, or it would count none of them: this
    * writes only into the app's own `data/mcosu/`, and changes nothing a profile holds.
    */
-  private async buildMcosuReplays(since: number): Promise<void> {
-    for (const install of this.opts.installs.filter((i) => i.kind === 'mcosu')) {
+  private async buildMcosuReplays(since: number, installs: InstallChoice = null): Promise<void> {
+    for (const install of this.chosen(installs).filter((i) => i.kind === 'mcosu')) {
       try {
         await buildMcosuReplays(install.root, install.replayDir, since);
       } catch (e) {
@@ -1071,12 +1123,17 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     }
   }
 
-  private logDirs(): string[] {
-    return this.opts.installs.map((i) => logDirOf(i)).filter((d): d is string => d !== null);
+  /** The installs an import was told to look in, out of the ones this tracker has. */
+  private chosen(installs: InstallChoice): OsuInstall[] {
+    return installs === null ? this.opts.installs : this.opts.installs.filter((i) => installs.includes(i.root));
   }
 
-  private replayDirs(): string[] {
-    return this.opts.installs.map((i) => i.replayDir);
+  private logDirs(installs: InstallChoice = null): string[] {
+    return this.chosen(installs).map((i) => logDirOf(i)).filter((d): d is string => d !== null);
+  }
+
+  private replayDirs(installs: InstallChoice = null): string[] {
+    return this.chosen(installs).map((i) => i.replayDir);
   }
 
   /** Append to the ingest queue and hand back this task's own result. */

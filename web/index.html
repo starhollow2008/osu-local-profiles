@@ -296,7 +296,7 @@
   <button type="button" data-act="unpin" role="menuitem" data-i18n="playMenu.unpin">Unpin</button>
   <button type="button" data-act="details" role="menuitem" data-i18n="playMenu.viewDetails">View Details</button>
   <button type="button" data-act="replay" role="menuitem" data-i18n="playMenu.downloadReplay">Download Replay</button>
-  <button type="button" data-act="osu" role="menuitem" data-i18n="playMenu.viewOnOsu">View on osu!</button>
+  <button type="button" data-act="osu" role="menuitem" data-i18n="playMenu.viewOnOsu">View osu! score link</button>
   <button type="button" data-act="copy-link" role="menuitem" data-i18n="playMenu.copyLink">Copy link</button>
   <button type="button" data-act="save-image" role="menuitem" data-i18n="playMenu.saveScreenshot">Save screenshot</button>
   <button type="button" data-act="copy-image" role="menuitem" data-i18n="playMenu.copyScreenshot">Copy screenshot</button>
@@ -936,6 +936,15 @@
       <input type="checkbox" id="backfillFiltered" checked>
     </label>
     <div class="setting__hint" id="backfillFilterHint"></div>
+
+    <!--
+      Where to look: every osu! install this app tracks, each ticked. A profile kept for one
+      client's playstyle can leave the others out. Shown only when there is a choice to make.
+    -->
+    <div class="field field--stacked" id="backfillInstallsField" hidden>
+      <span data-i18n="backfillModal.lookIn">Look in</span>
+      <div class="checkgroup" id="backfillInstalls"></div>
+    </div>
 
     <!--
       Replay files: ones downloaded from osu!'s website, or kept from an old install, that osu!

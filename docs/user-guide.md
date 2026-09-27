@@ -497,6 +497,9 @@ imported, then confirm.
 - **From and To** pick a range of your own - an evening last week, without the week since. Tick
   **Earliest** to start from the oldest play there is, and **Now** (ticked by default) to run up
   to the present; a ticked end hides its date.
+- **Look in**, when the app has found more than one osu! install (osu!lazer, osu!stable, McOsu,
+  osu!'s development client), lists them all, ticked. Untick any you do not want this import to
+  read - a profile kept for your McOsu playstyle, say, can leave osu!stable's plays out.
 - **Import replay files...** takes `.osr` files you have yourself - downloaded from osu!'s
   website, say, or kept from an old install - that osu! no longer has. Choose as many as you like
   at once, or select them in a folder and drag them onto the dialog. Each is imported straight
@@ -507,21 +510,25 @@ imported, then confirm.
   you no longer have. **Check** shows the score and who set it; **Import** brings it in. Its pp
   is calculated here from the score's own numbers, exactly as osu! calculates it - and after a
   pp rework it is recalculated here with everything else, no internet needed. A beatmap you do
-  not have installed is downloaded once and kept.
+  not have installed is downloaded once and kept. If osu! did keep the replay after all, in any
+  of your osu! installs, it is found and used instead, and the dialog says so.
 - **Enter a score by hand...** is the last resort, for a play with no replay and no link. Pick
   the beatmap - search your installed ones by name, or paste its link - then type the
   judgements, max combo, mods, when you played it, and the score if you know it. Everything is
   checked against the beatmap, and the pp is calculated from what you entered.
 
 Best performances imported from your osu! account are priced the same way: each is rebuilt from
-what osu! sent and calculated here, so a pp rework recalculates them with everything else. If the
+what osu! sent and calculated here, so a pp rework recalculates them with everything else. Right
+after the import, every osu! install on this computer is searched for the replays of those plays,
+and each one found takes its score's place - so plays whose replay you still have never show **No
+replay file** at all. Only those plays' own replays are used: nothing else is imported. If the
 real replay of one turns up later - live, from Import past plays, or a file you add - it takes
-that score's place, keeping its pin.
+that score's place too, keeping its pin, and never adds the play twice.
 
 Scores with no replay say so on every row they appear in, on their details card, and in shared
 copies of the profile: **No replay file** for one imported from osu! (by link, or with an
 account's best performances), and **Manually entered by hand** for one typed in. Neither can be
-downloaded as a replay. Any score osu! has - most submitted plays too - has **View on osu!** in
+downloaded as a replay. Any score osu! has - most submitted plays too - has **View osu! score link** in
 its ··· menu.
 
 It reads osu!lazer's own logs as well as your replays, so a past session comes back whole: the

@@ -52,7 +52,7 @@ import {
   refreshLanguageButton,
 } from './language-picker.js';
 import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './metadata.js';
-import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
+import { bindOsuFolders, closeOsuFolders, installName, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { renderMedals } from './medals.js';
@@ -243,6 +243,8 @@ let playsRefused = 0;
 let unsubmittedAttempts = 0;
 /** Which clients were found, so the page can say how the one being watched behaves. */
 let installKinds = [];
+/** The osu! installs the app tracks, as /api/state lists them: what an import can look in. */
+let installs = [];
 let sharing = { canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
@@ -680,6 +682,7 @@ async function loadState() {
 
   renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
+  installs = s.installs;
   renderStableNote();
   // osu!'s development client is a lazer of its own, and says which (roadmap 5.68).
   const kinds =
@@ -3396,6 +3399,33 @@ $('backfillSources').onchange = updateBackfillConfirm;
 const backfillApplyFilter = () => $('backfillFiltered').checked;
 
 /**
+ * Where this import looks: one ticked box per osu! install, all of them each time the dialog
+ * opens. Only offered when there are two or more -- with one there is nothing to choose.
+ */
+function renderBackfillInstalls() {
+  $('backfillInstallsField').hidden = installs.length < 2;
+  $('backfillInstalls').innerHTML = installs
+    .map(
+      (i) =>
+        `<label class="checkgroup__item" title="${escapeHtml(i.root)}"><input type="checkbox" data-root="${escapeHtml(i.root)}" checked> ${escapeHtml(installName(i))}</label>`,
+    )
+    .join('');
+}
+
+/** The roots of the installs ticked, or null for every one when there was no choice to make. */
+function backfillInstallRoots() {
+  if ($('backfillInstallsField').hidden) return null;
+  return [...$('backfillInstalls').querySelectorAll('input[data-root]:checked')].map((box) => box.dataset.root);
+}
+
+$('backfillInstalls').onchange = () => {
+  const none = backfillInstallRoots()?.length === 0;
+  $('backfillCheck').disabled = none;
+  // Other folders hold other plays, so the counts are no longer the ones this would import.
+  resetBackfillPreview(none ? t('backfill.noInstalls') : t('backfill.installsChanged'));
+};
+
+/**
  * What ticking the box would actually do, said under it.
  *
  * Three states, because the box means something different in each: a filter that is set and
@@ -3445,6 +3475,8 @@ function openBackfill() {
   // decision to bypass the filter should be made for the import in front of you.
   $('backfillFiltered').checked = true;
   renderBackfillFilterHint();
+  renderBackfillInstalls();
+  $('backfillCheck').disabled = false;
   resetBackfillPreview(t('backfill.pickATime'));
   $('backfillModal').hidden = false;
   $('backfillCancel').focus();
@@ -3512,7 +3544,7 @@ $('backfillCheck').onclick = async () => {
   try {
     const d = await postJson(
       '/api/backfill/preview',
-      { since, until, applyFilter: backfillApplyFilter() },
+      { since, until, applyFilter: backfillApplyFilter(), installs: backfillInstallRoots() },
       'preview failed',
     );
 
@@ -3647,7 +3679,7 @@ $('backfillConfirm').onclick = async () => {
     );
     const d = await postJson(
       '/api/backfill',
-      { since, until, confirm: true, sources, applyFilter: backfillApplyFilter() },
+      { since, until, confirm: true, sources, applyFilter: backfillApplyFilter(), installs: backfillInstallRoots() },
       'import failed',
     );
     const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
@@ -3880,11 +3912,14 @@ $('scoreLinkImport').onclick = async () => {
     const d = await postJson('/api/score-link', { link: checkedLink });
     if (d.status === 'added') {
       closeScoreLink();
+      // With its replay when this computer still had the one osu! wrote, which then stands in
+      // for the one built from the link.
+      const imported = {
+        title: original(d.score.title, d.score.titleOriginal),
+        pp: d.score.pp != null ? fmt(d.score.pp, 0) : '-',
+      };
       resetBackfillPreview(
-        escapeHtml(t('scoreLink.imported', {
-          title: original(d.score.title, d.score.titleOriginal),
-          pp: d.score.pp != null ? fmt(d.score.pp, 0) : '-',
-        })),
+        escapeHtml(d.replay ? t('scoreLink.importedWithReplay', imported) : t('scoreLink.imported', imported)),
       );
       await Promise.all([loadProfile(), loadState()]);
     } else {

@@ -36,7 +36,7 @@ import type { OsuWebScore, OsuWebStanding } from '../clients/osu-web.ts';
  * a machine whose clock has drifted can be further out, so the window is generous. It is
  * never the only test -- see `findExistingScore`.
  */
-const TIME_TOLERANCE_MS = 5 * 60 * 1000;
+export const TIME_TOLERANCE_MS = 5 * 60 * 1000;
 
 /**
  * Mods that leave a beatmap's star rating exactly as it is.
