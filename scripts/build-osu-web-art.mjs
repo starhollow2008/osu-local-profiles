@@ -4,8 +4,10 @@
  *
  * This project is AGPL-3.0-or-later, the licence osu-web is under, so osu!'s own files are
  * used rather than redrawn: the 70-odd mod glyphs and the badge blanks they sit in, the small
- * grade badges, stable's big grade letters and the guest avatar. They are copied byte for
- * byte and never edited, from one osu-web commit, which `web/osu-web/README.md` records.
+ * grade badges, stable's big grade letters, the guest avatar and the four ruleset icons. They
+ * are copied byte for byte and never edited, from one osu-web commit, which
+ * `web/osu-web/README.md` records -- all but the ruleset icons, which osu-web keeps only as
+ * glyphs of an icon font, and are each written out as an SVG of its own (see `MODE_GLYPHS`).
  * THIRD-PARTY-NOTICES.md credits them.
  *
  * Which glyph belongs to which acronym is read out of osu-web's own `mod.less`, so a mod
@@ -17,6 +19,7 @@
  *
  * Run: node scripts/build-osu-web-art.mjs
  *      node scripts/build-osu-web-art.mjs --source reference/osu-web   (no network)
+ *      node scripts/build-osu-web-art.mjs --commit <sha>                (one commit, not master)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,6 +44,9 @@ const localSource = argument > 0 ? path.resolve(process.argv[argument + 1]) : nu
  * mix two versions of the art; resolving the commit first cannot.
  */
 async function resolveCommit() {
+  // A named commit: to add something new without also moving everything else to master.
+  const named = process.argv.indexOf('--commit');
+  if (named > 0) return process.argv[named + 1];
   if (localSource) {
     return execFileSync('git', ['-C', localSource, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   }
@@ -115,6 +121,37 @@ files.push(['public/images/layout/avatar-guest@2x.png', 'layout/avatar-guest@2x.
 const contents = [];
 for (const [from, to] of files) contents.push([to, await read(from), from]);
 
+/*
+ * The ruleset icons osu-web's mode switcher shows (`playmode-tabs.tsx`): not image files there
+ * but four glyphs of its own icon font, `resources/fonts/extra`, which `icons.less` names
+ * `fa-extra-mode-*`. Each is taken out of the font's SVG form and written as an SVG of its own:
+ * the outline exactly as drawn, turned from the font's upward y axis to an image's downward
+ * one, so the page can show it the way it shows a mod glyph, as a mask in the text's colour.
+ *
+ * The font itself is never taken: it also carries the osu! logo (`osu`, U+E805), which osu-web's
+ * README keeps out of its AGPL grant as a trademark. Only the four glyphs named here are read.
+ */
+const EXTRA_FONT = 'resources/fonts/extra/extra.svg';
+const MODE_GLYPHS = { osu: 'mode-osu', taiko: 'mode-taiko', fruits: 'mode-ctb', mania: 'mode-mania' };
+
+const attributes = (tag) => Object.fromEntries([...tag.matchAll(/([\w:-]+)="([^"]*)"/g)].map((m) => [m[1], m[2]]));
+const extraFont = (await read(EXTRA_FONT)).toString('utf8');
+const face = attributes(/<font-face\b[^>]*>/.exec(extraFont)?.[0] ?? '');
+const fontAdvance = attributes(/<font\b[^>]*>/.exec(extraFont)?.[0] ?? '')['horiz-adv-x'];
+const em = Number(face['units-per-em']);
+const ascent = Number(face.ascent);
+if (!Number.isFinite(em) || !Number.isFinite(ascent)) throw new Error(`${EXTRA_FONT} has no usable <font-face>; its layout probably changed`);
+const glyphTags = [...extraFont.matchAll(/<glyph\b[^>]*>/g)].map((m) => attributes(m[0]));
+for (const [ruleset, name] of Object.entries(MODE_GLYPHS)) {
+  const glyph = glyphTags.find((g) => g['glyph-name'] === name);
+  if (!glyph?.d) throw new Error(`${EXTRA_FONT} has no glyph ${name}; the mode switcher's icons moved`);
+  const advance = Number(glyph['horiz-adv-x'] ?? fontAdvance ?? em);
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${advance} ${em}">` +
+    `<path transform="matrix(1 0 0 -1 0 ${ascent})" d="${glyph.d}"/></svg>\n`;
+  contents.push([`modes/mode-${ruleset}.svg`, Buffer.from(svg, 'utf8'), `${EXTRA_FONT}#${name}`]);
+}
+
 fs.rmSync(outDir, { recursive: true, force: true });
 let bytes = 0;
 for (const [to, buffer] of contents) {
@@ -146,6 +183,12 @@ by ppy.
 | \`grades/\` | \`public/images/badges/score-ranks-v2019/\` | the small grade badges |
 | \`scores/\` | \`resources/images/scores/\` | a stable score's big grade letter |
 | \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture |
+| \`modes/\` | \`${EXTRA_FONT}\`, glyphs ${Object.values(MODE_GLYPHS).join(', ')} | the mode switcher's ruleset icons |
+
+\`modes/\` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
+glyphs of its icon font, so each glyph's outline is written out as an SVG of its own, unchanged
+but for the flip from the font's upward y axis to an image's downward one. The font itself is
+not taken: it also holds the osu! logo.
 `,
 );
 
@@ -175,11 +218,14 @@ ${Object.entries(GRADES).map(([grade, value]) => `.score-rank--${grade} { backgr
 ${LEGACY.map((rank) => `.legacy-rank--${rank} { background-image: ${url(`scores/legacy-ranking-${rank}@2x.png`)}; }`).join('\n')}
 
 .avatar-guest { background-image: ${url('layout/avatar-guest@2x.png')}; }
+
+${Object.keys(MODE_GLYPHS).map((ruleset) => `.mode-icon--${ruleset} { ${mask(`modes/mode-${ruleset}.svg`)} }`).join('\n')}
 `;
 
 fs.writeFileSync(cssFile, css);
 
 console.log(
-  `${glyphs.length} mod glyphs, ${Object.keys(GRADES).length} grades, ${LEGACY.length} stable letters ` +
+  `${glyphs.length} mod glyphs, ${Object.keys(GRADES).length} grades, ${LEGACY.length} stable letters, ` +
+    `${Object.keys(MODE_GLYPHS).length} ruleset icons ` +
     `-> web/osu-web/ (${(bytes / 1024).toFixed(0)} KB) from ${REPO}@${commit.slice(0, 12)}`,
 );

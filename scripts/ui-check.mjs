@@ -2719,6 +2719,32 @@ check('level bar is b3', await bg('.profile-detail-bar'), await literal('hsl(333
 
 console.log('\nthe page rendered');
 check('four game modes', await evaluate("document.querySelectorAll('#modes a').length"), 4);
+// osu-web's ruleset icons, as osu!'s own profile page shows them: the icon alone, named on hover.
+check(
+  'each mode is its icon, named for a screen reader',
+  await evaluate(`[...document.querySelectorAll('#modes a')].map((a) => {
+    const icon = a.querySelector('.mode-icon');
+    const mask = icon && getComputedStyle(icon).webkitMaskImage;
+    return a.getAttribute('aria-label') + ':' + (a.textContent.trim() === '' && /modes\\/mode-/.test(mask ?? ''));
+  }).join()`),
+  'osu!:true,osu!taiko:true,osu!catch:true,osu!mania:true',
+);
+check(
+  'hovering a mode names it in a tooltip above it',
+  await evaluate(`(() => {
+    // At the top of the page: scrolled past, the switcher has no room above it, and the tooltip
+    // rightly opens below instead.
+    window.scrollTo(0, 0);
+    const link = document.querySelectorAll('#modes a')[1];
+    link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    const tip = document.querySelector('.tooltip-default');
+    const shown = tip && !tip.hidden && tip.textContent === 'osu!taiko' &&
+      tip.getBoundingClientRect().bottom <= link.getBoundingClientRect().top;
+    document.body.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    return shown && tip.hidden;
+  })()`),
+  true,
+);
 check(
   'five grade counts',
   await evaluate("document.querySelectorAll('.profile-rank-count__item').length"),

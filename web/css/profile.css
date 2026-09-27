@@ -444,32 +444,50 @@
 
 /* --- gamemode switcher -------------------------------------------------- */
 
+/*
+ * The mode switcher: osu-web's game-mode.less and game-mode-link.less -- each ruleset's icon
+ * alone, 20px, in the header's pink until it is the one showing or under the pointer, then
+ * white. The name is the tooltip (web/js/tooltip.js), as on osu!'s own profile page.
+ */
 .game-mode {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
+  align-items: center;
+  gap: 10px 20px;
   align-self: flex-end;
   margin-left: auto;
-  font-size: var(--fs-normal);
+  padding-bottom: 6px;
+  line-height: normal;
 }
 
 .game-mode__link {
-  color: hsl(var(--hsl-l1));
-  padding-bottom: 6px;
-  border-bottom: 2px solid transparent;
-  line-height: 1;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  color: hsl(var(--hsl-h1));
+  font-size: var(--fs-large);
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
 }
 
 .game-mode__link:hover {
-  color: hsl(var(--hsl-c1));
+  color: #fff;
   text-decoration: none;
 }
 
 .game-mode__link--active {
-  color: hsl(var(--hsl-c1));
-  border-bottom-color: hsl(var(--hsl-h1));
-  font-weight: 700;
+  color: #fff;
+}
+
+/* A ruleset's icon from osu-web's own icon font (osu-web-art.css), drawn in the link's colour. */
+.mode-icon {
+  display: block;
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
 }
 
 /* A mode with no tracked plays is still selectable, just visibly idle. */
@@ -477,12 +495,7 @@
   opacity: 0.45;
 }
 
-@media (min-width: 900px) {
-  .game-mode {
-    font-size: var(--fs-title-small);
-    gap: 22px;
-  }
-}
+
 
 /* ======================================================================== */
 /* Detail block: ranks, chart, grade counts, stats                          */
@@ -1950,6 +1963,42 @@
   text-align: center;
   line-height: 1;
   font-size: var(--fs-normal);
+}
+
+/*
+ * osu-web's default tooltip (tooltip-default.less, and qtip's 10x8 tip): a small dark label
+ * above what it names. Placed by web/js/tooltip.js.
+ */
+.tooltip-default {
+  position: fixed;
+  z-index: 70;
+  max-width: 280px;
+  padding: 2px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b6));
+  color: #fff;
+  font-size: var(--fs-normal);
+  line-height: 1.1;
+  text-align: center;
+  pointer-events: none;
+}
+
+.tooltip-default::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: var(--tip-x, 50%);
+  width: 10px;
+  height: 8px;
+  margin-left: -5px;
+  background-color: hsl(var(--hsl-b6));
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.tooltip-default--below::after {
+  top: auto;
+  bottom: 100%;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
 }
 
 .medal-tooltip::after {

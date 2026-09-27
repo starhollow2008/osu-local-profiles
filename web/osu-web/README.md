@@ -16,3 +16,9 @@ by ppy.
 | `grades/` | `public/images/badges/score-ranks-v2019/` | the small grade badges |
 | `scores/` | `resources/images/scores/` | a stable score's big grade letter |
 | `layout/` | `public/images/layout/` | the avatar of a profile with no picture |
+| `modes/` | `resources/fonts/extra/extra.svg`, glyphs mode-osu, mode-taiko, mode-ctb, mode-mania | the mode switcher's ruleset icons |
+
+`modes/` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
+glyphs of its icon font, so each glyph's outline is written out as an SVG of its own, unchanged
+but for the flip from the font's upward y axis to an image's downward one. The font itself is
+not taken: it also holds the osu! logo.

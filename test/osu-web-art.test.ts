@@ -64,5 +64,27 @@ test('nothing is vendored that the licence does not cover', () => {
   walk(artDir);
   assert.deepEqual(files.filter((f) => /logo|pippi|font|\.(?:otf|ttf|woff2?)$/i.test(f)), []);
   const folders = new Set(files.map((f) => f.split('/')[0]));
-  assert.deepEqual([...folders].sort(), ['README.md', 'grades', 'layout', 'mods', 'scores']);
+  assert.deepEqual([...folders].sort(), ['README.md', 'grades', 'layout', 'modes', 'mods', 'scores']);
+});
+
+/*
+ * The ruleset icons (roadmap 5.72) are the one set not copied as files: osu-web keeps them only
+ * as glyphs of its icon font, and that font also holds the osu! logo. So the four are written out
+ * one glyph each, and this holds the line -- exactly those four, each a single outline, and
+ * nothing else of the font.
+ */
+test('the ruleset icons are the four mode glyphs alone, never the font or its logo', () => {
+  const modes = path.join(artDir, 'modes');
+  assert.deepEqual(fs.readdirSync(modes).sort(), ['mode-fruits.svg', 'mode-mania.svg', 'mode-osu.svg', 'mode-taiko.svg']);
+  for (const file of fs.readdirSync(modes)) {
+    const svg = fs.readFileSync(path.join(modes, file), 'utf8');
+    assert.equal((svg.match(/<path /g) ?? []).length, 1, `${file} is one outline`);
+    assert.ok(!/<font|<glyph|unicode=/.test(svg), `${file} carries nothing of the font`);
+  }
+  for (const ruleset of ['osu', 'taiko', 'fruits', 'mania']) {
+    assert.ok(
+      css.includes(`.mode-icon--${ruleset} { -webkit-mask-image: url("../osu-web/modes/mode-${ruleset}.svg")`),
+      `.mode-icon--${ruleset} draws its glyph`,
+    );
+  }
 });

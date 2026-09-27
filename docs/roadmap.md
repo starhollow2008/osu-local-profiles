@@ -3379,3 +3379,24 @@ the rest to a recommendation. What was built:
 - In the page's language, at the user's request: headers, sheet names and words, from the page's
   own translation files (`src/export/words.ts`); checked in Excel with a Japanese workbook.
 - The JSON export left out `visibleSql`, so removed scores were in it; now they are not.
+
+## 5.72 - The mode switcher's icons
+
+**Status:** done -- unreleased.
+
+The user asked for the mode switcher to show osu!'s own ruleset icons, as osu!'s profile page does,
+with the name on hover, and whether the licence allows it.
+
+- **Allowed.** The icons are osu-web's own work in osu-web's repository: four glyphs of its icon
+  font `resources/fonts/extra` (Fontello, `icons.less`'s `fa-extra-mode-*`), not
+  `ppy/osu-resources`. osu-web's README grants its artwork under the AGPL, less the "osu!" and
+  "ppy" branding. The same font also holds the osu! logo, so **the font is not taken**: only the
+  four mode glyphs are read, and each is written out as an SVG of its own, outline unchanged but
+  for the flip from font to image coordinates (`MODE_GLYPHS` in scripts/build-osu-web-art.mjs,
+  now with `--commit`, run pinned to the commit already vendored so nothing else moved).
+- **Drawn as osu-web does** (`playmode-tabs.tsx`, `game-mode.less`, `game-mode-link.less`): the
+  icon alone, 20px, pink until active or hovered, then white; as a mask in the link's colour,
+  like the mod glyphs. Modes with no plays stay dimmed, as before.
+- **The name on hover**: `web/js/tooltip.js`, a port of osu-web's `tooltip-default` (above and
+  centred, 10x8 tip, shown at once, gone on leaving or clicking), for any `data-tooltip`. The
+  name is also each link's `aria-label`.

@@ -16,6 +16,7 @@ import {
   shortDate,
   timeAgo,
 } from './format.js';
+import { hideTooltip } from './tooltip.js';
 import {
   coverUrl,
   guestAvatar,
@@ -289,12 +290,20 @@ function renderCover(top) {
   el.style.setProperty('--cover', url ? `url('${url}')` : 'none');
 }
 
+/** osu-web's name for each ruleset, which names its icon (osu-web-art.css). */
+const RULESETS = ['osu', 'taiko', 'fruits', 'mania'];
+
+/*
+ * The mode switcher as osu-web's profile page draws it (`playmode-tabs.tsx`): each mode's icon
+ * alone, its name in the tooltip over it -- and read out by a screen reader, which has no icon.
+ */
 function renderModes() {
+  hideTooltip();
   $('modes').innerHTML = MODE_NAMES.map((name, i) => {
     const classes = ['game-mode__link'];
     if (i === mode) classes.push('game-mode__link--active');
     if (!modesWithPlays.includes(i)) classes.push('game-mode__link--empty');
-    return `<a class="${classes.join(' ')}" href="#" data-mode="${i}">${escapeHtml(name)}</a>`;
+    return `<a class="${classes.join(' ')}" href="#" data-mode="${i}" data-tooltip="${escapeHtml(name)}" aria-label="${escapeHtml(name)}"${i === mode ? ' aria-current="page"' : ''}><span class="mode-icon mode-icon--${RULESETS[i]}" aria-hidden="true"></span></a>`;
   }).join('');
 }
 

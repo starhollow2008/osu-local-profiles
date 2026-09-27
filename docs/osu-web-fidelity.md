@@ -47,6 +47,7 @@ Refresh it with `git -C reference/osu-web pull` before a fidelity pass, since os
 |---|---|---|---|
 | LESS, TSX markup, colours, metrics | osu-web `resources/` | AGPL-3.0-or-later | **yes**, ported with its source named |
 | mod glyphs and blanks, grade badges, stable's grade letters, guest avatar | osu-web `public/images/`, `resources/images/` | AGPL-3.0-or-later | **yes**, vendored by `scripts/build-osu-web-art.mjs` |
+| ruleset icons (the mode switcher, `fa-extra-mode-*`) | osu-web `resources/fonts/extra/` (its own Fontello icon font) | AGPL-3.0-or-later | **yes**, the four mode glyphs only, each written out as an SVG by `scripts/build-osu-web-art.mjs`; never the font, which also holds the osu! logo (U+E805) |
 | mod names, types, setting labels | osu-web `database/mods.json` | facts about the game | **yes**, via `scripts/build-mod-table.mjs` |
 | country flags | [Twemoji](https://github.com/jdecked/twemoji) | CC-BY 4.0 | **yes**, vendored by `scripts/build-flags.mjs` |
 | medal art | `assets.ppy.sh`, not in the osu-web repository | not granted | loaded at runtime over a drawn placeholder, never shipped |

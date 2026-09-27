@@ -103,3 +103,8 @@
 .legacy-rank--D { background-image: url("../osu-web/scores/legacy-ranking-D@2x.png"); }
 
 .avatar-guest { background-image: url("../osu-web/layout/avatar-guest@2x.png"); }
+
+.mode-icon--osu { -webkit-mask-image: url("../osu-web/modes/mode-osu.svg"); mask-image: url("../osu-web/modes/mode-osu.svg"); }
+.mode-icon--taiko { -webkit-mask-image: url("../osu-web/modes/mode-taiko.svg"); mask-image: url("../osu-web/modes/mode-taiko.svg"); }
+.mode-icon--fruits { -webkit-mask-image: url("../osu-web/modes/mode-fruits.svg"); mask-image: url("../osu-web/modes/mode-fruits.svg"); }
+.mode-icon--mania { -webkit-mask-image: url("../osu-web/modes/mode-mania.svg"); mask-image: url("../osu-web/modes/mode-mania.svg"); }
