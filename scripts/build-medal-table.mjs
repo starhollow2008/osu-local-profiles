@@ -143,7 +143,8 @@ console.log(`  mod introduction: ${table.intro.length} medals`);
 /*
  * What the rules need to know about mods, per ruleset, from osu-web's `database/mods.json`
  * (generated from ppy/osu itself): which count as Conversion and as Fun, and which a
- * "this mod only" medal ignores -- System mods and Classic (`IsPermittedInNoModContext`).
+ * "this mod only" medal ignores -- System mods and Classic (`IsPermittedInNoModContext`),
+ * and which bar a star medal: Difficulty Reduction and Automation (`IsDifficultyReductionMod`).
  * Per ruleset because osu! types them per ruleset: the mania key mods are Conversion, and
  * osu!standard has Touch Device where the others do not.
  */
@@ -155,6 +156,7 @@ for (const ruleset of mods) {
     conversion: of('Conversion'),
     fun: of('Fun'),
     ignoredAlone: [...new Set(['CL', ...of('System')])],
+    reduction: [...of('DifficultyReduction'), ...of('Automation')],
   };
 }
 

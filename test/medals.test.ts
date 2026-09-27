@@ -24,6 +24,11 @@ interface Fixture {
   at?: number;
   mods?: { acronym: string; settings?: Record<string, unknown> }[];
   client?: 'lazer' | 'stable';
+  /** The beatmap's status. Ranked unless said. */
+  status?: number;
+  /** Whether osu! ranks these mods. True unless said. */
+  modsRanked?: boolean;
+  beatmapId?: number | null;
 }
 
 function harness() {
@@ -39,8 +44,8 @@ function harness() {
         (profile_id, dedupe_key, mode, beatmap_md5, client, mods_json, mods_label,
          count300, count100, count50, count_geki, count_katu, count_miss,
          accuracy, max_combo, total_score, passed, grade, stars, pp,
-         beatmap_max_combo, map_status, mods_ranked, mods_countable, ranked, played_at)
-       VALUES (?,?,?,?,?,?,'',?,0,0,0,0,?,0.99,?,500000,?,'S',?,?,?,?,1,1,1,?)`,
+         beatmap_max_combo, map_status, mods_ranked, mods_countable, ranked, beatmap_id, played_at)
+       VALUES (?,?,?,?,?,?,'',?,0,0,0,0,?,0.99,?,500000,?,'S',?,?,?,?,?,1,1,?,?)`,
     ).run(
       profileId, `key-${n}`, f.mode ?? 0, f.md5 ?? `md5-${n}`,
       f.client ?? 'lazer', JSON.stringify(f.mods ?? []),
@@ -51,7 +56,9 @@ function harness() {
       f.stars === undefined ? 5.0 : f.stars,
       f.pp === undefined ? 100 : f.pp,
       f.beatmapMaxCombo === undefined ? null : f.beatmapMaxCombo,
-      Status.RANKED,
+      f.status ?? Status.RANKED,
+      (f.modsRanked ?? true) ? 1 : 0,
+      f.beatmapId ?? null,
       f.at ?? 1_700_000_000_000 + n * 60_000,
     );
     return (db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;
@@ -181,8 +188,8 @@ test('an earned medal becomes one Recent entry, at the moment it was earned', ()
 test("the header's medal count is the whole profile's, not one mode's", () => {
   const h = harness();
   try {
-    h.add({ combo: 600, mode: 0 }); // 500 combo, plus star pass 1..5
-    h.add({ hits: 40_000, mode: 1 }); // taiko's first hit-count medal, plus its star passes
+    h.add({ combo: 600, mode: 0 }); // 500 combo, plus the 5-star pass
+    h.add({ hits: 40_000, mode: 1 }); // taiko's first hit-count medal, plus its 5-star pass
     const perMode = [0, 1].map(
       (mode) => h.medals(mode).medals.filter((m) => m.achievedAt !== null).length,
     );
@@ -225,14 +232,32 @@ test('play-count medals count every play, passed or not', () => {
 
 /* ------------------------------------------------------------ star pass */
 
-test('passing an n-star map awards every star medal up to n', () => {
+/* osu!'s `StarRatingMedalAwarder`: `stars >= n && stars < n + 1`, one band per medal. */
+test('passing an n-star map awards the n-star medal alone, none below it', () => {
   const h = harness();
   try {
     h.add({ stars: 5.9, combo: 1 });
     assert.deepEqual(
       earned(h.medals().medals).filter((s) => s.startsWith('osu-skill-pass')),
-      ['osu-skill-pass-1', 'osu-skill-pass-2', 'osu-skill-pass-3', 'osu-skill-pass-4', 'osu-skill-pass-5'],
+      ['osu-skill-pass-5'],
     );
+
+    h.add({ stars: 2.0, combo: 1 });
+    assert.deepEqual(
+      earned(h.medals().medals).filter((s) => s.startsWith('osu-skill-pass')),
+      ['osu-skill-pass-2', 'osu-skill-pass-5'],
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a map below one star or beyond the last medal awards no star medal', () => {
+  const h = harness();
+  try {
+    h.add({ stars: 0.8, combo: 1 });
+    h.add({ stars: 11.2, combo: 1 });
+    assert.deepEqual(earned(h.medals().medals).filter((s) => s.includes('skill')), []);
   } finally {
     h.cleanup();
   }
@@ -262,6 +287,102 @@ test('a play with no star rating awards no star medal', () => {
   }
 });
 
+/*
+ * osu!'s `StarRatingMedalAwarder` refuses the rest: its medal processor takes ranked,
+ * approved, qualified and loved maps, and the awarder then skips Qualified and Loved.
+ */
+test('star medals are for ranked and approved maps, never qualified, loved or unranked', () => {
+  const h = harness();
+  try {
+    h.add({ stars: 1.5, status: Status.LOVED });
+    h.add({ stars: 2.5, status: Status.QUALIFIED });
+    h.add({ stars: 3.5, status: Status.GRAVEYARD });
+    h.add({ stars: 4.5, status: Status.PENDING });
+    assert.deepEqual(earned(h.medals().medals).filter((s) => s.includes('skill')), []);
+
+    h.add({ stars: 5.5, status: Status.APPROVED });
+    h.add({ stars: 6.5, status: Status.RANKED });
+    assert.deepEqual(
+      earned(h.medals().medals).filter((s) => s.includes('skill')),
+      ['osu-skill-pass-5', 'osu-skill-pass-6'],
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a profile counting other map statuses still gets no star medal on loved or qualified', () => {
+  const h = harness();
+  try {
+    h.add({ stars: 1.5, status: Status.LOVED });
+    h.add({ stars: 2.5, status: Status.QUALIFIED });
+    h.add({ stars: 3.5, status: Status.GRAVEYARD });
+    const widened = { ...VANILLA, extraMapStatuses: [Status.GRAVEYARD, Status.QUALIFIED, Status.LOVED] };
+    assert.deepEqual(
+      earned(computeMedals(h.db, h.profileId, 0, widened).medals).filter((s) => s.includes('skill')),
+      ['osu-skill-pass-3'],
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('difficulty reduction, automation and unranked mods earn no star medal', () => {
+  const h = harness();
+  try {
+    for (const acronym of ['EZ', 'NF', 'HT', 'DC', 'SO', 'RX', 'AP', 'AT', 'CN']) {
+      h.add({ stars: 7.5, mods: [{ acronym }], miss: 0, combo: 500, beatmapMaxCombo: 500 });
+    }
+    h.add({ stars: 8.5, mods: [{ acronym: 'DT', settings: { speed_change: 1.3 } }], modsRanked: false });
+    assert.deepEqual(earned(h.medals().medals).filter((s) => s.includes('skill')), []);
+
+    // Mods that make a map harder, or change nothing, are fine.
+    h.add({ stars: 7.5, mods: [{ acronym: 'HD' }, { acronym: 'DT' }], miss: 0, combo: 500, beatmapMaxCombo: 500 });
+    assert.deepEqual(
+      earned(h.medals().medals).filter((s) => s.includes('skill')),
+      ['osu-skill-fc-7', 'osu-skill-pass-7'],
+    );
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('a play that could never earn a star FC is not counted as an unknown FC', () => {
+  const h = harness();
+  try {
+    h.add({ stars: 4.5, mods: [{ acronym: 'NF' }], miss: 0, combo: 900, beatmapMaxCombo: null });
+    assert.equal(h.medals().fcUnknown, 0);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('on osu!mania, key mods and Dual Stages earn no star medal', () => {
+  const h = harness();
+  try {
+    for (const acronym of ['4K', '7K', '10K', 'DS']) h.add({ mode: 3, stars: 3.5, mods: [{ acronym }] });
+    assert.deepEqual(earned(h.medals(3).medals).filter((s) => s.includes('skill')), []);
+
+    h.add({ mode: 3, stars: 3.5, mods: [{ acronym: 'MR' }] });
+    assert.deepEqual(earned(h.medals(3).medals).filter((s) => s.includes('skill')), ['mania-skill-pass-3']);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test("osu!taiko's beatmap 19990 earns no star medal, as osu! exempts it", () => {
+  const h = harness();
+  try {
+    h.add({ mode: 1, stars: 2.5, beatmapId: 19990 });
+    assert.deepEqual(earned(h.medals(1).medals).filter((s) => s.includes('skill')), []);
+    // Only on taiko: the same id in another mode is any other map.
+    h.add({ mode: 0, stars: 2.5, beatmapId: 19990 });
+    assert.deepEqual(earned(h.medals(0).medals).filter((s) => s.includes('skill')), ['osu-skill-pass-2']);
+  } finally {
+    h.cleanup();
+  }
+});
+
 /* -------------------------------------------------------------- star FC */
 
 /*
@@ -278,7 +399,7 @@ test('a full combo needs the whole combo, not just no misses', () => {
     h.add({ stars: 3.2, miss: 0, combo: 500, beatmapMaxCombo: 500 });
     assert.deepEqual(
       earned(h.medals().medals).filter((s) => s.includes('-fc-')),
-      ['osu-skill-fc-1', 'osu-skill-fc-2', 'osu-skill-fc-3'],
+      ['osu-skill-fc-3'],
     );
   } finally {
     h.cleanup();

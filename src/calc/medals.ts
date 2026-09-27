@@ -5,6 +5,7 @@ import { estimateRank } from './rank.ts';
 import { bonusPp, isCustomised, weightedTotal } from './pp.ts';
 import type { LazerMod } from '../osr.ts';
 import definitions from './medal-definitions.json' with { type: 'json' };
+import { Status } from '../clients/beatmaps.ts';
 import { beatmapName, beatmapNameOriginal, NAME_COLUMNS, names } from './metadata.ts';
 
 /**
@@ -91,8 +92,14 @@ interface IntroDefinition extends Definition {
   rule: IntroRule;
 }
 
-/** Per ruleset, from osu-web's mods.json: which acronyms are which type. */
-export type ModTypes = Record<string, { conversion: string[]; fun: string[]; ignoredAlone: string[] }>;
+/**
+ * Per ruleset, from osu-web's mods.json: which acronyms are which type. `reduction` is
+ * Difficulty Reduction and Automation together, what `IsDifficultyReductionMod` refuses.
+ */
+export type ModTypes = Record<
+  string,
+  { conversion: string[]; fun: string[]; ignoredAlone: string[]; reduction: string[] }
+>;
 
 const TABLE = definitions as {
   rank: Definition[];
@@ -128,6 +135,46 @@ export function earnsIntroMedal(
   if (rule.ruleset !== undefined && rule.ruleset !== ruleset) return false;
   const counted = mods.filter((m) => !known.ignoredAlone.includes(m.acronym));
   return counted.length === 1 && counted[0]!.acronym === rule.mod && !isCustomised(counted[0]!);
+}
+
+/** Mania's key mods, 1K to 10K. */
+const MANIA_KEY_MOD = /^(?:[1-9]|10)K$/;
+
+/** The one beatmap osu! exempts from the osu!taiko star medals. */
+const TAIKO_EXEMPT_BEATMAP = 19990;
+
+/**
+ * May this play earn a star pass or FC medal at all? osu!'s own rules, from
+ * ppy/osu-queue-score-statistics' `StarRatingMedalAwarder`, beyond the map's status (which
+ * `starMedalSql` reads):
+ *
+ * - No Difficulty Reduction or Automation mod (`IsDifficultyReductionMod`), whatever the
+ *   profile counts. Unranked mods are refused there too; `countsSql` does that from
+ *   `mods_ranked`, unless the profile has chosen to count them.
+ * - On osu!mania, no key mod and no Dual Stages.
+ * - Not osu!taiko's beatmap 19990, which osu! exempts by id.
+ */
+export function mayEarnStarMedal(
+  mods: readonly LazerMod[],
+  ruleset: number,
+  beatmapId: number | null,
+  types: ModTypes = TABLE.modTypes,
+): boolean {
+  const reduction = types[String(ruleset)]?.reduction ?? [];
+  if (mods.some((m) => reduction.includes(m.acronym))) return false;
+  if (ruleset === 3 && mods.some((m) => m.acronym === 'DS' || MANIA_KEY_MOD.test(m.acronym))) return false;
+  if (ruleset === 1 && beatmapId === TAIKO_EXEMPT_BEATMAP) return false;
+  return true;
+}
+
+/**
+ * A play that counts toward pp, on a map that is not Qualified or Loved: osu! skips both for
+ * star medals, since their star rating may be broken or yet change. So on osu!'s own rules
+ * that leaves ranked and approved maps, and a profile counting other statuses gets them too.
+ */
+function starMedalSql(e: Eligibility): string {
+  return `(${countsSql(e)}
+           AND COALESCE(s.map_status, ${Status.RANKED}) NOT IN (${Status.QUALIFIED}, ${Status.LOVED}))`;
 }
 
 /**
@@ -199,6 +246,10 @@ interface MedalRow {
   stars: number | null;
   pp: number | null;
   counts: number;
+  /** Counts toward pp, on a map osu! gives star medals for. */
+  star_map: number;
+  mods_json: string;
+  beatmap_id: number | null;
   passed: number;
   miss: number;
   beatmap_max_combo: number | null;
@@ -220,6 +271,15 @@ function isFullCombo(row: MedalRow): boolean | null {
   if (row.miss > 0) return false;
   if (row.beatmap_max_combo === null || row.beatmap_max_combo <= 0) return null;
   return row.max_combo >= row.beatmap_max_combo;
+}
+
+/** A score's mods, or null when they cannot be read -- and then nothing can be said for them. */
+function parseMods(json: string): LazerMod[] | null {
+  try {
+    return JSON.parse(json) as LazerMod[];
+  } catch {
+    return null;
+  }
 }
 
 function title(row: MedalRow): string | null {
@@ -247,6 +307,7 @@ export function computeMedals(
               ${starsColumn(e)} AS stars,
               ${ppColumn(e)} AS pp,
               ${countsSql(e)} AS counts,
+              ${starMedalSql(e)} AS star_map, s.mods_json, s.beatmap_id,
               ${NAME_COLUMNS}
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
@@ -292,16 +353,20 @@ export function computeMedals(
 
     /*
      * Star medals are about the beatmap that was played, not about the profile's totals, so
-     * they need a real star rating and a passing score. An unranked map still counts: osu!
-     * awards these on any beatmap, and so does this.
+     * they need a real star rating (with the play's mods) on a play osu! would rank, and
+     * `starMedalSql`/`mayEarnStarMedal` say which. Only such a play can leave an FC unknown.
+     *
+     * Each medal is its own band, never the ones below it: osu!'s `StarRatingMedalAwarder`
+     * checks `stars >= n && stars < n + 1`, so a 5.9-star pass earns the 5-star medal alone.
      */
-    if (row.passed === 1 && row.stars !== null) {
+    const mods = row.star_map === 1 ? parseMods(row.mods_json) : null;
+    if (mods !== null && row.stars !== null && mayEarnStarMedal(mods, mode, row.beatmap_id)) {
       const level = Math.floor(row.stars);
-      for (let star = 1; star <= level; star++) remember(passAt, star, row);
+      remember(passAt, level, row);
 
       const fc = isFullCombo(row);
       if (fc === null) fcUnknown++;
-      else if (fc) for (let star = 1; star <= level; star++) remember(fcAt, star, row);
+      else if (fc) remember(fcAt, level, row);
     }
 
     // Rank needs the profile's pp, which is the weighted total of its best score on each

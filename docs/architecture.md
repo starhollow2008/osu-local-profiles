@@ -229,7 +229,7 @@ Flags from Twemoji (CC-BY 4.0, same source as osu!). Generated: `web/js/mod-defi
 
 - Combo + play-count medals exist for **osu!standard only**
 - taiko, catch, mania have **hit-count** medals instead
-- Star pass/FC medals: 1–10 for standard, 1–8 elsewhere
+- Star pass/FC medals: 1–10 for standard, 1–8 elsewhere. osu!'s `StarRatingMedalAwarder`: each medal is its own band (`n <= stars < n+1`), never the ones below; a play that `countsSql`, never on Qualified/Loved; no Difficulty Reduction/Automation mod (`modTypes.reduction`); mania no key mods/DS; taiko beatmap 19990 exempt
 - **Mod Introduction** is the only other group (user chose it). Rules: mod alone at defaults, system mods + CL ignored, SO in standard only, NC/DC ≠ DT/HT, passes only, Conversion/Fun = lazer-only mod types
 
 Page shows no text for a medal (icons only, groups: Mod Introduction then Skill & Dedication per `ordering`). Hover card: `#medalTooltip`, one shared element positioned in window coords. Header medals figure = account-wide `earnedMedalCount`. Earned medal = Recent-feed event (`medalEvents`) - except rank medals (`dated: false`).

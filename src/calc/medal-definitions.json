@@ -852,6 +852,17 @@
         "CL",
         "TD",
         "SV2"
+      ],
+      "reduction": [
+        "EZ",
+        "NF",
+        "HT",
+        "DC",
+        "AT",
+        "CN",
+        "RX",
+        "AP",
+        "SO"
       ]
     },
     "1": {
@@ -872,6 +883,16 @@
       "ignoredAlone": [
         "CL",
         "SV2"
+      ],
+      "reduction": [
+        "EZ",
+        "NF",
+        "HT",
+        "DC",
+        "SR",
+        "AT",
+        "CN",
+        "RX"
       ]
     },
     "2": {
@@ -892,6 +913,15 @@
       "ignoredAlone": [
         "CL",
         "SV2"
+      ],
+      "reduction": [
+        "EZ",
+        "NF",
+        "HT",
+        "DC",
+        "AT",
+        "CN",
+        "RX"
       ]
     },
     "3": {
@@ -924,6 +954,15 @@
       "ignoredAlone": [
         "CL",
         "SV2"
+      ],
+      "reduction": [
+        "EZ",
+        "NF",
+        "HT",
+        "DC",
+        "NR",
+        "AT",
+        "CN"
       ]
     }
   }
