@@ -1,5 +1,6 @@
 import { wasDeleted } from '../scores.ts';
-import { findExistingScore, replayIdentity } from './online-import.ts';
+import { findExistingScore, replaces, replayIdentity } from './online-import.ts';
+import { releaseUploadedReplay } from '../uploaded-replays.ts';
 import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
 import type { SQLInputValue } from 'node:sqlite';
@@ -213,15 +214,20 @@ export async function ingestScore(
   // Deleted for good from Settings: the replay is still on disk, and must stay out.
   if (wasDeleted(ctx.db, ctx.profileId, key)) return { status: 'skipped', reason: 'deleted' };
   /*
-   * The same play, already here under osu!'s own record of it.
+   * The same play, already here under another record of it: osu!'s figures from an import of
+   * best performances, or a replay this app built from a score's link.
    *
    * `dedupe_key` cannot catch this: a replay keys on its own hash and an imported score on
    * osu!'s id, so the two never collide however much they describe the same play. This is
    * what stops Import past plays from doubling every best performance an import brought in.
-   * The imported row is left as it stands -- osu! priced that play itself, and matching what
-   * the website shows is the whole point of having imported it.
+   *
+   * A worse record is replaced by this one, in place -- its id, pin and removal kept -- and an
+   * equal or better one stands (`replaces`). So a replay turning up for a play imported from
+   * osu! takes its place, as does one this app builds from the play's own numbers, and every
+   * score ends up on the best record there is of it.
    */
-  if (findExistingScore(ctx.db, ctx.profileId, replayIdentity(score)) !== null) {
+  const found = findExistingScore(ctx.db, ctx.profileId, replayIdentity(score));
+  if (found !== null && !replaces(found, score.built ? 'built' : 'replay')) {
     return { status: 'skipped', reason: 'duplicate' };
   }
 
@@ -331,18 +337,38 @@ export async function ingestScore(
     // to a replay file that may no longer be on disk.
     player_name: player.name,
     player_id: player.userId,
+    // A replay this app built, for a score from its osu! link or entered by hand.
+    origin: score.built?.origin ?? null,
   };
   const columns = Object.keys(row);
-  const { lastInsertRowid } = ctx.db
-    .prepare(`INSERT INTO scores (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
-    .run(...(Object.values(row) as SQLInputValue[]));
+  let scoreId: number;
+  if (found === null) {
+    const { lastInsertRowid } = ctx.db
+      .prepare(`INSERT INTO scores (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
+      .run(...(Object.values(row) as SQLInputValue[]));
+    scoreId = Number(lastInsertRowid);
+  } else {
+    // The same row object, as an UPDATE of the worse record: no longer osu!'s figures as they came.
+    const old = ctx.db.prepare('SELECT replay_path, origin FROM scores WHERE id = ?').get(found.id) as {
+      replay_path: string | null;
+      origin: string | null;
+    };
+    ctx.db
+      .prepare(`UPDATE scores SET ${columns.map((c) => `${c} = ?`).join(', ')}, imported_at = NULL WHERE id = ?`)
+      .run(...(Object.values(row) as SQLInputValue[]), found.id);
+    // A replay this app built for it is not needed any more, once nothing points at it.
+    if (old.origin !== null && old.replay_path !== null && old.replay_path !== replayPath) {
+      releaseUploadedReplay(ctx.db, old.replay_path);
+    }
+    scoreId = found.id;
+  }
   // Tracked now, however it got here, so it is no longer a play the app turned away.
   forgetDecline(ctx.db, ctx.profileId, 'score', key);
 
   return {
     status: 'added',
     score: {
-      id: Number(lastInsertRowid),
+      id: scoreId,
       mode,
       ...named,
       modsLabel: priced.mods_label,

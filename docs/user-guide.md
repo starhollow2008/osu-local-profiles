@@ -494,6 +494,26 @@ imported, then confirm.
   away, through the same checks as everything else (the filter box above included), and the
   dialog says what came of them. The app keeps its own copy in `data/replays/`, so deleting the
   file you chose loses nothing, and **Back up everything** includes it.
+- **Import from a score link...** takes a score's link on osu.ppy.sh, for a play whose replay
+  you no longer have. **Check** shows the score and who set it; **Import** brings it in. Its pp
+  is calculated here from the score's own numbers, exactly as osu! calculates it - and after a
+  pp rework it is recalculated here with everything else, no internet needed. A beatmap you do
+  not have installed is downloaded once and kept.
+- **Enter a score by hand...** is the last resort, for a play with no replay and no link. Pick
+  the beatmap - search your installed ones by name, or paste its link - then type the
+  judgements, max combo, mods, when you played it, and the score if you know it. Everything is
+  checked against the beatmap, and the pp is calculated from what you entered.
+
+Best performances imported from your osu! account are priced the same way: each is rebuilt from
+what osu! sent and calculated here, so a pp rework recalculates them with everything else. If the
+real replay of one turns up later - live, from Import past plays, or a file you add - it takes
+that score's place, keeping its pin.
+
+Scores with no replay say so on every row they appear in, on their details card, and in shared
+copies of the profile: **No replay file** for one imported from osu! (by link, or with an
+account's best performances), and **Manually entered by hand** for one typed in. Neither can be
+downloaded as a replay. Any score osu! has - most submitted plays too - has **View on osu!** in
+its ··· menu.
 
 It reads osu!lazer's own logs as well as your replays, so a past session comes back whole: the
 finished plays from their replays, the quits, fails and retries osu! counted, and the ones made

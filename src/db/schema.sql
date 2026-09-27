@@ -101,6 +101,12 @@ CREATE TABLE IF NOT EXISTS scores (
   -- tracked score, which is what tells the two apart -- and what keeps a recompute away from
   -- a row it has no replay to recompute from.
   imported_at     INTEGER,
+  -- Set when the replay behind this row is one this app built (src/built-replays.ts): 'link',
+  -- a score imported from its osu! link, or 'manual', one entered by hand. Either is priced
+  -- from that replay like any other, and shown with "No replay file" or "Manually entered by hand".
+  -- NULL on a score from a replay osu! wrote -- and on one imported with best performances,
+  -- which imported_at marks instead.
+  origin          TEXT,
   replay_path     TEXT,
   -- Removed from the profile by the user. A hide rather than a DELETE: the replay is still
   -- on disk, so a deleted row would be re-ingested and dedupe would no longer suppress it.

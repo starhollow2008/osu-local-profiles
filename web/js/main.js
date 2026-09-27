@@ -814,6 +814,9 @@ document.addEventListener('click', () => setMenuOpen(false));
 $('optionsMenu').onclick = (e) => e.stopPropagation();
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
+  // These two open over Import past plays: Escape closes the one on top, not both.
+  if (!$('scoreLinkModal').hidden) return closeScoreLink();
+  if (!$('manualModal').hidden) return closeManual();
   // The score card's own menu closes first; a second Escape closes the card.
   if (!$('scoreModal').hidden && $('playMenu').hidden) closeScoreCard();
   setMenuOpen(false);
@@ -2503,6 +2506,9 @@ function openPlayMenu(button) {
   // a replay, which an unfinished play never does.
   menu.querySelector('[data-act="details"]').hidden = !isScore || inCard;
   menu.querySelector('[data-act="replay"]').hidden = !isScore || inCard || button.dataset.replay !== '1';
+  // The score's own page on osu!, for any score osu! has -- in a shared copy too.
+  menu.dataset.osuUrl = isScore ? (button.dataset.osuUrl ?? '') : '';
+  menu.querySelector('[data-act="osu"]').hidden = menu.dataset.osuUrl === '';
   // Sharing the score is the details card's: its link is its own page, and the image is it.
   for (const act of ['copy-link', 'save-image', 'copy-image']) {
     menu.querySelector(`[data-act="${act}"]`).hidden = !inCard;
@@ -2573,6 +2579,12 @@ $('playMenu').onclick = async (e) => {
   }
   if (act === 'replay') {
     void downloadReplay(id);
+    return;
+  }
+  if (act === 'osu') {
+    const url = $('playMenu').dataset.osuUrl;
+    // Only ever osu!'s own score pages: the server builds these, and nothing else may open.
+    if (url && url.startsWith('https://osu.ppy.sh/scores/')) window.open(url, '_blank', 'noopener');
     return;
   }
   if (act === 'copy-link') {
@@ -3551,6 +3563,348 @@ $('backfillFileInput').onchange = () => {
     void importReplayFiles([...e.dataTransfer.files]);
   });
 }
+
+/*
+ * Import past plays -> Import from a score link.
+ *
+ * Checked, then imported: the check shows what the score is and whose, and nothing is written
+ * until Import is pressed for that same link. Somebody else's score takes a second press, as
+ * Track anyway does. The score is then priced here and announced like any play that arrives.
+ */
+let checkedLink = null;
+
+const linkSummary = (html) => {
+  $('scoreLinkSummary').innerHTML = html;
+};
+
+function openScoreLink() {
+  $('scoreLinkInput').value = '';
+  checkedLink = null;
+  $('scoreLinkImport').disabled = true;
+  linkSummary(escapeHtml(t('scoreLinkModal.pasteFirst')));
+  $('scoreLinkModal').hidden = false;
+  $('scoreLinkInput').focus();
+}
+
+const closeScoreLink = () => {
+  $('scoreLinkModal').hidden = true;
+};
+
+$('backfillScoreLink').onclick = openScoreLink;
+$('scoreLinkCancel').onclick = closeScoreLink;
+$('scoreLinkModal').onclick = (e) => {
+  if (e.target === $('scoreLinkModal')) closeScoreLink();
+};
+// A different link is a different score: Import waits for it to be checked.
+$('scoreLinkInput').oninput = () => {
+  checkedLink = null;
+  $('scoreLinkImport').disabled = true;
+};
+$('scoreLinkInput').onkeydown = (e) => {
+  if (e.key === 'Enter') $('scoreLinkCheck').click();
+};
+
+$('scoreLinkCheck').onclick = async () => {
+  const link = $('scoreLinkInput').value.trim();
+  if (!link) return;
+  $('scoreLinkCheck').disabled = true;
+  linkSummary(escapeHtml(t('scoreLink.checking')));
+  try {
+    const d = await postJson('/api/score-link/check', { link });
+    const facts = [
+      d.grade,
+      pct(d.accuracy),
+      `${fmt(d.maxCombo)}x`,
+      d.mods,
+      d.osuPp != null ? t('scoreLink.osuPp', { pp: fmt(d.osuPp, 0) }) : null,
+      new Date(d.playedAt).toLocaleString(currentLocale()),
+    ].filter(Boolean);
+    const notes = [];
+    if (d.already) notes.push(t('scoreLink.already'));
+    else if (d.yours === false) notes.push(t('scoreLink.notYours', { player: d.player }));
+    linkSummary(
+      `<b>${escapeHtml(original(d.title, d.titleOriginal))}</b><br>` +
+        `${escapeHtml(facts.join(' · '))}<br>` +
+        `${escapeHtml(t('scoreLink.setBy', { player: d.player || t('live.someoneElse') }))}` +
+        (notes.length ? `<br><span class="warn-text">${escapeHtml(notes.join(' '))}</span>` : ''),
+    );
+    checkedLink = link;
+    $('scoreLinkImport').disabled = d.already;
+    $('scoreLinkImport').dataset.others = d.yours === false ? '1' : '0';
+  } catch (err) {
+    linkSummary(escapeHtml(err.message));
+  } finally {
+    $('scoreLinkCheck').disabled = false;
+  }
+};
+
+$('scoreLinkImport').onclick = async () => {
+  const button = $('scoreLinkImport');
+  if (checkedLink === null) return;
+  if (button.dataset.others === '1' && !armed(button, t('scoreLink.importOthers'))) return;
+  button.disabled = true;
+  $('scoreLinkCheck').disabled = true;
+  linkSummary(escapeHtml(t('scoreLink.importing')));
+  try {
+    const d = await postJson('/api/score-link', { link: checkedLink });
+    if (d.status === 'added') {
+      closeScoreLink();
+      resetBackfillPreview(
+        escapeHtml(t('scoreLink.imported', {
+          title: original(d.score.title, d.score.titleOriginal),
+          pp: d.score.pp != null ? fmt(d.score.pp, 0) : '-',
+        })),
+      );
+      await Promise.all([loadProfile(), loadState()]);
+    } else {
+      linkSummary(escapeHtml(t('scoreLink.already')));
+    }
+  } catch (err) {
+    linkSummary(escapeHtml(err.message));
+    button.disabled = false;
+  } finally {
+    $('scoreLinkCheck').disabled = false;
+  }
+};
+
+/*
+ * Import past plays -> Enter a score by hand.
+ *
+ * Pick a beatmap -- searched among the installed ones, or a link osu! is asked for -- then the
+ * judgements its ruleset has, as osu!stable's results screen shows them. The accuracy is worked
+ * out here as they are typed, so a mistake shows before anything is sent; everything is checked
+ * again by the server, and the pp comes from osu!'s calculator, never from this form.
+ */
+let manualBeatmap = null;
+let manualFound = [];
+
+/** Each ruleset's judgements, by the replay counter that holds them, as osu!stable labels them. */
+const MANUAL_FIELDS = {
+  0: [['c300', () => '300'], ['c100', () => '100'], ['c50', () => '50'], ['miss', () => t('manual.miss')]],
+  1: [['c300', () => t('manual.great')], ['c100', () => t('manual.good')], ['miss', () => t('manual.miss')]],
+  2: [
+    ['c300', () => t('manual.fruits')],
+    ['c100', () => t('manual.drops')],
+    ['c50', () => t('manual.droplets')],
+    ['katu', () => t('manual.missedDroplets')],
+    ['miss', () => t('manual.miss')],
+  ],
+  3: [
+    ['geki', () => 'MAX'],
+    ['c300', () => '300'],
+    ['katu', () => '200'],
+    ['c100', () => '100'],
+    ['c50', () => '50'],
+    ['miss', () => t('manual.miss')],
+  ],
+};
+
+const manualHint = (message, isError) => hint('manualHint', message, isError);
+const manualMode = () => Number($('manualMode').value);
+
+function manualCounts() {
+  const out = {};
+  for (const [key] of MANUAL_FIELDS[manualMode()] ?? []) {
+    const value = $(`manual-${key}`)?.value ?? '';
+    out[key] = value === '' ? 0 : Number(value);
+  }
+  return out;
+}
+
+/** osu!stable's accuracy for the counts typed, the formula each ruleset's results screen uses. */
+function manualAccuracyOf(mode, c) {
+  const n = (k) => c[k] ?? 0;
+  if (mode === 0) {
+    const total = n('c300') + n('c100') + n('c50') + n('miss');
+    return total ? (300 * n('c300') + 100 * n('c100') + 50 * n('c50')) / (300 * total) : null;
+  }
+  if (mode === 1) {
+    const total = n('c300') + n('c100') + n('miss');
+    return total ? (n('c300') + 0.5 * n('c100')) / total : null;
+  }
+  if (mode === 2) {
+    const total = n('c300') + n('c100') + n('c50') + n('katu') + n('miss');
+    return total ? (n('c300') + n('c100') + n('c50')) / total : null;
+  }
+  const total = n('geki') + n('c300') + n('katu') + n('c100') + n('c50') + n('miss');
+  return total ? (300 * (n('geki') + n('c300')) + 200 * n('katu') + 100 * n('c100') + 50 * n('c50')) / (300 * total) : null;
+}
+
+function renderManualSummary() {
+  const mode = manualMode();
+  const counts = manualCounts();
+  const judged = Object.values(counts).reduce((a, b) => a + b, 0);
+  const acc = manualAccuracyOf(mode, counts);
+  const parts = [acc === null ? t('manual.accuracyUnknown') : t('manual.accuracy', { acc: pct(acc) })];
+  // An osu! or mania play on its own beatmap is judged once per object, exactly.
+  if (manualBeatmap && mode === manualBeatmap.mode && (mode === 0 || mode === 3)) {
+    parts.push(t('manual.objects', { n: fmt(judged), total: fmt(manualBeatmap.objects) }));
+  }
+  $('manualAccuracy').textContent = parts.join(' ');
+  $('manualAdd').disabled = !manualBeatmap || judged === 0 || $('manualCombo').value === '';
+}
+
+function renderManualCounts() {
+  $('manualCounts').innerHTML = (MANUAL_FIELDS[manualMode()] ?? [])
+    .map(
+      ([key, label]) =>
+        `<label class="field"><span>${escapeHtml(label())}</span><input type="number" id="manual-${key}" min="0" step="1"></label>`,
+    )
+    .join('');
+  renderManualSummary();
+}
+
+function chooseManualBeatmap(beatmap) {
+  manualBeatmap = beatmap;
+  $('manualBeatmapResults').hidden = true;
+  $('manualChosen').innerHTML = `<span class="u-ellipsis">${escapeHtml(original(beatmap.title, beatmap.titleOriginal))}</span>
+    <button type="button" id="manualChange">${escapeHtml(t('manual.change'))}</button>`;
+  $('manualChosen').hidden = false;
+  $('manualBeatmapQuery').closest('.field').hidden = true;
+  // A beatmap made for osu! can be played in any ruleset; the others only in their own.
+  const modes = beatmap.mode === 0 ? [0, 1, 2, 3] : [beatmap.mode];
+  $('manualMode').innerHTML = modes.map((m) => `<option value="${m}">${escapeHtml(MODE_NAMES[m])}</option>`).join('');
+  $('manualMode').value = String(beatmap.mode);
+  $('manualMode').disabled = modes.length === 1;
+  $('manualForm').hidden = false;
+  renderManualCounts();
+  manualHint(' ');
+}
+
+function openManual() {
+  manualBeatmap = null;
+  manualFound = [];
+  $('manualBeatmapQuery').value = '';
+  $('manualBeatmapQuery').closest('.field').hidden = false;
+  $('manualBeatmapResults').hidden = true;
+  $('manualChosen').hidden = true;
+  $('manualForm').hidden = true;
+  for (const id of ['manualCombo', 'manualMods', 'manualTotal']) $(id).value = '';
+  $('manualPlayedAt').value = toLocalInput(Date.now());
+  $('manualAdd').disabled = true;
+  manualHint(' ');
+  $('manualModal').hidden = false;
+  $('manualBeatmapQuery').focus();
+}
+
+const closeManual = () => {
+  $('manualModal').hidden = true;
+};
+
+$('backfillManual').onclick = openManual;
+$('manualCancel').onclick = closeManual;
+$('manualModal').onclick = (e) => {
+  if (e.target === $('manualModal')) closeManual();
+};
+
+/** A beatmap link or bare id, which osu! is asked about, rather than words to search for. */
+const looksLikeBeatmapLink = (q) => /^\d+$/.test(q) || /osu\.ppy\.sh\//i.test(q);
+
+function renderManualResults(message) {
+  const list = $('manualBeatmapResults');
+  list.innerHTML =
+    (message ? `<div class="setting__hint">${escapeHtml(message)}</div>` : '') +
+    manualFound
+      .map(
+        (b, i) => `<button type="button" class="manual-beatmap" data-found="${i}">
+          <span class="u-ellipsis">${escapeHtml(original(b.title, b.titleOriginal))}</span>
+          <span class="manual-beatmap__mode">${escapeHtml(MODE_NAMES[b.mode])}</span>
+        </button>`,
+      )
+      .join('');
+  list.hidden = false;
+}
+
+let manualSearchTimer = 0;
+$('manualBeatmapQuery').oninput = () => {
+  clearTimeout(manualSearchTimer);
+  const q = $('manualBeatmapQuery').value.trim();
+  manualFound = [];
+  if (!q) {
+    $('manualBeatmapResults').hidden = true;
+    return;
+  }
+  if (looksLikeBeatmapLink(q)) {
+    renderManualResults(t('manual.pressEnter'));
+    return;
+  }
+  manualSearchTimer = setTimeout(async () => {
+    try {
+      const d = await (await fetch(`/api/beatmaps/search?q=${encodeURIComponent(q)}`)).json();
+      if ($('manualBeatmapQuery').value.trim() !== q) return;
+      manualFound = d.beatmaps ?? [];
+      renderManualResults(manualFound.length ? null : t('manual.noneFound'));
+    } catch (err) {
+      renderManualResults(err.message);
+    }
+  }, 250);
+};
+
+$('manualBeatmapQuery').onkeydown = async (e) => {
+  if (e.key !== 'Enter') return;
+  const q = $('manualBeatmapQuery').value.trim();
+  if (!looksLikeBeatmapLink(q)) {
+    if (manualFound.length === 1) chooseManualBeatmap(manualFound[0]);
+    return;
+  }
+  renderManualResults(t('manual.lookingUp'));
+  try {
+    chooseManualBeatmap(await postJson('/api/beatmaps/find', { link: q }));
+  } catch (err) {
+    renderManualResults(err.message);
+  }
+};
+
+$('manualBeatmapResults').onclick = (e) => {
+  const button = e.target.closest('[data-found]');
+  if (button) chooseManualBeatmap(manualFound[Number(button.dataset.found)]);
+};
+
+$('manualChosen').onclick = (e) => {
+  if (!e.target.closest('#manualChange')) return;
+  manualBeatmap = null;
+  $('manualChosen').hidden = true;
+  $('manualForm').hidden = true;
+  $('manualAdd').disabled = true;
+  $('manualBeatmapQuery').closest('.field').hidden = false;
+  $('manualBeatmapQuery').focus();
+};
+
+$('manualMode').onchange = renderManualCounts;
+$('manualForm').oninput = renderManualSummary;
+
+$('manualAdd').onclick = async () => {
+  if (!manualBeatmap) return;
+  $('manualAdd').disabled = true;
+  manualHint(t('manual.adding'));
+  try {
+    const d = await postJson('/api/manual-score', {
+      md5: manualBeatmap.md5,
+      mode: manualMode(),
+      counts: manualCounts(),
+      maxCombo: $('manualCombo').value,
+      mods: $('manualMods').value,
+      totalScore: $('manualTotal').value,
+      playedAt: new Date($('manualPlayedAt').value).getTime(),
+    });
+    if (d.status === 'added') {
+      closeManual();
+      resetBackfillPreview(
+        escapeHtml(t('manual.added', {
+          title: original(d.score.title, d.score.titleOriginal),
+          pp: d.score.pp != null ? fmt(d.score.pp, 0) : '-',
+        })),
+      );
+      await Promise.all([loadProfile(), loadState()]);
+    } else {
+      manualHint(t('manual.already'), true);
+    }
+  } catch (err) {
+    manualHint(err.message, true);
+  } finally {
+    renderManualSummary();
+  }
+};
 
 /* ---------------------------------------------------- play tracking filter */
 

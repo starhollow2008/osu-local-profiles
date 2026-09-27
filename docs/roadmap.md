@@ -3089,3 +3089,65 @@ in the game.
   `.osr` files, the drop hint, the outline and its words on a drag, a drop taken from the
   browser, a non-replay refused before anything is sent). The one failure is the existing
   McOsu badge check. The dialog and the drag outline were looked at.
+
+## 5.64 - Scores from their osu! link, and entered by hand
+
+**Status:** done -- unreleased.
+
+The user's request: import a score from its osu.ppy.sh link, and -- a last resort -- type one in,
+for plays with no replay anywhere; pp calculated **here**, repriced here after a rework with no
+internet, never re-fetched; a "No replay file" / "Manually entered by hand" notice on the row everywhere,
+shared pages included; View on osu! in the row's menu.
+
+- **Feasible exactly, not estimated.** pp never reads cursor data or where a slider broke, so a
+  replay built from the score's numbers prices as osu! does: 175.697 -> 175.6969 (a 2015 stable
+  score osu! has no replay of), 338.837 -> 338.8372 (lazer), and the stable play typed in by hand,
+  175.6969. See docs/architecture.md, "Scores with no replay".
+- **Built replays** (`src/built-replays.ts`) with an app block for their origin; McOsu's builder
+  moved onto the shared `src/replay-writer.ts`, its output byte-identical. `scores.origin`, a
+  `Play.source` for every row, Download Replay refused.
+- **Beatmaps downloaded once** when not installed, MD5-checked, kept in `data/beatmaps/`, indexed
+  and backed up.
+- **Import past plays** gains Import from a score link... (check, then import; someone else's
+  asks twice) and Enter a score by hand... (search installed beatmaps or paste a link; ruleset,
+  judgements, combo, mods, score, date; live accuracy; everything checked by the server, combo
+  against osu!'s answer for the map).
+- **View on osu!** for any score osu! has, the legacy id through `/scores/<ruleset>/<id>` --
+  the bare form is a different player's score.
+
+- **Best performances imported from an account (5.50) follow**, at the user's request: a replay
+  when there is one, the score's own numbers otherwise. Each is built into a replay from what
+  osu! handed over and takes its row's place -- after an import from osu! and on Recalculate every
+  score (downloading a beatmap not installed), at launch for installed ones. And a better record
+  of a play always replaces a worse one in place (`RecordKind`): osu!'s figures < a built replay <
+  a replay osu! wrote, so a real replay turning up for an imported or linked score replaces it,
+  pin and all, where it used to be skipped as a duplicate.
+- **The tag reads "Manually entered by hand"**, the user's wording; McOsu plays carry none.
+- **A leak from 5.61/5.63, fixed**: an uploaded replay kept only for its Plays not tracked listing
+  was left behind when the listing went (Track anyway, the red minus, a reset, or the same play
+  listed again under osu!'s own file). Every removal now lets its copy go; `releaseUploadedReplay`
+  will only ever delete `replays/<md5>.osr`, never one of osu!'s files; and each launch sweeps
+  `data/replays/` for copies nothing points at (`pruneUploadedReplays`).
+
+### Verified
+
+- `npm run check`: 624 tests; `test/online-import.test.ts` now pins a replay taking an imported
+  score's place (same row, pin kept, both ids kept), `test/score-entry.test.ts` the conversion
+  (priced here, row and pin kept, osu! link kept, a beatmap not installed left for later, nothing
+  without a calculator), and `test/replay-upload.test.ts` the releases, the guard and the sweep.
+- **Best performances, against osu!**: Import from osu! for this machine's account into a copy of
+  its profile -- 361 best performances and pinned scores over four rulesets, every one built and
+  priced here in 49 seconds with the missing beatmaps downloaded. Compared with osu!'s own list:
+  336 within 0.01pp, the largest difference 0.098pp (osu! does not reprocess every stored score on
+  a minor calculator change), none left on osu!'s figures. Import past plays over everything then
+  put 94 real replays in their rows' places -- same ids, no duplicates (428 + 2,401 - 94 = 2,735
+  rows), pins kept -- and the launch after swept 4 orphaned copies from earlier testing.
+- Against a copy of this machine's profile with the real helper (2026.916.0): both links imported
+  at osu!'s pp, the stable one recognised again by its legacy link; hand entries refused for a
+  wrong judgement total and an impossible combo, then priced at 175.697; a beatmap not installed
+  (DISCO★PRINCE) downloaded by link.
+- `npm run ui` against that copy: 373/373 at the end (366/367 before the McOsu badge check found a
+  McOsu play to look at) -- 12 new checks (both dialogs over Import past plays,
+  Escape closing only the top one, a non-link refused, the form waiting for a beatmap, a search
+  with no match, the row tag and its explanation, View on osu! only where osu! has the score).
+  The one failure is the existing McOsu badge check. Rows, the menu and both dialogs looked at.

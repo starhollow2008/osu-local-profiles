@@ -81,6 +81,9 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   // writes '' where the file has no original-language variant, so nothing is read twice.
   { table: 'beatmaps', column: 'artist_unicode', definition: 'TEXT' },
   { table: 'beatmaps', column: 'title_unicode', definition: 'TEXT' },
+  // Added with scores imported from their osu! link and entered by hand. NULL on every score
+  // tracked from a replay osu! wrote, which is every row before it.
+  { table: 'scores', column: 'origin', definition: 'TEXT' },
 ];
 
 /**

@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { LazerMod } from '../osr.ts';
 import { osuSection } from './beatmaps.ts';
 import { decodeLegacyMods } from '../calc/pp.ts';
+import { appBlock, encodeReplay, readAppBlock } from '../replay-writer.ts';
 
 /**
  * McOsu (github.com/McKay42/McOsu), an osu!standard client built on its own engine.
@@ -244,9 +245,6 @@ export function parseMcosuScores(buf: Buffer): McosuScore[] {
 /* The replay the app builds                                                */
 /* ------------------------------------------------------------------------ */
 
-/** .NET ticks at the unix epoch. */
-const TICKS_AT_EPOCH = 621355968000000000n;
-
 /** Where a McOsu play's built replay is kept, named by its beatmap and when it was played. */
 export function builtReplayPath(dir: string, score: Pick<McosuScore, 'beatmapMD5' | 'playedAt'>): string {
   return path.join(dir, `${score.beatmapMD5}-${Math.floor(score.playedAt / 1000)}.osr`);
@@ -260,89 +258,50 @@ export function builtReplayPath(dir: string, score: Pick<McosuScore, 'beatmapMD5
  * otherwise read the play as Cinema, which never counts.
  */
 export function buildMcosuReplay(score: McosuScore): Buffer {
-  const parts: Buffer[] = [];
-  const byte = (v: number) => parts.push(Buffer.from([v]));
-  const short = (v: number) => {
-    const b = Buffer.alloc(2);
-    b.writeInt16LE(v);
-    parts.push(b);
-  };
-  const int = (v: number) => {
-    const b = Buffer.alloc(4);
-    b.writeInt32LE(v);
-    parts.push(b);
-  };
-  const long = (v: bigint) => {
-    const b = Buffer.alloc(8);
-    b.writeBigInt64LE(v);
-    parts.push(b);
-  };
-  const string = (s: string | null) => {
-    if (s === null) return byte(0);
-    const data = Buffer.from(s, 'utf8');
-    const len: number[] = [];
-    let n = data.length;
-    do {
-      let x = n & 0x7f;
-      n >>>= 7;
-      if (n) x |= 0x80;
-      len.push(x);
-    } while (n);
-    parts.push(Buffer.from([0x0b, ...len]), data);
-  };
-
-  byte(0);
-  int(BUILT_REPLAY_VERSION);
-  string(score.beatmapMD5);
-  string(score.playerName);
-  string(null);
-  short(score.count300);
-  short(score.count100);
-  short(score.count50);
-  short(score.countGeki);
-  short(score.countKatu);
-  short(score.countMiss);
-  // stable's field is 32 bits; a McOsu total beyond it would be a marathon well past any stable one.
-  int(Math.min(score.totalScore, 0x7fffffff));
-  short(score.maxCombo);
-  byte(score.maxPossibleCombo > 0 && score.maxCombo >= score.maxPossibleCombo ? 1 : 0);
-  int(score.legacyMods & ~NIGHTMARE_BIT);
-  string(null); // life bar
-  long(BigInt(Math.floor(score.playedAt / 1000)) * 10_000_000n + TICKS_AT_EPOCH);
-  int(0); // no replay data
-  long(0n); // never submitted, so no online id
-
-  const block = Buffer.from(JSON.stringify(score.facts), 'utf8');
-  parts.push(Buffer.from(MCOSU_BLOCK, 'latin1'));
-  int(block.length);
-  parts.push(block);
-  return Buffer.concat(parts);
+  return encodeReplay(
+    {
+      mode: 0,
+      version: BUILT_REPLAY_VERSION,
+      beatmapMD5: score.beatmapMD5,
+      player: score.playerName,
+      replayMD5: null,
+      counts: {
+        c300: score.count300,
+        c100: score.count100,
+        c50: score.count50,
+        geki: score.countGeki,
+        katu: score.countKatu,
+        miss: score.countMiss,
+      },
+      totalScore: score.totalScore,
+      maxCombo: score.maxCombo,
+      perfect: score.maxPossibleCombo > 0 && score.maxCombo >= score.maxPossibleCombo,
+      legacyMods: score.legacyMods & ~NIGHTMARE_BIT,
+      // McOsu keeps the second a play ended, so that is what the replay says.
+      playedAt: Math.floor(score.playedAt / 1000) * 1000,
+      // Never submitted, so no online id.
+      onlineId: 0n,
+    },
+    [appBlock(MCOSU_BLOCK, score.facts)],
+  );
 }
 
 /** The app's block from after a replay, or null when it has none. `rest` starts just past the online id. */
 export function readMcosuBlock(rest: Buffer): McosuFacts | null {
-  const magic = Buffer.from(MCOSU_BLOCK, 'latin1');
-  if (rest.length < magic.length + 4 || !rest.subarray(0, magic.length).equals(magic)) return null;
-  const len = rest.readInt32LE(magic.length);
-  const start = magic.length + 4;
-  if (len <= 0 || start + len > rest.length) return null;
-  try {
-    const raw = JSON.parse(rest.toString('utf8', start, start + len)) as Partial<McosuFacts>;
-    const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
-    return {
-      speed: num(raw.speed, 1),
-      cs: num(raw.cs, NaN),
-      ar: num(raw.ar, NaN),
-      od: num(raw.od, NaN),
-      hp: num(raw.hp, NaN),
-      nightmare: raw.nightmare === true,
-      experimental: Array.isArray(raw.experimental)
-        ? raw.experimental.filter((m): m is string => typeof m === 'string')
-        : [],
-    };
-  } catch {
-    return null;
-  }
+  const raw = readAppBlock(rest, MCOSU_BLOCK) as Partial<McosuFacts> | null;
+  if (raw === null || typeof raw !== 'object') return null;
+  const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+  return {
+    speed: num(raw.speed, 1),
+    cs: num(raw.cs, NaN),
+    ar: num(raw.ar, NaN),
+    od: num(raw.od, NaN),
+    hp: num(raw.hp, NaN),
+    nightmare: raw.nightmare === true,
+    experimental: Array.isArray(raw.experimental)
+      ? raw.experimental.filter((m): m is string => typeof m === 'string')
+      : [],
+  };
 }
 
 /* ------------------------------------------------------------------------ */

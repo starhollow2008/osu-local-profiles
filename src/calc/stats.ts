@@ -15,6 +15,7 @@ import { incompleteSql,
   type Eligibility,
 } from './eligibility.ts';
 import { NAME_COLUMNS, names, withFallbackTitle } from './metadata.ts';
+import { scoreUrl } from '../clients/osu-web.ts';
 
 /** osu! weights only the top 100 plays. */
 
@@ -68,6 +69,22 @@ export interface Play {
    * download it. The file itself is checked when it is asked for: osu! can delete it.
    */
   hasReplay: boolean;
+  /**
+   * Where the score came from. `replay` is a replay osu! (or McOsu) wrote; the others have
+   * none, and every row showing one says so: `osu`, imported with an account's best
+   * performances; `link`, imported from its link on osu.ppy.sh; `manual`, entered by hand.
+   */
+  source: PlaySource;
+  /** The score's own page on osu.ppy.sh, when osu! has it -- the row's menu links to it. */
+  osuUrl: string | null;
+}
+
+export type PlaySource = 'replay' | 'osu' | 'link' | 'manual';
+
+/** A row's `PlaySource`, from its `origin` and `imported_at`. */
+export function playSource(origin: unknown, imported: boolean): PlaySource {
+  if (origin === 'link' || origin === 'manual') return origin;
+  return imported ? 'osu' : 'replay';
 }
 
 export interface MostPlayed {
@@ -127,7 +144,9 @@ function playColumns(e: Eligibility): string {
         s.pp_nomod IS NOT NULL AS has_nomod,
         s.pinned_at IS NOT NULL AS pinned,
         -- A McOsu play's replay is one this app built, with no cursor data: nothing to offer.
-        (s.replay_path IS NOT NULL AND s.client <> 'mcosu') AS has_replay,
+        -- Nor is one built for a score from its link or entered by hand.
+        (s.replay_path IS NOT NULL AND s.client <> 'mcosu' AND s.origin IS NULL) AS has_replay,
+        s.mode, s.origin, s.imported_at IS NOT NULL AS imported, s.online_score_id, s.legacy_score_id,
         b.beatmapset_id, ${NAME_COLUMNS}, b.version, b.creator`;
 }
 
@@ -169,6 +188,13 @@ function toPlay(r: Row, e: Eligibility): Play {
     counted: r['counts'] === 1,
     pinned: r['pinned'] === 1,
     hasReplay: r['has_replay'] === 1,
+    source: playSource(r['origin'], r['imported'] === 1),
+    osuUrl: scoreUrl({
+      mode: Number(r['mode']),
+      client: String(r['client']),
+      onlineScoreId: (r['online_score_id'] as string | null) ?? null,
+      legacyScoreId: (r['legacy_score_id'] as string | null) ?? null,
+    }),
     ppBasis:
       r['pp'] === null
         ? null

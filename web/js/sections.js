@@ -176,6 +176,25 @@ function ppCell(play) {
 }
 
 /**
+ * What a score with no replay says about itself, wherever it is shown -- here, on its card, and
+ * in a shared copy. Nothing for a score from a replay osu! wrote.
+ *
+ * Two kinds, because they mean different things. "No replay file": osu!'s own record of a play
+ * that really happened -- imported with an account's best performances, or from the score's
+ * link -- priced from its numbers exactly as osu! prices them. "Manually entered by hand": typed in,
+ * which nothing can verify, and which a reader of a shared profile has to be able to see.
+ */
+export function sourceTag(play) {
+  if (play.source === 'manual') {
+    return `<span class="play-source play-source--manual" title="${escapeHtml(t('source.manualTitle'))}">${escapeHtml(t('source.manual'))}</span>`;
+  }
+  if (play.source === 'link' || play.source === 'osu') {
+    return `<span class="play-source" title="${escapeHtml(t('source.noReplayTitle'))}">${escapeHtml(t('source.noReplay'))}</span>`;
+  }
+  return '';
+}
+
+/**
  * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
  * accuracy, mods and pp stepping right.
  */
@@ -208,7 +227,8 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
   const menu = actions
     ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="score"
          data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}" data-set="${play.beatmapsetId ?? ''}"
-         data-replay="${play.hasReplay ? 1 : 0}" aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
+         data-replay="${play.hasReplay ? 1 : 0}" data-osu-url="${escapeHtml(play.osuUrl ?? '')}"
+         aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
     : '';
 
   // The drag handle is a convenience; the menu's Move up / Move down do the same job for
@@ -227,6 +247,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
       <div class="play-detail__beatmap-and-time">
         <span class="play-detail__beatmap u-ellipsis">${escapeHtml(play.version ?? '')}${stars}</span>
         <span class="play-detail__time" title="${escapeHtml(fullDate(play.playedAt))}">${escapeHtml(timeAgo(play.playedAt))}</span>
+        ${sourceTag(play)}
       </div>
     </div>
   </div>

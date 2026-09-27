@@ -92,7 +92,7 @@ export function strippableMods(mods: LazerMod[]): string[] {
  * labelled and judged as a plain nomod one -- while osu!, asked about the raw bitmask, rightly
  * called it unranked, so it read as greyed out for no reason anyone could see.
  */
-const LEGACY_MOD_BITS: readonly string[] = [
+export const LEGACY_MOD_BITS: readonly string[] = [
   'NF', 'EZ', 'TD', 'HD', 'HR', 'SD', 'DT', 'RX', 'HT', 'NC', 'FL', 'AT', 'SO', 'AP', 'PF',
   '4K', '5K', '6K', '7K', '8K', 'FI', 'RD', 'CN', 'TP', '9K', 'DS', '1K', '3K', '2K', 'SV2', 'MR',
 ];
@@ -129,6 +129,28 @@ export function decodeLegacyMods(bitmask: number, ruleset: number): LazerMod[] {
 }
 
 /**
+ * The other way: mods as osu!stable's bitmask, for a replay this app builds of a stable score.
+ * Null when one of them has no bit -- a lazer-only mod, or a setting only lazer can hold -- since
+ * such a play cannot be a stable replay. Classic is dropped: every stable score is scored with it.
+ * Nightcore, Perfect and Cinema set their parents' bits as well, as stable writes them.
+ */
+export function encodeLegacyMods(mods: readonly LazerMod[]): number | null {
+  const implied: Record<string, string> = { NC: 'DT', PF: 'SD', CN: 'AT' };
+  let bits = 0;
+  for (const mod of mods) {
+    if (mod.acronym === 'CL') continue;
+    if (isCustomised(mod)) return null;
+    for (const acronym of [mod.acronym, implied[mod.acronym]]) {
+      if (acronym === undefined) continue;
+      const bit = LEGACY_MOD_BITS.indexOf(acronym);
+      if (bit < 0) return null;
+      bits |= 1 << bit;
+    }
+  }
+  return bits >>> 0;
+}
+
+/**
  * The mods actually in effect, preferring lazer's structured list (which carries settings).
  *
  * A McOsu play's are worked out from what McOsu recorded (`mcosuMods`), and telling an
@@ -158,6 +180,8 @@ export interface Pricing {
  * app built, and a speed or override its mod bits could not hold is priced from here.
  */
 export function scorePricing(score: ReplayScore, osuPath: string | null): Pricing {
+  // A score entered by hand with no total: stable pricing must not read the 0 in its place.
+  if (score.built) return score.built.legacyTotal || score.client !== 'stable' ? {} : { ignoreLegacyTotalScore: true };
   if (!score.mcosu) return {};
   const derived = mcosuModsFor(score, osuPath);
   if (derived.priced === null) return { unpriceable: true };

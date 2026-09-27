@@ -106,7 +106,10 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 
 - Hand the replay file, never a reconstructed ScoreInfo. McOsu writes none: hand the stable
   replay the app built for the play (`data/mcosu/`, `src/clients/mcosu.ts`), with a custom
-  rate or override as the request's `mods`
+  rate or override as the request's `mods`. A score from its osu! link or entered by hand is
+  the same: a replay built from its numbers (`src/built-replays.ts`, `data/replays/`), priced
+  and repriced here offline, never osu!'s pp re-fetched (roadmap 5.64). Built replays are
+  never offered for download
 - No fallback calc (`rosu-pp` removed). Helper down = store no pp, say so
 - Slim (partially trimmed, extra natives pruned) only through `buildCheckedPpHelper`, which
   ships it only when `scripts/pp-parity.mjs` finds every answer identical to the full helper

@@ -887,6 +887,28 @@
   flex: none;
 }
 
+/*
+ * A score with no replay, saying so where its date is: quiet for osu!'s own record of a play,
+ * in osu!'s orange for one entered by hand, which nothing can verify. Its title says what each
+ * means. See `sourceTag`.
+ */
+.play-source {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 10000px;
+  border: 1px solid hsl(var(--hsl-b2));
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small-2);
+  line-height: 16px;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.play-source--manual {
+  border-color: hsla(var(--hsl-orange-1), 0.6);
+  color: hsl(var(--hsl-orange-1));
+}
+
 .play-detail__group--bottom {
   display: flex;
   align-items: center;
@@ -2719,13 +2741,15 @@
 
 .setting .field input[type="text"],
 .setting .field select,
-.declined-reason select {
+.declined-reason select,
+#manualMode {
   flex: 0 1 240px;
   min-width: 0;
 }
 
 .setting .field select,
-.declined-reason select {
+.declined-reason select,
+#manualMode {
   background-color: hsl(var(--hsl-b6));
   color: hsl(var(--hsl-c1));
   border: 1px solid hsl(var(--hsl-b3));
@@ -2985,6 +3009,101 @@
 
 .backfill-files .setting__hint {
   margin: 0;
+}
+
+/* The second row: a score's link, or typing one in. */
+.backfill-files--more {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: 0;
+  flex-wrap: wrap;
+}
+
+/* Something a score-link check says to be careful of: not yours, or already here. */
+.warn-text {
+  color: hsl(var(--hsl-orange-1));
+}
+
+/* Enter a score by hand: beatmaps matching the search, one button each. */
+.manual-beatmaps {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.manual-beatmap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  text-align: left;
+}
+
+.manual-beatmap:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.manual-beatmap .u-ellipsis {
+  flex: 1;
+  min-width: 0;
+}
+
+.manual-beatmap__mode {
+  flex: none;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+/* The beatmap chosen, with the way back to choosing another. */
+.manual-chosen {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font-weight: 600;
+}
+
+.manual-chosen .u-ellipsis {
+  flex: 1;
+  min-width: 0;
+}
+
+.manual-chosen button {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+  font-weight: 400;
+}
+
+/* The judgements, and combo, mods, score and date: two to a row, each a label over its box. */
+.manual-counts,
+.manual-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 16px;
+}
+
+.manual-counts .field,
+.manual-grid .field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.manual-counts input,
+.manual-grid input {
+  width: 100%;
 }
 
 /*
@@ -3984,6 +4103,11 @@ a.beatmapset-badge--spotlight:hover {
   gap: 2px 10px;
   margin: 15px 0;
   font-size: var(--fs-normal);
+}
+
+/* No replay file, or Entered by hand: the row's tag, on the card. */
+.score-player__row--source {
+  margin: -8px 0 15px;
 }
 
 /* `score-buttons` and `btn-osu-big--rounded`. */
@@ -5049,8 +5173,8 @@ s.bbcode-editor__glyph {
   display: none !important;
 }
 
-/* Rows keep their menu, with View Details the one thing in it. */
-.static-copy #playMenu > :not([data-act="details"]) {
+/* Rows keep their menu, with View Details and the score's page on osu! the only things in it. */
+.static-copy #playMenu > :not([data-act="details"], [data-act="osu"]) {
   display: none !important;
 }
 

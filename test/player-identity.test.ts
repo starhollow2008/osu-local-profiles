@@ -262,6 +262,7 @@ function replay(over: Partial<ReplayScore> = {}): ReplayScore {
     onlineScoreId: null,
     extras: null,
     mcosu: null,
+    built: null,
     ...over,
   };
 }

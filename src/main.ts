@@ -8,7 +8,9 @@ import { discoverInstalls, type DiscoveryResult } from './clients/discover.ts';
 import { osuFolderService } from './clients/folders.ts';
 import { backfillOriginalMetadata, BeatmapResolver } from './clients/beatmaps.ts';
 import { openDb } from './db/index.ts';
-import { activeProfileId, getProfile, seedFirstProfile } from './profiles.ts';
+import { activeProfileId, getProfile, listProfiles, seedFirstProfile } from './profiles.ts';
+import { convertImportedScores, trackerEntryDeps } from './score-entry.ts';
+import { pruneUploadedReplays } from './uploaded-replays.ts';
 import { Tracker, type IndexState } from './tracker/index.ts';
 import { catchUpSince, HEARTBEAT_MS, lastRunAt, markRunning } from './tracker/catch-up.ts';
 import { explainWatchError } from './tracker/watcher.ts';
@@ -419,6 +421,22 @@ async function main(): Promise<void> {
           `${repaired.gainedPp > 0 ? ` (${repaired.gainedPp} now have pp)` : ''}\n`,
       );
     }
+
+    /*
+     * Best performances imported from osu! and still on osu!'s own figures: each built into a
+     * replay and priced here, so a pp rework reprices them with everything else. Only on
+     * installed beatmaps -- a launch never goes online -- so the rest wait for Recalculate every
+     * score, or the next import. See convertImportedScores.
+     */
+    let converted = 0;
+    for (const profile of listProfiles(db)) {
+      const deps = trackerEntryDeps(tracker, db, dataDir(), profile.id);
+      converted += (await convertImportedScores(deps, profile.id, { download: false }).catch(() => ({ converted: 0 })))
+        .converted;
+    }
+    if (converted > 0) console.log(`  Priced ${converted} score(s) imported from osu! here, from their own numbers\n`);
+    // Uploaded and built replays nothing points at any more -- see pruneUploadedReplays.
+    pruneUploadedReplays(db, dataDir());
 
     /*
      * An update that brings a new osu! release -- a pp rework, typically -- reprices what the

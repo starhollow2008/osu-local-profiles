@@ -11,6 +11,7 @@
  */
 import { createRequire } from 'node:module';
 import { readMcosuBlock, type McosuFacts } from './clients/mcosu.ts';
+import { readBuiltBlock, type BuiltFacts } from './built-replays.ts';
 
 const require = createRequire(import.meta.url);
 const LZMA = require('lzma-js-simple-v2') as {
@@ -80,6 +81,8 @@ export interface ReplayScore {
   extras: LazerExtras | null;
   /** What McOsu recorded that a stable replay cannot hold. Only on a replay built for a McOsu play. */
   mcosu: McosuFacts | null;
+  /** Set on a replay this app built for a score imported from its link or entered by hand. */
+  built: BuiltFacts | null;
 }
 
 /**
@@ -174,6 +177,7 @@ export async function parseReplay(buf: Buffer): Promise<ReplayScore> {
   let onlineScoreId: bigint | null = null;
   let extras: LazerExtras | null = null;
   let mcosu: McosuFacts | null = null;
+  let built: BuiltFacts | null = null;
 
   if (c.remaining >= 8) {
     onlineScoreId = c.long();
@@ -185,9 +189,11 @@ export async function parseReplay(buf: Buffer): Promise<ReplayScore> {
         } catch {
           extras = null;   // corrupt or unknown block: fall back to legacy fields
         }
+        built = readBuiltBlock(c.rest());
       }
     } else if (version < LAZER_EXT_MIN_VERSION) {
       mcosu = readMcosuBlock(c.rest());
+      built = readBuiltBlock(c.rest());
     }
   }
 
@@ -200,5 +206,6 @@ export async function parseReplay(buf: Buffer): Promise<ReplayScore> {
     onlineScoreId: onlineScoreId === -1n ? null : onlineScoreId,
     extras,
     mcosu,
+    built,
   };
 }

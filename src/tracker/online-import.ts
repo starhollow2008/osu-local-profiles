@@ -97,19 +97,19 @@ export function findExistingScore(
   db: Db,
   profileId: number,
   identity: PlayIdentity,
-): { id: number; imported: boolean } | null {
+): ExistingScore | null {
   const ids = [...new Set(identity.onlineIds.filter((v) => v !== '' && v !== '0'))];
   if (ids.length > 0) {
     const marks = ids.map(() => '?').join(',');
     const byId = db
       .prepare(
-        `SELECT id, imported_at FROM scores
+        `SELECT id, imported_at, origin FROM scores
           WHERE profile_id = ?
             AND (online_score_id IN (${marks}) OR legacy_score_id IN (${marks}))
           LIMIT 1`,
       )
-      .get(profileId, ...ids, ...ids) as { id: number; imported_at: number | null } | undefined;
-    if (byId) return { id: byId.id, imported: byId.imported_at !== null };
+      .get(profileId, ...ids, ...ids) as ExistingRow | undefined;
+    if (byId) return existing(byId);
   }
 
   const totals = [...new Set(identity.totals.filter((t) => Number.isFinite(t)))];
@@ -117,7 +117,7 @@ export function findExistingScore(
   const marks = totals.map(() => '?').join(',');
   const byPlay = db
     .prepare(
-      `SELECT id, imported_at FROM scores
+      `SELECT id, imported_at, origin FROM scores
         WHERE profile_id = ?
           AND beatmap_md5 = ?
           AND total_score IN (${marks})
@@ -132,8 +132,44 @@ export function findExistingScore(
       identity.maxCombo,
       identity.playedAt,
       TIME_TOLERANCE_MS,
-    ) as { id: number; imported_at: number | null } | undefined;
-  return byPlay ? { id: byPlay.id, imported: byPlay.imported_at !== null } : null;
+    ) as ExistingRow | undefined;
+  return byPlay ? existing(byPlay) : null;
+}
+
+interface ExistingRow {
+  id: number;
+  imported_at: number | null;
+  origin: string | null;
+}
+
+/** A play already in the profile, and how good a record of it the profile holds. */
+export interface ExistingScore {
+  id: number;
+  /** Stored with osu!'s own pp by an import of best performances, not from any replay. */
+  imported: boolean;
+  record: RecordKind;
+}
+
+/**
+ * How good a record of a play a row is, worst first: osu!'s own figures stored as they came
+ * (`osu`), a replay this app built from them (`built`, priced here), a replay osu! wrote
+ * (`replay`, which alone has the cursor data). A better record of a play already here replaces
+ * the worse one in place -- see `replaces` -- so a play is never in a profile twice, and never
+ * held on a worse record than one this app has seen.
+ */
+export type RecordKind = 'osu' | 'built' | 'replay';
+
+const RANK: Record<RecordKind, number> = { osu: 0, built: 1, replay: 2 };
+
+const existing = (r: ExistingRow): ExistingScore => ({
+  id: r.id,
+  imported: r.imported_at !== null,
+  record: r.imported_at !== null ? 'osu' : r.origin === null ? 'replay' : 'built',
+});
+
+/** Whether a record of kind `incoming` should take the place of the row already here. */
+export function replaces(found: ExistingScore, incoming: RecordKind): boolean {
+  return RANK[incoming] > RANK[found.record];
 }
 
 /** How an imported score names itself in `dedupe_key`, and so in `deleted_scores`. */
@@ -207,7 +243,7 @@ export function identityOf(score: OsuWebScore): PlayIdentity {
  * left at zero. Anything unrecognised is ignored: an invented count would be worse than a
  * missing one, exactly as in `lazerAccuracy`.
  */
-function legacyCounts(
+export function legacyCounts(
   statistics: Record<string, number>,
   mode: Ruleset,
 ): { c300: number; c100: number; c50: number; geki: number; katu: number; miss: number } {
@@ -253,7 +289,7 @@ function ratingOf(score: OsuWebScore): number | null {
  * one online. Where the local answer exists it stays, so an import can never quietly restate
  * what is installed -- it only speaks for maps nothing here can describe.
  */
-function cacheBeatmap(db: Db, resolver: BeatmapResolver, score: OsuWebScore): number | null {
+export function cacheBeatmap(db: Db, resolver: BeatmapResolver, score: OsuWebScore): number | null {
   // Resolving first creates the row if there is none, so the update below always has one.
   const local = resolver.resolve(score.beatmapMD5);
 

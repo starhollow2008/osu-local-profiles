@@ -508,8 +508,9 @@ export function scoreDetail(
     perfectCombo: mapMax === null || mapMax <= 0 ? null : play.maxCombo >= mapMax,
     difficultyStars: difficultyStars(db, profileId, play.beatmapMd5, mode, play.beatmapId, play.beatmapsetId),
     creatorId: details?.userId ?? null,
-    // A McOsu play's replay is one this app built, with no cursor data: nothing to watch.
-    replayAvailable: row['client'] !== 'mcosu' && replayPath !== null && fs.existsSync(replayPath),
+    // A McOsu play's replay is one this app built, with no cursor data: nothing to watch. The
+    // same for a score from its link or entered by hand (`play.hasReplay` says so).
+    replayAvailable: play.hasReplay && replayPath !== null && fs.existsSync(replayPath),
     ppBreakdown: parseBreakdown(parts),
     ppVersion: (row['pp_version'] as string | null) ?? null,
   };
@@ -602,7 +603,7 @@ export function replayDownload(
 ): { path: string; fileName: string } | { error: string } {
   const row = db
     .prepare(
-      `SELECT s.replay_path, s.client, s.played_at, b.artist, b.title, b.creator, b.version
+      `SELECT s.replay_path, s.client, s.origin, s.played_at, b.artist, b.title, b.creator, b.version
          FROM scores s
          LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
         WHERE s.id = ? AND s.profile_id = ? AND ${visibleSql()}`,
@@ -614,6 +615,8 @@ export function replayDownload(
   if (!file) return { error: 'no replay was recorded for this score' };
   // McOsu writes no replays; the one this app built for the play holds no cursor data.
   if (row['client'] === 'mcosu') return { error: 'McOsu does not save replays' };
+  // Built from osu!'s record of the score, or from what was typed in: no cursor data either.
+  if (row['origin'] !== null) return { error: 'this score has no replay file' };
   if (!fs.existsSync(file)) {
     return { error: "the replay is no longer in osu!'s files - it may have been deleted from osu!" };
   }

@@ -7,7 +7,8 @@ import type { AddressInfo } from 'node:net';
 import { startServer } from '../src/http/server.ts';
 import { createBackup, isProfileFile } from '../src/backup.ts';
 import { readZipEntries } from '../src/update/zip.ts';
-import { listDeclines } from '../src/tracker/declined.ts';
+import { deleteDeclines, listDeclines } from '../src/tracker/declined.ts';
+import { pruneUploadedReplays, releaseUploadedReplay } from '../src/uploaded-replays.ts';
 import { updateSettings } from '../src/settings.ts';
 import { harness, SINCE, stableReplay, type Harness } from './import-fixture.ts';
 
@@ -119,5 +120,34 @@ test('a file that is not a replay is refused, and nothing is kept', async () => 
     assert.match(((await res.json()) as { error: string }).error, /not an osu! replay/);
     assert.deepEqual(stored(dataDir), []);
     assert.equal(h.count('scores'), 0);
+  });
+});
+
+/*
+ * A copy is kept only while something points at it -- including a play not tracked, for Track
+ * anyway -- and let go of when that goes. And whatever is handed to be let go of, nothing but one
+ * of these copies is ever deleted: osu!'s own replays are never the app's to remove.
+ */
+test('a listed upload’s copy goes with its listing, and osu!’s own files are never touched', async () => {
+  await withServer(async (h, upload, dataDir) => {
+    await upload(stableReplay({ player: 'mrekk', playedAt: SINCE, onlineId: 900_000_001n }));
+    assert.equal(stored(dataDir).length, 1, 'kept for Track anyway');
+    const [listed] = listDeclines(h.db, h.profileId);
+    deleteDeclines(h.db, h.profileId, [listed!.id]);
+    assert.deepEqual(stored(dataDir), [], 'deleted for good, so nothing needs it');
+
+    // An osu!stable replay's own name, however it is handed over, is not one of these copies.
+    const osus = path.join(dataDir, 'replays', `${'a'.repeat(32)}-638000000000000000.osr`);
+    fs.writeFileSync(osus, 'x');
+    releaseUploadedReplay(h.db, osus);
+    assert.ok(fs.existsSync(osus));
+    fs.rmSync(osus);
+
+    // What goes in bulk -- a reset, a deleted profile -- the sweep at launch finds.
+    await upload(stableReplay({ player: 'Tangy', playedAt: SINCE + HOUR }));
+    assert.equal(stored(dataDir).length, 1);
+    h.db.exec('DELETE FROM scores');
+    assert.equal(pruneUploadedReplays(h.db, dataDir), 1);
+    assert.deepEqual(stored(dataDir), []);
   });
 });

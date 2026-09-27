@@ -31,6 +31,9 @@ import { dedupeKey, describe, ingestReplayFile, type IngestedScore, type IngestO
 import { scanForReplays, type BackfillScan, type OtherPlayerFound } from './backfill.ts';
 import { declineToTrack, forgetDeclineById, recordDecline, type DeclineSource } from './declined.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
+import { parseReplay } from '../osr.ts';
+import { scorePricing, type PpResult } from '../calc/pp.ts';
+import { priceAsPlayed } from './pricing.ts';
 import {
   countStale,
   foundBeatmapIds,
@@ -733,6 +736,46 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       if (result.status === 'added') this.added++;
       else if (result.status === 'filtered') this.filtered++;
       return result;
+    });
+  }
+
+  /**
+   * Import a replay this app built (src/built-replays.ts): a score from its osu! link, or one
+   * entered by hand. Named by the user, one score at a time, so neither the filter nor the owner
+   * check has a say -- the page shows whose score it is before it is imported -- while the
+   * duplicate and deleted checks stand. Announced like a play that just arrived.
+   */
+  importBuiltReplay(file: string, profileId = this.opts.profileId): Promise<IngestOutcome> {
+    return this.enqueue(async () => {
+      const result = await ingestReplayFile(file, {
+        db: this.opts.db,
+        resolver: this.opts.resolver,
+        profileId,
+        trackingSince: 0,
+        official: this.opts.official,
+        filter: defaultTrackingFilter(),
+        identity: UNKNOWN_IDENTITY,
+      });
+      // Announced when it is a play of the profile on screen; a conversion of another's is quiet.
+      if (result.status === 'added' && profileId === this.opts.profileId) {
+        this.added++;
+        this.emit('score', result.score);
+      }
+      return result;
+    });
+  }
+
+  /**
+   * What osu!'s calculator makes of a replay, writing nothing: for a score entered by hand, whose
+   * combo cannot be checked against its beatmap until osu! has said what the beatmap's is. Null
+   * with no calculator or no beatmap file.
+   */
+  priceReplay(file: string): Promise<PpResult | null> {
+    return this.enqueue(async () => {
+      if (!this.opts.official) return null;
+      const score = await parseReplay(fs.readFileSync(file));
+      const beatmap = this.opts.resolver.resolve(score.beatmapMD5);
+      return await priceAsPlayed(file, beatmap, this.opts.official, scorePricing(score, beatmap.osuPath));
     });
   }
 

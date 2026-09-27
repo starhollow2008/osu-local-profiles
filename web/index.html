@@ -280,6 +280,7 @@
   <button type="button" data-act="unpin" role="menuitem" data-i18n="playMenu.unpin">Unpin</button>
   <button type="button" data-act="details" role="menuitem" data-i18n="playMenu.viewDetails">View Details</button>
   <button type="button" data-act="replay" role="menuitem" data-i18n="playMenu.downloadReplay">Download Replay</button>
+  <button type="button" data-act="osu" role="menuitem" data-i18n="playMenu.viewOnOsu">View on osu!</button>
   <button type="button" data-act="copy-link" role="menuitem" data-i18n="playMenu.copyLink">Copy link</button>
   <button type="button" data-act="save-image" role="menuitem" data-i18n="playMenu.saveScreenshot">Save screenshot</button>
   <button type="button" data-act="copy-image" role="menuitem" data-i18n="playMenu.copyScreenshot">Copy screenshot</button>
@@ -934,6 +935,12 @@
         a folder and drag them onto this window.
       </span>
     </div>
+    <!-- No replay at all: a score's link on osu!, or, as a last resort, typing it in. -->
+    <div class="backfill-files backfill-files--more">
+      <button type="button" id="backfillScoreLink" data-i18n="backfillScoreLink">Import from a score link…</button>
+      <button type="button" id="backfillManual" data-i18n="backfillManual">Enter a score by hand…</button>
+      <span class="setting__hint" data-i18n="backfillModal.noReplayHint">No replay? Use its link on osu.ppy.sh, or type it in as a last resort.</span>
+    </div>
 
     <div class="backfill-summary" id="backfillSummary">
       Pick a time, then check what would be imported.
@@ -946,6 +953,78 @@
       <button id="backfillCancel" type="button" data-i18n="backfillCancel">Cancel</button>
       <button id="backfillCheck" type="button" data-i18n="backfillCheck">Check</button>
       <button id="backfillConfirm" class="primary" type="button" disabled>Import</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  Import past plays -> Import from a score link. Checked first, so the page can show whose score
+  it is and what it is before anything is written; imported on a second press. The score is then
+  priced here from its numbers like any other -- see src/score-entry.ts and src/built-replays.ts.
+-->
+<div class="backdrop" id="scoreLinkModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="scoreLinkTitle">
+    <h3 id="scoreLinkTitle" data-i18n="scoreLinkTitle">Import from a score link</h3>
+    <p data-i18n="scoreLinkModal.intro">
+      Paste a score's link from osu.ppy.sh - for a play whose replay you no longer have. Its pp is
+      calculated here from the score's own numbers, exactly as osu! calculates it, and recalculated
+      here after a pp rework with no internet needed. It is marked "No replay file".
+    </p>
+    <label class="field field--wide">
+      <span data-i18n="scoreLinkModal.link">Score link</span>
+      <input type="text" id="scoreLinkInput" placeholder="https://osu.ppy.sh/scores/..." autocomplete="off" spellcheck="false">
+    </label>
+    <div class="backfill-summary" id="scoreLinkSummary" data-i18n="scoreLinkModal.pasteFirst">Paste a link, then check it.</div>
+    <div class="actions">
+      <button id="scoreLinkCancel" type="button" data-i18n="scoreLinkCancel">Cancel</button>
+      <button id="scoreLinkCheck" type="button" data-i18n="scoreLinkCheck">Check</button>
+      <button id="scoreLinkImport" class="primary" type="button" data-i18n="scoreLinkImport" disabled>Import</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  Import past plays -> Enter a score by hand. The last resort, for a play with no replay and no
+  link. Every number is checked against the beatmap, the pp comes from osu!'s calculator and never
+  from the form, and the score says "Manually entered by hand" everywhere it is shown.
+-->
+<div class="backdrop" id="manualModal" hidden>
+  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="manualTitle">
+    <h3 id="manualTitle" data-i18n="manualTitle">Enter a score by hand</h3>
+    <div class="warn" data-i18n="manualModal.lastResort">
+      A last resort, for a play with no replay and no score link. Nothing can check what you type,
+      so the score is marked "Manually entered by hand" everywhere it appears, shared copies included. Its
+      pp is calculated from the numbers you enter.
+    </div>
+
+    <label class="field field--wide">
+      <span data-i18n="manualModal.beatmap">Beatmap</span>
+      <input type="text" id="manualBeatmapQuery" autocomplete="off" spellcheck="false"
+             data-i18n-attr="placeholder:manualModal.beatmapPlaceholder"
+             placeholder="Search your beatmaps, or paste a beatmap link">
+    </label>
+    <div class="manual-beatmaps" id="manualBeatmapResults" hidden></div>
+    <div class="manual-chosen" id="manualChosen" hidden></div>
+
+    <div id="manualForm" hidden>
+      <label class="field">
+        <span data-i18n="manualModal.ruleset">Ruleset</span>
+        <select id="manualMode"></select>
+      </label>
+      <div class="manual-counts" id="manualCounts"></div>
+      <div class="manual-grid">
+        <label class="field"><span data-i18n="manualModal.maxCombo">Max combo</span><input type="number" id="manualCombo" min="0" step="1"></label>
+        <label class="field"><span data-i18n="manualModal.mods">Mods</span><input type="text" id="manualMods" placeholder="HDDT" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span data-i18n="manualModal.score">Score (optional)</span><input type="number" id="manualTotal" min="0" step="1"></label>
+        <label class="field"><span data-i18n="manualModal.playedAt">Played</span><input type="datetime-local" id="manualPlayedAt"></label>
+      </div>
+      <p class="setting__hint" id="manualAccuracy"></p>
+    </div>
+
+    <div class="profile-hint" id="manualHint">&nbsp;</div>
+    <div class="actions">
+      <button id="manualCancel" type="button" data-i18n="manualCancel">Cancel</button>
+      <button id="manualAdd" class="primary" type="button" data-i18n="manualAdd" disabled>Add score</button>
     </div>
   </div>
 </div>

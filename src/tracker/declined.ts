@@ -1,5 +1,6 @@
 import type { Db } from '../db/index.ts';
 import { deletedIncompleteKey, wasDeleted } from '../scores.ts';
+import { releaseUploadedReplay } from '../uploaded-replays.ts';
 import type { FilterCriterion } from '../tracking-filter.ts';
 import type { Recording } from './incomplete.ts';
 
@@ -94,6 +95,8 @@ const unkeyed = (dedupeKey: string): boolean => dedupeKey.startsWith('file:');
  */
 export function recordDecline(db: Db, profileId: number, d: Decline, at = Date.now()): void {
   if (wasDeleted(db, profileId, deletedKey(d.kind, d.dedupeKey))) return;
+  // What this play was listed with before, if anything: an uploaded copy it may no longer need.
+  const before = pathsOf(db, 'profile_id = ? AND kind = ? AND dedupe_key = ?', profileId, d.kind, d.dedupeKey);
   const table = d.kind === 'incomplete' ? 'incomplete_plays' : 'scores';
   if (db.prepare(`SELECT 1 AS hit FROM ${table} WHERE profile_id = ? AND dedupe_key = ?`).get(profileId, d.dedupeKey)) {
     // And a row left from before this was checked goes, the next time the play turns up.
@@ -126,10 +129,35 @@ export function recordDecline(db: Db, profileId: number, d: Decline, at = Date.n
     d.replayPath,
     d.recording === null ? null : JSON.stringify(d.recording),
   );
+  const pruned = pathsOf(
+    db,
+    `profile_id = ? AND id NOT IN
+       (SELECT id FROM declined_plays WHERE profile_id = ? ORDER BY declined_at DESC, id DESC LIMIT ?)`,
+    profileId,
+    profileId,
+    MAX_DECLINES,
+  );
   db.prepare(
     `DELETE FROM declined_plays WHERE profile_id = ? AND id NOT IN
        (SELECT id FROM declined_plays WHERE profile_id = ? ORDER BY declined_at DESC, id DESC LIMIT ?)`,
   ).run(profileId, profileId, MAX_DECLINES);
+  release(db, [...before, ...pruned]);
+}
+
+/** The replay files the rows matching `where` point at. */
+function pathsOf(db: Db, where: string, ...params: (string | number)[]): string[] {
+  return (db.prepare(`SELECT replay_path FROM declined_plays WHERE ${where}`).all(...params) as { replay_path: string | null }[])
+    .map((r) => r.replay_path)
+    .filter((p): p is string => p !== null);
+}
+
+/**
+ * Let go of the uploaded copies these rows pointed at, once nothing else does: a replay uploaded
+ * and turned away is kept only for as long as it is listed here (src/uploaded-replays.ts). A
+ * path that is not one of those copies -- osu!'s own files -- is never touched.
+ */
+function release(db: Db, paths: string[]): void {
+  for (const p of new Set(paths)) releaseUploadedReplay(db, p);
 }
 
 /**
@@ -137,20 +165,27 @@ export function recordDecline(db: Db, profileId: number, d: Decline, at = Date.n
  * imported -- so it is no longer one the app turned away.
  */
 export function forgetDecline(db: Db, profileId: number, kind: 'score' | 'incomplete', dedupeKey: string): void {
+  const paths = pathsOf(db, 'profile_id = ? AND kind = ? AND dedupe_key = ?', profileId, kind, dedupeKey);
   db.prepare('DELETE FROM declined_plays WHERE profile_id = ? AND kind = ? AND dedupe_key = ?').run(
     profileId,
     kind,
     dedupeKey,
   );
+  release(db, paths);
 }
 
 export function forgetDeclineById(db: Db, profileId: number, id: number): void {
+  const paths = pathsOf(db, 'profile_id = ? AND id = ?', profileId, id);
   db.prepare('DELETE FROM declined_plays WHERE profile_id = ? AND id = ?').run(profileId, id);
+  release(db, paths);
 }
 
 /** Empty the list without deleting anything for good -- what a profile reset does. */
 export function clearDeclines(db: Db, profileId: number): number {
-  return Number(db.prepare('DELETE FROM declined_plays WHERE profile_id = ?').run(profileId).changes);
+  const paths = pathsOf(db, 'profile_id = ?', profileId);
+  const cleared = Number(db.prepare('DELETE FROM declined_plays WHERE profile_id = ?').run(profileId).changes);
+  release(db, paths);
+  return cleared;
 }
 
 /**
@@ -166,10 +201,10 @@ export function deleteDeclines(db: Db, profileId: number, ids: number[] | 'all',
   if (wanted !== null && wanted.length === 0) return 0;
   const rows = db
     .prepare(
-      `SELECT id, kind, dedupe_key FROM declined_plays WHERE profile_id = ?
+      `SELECT id, kind, dedupe_key, replay_path FROM declined_plays WHERE profile_id = ?
         ${wanted === null ? '' : `AND id IN (${wanted.map(() => '?').join(',')})`}`,
     )
-    .all(profileId, ...(wanted ?? [])) as Pick<DeclineRow, 'id' | 'kind' | 'dedupe_key'>[];
+    .all(profileId, ...(wanted ?? [])) as Pick<DeclineRow, 'id' | 'kind' | 'dedupe_key' | 'replay_path'>[];
   if (wanted !== null && rows.length !== wanted.length) throw new Error('that play is not in the list any more');
 
   db.exec('BEGIN');
@@ -187,6 +222,7 @@ export function deleteDeclines(db: Db, profileId: number, ids: number[] | 'all',
     db.exec('ROLLBACK');
     throw e;
   }
+  release(db, rows.map((r) => r.replay_path).filter((p): p is string => p !== null));
   return rows.length;
 }
 

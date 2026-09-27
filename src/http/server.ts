@@ -59,6 +59,18 @@ import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { filterNarrows } from '../tracking-filter.ts';
 import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
 import { MAX_REPLAY_BYTES, releaseUploadedReplay, storeUploadedReplay } from '../uploaded-replays.ts';
+import {
+  checkScoreLink,
+  enterScore,
+  findBeatmap,
+  importScoreLink,
+  searchBeatmaps,
+  convertImportedScores,
+  trackerEntryDeps,
+  type EntryDeps,
+  type EntryResult,
+  type ManualInput,
+} from '../score-entry.ts';
 import { clearDeclines, declineCount, deleteDeclines, listDeclines } from '../tracker/declined.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
@@ -740,10 +752,21 @@ export function startServer(opts: ServerOptions): http.Server {
          */
         if (body['all'] === true) {
           try {
+            /*
+             * Best performances still on osu!'s figures first, each built into a replay priced
+             * here, so this run recalculates them too. A beatmap not installed is downloaded:
+             * this is the one button that means "put every score on this calculator".
+             */
+            let converted = 0;
+            for (const profile of listProfiles(opts.db)) {
+              const deps = trackerEntryDeps(opts.tracker, opts.db, opts.dataDir, profile.id);
+              converted += (await convertImportedScores(deps, profile.id, { download: true })).converted;
+            }
             const result = await opts.tracker.recalculate(false);
             console.log(
               `\n  recalculated ${result.updated} score(s) in every profile from their replays` +
-                `${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}\n`,
+                `${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}` +
+                `${converted > 0 ? `, and priced ${converted} imported from osu! here` : ''}\n`,
             );
             return json(res, { ok: true, ...result });
           } catch (e) {
@@ -885,6 +908,63 @@ export function startServer(opts: ServerOptions): http.Server {
         })().catch((e: unknown) => json(res, { error: (e as Error).message }, 500));
       });
       return;
+    }
+
+    /*
+     * One score added by name: from its link on osu.ppy.sh, or typed in by hand. Both become a
+     * replay this app builds and prices like any other -- see src/score-entry.ts. A link is
+     * checked first (whose score, already here?) and imported on a second request, so nothing
+     * is written until the page has shown what it found.
+     */
+    const entryDeps = (profileId = current()): EntryDeps =>
+      trackerEntryDeps(opts.tracker, opts.db, opts.dataDir, profileId);
+    const entryAnswer = (result: EntryResult) =>
+      result.status === 'added' && result.outcome.status === 'added'
+        ? { status: 'added', score: result.outcome.score }
+        : { status: 'already' };
+
+    if (url.pathname === '/api/score-link/check' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        try {
+          return json(res, await checkScoreLink(entryDeps(), String(body['link'] ?? '')));
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
+        }
+      });
+    }
+    if (url.pathname === '/api/score-link' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        try {
+          return json(res, entryAnswer(await importScoreLink(entryDeps(), String(body['link'] ?? ''))));
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
+        }
+      });
+    }
+    if (url.pathname === '/api/beatmaps/search' && req.method === 'GET') {
+      return json(res, { beatmaps: searchBeatmaps(entryDeps(), url.searchParams.get('q') ?? '') });
+    }
+    if (url.pathname === '/api/beatmaps/find' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        try {
+          const md5 = typeof body['md5'] === 'string' ? body['md5'] : undefined;
+          return json(res, await findBeatmap(entryDeps(), { md5, link: String(body['link'] ?? '') }));
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
+        }
+      });
+    }
+    if (url.pathname === '/api/manual-score' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        try {
+          // The name the replay is written under: whoever this profile is, as it knows itself.
+          const player = opts.tracker.playerIdentity.displayName || getProfile(opts.db, current())?.name || '';
+          const result = await enterScore(entryDeps(), body as unknown as ManualInput, player);
+          return json(res, entryAnswer(result));
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
+        }
+      });
     }
 
     const aboutImage =
@@ -1081,6 +1161,15 @@ export function startServer(opts: ServerOptions): http.Server {
                 const pins = scores.reduce((n, r) => n + r.pinned, 0);
                 if (wantBest && added > 0) done.push(`${added} score${added === 1 ? '' : 's'}`);
                 if (wantPinned && pins > 0) done.push(`${pins} pinned`);
+                /*
+                 * Then priced here: each built into a replay from what osu! handed over, so a
+                 * pp rework reprices it with everything else. A beatmap not installed is
+                 * downloaded now, while the import is online anyway.
+                 */
+                if (scores.length > 0) {
+                  const conversion = await convertImportedScores(entryDeps(id), id, { download: true });
+                  if (conversion.converted > 0) done.push(`${conversion.converted} priced here`);
+                }
               }
 
               broadcast('identity', { linked: user.id });

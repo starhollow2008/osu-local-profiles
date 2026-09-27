@@ -380,8 +380,80 @@ check('a drop is the page’s, not the browser’s', files.handled, true);
 check('and the dialog goes back to normal', files.unlit, true);
 check('a file that is not a replay is refused before anything is sent', files.said, 'None of those are osu! replays (.osr files).');
 
+/*
+ * A score's link, and typing one in: each opens over Import past plays, and Escape closes only
+ * the one on top. Nothing here imports anything -- a link that is not one is refused before osu!
+ * is asked, and a search that matches nothing finds nothing to enter a score on.
+ */
+const entry = JSON.parse(await evaluate(`(async () => {
+  const $ = (id) => document.getElementById(id);
+  const visible = (id) => getComputedStyle($(id)).display !== 'none';
+  const escape = () => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const out = {};
+  $('backfillScoreLink').click();
+  out.linkOpen = visible('scoreLinkModal');
+  out.importWaits = $('scoreLinkImport').disabled;
+  $('scoreLinkInput').value = 'https://example.com/not-a-score';
+  $('scoreLinkCheck').click();
+  await wait(400);
+  out.refused = $('scoreLinkSummary').textContent.trim();
+  out.stillWaits = $('scoreLinkImport').disabled;
+  escape();
+  out.linkClosed = !visible('scoreLinkModal');
+  out.importStays = visible('backfillModal');
+
+  $('backfillManual').click();
+  out.manualOpen = visible('manualModal');
+  out.formWaits = !visible('manualForm') && $('manualAdd').disabled;
+  out.warns = document.querySelector('#manualModal .warn').textContent.includes('Manually entered by hand');
+  $('manualBeatmapQuery').value = 'zzqqxxnothingmatches';
+  $('manualBeatmapQuery').dispatchEvent(new Event('input'));
+  await wait(700);
+  out.noneFound = $('manualBeatmapResults').textContent.trim();
+  escape();
+  out.manualClosed = !visible('manualModal');
+  return JSON.stringify(out);
+})()`));
+check('a score link opens over Import past plays', entry.linkOpen, true);
+check('and Import waits for the link to be checked', entry.importWaits, true);
+check('a link that is not a score’s is refused', entry.refused, 'that is not a link to a score on osu.ppy.sh');
+check('and Import still waits', entry.stillWaits, true);
+check('Escape closes only the score link dialog', `${entry.linkClosed}|${entry.importStays}`, 'true|true');
+check('entering a score by hand opens with its warning', `${entry.manualOpen}|${entry.warns}`, 'true|true');
+check('the form waits for a beatmap', entry.formWaits, true);
+check('a search that matches nothing says so', entry.noneFound, 'No installed beatmap matches. Paste its link instead.');
+check('Escape closes only that one', entry.manualClosed, true);
+
 await evaluate("document.getElementById('backfillCancel').click()");
 check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
+
+/*
+ * A score with no replay says so on its row, and any score osu! has links to it from the row's
+ * menu. Against whatever this profile holds, so each check skips when there is nothing to see.
+ */
+const sources = JSON.parse(await evaluate(`(() => {
+  const tags = [...document.querySelectorAll('.play-source')];
+  const withUrl = document.querySelector('.play-detail__menu[data-osu-url^="https://osu.ppy.sh/scores/"]');
+  const without = document.querySelector('.play-detail__menu[data-osu-url=""]');
+  const menuShows = (button) => {
+    if (!button) return null;
+    button.click();
+    const shown = !document.querySelector('#playMenu [data-act="osu"]').hidden;
+    document.body.click();
+    return shown;
+  };
+  return JSON.stringify({
+    tags: tags.length,
+    titled: tags.every((t) => t.title.length > 20),
+    known: tags.every((t) => ['No replay file', 'Manually entered by hand'].includes(t.textContent.trim())),
+    linked: menuShows(withUrl),
+    unlinked: menuShows(without),
+  });
+})()`));
+check('a score with no replay says so, and why', sources.tags === 0 ? SKIP : `${sources.titled}|${sources.known}`, 'true|true');
+check('a score osu! has offers View on osu!', sources.linked === null ? SKIP : sources.linked, true);
+check('one osu! never had does not', sources.unlinked === null ? SKIP : sources.unlinked, false);
 
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optBackfill').click()");

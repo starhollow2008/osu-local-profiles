@@ -19,6 +19,7 @@ import {
   replayIdentity,
 } from '../src/tracker/online-import.ts';
 import { ingestScore } from '../src/tracker/ingest.ts';
+import { applyScoreAction } from '../src/scores.ts';
 import { importedBonusPp } from '../src/standing.ts';
 import { computeStats } from '../src/calc/stats.ts';
 import type { ReplayScore } from '../src/osr.ts';
@@ -139,6 +140,7 @@ function stableReplay(over: Partial<ReplayScore> = {}): ReplayScore {
     onlineScoreId: 4430944113n,
     extras: null,
     mcosu: null,
+    built: null,
     ...over,
   };
 }
@@ -296,14 +298,16 @@ test('a play already tracked from its replay is recognised, not imported over', 
   }
 });
 
-test('importing past plays later does not add an imported score a second time', async () => {
+test('a replay found later takes an imported score’s place, and never adds it twice', async () => {
   const h = harness();
   try {
-    assert.equal(importScore(h.db, h.resolver, h.profileId, parsed()).status, 'added');
+    const { id } = importScore(h.db, h.resolver, h.profileId, parsed()) as { id: number };
+    applyScoreAction(h.db, h.profileId, id, 'pin');
 
     // The user now imports their whole replay history off this machine. The replay of that
     // same play has to be recognised -- its dedupe_key cannot match, because a replay keys on
-    // its own hash and an imported score on osu!'s id.
+    // its own hash and an imported score on osu!'s id -- and, being the better record of it,
+    // put in the imported row's place: same row, its pin kept, no longer osu!'s figures.
     const again = await ingestScore(stableReplay(), '/replays/one.osr', {
       db: h.db,
       resolver: h.resolver,
@@ -311,8 +315,30 @@ test('importing past plays later does not add an imported score a second time', 
       trackingSince: 0,
       official: null,
     });
-    assert.deepEqual(again, { status: 'skipped', reason: 'duplicate' });
-    assert.equal((h.db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n, 1);
+    assert.equal(again.status, 'added');
+    const rows = h.db.prepare('SELECT id, imported_at, replay_path, pinned_at, legacy_score_id FROM scores').all() as {
+      id: number;
+      imported_at: number | null;
+      replay_path: string;
+      pinned_at: number | null;
+      legacy_score_id: string | null;
+    }[];
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.id, id, 'the same row');
+    assert.equal(rows[0]!.imported_at, null);
+    assert.equal(rows[0]!.replay_path, '/replays/one.osr');
+    assert.notEqual(rows[0]!.pinned_at, null, 'its pin kept');
+    assert.equal(rows[0]!.legacy_score_id, '4430944113', 'and both of osu!’s ids, for matching it again');
+
+    // And once on its replay, the replay stands: the same file again is a duplicate.
+    const third = await ingestScore(stableReplay(), '/replays/one.osr', {
+      db: h.db,
+      resolver: h.resolver,
+      profileId: h.profileId,
+      trackingSince: 0,
+      official: null,
+    });
+    assert.deepEqual(third, { status: 'skipped', reason: 'duplicate' });
   } finally {
     h.cleanup();
   }
@@ -330,8 +356,14 @@ test('a replay too old to carry an id is still matched by the play itself', asyn
       '/replays/old.osr',
       { db: h.db, resolver: h.resolver, profileId: h.profileId, trackingSince: 0, official: null },
     );
-    assert.deepEqual(ancient, { status: 'skipped', reason: 'duplicate' });
+    // Recognised as that play -- and so put in its place, not added beside it.
+    assert.equal(ancient.status, 'added');
     assert.equal((h.db.prepare('SELECT COUNT(*) AS n FROM scores').get() as { n: number }).n, 1);
+    const row = h.db.prepare('SELECT imported_at, replay_path FROM scores').get() as {
+      imported_at: number | null;
+      replay_path: string;
+    };
+    assert.deepEqual({ ...row }, { imported_at: null, replay_path: '/replays/old.osr' });
   } finally {
     h.cleanup();
   }
@@ -377,7 +409,7 @@ test('a lazer replay matches by its own id, a stable one by the legacy id', () =
       maxCombo: 0,
       totals: [],
     });
-    assert.deepEqual(byLazerId, { id, imported: true });
+    assert.deepEqual(byLazerId, { id, imported: true, record: 'osu' });
 
     const byLegacyId = findExistingScore(h.db, h.profileId, {
       onlineIds: ['4430944113'],
@@ -386,7 +418,7 @@ test('a lazer replay matches by its own id, a stable one by the legacy id', () =
       maxCombo: 0,
       totals: [],
     });
-    assert.deepEqual(byLegacyId, { id, imported: true });
+    assert.deepEqual(byLegacyId, { id, imported: true, record: 'osu' });
 
     // Stable wrote 0 for a play it never submitted; that is not an id and must match nothing.
     assert.equal(

@@ -10,7 +10,7 @@
 import { escapeHtml, fmt } from './format.js';
 import { coverUrl, gradeBadge, modList } from './badges.js';
 import { MODE_ICON, MODE_NAME, difficultyBadge } from './beatmapsets.js';
-import { ppNotes } from './sections.js';
+import { ppNotes, sourceTag } from './sections.js';
 import { assetUrl } from './static-mode.js';
 import { t } from './i18n.js';
 import { beatmapArtist, beatmapTitle } from './metadata.js';
@@ -291,6 +291,8 @@ const submitted = (ms) =>
   new Date(ms).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' });
 
 function player(score, who) {
+  // No replay, or entered by hand: said on the card as on the row, and in a shared copy.
+  const source = sourceTag(score);
   return `<div class="score-player">
   <div class="score-player__row score-player__row--score">
     <div class="score-player__mods">${modList(score.mods)}</div>
@@ -301,6 +303,7 @@ function player(score, who) {
     <span>${escapeHtml(t('score.submittedOn'))}</span><strong>${escapeHtml(submitted(score.playedAt))}</strong>
     <span>${escapeHtml(t('score.playedOn'))}</span><strong>${CLIENT_NAMES[score.client] ?? 'Lazer'}</strong>
   </div>
+  ${source ? `<div class="score-player__row score-player__row--source">${source}</div>` : ''}
 </div>`;
 }
 
@@ -313,7 +316,8 @@ function buttons(score) {
   const menu = `<div class="score-buttons__menu">
     <button class="score-buttons__menu-button" type="button" data-play-menu data-kind="score" data-context="card"
             data-id="${score.id}" data-pinned="${score.pinned ? 1 : 0}" data-set="${score.beatmapsetId ?? ''}"
-            data-replay="${score.hasReplay ? 1 : 0}" aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}"
+            data-replay="${score.hasReplay ? 1 : 0}" data-osu-url="${escapeHtml(score.osuUrl ?? '')}"
+            aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}"
             title="${escapeHtml(t('score.options'))}">&#8943;</button>
   </div>`;
   return `<div class="score-buttons">${download}${menu}</div>`;

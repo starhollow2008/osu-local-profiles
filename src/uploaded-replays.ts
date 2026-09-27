@@ -44,7 +44,10 @@ export function storeUploadedReplay(dataDir: string, bytes: Buffer): string | nu
  * under osu!'s own file, or deleted for good, or not readable after all. One a score or a play
  * not tracked still points at is kept -- a recalculation and Track anyway both need it.
  */
-export function releaseUploadedReplay(db: Db, file: string): void {
+export function releaseUploadedReplay(db: Db, file: string | null): void {
+  // Only ever one of this app's own copies. osu!stable names its replays `<hash>-<time>.osr`
+  // and lazer's store has no extensions, so neither can match -- whatever a caller hands in.
+  if (file === null || !/[\\/]replays[\\/][0-9a-f]{32}\.osr$/.test(file)) return;
   const used = db
     .prepare(
       `SELECT 1 AS hit FROM scores WHERE replay_path = ?
@@ -57,4 +60,27 @@ export function releaseUploadedReplay(db: Db, file: string): void {
   } catch {
     /* in use elsewhere; harmless to leave */
   }
+}
+
+/**
+ * Every stored copy nothing points at any more, removed: at launch, when nothing is mid-import.
+ * The releases above catch almost all of them as they happen; this catches what goes in bulk --
+ * a profile deleted or reset, a list emptied -- and anything a crash left half-way.
+ */
+export function pruneUploadedReplays(db: Db, dataDir: string): number {
+  const dir = path.join(dataDir, UPLOADED_DIR);
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of names) {
+    if (!/^[0-9a-f]{32}\.osr$/.test(name)) continue;
+    const file = path.join(dir, name);
+    releaseUploadedReplay(db, file);
+    if (!fs.existsSync(file)) removed++;
+  }
+  return removed;
 }

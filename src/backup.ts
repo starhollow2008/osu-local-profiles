@@ -5,13 +5,15 @@ import { openDb, type Db } from './db/index.ts';
 import { listProfiles } from './profiles.ts';
 import { entryData, readZipEntries, writeZip } from './update/zip.ts';
 import { isUploadedReplay, UPLOADED_DIR } from './uploaded-replays.ts';
+import { BEATMAPS_DIR, isStoredBeatmap } from './stored-beatmaps.ts';
 
 /**
  * Backing up every profile, and restoring a backup.
  *
  * **A backup is `data/` as far as the profiles go**: the database, and the pictures, me!
- * images and uploaded replays (`data/replays/`, src/uploaded-replays.ts) that live beside it as
- * files rather than in it. The archive holds them under the
+ * images, uploaded and built replays (`data/replays/`, src/uploaded-replays.ts) and downloaded
+ * beatmaps (`data/beatmaps/`, src/stored-beatmaps.ts) that live beside it as files rather than
+ * in it. The archive holds them under the
  * same names they have in `data/`, so "copy the data folder" and "Back up everything" are
  * the same thing, and a backup unzipped by hand into `data/` is a restore. `config.json` is
  * left out on purpose: it is this install's osu! paths, port and language, and would be
@@ -47,8 +49,11 @@ export function isProfileFile(relative: string): boolean {
     // The pre-profile pictures src/identity.ts still honours.
     /^(avatar|cover)\.(png|jpe?g|webp)$/i.test(relative) ||
     /^about-images\/\d+\/[\w.-]+$/.test(relative) ||
-    // Replays uploaded to Import past plays: the copy here may be the only one there is.
-    isUploadedReplay(relative)
+    // Replays uploaded to Import past plays, or built for a score from its link or entered by
+    // hand: the copy here may be the only one there is.
+    isUploadedReplay(relative) ||
+    // Beatmaps downloaded to price those scores, so a restore needs no internet to reprice them.
+    isStoredBeatmap(relative)
   );
 }
 
@@ -69,7 +74,12 @@ function filesUnder(dir: string, prefix = ''): string[] {
 /** The pictures and me! images in `data/`: the profile data that is not the database. */
 function profileImages(dataDir: string): string[] {
   const top = filesUnder(dataDir).filter((f) => !f.includes('/'));
-  return [...top, ...filesUnder(dataDir, 'about-images'), ...filesUnder(dataDir, UPLOADED_DIR)].filter(
+  return [
+    ...top,
+    ...filesUnder(dataDir, 'about-images'),
+    ...filesUnder(dataDir, UPLOADED_DIR),
+    ...filesUnder(dataDir, BEATMAPS_DIR),
+  ].filter(
     (f) => f !== DB_FILE && isProfileFile(f),
   );
 }

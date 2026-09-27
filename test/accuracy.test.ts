@@ -34,6 +34,7 @@ function wonderfulWonder(overrides: Partial<ReplayScore> = {}): ReplayScore {
       maximum_statistics: { great: 199, large_tick_hit: 3, ignore_hit: 73, slider_tail_hit: 73 },
     },
     mcosu: null,
+    built: null,
     ...overrides,
   };
 }

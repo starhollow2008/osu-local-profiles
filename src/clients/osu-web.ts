@@ -415,6 +415,110 @@ export async function fetchBeatmapset(beatmapsetId: number): Promise<BeatmapsetD
   return details;
 }
 
+/* ------------------------------------------------------------ one score, by link */
+
+/**
+ * Where osu! shows one score, from whatever the user pasted: a link to it, or its number.
+ *
+ * Two kinds of number, and they must not be confused. A score set on lazer, or on osu!stable
+ * since both have lived on one site, has a solo id: `osu.ppy.sh/scores/308368918`. An
+ * osu!stable replay carries the play's *legacy* id, which osu! shows under its ruleset:
+ * `osu.ppy.sh/scores/osu/2019594028`. The same number under the first form is somebody else's
+ * score entirely -- 2019594028 as a solo id is a different player's play on a different map --
+ * so a bare number is taken as a solo id, and the ruleset form is kept exactly as it came.
+ */
+export function parseScoreLink(input: string): string | null {
+  const text = input.trim();
+  if (/^\d{1,19}$/.test(text)) return `scores/${text}`;
+  const match = /^(?:https?:\/\/)?(?:www\.|lazer\.)?osu\.ppy\.sh\/scores\/(?:(osu|taiko|fruits|mania)\/)?(\d{1,19})\/?(?:[?#].*)?$/i.exec(
+    text,
+  );
+  if (!match) return null;
+  return match[1] ? `scores/${match[1].toLowerCase()}/${match[2]}` : `scores/${match[2]}`;
+}
+
+/** A score's page on osu!, from what a row stores. Null for a play osu! never had. */
+export function scoreUrl(row: {
+  mode: number;
+  client: string;
+  onlineScoreId: string | null;
+  legacyScoreId: string | null;
+}): string | null {
+  const ruleset = MODE_FOR_RULESET[row.mode] ?? 'osu';
+  // A stable play's legacy id, where one is kept, finds it however the row came to be.
+  if (row.legacyScoreId !== null) return `https://osu.ppy.sh/scores/${ruleset}/${row.legacyScoreId}`;
+  if (row.onlineScoreId === null || row.onlineScoreId === '0' || row.client === 'mcosu') return null;
+  // A stable replay's id is a legacy one, which only the ruleset form finds.
+  return row.client === 'stable'
+    ? `https://osu.ppy.sh/scores/${ruleset}/${row.onlineScoreId}`
+    : `https://osu.ppy.sh/scores/${row.onlineScoreId}`;
+}
+
+/** A score as its page gives it, with who set it. */
+export interface LinkedScore {
+  score: OsuWebScore;
+  player: { id: number | null; name: string };
+}
+
+/**
+ * The score a score page embeds: `<script id="json-show">`, the same object `/scores/best`
+ * answers with, so `scoreFromJson` reads it. Null when the page has none, or not in that shape.
+ */
+export function extractScorePage(html: string): LinkedScore | null {
+  const match = /<script id="json-show" type="application\/json">([\s\S]*?)<\/script>/.exec(html);
+  if (!match) return null;
+  let raw: Record<string, unknown>;
+  try {
+    raw = JSON.parse(match[1]!) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const score = scoreFromJson(raw);
+  if (!score) return null;
+  const user = (raw['user'] ?? {}) as Record<string, unknown>;
+  const id = typeof raw['user_id'] === 'number' ? raw['user_id'] : null;
+  return { score, player: { id, name: typeof user['username'] === 'string' ? user['username'] : '' } };
+}
+
+/**
+ * One score, from its link. Asked of osu!'s public page, as a profile is: no login. Only when
+ * the user imports a score by its link -- nothing afterwards ever asks again, because the score
+ * is priced here from then on.
+ */
+export async function fetchLinkedScore(input: string): Promise<LinkedScore> {
+  const where = parseScoreLink(input);
+  if (!where) throw new Error('that is not a link to a score on osu.ppy.sh');
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`https://osu.ppy.sh/${where}`, 'text/html');
+  } catch {
+    throw new Error('could not reach osu.ppy.sh');
+  }
+  if (response.status === 404) throw new Error('osu! has no score at that link -- it may have been replaced by a better one');
+  if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+  const linked = extractScorePage(await response.text());
+  if (!linked) throw new Error('the score page was not in the shape expected; osu! may have changed it');
+  return linked;
+}
+
+/**
+ * A beatmap's `.osu` file, as osu! serves it to anyone (`osu.ppy.sh/osu/<id>`) -- for a score on
+ * a beatmap that is not installed, which cannot be priced without it. Whether it is the version
+ * a score was set on is the caller's to check, by its MD5.
+ */
+export async function fetchBeatmapFile(beatmapId: number): Promise<Buffer> {
+  if (!Number.isInteger(beatmapId) || beatmapId <= 0) throw new Error('not a beatmap id');
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`https://osu.ppy.sh/osu/${beatmapId}`, 'text/plain');
+  } catch {
+    throw new Error('could not reach osu.ppy.sh');
+  }
+  if (response.status === 404) throw new Error('osu! has no beatmap with that id');
+  if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+  return Buffer.from(await response.arrayBuffer());
+}
+
 /* ------------------------------------------------------------------ scores */
 
 /**
@@ -461,6 +565,8 @@ export interface OsuWebScore {
   legacyTotalScore: number | null;
   grade: string;
   passed: boolean;
+  /** osu!stable's full-combo flag, as a stable replay's header holds it. */
+  legacyPerfect: boolean;
   /** Whether osu! itself ranks this score -- its own verdict, so nothing here recomputes it. */
   ranked: boolean;
   /** osu!'s own pp for the play. Null on a score it awards none for. */
@@ -578,6 +684,7 @@ export function scoreFromJson(raw: Record<string, unknown>): OsuWebScore | null 
     legacyTotalScore: num(raw['legacy_total_score']),
     grade,
     passed: raw['passed'] === true,
+    legacyPerfect: raw['legacy_perfect'] === true,
     ranked: raw['ranked'] === true,
     pp: num(raw['pp']),
     playedAt,
