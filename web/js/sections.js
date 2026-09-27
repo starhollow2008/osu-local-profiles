@@ -228,7 +228,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
     ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="score"
          data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}" data-set="${play.beatmapsetId ?? ''}"
          data-replay="${play.hasReplay ? 1 : 0}" data-osu-url="${escapeHtml(play.osuUrl ?? '')}"
-         aria-haspopup="true" aria-label="Options for this score" title="Options">&#8943;</button>`
+         aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}" title="${escapeHtml(t('score.options'))}">&#8943;</button>`
     : '';
 
   // The drag handle is a convenience; the menu's Move up / Move down do the same job for

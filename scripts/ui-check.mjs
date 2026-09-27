@@ -1375,7 +1375,9 @@ check(
   false,
 );
 
-check('the menu is seven entries', menuLabels.length, 7);
+// Seven, and Auto-update, its own row at the user's request (roadmap 5.66).
+check('the menu is eight entries', menuLabels.length, 8);
+check('Auto-update is one of them', menuLabels.includes('Auto-update'), true);
 // The way out when auto-detection missed an install. It has to be reachable from the menu,
 // because the person who needs it is the one the app has already failed.
 check('osu! folders is one of them', menuLabels.includes('osu! folders'), true);
@@ -1979,6 +1981,25 @@ check(
     window.scrollTo(0, from);
     if (!moved) return 'the page could not scroll';
     return Math.abs(after - before) < 1;
+  })()`),
+  true,
+);
+/*
+ * Remove from profile is the one destructive item there, and reads as one: red, as the
+ * Options menu's are. It is a `.play-menu`, not a `.menu`, so that rule never reached it.
+ */
+check(
+  'Remove from profile is red',
+  await evaluate(`(() => {
+    const menu = document.getElementById('playMenu');
+    if (getComputedStyle(menu).display === 'none') return 'skipped';
+    const want = getComputedStyle(document.documentElement).getPropertyValue('--rank-d').trim();
+    const probe = document.createElement('span');
+    probe.style.color = want;
+    document.body.append(probe);
+    const red = getComputedStyle(probe).color;
+    probe.remove();
+    return getComputedStyle(menu.querySelector('[data-act="hide"]')).color === red;
   })()`),
   true,
 );

@@ -68,6 +68,12 @@
   "Manually entered by hand" one you typed in - on every row, the score's details and shared
   pages. Any score osu! has now has **View on osu!** in its **···** menu.
 
+- **Remove from profile is red** in a score's **···** menu, as the Options menu's destructive
+  items are, so it is not pressed by mistake.
+
+- **Everything new in this release is translated** into all 15 languages, and a score's **···**
+  button is labelled in your language for screen readers too.
+
 ## 1.26.0
 
 - **Your finished plays are tracked even if you imported someone else's osu! account.**

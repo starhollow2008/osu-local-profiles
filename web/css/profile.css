@@ -2417,6 +2417,15 @@
   background-color: hsl(var(--hsl-b3));
 }
 
+/* Remove from profile: red, as the Options menu's destructive items are. */
+.play-menu button.danger {
+  color: var(--rank-d);
+}
+
+.play-menu button.danger:hover {
+  background-color: hsl(0, 40%, 24%);
+}
+
 .play-menu .sep {
   height: 1px;
   background-color: hsl(var(--hsl-b3));
