@@ -64,7 +64,6 @@
   "backfillCancel": "Annuleren",
   "backfillCheck": "Controleren",
   "backfillModal.goBackOnlyAsFar": "Ga alleen terug tot de sessie die je met deze speelstijl speelde. Alles daarvóór haalt pogingen binnen die je met je gewone stijl maakte - en juist dat is wat een apart profiel moet buitenhouden.",
-  "backfillModal.importPlaysSince": "Pogingen importeren sinds",
   "backfillModal.onlyImportPlaysThatMatch": "Alleen pogingen importeren die aan mijn bijhoudfilter voldoen",
   "backfillModal.playsSetWhileThisApp": "Pogingen die je maakte terwijl deze app gesloten was, zijn nooit bijgehouden. Kies hoe ver je terug wilt kijken en ze worden vanaf dat moment geïmporteerd - voltooide pogingen uit hun replays, en afgebroken, mislukte en opnieuw geprobeerde pogingen uit de eigen logboeken van osu!lazer.",
   "backfillPresets.12Hours": "12 uur",

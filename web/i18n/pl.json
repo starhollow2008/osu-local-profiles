@@ -65,7 +65,6 @@
   "backfillCancel": "Anuluj",
   "backfillCheck": "Sprawdź",
   "backfillModal.goBackOnlyAsFar": "Cofnij się tylko do sesji, którą grałeś tym stylem. Wszystko wcześniejsze wciągnie podejścia zagrane twoim zwykłym stylem - a właśnie po to istnieje osobny profil, żeby je odsiać.",
-  "backfillModal.importPlaysSince": "Importuj podejścia od",
   "backfillModal.onlyImportPlaysThatMatch": "Importuj tylko podejścia zgodne z moim filtrem śledzenia",
   "backfillModal.playsSetWhileThisApp": "Podejścia zagrane, gdy ta aplikacja była zamknięta, nigdy nie zostały zapisane. Wybierz, jak daleko sięgnąć wstecz, a zostaną zaimportowane od tego momentu - ukończone podejścia z ich powtórek, a wyjścia, porażki i ponowne próby z własnych logów osu!lazer.",
   "backfillPresets.12Hours": "12 godzin",

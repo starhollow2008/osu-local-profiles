@@ -64,7 +64,6 @@
   "backfillCancel": "取消",
   "backfillCheck": "检查",
   "backfillModal.goBackOnlyAsFar": "只回溯到你用这套打法游玩的那次会话。再往前就会把用你平常打法打出的成绩也拉进来 - 而这正是单独建一个档案要挡掉的东西。",
-  "backfillModal.importPlaysSince": "导入此时间之后的游玩",
   "backfillModal.onlyImportPlaysThatMatch": "只导入符合我的游玩记录筛选器的游玩",
   "backfillModal.playsSetWhileThisApp": "这个应用关闭期间打出的游玩从未被记录。选择要回溯多久，就会从那一刻起导入它们 - 完成的游玩来自回放，退出、失败和重试来自 osu!lazer 自己的日志。",
   "backfillPresets.12Hours": "12 小时",

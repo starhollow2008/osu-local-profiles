@@ -64,7 +64,6 @@
   "backfillCancel": "Annuller",
   "backfillCheck": "Kontroller",
   "backfillModal.goBackOnlyAsFar": "Gå kun tilbage til den session, du spillede med denne spillestil. Alt tidligere trækker forsøg med, som du spillede med din normale stil - og det er netop det, en separat profil findes for at holde ude.",
-  "backfillModal.importPlaysSince": "Importer forsøg siden",
   "backfillModal.onlyImportPlaysThatMatch": "Importer kun forsøg, der matcher mit sporingsfilter",
   "backfillModal.playsSetWhileThisApp": "Forsøg, du spillede, mens appen var lukket, er aldrig blevet fulgt. Vælg, hvor langt tilbage der skal kigges, så bliver de importeret fra det tidspunkt og frem - gennemførte forsøg fra deres replays, og afbrudte, mislykkede og gentagne forsøg fra osu!lazers egne logfiler.",
   "backfillPresets.12Hours": "12 timer",

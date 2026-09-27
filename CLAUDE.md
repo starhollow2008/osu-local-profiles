@@ -123,7 +123,7 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 - `/api/profile` cached until DB changes (`total_changes()` stamp)
 - No API polling. Local detection only. Works with no credentials, no network
 - No scan-and-import on startup *unless the profile asked for it*. Import past plays is
-  explicit: pick cutoff, preview, confirm. A launch imports the gap it was closed for only
+  explicit: pick a range, preview, confirm. A launch imports the gap it was closed for only
   with `importPlaysWhileClosed` on (off by default), never further back than the app last
   ran, and through `Tracker.backfill` like any other import (roadmap 5.56)
 - Ingestion serialized through promise queue (`src/tracker/index.ts`)

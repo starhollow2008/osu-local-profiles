@@ -298,6 +298,47 @@ check(
   true,
 );
 
+/*
+ * The range. From and To each have a box that opens that end -- Earliest, Now -- and a ticked
+ * end hides its date, so every date on screen is one the import will use. The presets set both
+ * ends; All is the last of them, and means earliest to now. Nothing here runs a preview.
+ */
+const importRange = JSON.parse(await evaluate(`(() => {
+  const $ = (id) => document.getElementById(id);
+  const visible = (id) => getComputedStyle($(id)).display !== 'none';
+  const click = (el) => el.click();
+  const tick = (id, on) => { $(id).checked = on; $(id).dispatchEvent(new Event('change')); };
+  const presets = [...$('backfillPresets').querySelectorAll('button')];
+  const lit = () => presets.filter((b) => b.classList.contains('active')).map((b) => b.textContent.trim()).join();
+  const out = {
+    opened: { lit: lit(), from: visible('backfillSince'), earliest: $('backfillFromEarliest').checked, now: $('backfillToNow').checked, to: visible('backfillUntil') },
+    last: presets.at(-1).textContent.trim(),
+  };
+  click(presets.at(-1));
+  out.all = { lit: lit(), from: visible('backfillSince'), earliest: $('backfillFromEarliest').checked, hint: visible('backfillEverything') };
+  tick('backfillToNow', false);
+  out.toOpened = { to: visible('backfillUntil'), filled: $('backfillUntil').value !== '', lit: lit() };
+  click(presets[0]);
+  out.preset = { lit: lit(), now: $('backfillToNow').checked, to: visible('backfillUntil'), from: visible('backfillSince'), hint: visible('backfillEverything') };
+  // An end before the start is refused before anything is asked of the server.
+  tick('backfillToNow', false);
+  $('backfillUntil').value = '2020-01-01T00:00';
+  $('backfillUntil').dispatchEvent(new Event('change'));
+  out.lit = lit();
+  click($('backfillCheck'));
+  out.backwards = $('backfillSummary').textContent.trim();
+  return JSON.stringify(out);
+})()`));
+// Compared as JSON: `check` compares with ===, and each of these is a few facts at once.
+const same = (actual, expected) => JSON.stringify(actual) === JSON.stringify(expected) || JSON.stringify(actual);
+check('the dialog opens on 3 hours, up to now', same(importRange.opened, { lit: '3 hours', from: true, earliest: false, now: true, to: false }), true);
+check('All is the last preset', importRange.last, 'All');
+check('All opens both ends, and says what everything means', same(importRange.all, { lit: 'All', from: false, earliest: true, hint: true }), true);
+check('unticking Now shows the end, filled in', same(importRange.toOpened, { to: true, filled: true, lit: '' }), true);
+check('a preset closes both ends again', same(importRange.preset, { lit: '1 hour', now: true, to: false, from: true, hint: false }), true);
+check('a date typed by hand lights no preset', importRange.lit, '');
+check('an end before the start is refused', importRange.backwards, 'The end of the range is before its start.');
+
 await evaluate("document.getElementById('backfillCancel').click()");
 check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
 

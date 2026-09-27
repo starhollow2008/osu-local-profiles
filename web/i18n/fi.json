@@ -64,7 +64,6 @@
   "backfillCancel": "Peruuta",
   "backfillCheck": "Tarkista",
   "backfillModal.goBackOnlyAsFar": "Palaa taaksepäin vain siihen sessioon, jonka pelasit tällä pelityylillä. Kaikki sitä aiempi vetää mukaan suorituksia, jotka pelasit tavallisella tyylilläsi - ja juuri sen takia erillinen profiili on olemassa.",
-  "backfillModal.importPlaysSince": "Tuo suoritukset alkaen",
   "backfillModal.onlyImportPlaysThatMatch": "Tuo vain suoritukset, jotka vastaavat seurantasuodatintani",
   "backfillModal.playsSetWhileThisApp": "Suorituksia, jotka pelasit sovelluksen ollessa suljettuna, ei ole koskaan tallennettu. Valitse, kuinka kauas taaksepäin katsotaan, niin ne tuodaan siitä hetkestä eteenpäin - loppuun pelatut suoritukset uusinnoistaan, ja keskeytykset, epäonnistumiset ja uudelleenyritykset osu!lazerin omista lokeista.",
   "backfillPresets.12Hours": "12 tuntia",

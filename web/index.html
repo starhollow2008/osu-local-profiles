@@ -864,9 +864,9 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">
     <h3 id="backfillTitle" data-i18n="backfillTitle">Import past plays</h3>
     <p data-i18n="backfillModal.playsSetWhileThisApp">
-      Plays set while this app was closed were never tracked. Choose how far back to look
-      and they will be imported from that moment onward - finished plays from their
-      replays, and quits, fails and retries from osu!lazer&rsquo;s own logs.
+      Plays set while this app was closed were never tracked. Choose when you played them
+      and they will be imported - finished plays from their replays, and quits, fails and
+      retries from osu!lazer&rsquo;s own logs.
     </p>
     <div class="warn" data-i18n="backfillModal.goBackOnlyAsFar">
       Go back only as far as the session you played with this playstyle. Anything earlier
@@ -880,12 +880,33 @@
       <button type="button" data-hours="6" data-i18n="backfillPresets.6Hours">6 hours</button>
       <button type="button" data-hours="12" data-i18n="backfillPresets.12Hours">12 hours</button>
       <button type="button" data-hours="24" data-i18n="backfillPresets.1Day">1 day</button>
+      <button type="button" data-all data-i18n="backfillPresets.all">All</button>
     </div>
 
-    <label class="field">
-      <span data-i18n="backfillModal.importPlaysSince">Import plays since</span>
-      <input type="datetime-local" id="backfillSince">
-    </label>
+    <!--
+      The range. Each end is a date, or -- ticked -- the open end: From the earliest play on this
+      computer, To now. The presets set both: "3 hours" is three hours ago to now, All is
+      earliest to now. A ticked end hides its date rather than disabling it, so a date on screen
+      is always one the import will use.
+    -->
+    <div class="field backfill-range">
+      <label for="backfillSince" data-i18n="backfillModal.from">From</label>
+      <span class="backfill-range__end">
+        <input type="datetime-local" id="backfillSince">
+        <label class="backfill-range__open"><input type="checkbox" id="backfillFromEarliest"> <span data-i18n="backfillModal.earliest">Earliest</span></label>
+      </span>
+    </div>
+    <div class="field backfill-range">
+      <label for="backfillUntil" data-i18n="backfillModal.to">To</label>
+      <span class="backfill-range__end">
+        <input type="datetime-local" id="backfillUntil" hidden>
+        <label class="backfill-range__open"><input type="checkbox" id="backfillToNow" checked> <span data-i18n="backfillModal.now">Now</span></label>
+      </span>
+    </div>
+    <div class="setting__hint" id="backfillEverything" data-i18n="backfillModal.everything" hidden>
+      Every play osu! has kept on this computer, however old. Checking reads every replay, so it
+      can take a while, and importing thousands of plays takes minutes.
+    </div>
 
     <!--
       The play tracking filter applies to an import as well as to live tracking, which is

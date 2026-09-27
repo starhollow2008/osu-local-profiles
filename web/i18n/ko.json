@@ -64,7 +64,6 @@
   "backfillCancel": "취소",
   "backfillCheck": "확인",
   "backfillModal.goBackOnlyAsFar": "이 플레이 스타일로 플레이한 세션까지만 거슬러 올라가세요. 그보다 이전까지 가면 평소 스타일로 낸 플레이까지 끌어오게 됩니다 - 프로필을 따로 두는 이유가 바로 그것을 막기 위해서입니다.",
-  "backfillModal.importPlaysSince": "이 시각 이후의 플레이 가져오기",
   "backfillModal.onlyImportPlaysThatMatch": "내 플레이 기록 필터에 맞는 플레이만 가져오기",
   "backfillModal.playsSetWhileThisApp": "이 앱이 닫혀 있는 동안 낸 플레이는 기록되지 않았습니다. 얼마나 거슬러 올라갈지 고르면 그 시점부터 가져옵니다 - 완주한 플레이는 리플레이에서, 중단·실패·재시도는 osu!lazer 자체 로그에서 가져옵니다.",
   "backfillPresets.12Hours": "12시간",

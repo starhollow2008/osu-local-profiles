@@ -479,8 +479,15 @@ count them.
 ## Importing plays you set while it was closed
 
 Scores are only tracked while the app is running, so a session played with it closed is missed.
-**Options -> Import past plays** covers that: pick how far back to look, check what would be
+**Options -> Import past plays** covers that: pick when you played, check what would be
 imported, then confirm.
+
+- **A preset** - 1 hour up to 1 day - imports from that long ago up to now.
+- **All** imports every play osu! has kept on this computer, however old. Checking reads every
+  replay, so it can take a minute or two, and importing thousands of plays takes longer.
+- **From and To** pick a range of your own - an evening last week, without the week since. Tick
+  **Earliest** to start from the oldest play there is, and **Now** (ticked by default) to run up
+  to the present; a ticked end hides its date.
 
 It reads osu!lazer's own logs as well as your replays, so a past session comes back whole: the
 finished plays from their replays, the quits, fails and retries osu! counted, and the ones made

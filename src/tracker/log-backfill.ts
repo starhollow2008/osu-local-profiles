@@ -48,7 +48,10 @@ export function scanLogsForPlays(
   profileId: number,
   dirs: readonly string[],
   since: number,
+  /** The end of the range, or null for now. */
+  until: number | null = null,
 ): LogBackfillScan {
+  const after = (at: number) => until !== null && at > until;
   const recorded = db.prepare(
     'SELECT 1 AS hit FROM incomplete_plays WHERE profile_id = ? AND dedupe_key = ?',
   );
@@ -75,7 +78,7 @@ export function scanLogsForPlays(
         : new Map<string, number>();
 
       for (const play of events.plays) {
-        if (play.passed || play.countedAt < since || seen.has(play.token)) continue;
+        if (play.passed || play.countedAt < since || after(play.countedAt) || seen.has(play.token)) continue;
         seen.add(play.token);
         if (isRecorded(play.token)) {
           alreadyTracked++;
@@ -87,7 +90,7 @@ export function scanLogsForPlays(
       for (const found of events.attempts) {
         const attempt: SessionAttempt = { ...found, session: files.id };
         const key = attemptKey(attempt);
-        if (attempt.endedAt < since || seen.has(key)) continue;
+        if (attempt.endedAt < since || after(attempt.endedAt) || seen.has(key)) continue;
         seen.add(key);
         if (isRecorded(key)) {
           alreadyTracked++;

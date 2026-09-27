@@ -64,7 +64,6 @@
   "backfillCancel": "Annulla",
   "backfillCheck": "Controlla",
   "backfillModal.goBackOnlyAsFar": "Torna indietro solo fino alla sessione che hai giocato con questo stile. Qualsiasi cosa precedente porta dentro partite giocate col tuo stile abituale - che è esattamente ciò che un profilo separato esiste per tenere fuori.",
-  "backfillModal.importPlaysSince": "Importa le partite da",
   "backfillModal.onlyImportPlaysThatMatch": "Importa solo le partite che rispettano il mio filtro di tracciamento",
   "backfillModal.playsSetWhileThisApp": "Le partite giocate mentre questa applicazione era chiusa non sono mai state seguite. Scegli quanto indietro guardare e verranno importate da quel momento in poi - le partite completate dai loro replay, e gli abbandoni, i fallimenti e i ritentativi dai log di osu!lazer.",
   "backfillPresets.12Hours": "12 ore",

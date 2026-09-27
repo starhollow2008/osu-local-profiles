@@ -64,7 +64,6 @@
   "backfillCancel": "Abbrechen",
   "backfillCheck": "Prüfen",
   "backfillModal.goBackOnlyAsFar": "Gehe nur so weit zurück wie die Sitzung, die du mit diesem Spielstil gespielt hast. Alles davor zieht Spiele deines normalen Stils herein - und genau die soll ein eigenes Profil ja heraushalten.",
-  "backfillModal.importPlaysSince": "Spiele importieren seit",
   "backfillModal.onlyImportPlaysThatMatch": "Nur Spiele importieren, die meinem Spielverfolgungs-Filter entsprechen",
   "backfillModal.playsSetWhileThisApp": "Spiele, die du bei geschlossener App gesetzt hast, wurden nie verfolgt. Wähle, wie weit zurück gesucht werden soll, und sie werden ab diesem Moment importiert - beendete Spiele aus ihren Replays, und Abbrüche, Fehlschläge und Neuversuche aus osu!lazers eigenen Logs.",
   "backfillPresets.12Hours": "12 Stunden",

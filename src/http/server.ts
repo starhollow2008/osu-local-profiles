@@ -1429,17 +1429,22 @@ export function startServer(opts: ServerOptions): http.Server {
       req.on('end', () => {
         void (async () => {
           let since: number;
+          let until: number | null = null;
           let confirmed = false;
           let applyFilter = true;
           let sources: BackfillSources = REPLAYS_ONLY;
           try {
             const parsed = JSON.parse(body) as {
               since?: number;
+              until?: number | null;
               confirm?: boolean;
               sources?: unknown;
               applyFilter?: boolean;
             };
             since = Number(parsed.since);
+            // The end of the range. Absent or null means now, which is what an import was
+            // before it could be given one.
+            until = parsed.until === undefined || parsed.until === null ? null : Number(parsed.until);
             confirmed = parsed.confirm === true;
             // Absent means apply it, which is what an import did before it could be asked
             // not to -- so an older page, or a script, keeps the behaviour it expects.
@@ -1458,11 +1463,20 @@ export function startServer(opts: ServerOptions): http.Server {
             return json(res, { error: 'expected a JSON body with a "since" timestamp' }, 400);
           }
 
-          if (!Number.isFinite(since) || since <= 0) {
+          // 0 is every play on this computer, however old: the dialog's All.
+          if (!Number.isFinite(since) || since < 0) {
             return json(res, { error: '"since" must be a millisecond timestamp' }, 400);
           }
           if (since > Date.now()) {
             return json(res, { error: '"since" is in the future' }, 400);
+          }
+          if (until !== null) {
+            if (!Number.isFinite(until)) {
+              return json(res, { error: '"until" must be a millisecond timestamp' }, 400);
+            }
+            if (until <= since) return json(res, { error: '"until" must be after "since"' }, 400);
+            // An end still to come is the same range as one ending now.
+            if (until >= Date.now()) until = null;
           }
           if (!preview && !confirmed) {
             return json(res, { error: 'importing requires an explicit confirmation' }, 400);
@@ -1470,10 +1484,11 @@ export function startServer(opts: ServerOptions): http.Server {
 
           try {
             if (preview) {
-              const scan = await opts.tracker.previewBackfill(since, applyFilter);
+              const scan = await opts.tracker.previewBackfill(since, applyFilter, until);
               // The candidate list carries absolute paths; the page only needs the counts.
               return json(res, {
                 since,
+                until,
                 scanned: scan.scanned,
                 importable: scan.importable,
                 duplicates: scan.duplicates,
@@ -1490,11 +1505,12 @@ export function startServer(opts: ServerOptions): http.Server {
               });
             }
 
-            const result = await opts.tracker.backfill(since, sources, applyFilter);
+            const result = await opts.tracker.backfill(since, sources, applyFilter, 'import', until);
             broadcast('backfill', result);
             console.log(
-              `\n  imported ${result.imported} past play(s) from ` +
-                `${new Date(since).toLocaleString()}` +
+              `\n  imported ${result.imported} past play(s) ` +
+                `${since === 0 ? 'from every play on this computer' : `from ${new Date(since).toLocaleString()}`}` +
+                `${until === null ? '' : ` to ${new Date(until).toLocaleString()}`}` +
                 `${result.unfinished + result.attempts > 0 ? `, and from osu!lazer's logs ${result.unfinished} unfinished and ${result.attempts} not submitted` : ''}` +
                 `${result.filtered > 0 ? ` (${result.filtered} declined by the tracking filter)` : ''}` +
                 `${result.otherPlayers > 0 ? ` (${result.otherPlayers} were set by other players)` : ''}\n`,

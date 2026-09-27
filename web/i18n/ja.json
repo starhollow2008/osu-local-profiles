@@ -64,7 +64,6 @@
   "backfillCancel": "キャンセル",
   "backfillCheck": "確認",
   "backfillModal.goBackOnlyAsFar": "このプレイスタイルで遊んだセッションのところまでだけ遡ってください。それより前まで遡ると、いつものスタイルで出したプレイまで取り込んでしまいます - プロフィールを分ける目的はまさにそれを避けることです。",
-  "backfillModal.importPlaysSince": "この時刻以降のプレイをインポート",
   "backfillModal.onlyImportPlaysThatMatch": "プレイ記録フィルターに合うプレイだけをインポートする",
   "backfillModal.playsSetWhileThisApp": "このアプリが閉じている間に出したプレイは記録されていません。どこまで遡るかを選べば、その時点以降のプレイがインポートされます - 完走したプレイはリプレイから、中断・失敗・リトライは osu!lazer 自身のログから取り込みます。",
   "backfillPresets.12Hours": "12時間",

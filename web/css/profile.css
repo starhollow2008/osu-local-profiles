@@ -2639,6 +2639,30 @@
   font-weight: 600;
 }
 
+/*
+ * Import past plays' From and To: the date, then the box that opens that end. The box keeps its
+ * place on the right whether or not the date beside it is showing, so the two rows line up.
+ */
+.backfill-range__end {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* One width for both dates, whatever time each holds, so From and To line up. */
+.backfill-range__end input[type="datetime-local"] {
+  width: 200px;
+}
+
+.backfill-range__open {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+  color: hsl(var(--hsl-c1));
+  cursor: pointer;
+}
+
 .field {
   display: flex;
   align-items: center;

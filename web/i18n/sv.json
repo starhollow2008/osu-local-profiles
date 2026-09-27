@@ -64,7 +64,6 @@
   "backfillCancel": "Avbryt",
   "backfillCheck": "Kontrollera",
   "backfillModal.goBackOnlyAsFar": "Gå bara tillbaka till den session du spelade med den här spelstilen. Allt tidigare drar in omgångar du spelade med din vanliga stil - och det är precis vad en separat profil finns till för att hålla utanför.",
-  "backfillModal.importPlaysSince": "Importera omgångar sedan",
   "backfillModal.onlyImportPlaysThatMatch": "Importera bara omgångar som matchar mitt spårningsfilter",
   "backfillModal.playsSetWhileThisApp": "Omgångar du spelade medan appen var stängd har aldrig följts. Välj hur långt tillbaka du vill titta, så importeras de från den tidpunkten och framåt - slutförda omgångar från sina replays, och avhopp, misslyckanden och omförsök från osu!lazers egna loggar.",
   "backfillPresets.12Hours": "12 timmar",

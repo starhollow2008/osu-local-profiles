@@ -176,6 +176,8 @@ export interface BackfillResult {
   otherPlayers: number;
   scanned: number;
   since: number;
+  /** The end of the range, or null for now. */
+  until: number | null;
 }
 
 /**
@@ -536,25 +538,22 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     return applyFilter ? this.currentFilter() : defaultTrackingFilter();
   }
 
-  /** Preview what an import would bring in, without changing anything. */
-  previewBackfill(since: number, applyFilter = true): Promise<BackfillPreview> {
+  /**
+   * Preview what an import would bring in, without changing anything. `until` ends the range,
+   * null meaning now; `since` 0 reaches every play on this computer.
+   */
+  previewBackfill(since: number, applyFilter = true, until: number | null = null): Promise<BackfillPreview> {
     return this.enqueue(async () => {
       const filter = this.importFilter(applyFilter);
       await this.buildMcosuReplays(since);
-      const replays = await scanForReplays(
-        this.opts.db,
-        this.opts.profileId,
-        this.replayDirs(),
-        since,
-        {
-          resolver: this.opts.resolver,
-          // So the preview counts what the import will actually decline, rather than promising
-          // plays the same filter is about to turn away.
-          filter,
-        },
-        this.currentIdentity(),
-      );
-      return { ...replays, log: this.previewLogs(since, filter) };
+      const replays = await scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since, {
+        until,
+        // So the preview counts what the import will actually decline, rather than promising
+        // plays the same filter is about to turn away.
+        filtering: { resolver: this.opts.resolver, filter },
+        owner: this.currentIdentity(),
+      });
+      return { ...replays, log: this.previewLogs(since, until, filter) };
     });
   }
 
@@ -562,8 +561,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * The logs' half of a preview. Every play goes through the check its import runs before
    * writing, so each number here is one the import reproduces.
    */
-  private previewLogs(since: number, filter: TrackingFilter): LogBackfillPreview {
-    const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
+  private previewLogs(since: number, until: number | null, filter: TrackingFilter): LogBackfillPreview {
+    const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since, until);
     const ctx = this.importContext(since, filter);
     const preview: LogBackfillPreview = {
       unfinished: 0,
@@ -621,13 +620,15 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * add dozens at once, and a toast per play would bury the page. Naming no sources means
    * replays alone, which is what an import meant before it read logs.
    *
-   * What it turns away is recorded, as coming from `origin`, so Settings can list it.
+   * What it turns away is recorded, as coming from `origin`, so Settings can list it. `until`
+   * ends the range, null meaning now, exactly as for the preview.
    */
   backfill(
     since: number,
     sources: BackfillSources = REPLAYS_ONLY,
     applyFilter = true,
     origin: DeclineSource = 'import',
+    until: number | null = null,
   ): Promise<BackfillResult> {
     return this.enqueue(async () => {
       let imported = 0;
@@ -646,15 +647,11 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
       if (sources.replays) {
         await this.buildMcosuReplays(since);
-        const scan = await scanForReplays(
-          this.opts.db,
-          this.opts.profileId,
-          this.replayDirs(),
-          since,
-          undefined,
+        const scan = await scanForReplays(this.opts.db, this.opts.profileId, this.replayDirs(), since, {
+          until,
           owner,
-          this.recordOtherPlayer(origin),
-        );
+          onOtherPlayer: this.recordOtherPlayer(origin),
+        });
         scanned = scan.scanned;
         otherPlayers = scan.otherPlayers.reduce((n, p) => n + p.count, 0);
         for (const candidate of scan.candidates) {
@@ -687,7 +684,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       }
 
       if (sources.unfinished || sources.attempts) {
-        const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
+        const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since, until);
         const ctx = this.importContext(since, filter, origin);
         const tally = (status: 'added' | 'skipped' | 'filtered'): boolean => {
           if (status === 'filtered') {
@@ -710,7 +707,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
         }
       }
 
-      return { imported, unfinished, attempts, skipped, filtered, otherPlayers, scanned, since };
+      return { imported, unfinished, attempts, skipped, filtered, otherPlayers, scanned, since, until };
     });
   }
 

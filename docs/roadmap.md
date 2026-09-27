@@ -3020,3 +3020,36 @@ console and an import declining hundreds without a word per play.
 - `npm run ui` against that copy: 344/345. The 16 checks here pass. The one failure is the
   existing McOsu badge check, which finds the tracking filter's own MC badge on a profile with
   no McOsu plays. The panel was looked at on desktop and phone widths, and both sections empty.
+
+## 5.62 - Import past plays over a range, or everything
+
+**Status:** done -- unreleased.
+
+The user's request: an **All** button beside the presets, and a way to import a date/time range
+rather than only "from then to now", done as simply and intuitively as possible.
+
+- **All**, the last preset: every play osu! has kept on this computer (`since` 0). A line under
+  the range says what that means and that checking reads every replay.
+- **From and To**, each with a box that opens that end: **Earliest** and **Now**, Now ticked by
+  default. A ticked end hides its date rather than greying it, so a date on screen is always one
+  the import uses. The presets set both ends; All is Earliest to Now, and lights up whenever the
+  range is that however it got there. A date typed by hand lights none. An end before its start
+  is refused on the page and by the server.
+- **`until` through every scan.** Matched against the time inside the play -- a replay's
+  mtime is when its play *ended*, so it can rule a play out of a start but never out of an end
+  -- in `scanForReplays` (its optional arguments now one `ScanOptions` object) and
+  `scanLogsForPlays`. A replay outside the range is never looked at, so another player's there
+  is not listed under Plays not tracked. `/api/backfill` and its preview take `until`, absent or
+  null meaning now, and an end still to come is taken as now. The catch-up at launch is
+  unchanged.
+
+### Verified
+
+- `npm run check`: 609 tests. `test/import-range.test.ts` covers a range bringing in only what is
+  inside it (replays and lazer's log attempts, the import matching its preview), All reaching
+  everything with what is tracked left alone, and the server's validation. The synthetic
+  install `test/declined.test.ts` built is now `test/import-fixture.ts`, shared by both.
+- `npm run ui` against a copy of this machine's profile: 346/347 -- 7 new checks on the range,
+  the one failure the existing McOsu badge check. The dialog was looked at by default, with a
+  range, and after an All check: 80 seconds over this machine's osu! folders, reporting 52
+  already tracked, 2,552 left out by that copy's test filter and 93 other players' replays.

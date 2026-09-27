@@ -3074,7 +3074,37 @@ function toLocalInput(ms) {
   return d.toISOString().slice(0, 16);
 }
 
-const sinceValue = () => new Date($('backfillSince').value).getTime();
+/*
+ * The range to import, as the server takes it: `since` 0 for the earliest play on this
+ * computer, `until` null for now. Either end, ticked, stands open; untouched, its date is used.
+ */
+const sinceValue = () =>
+  $('backfillFromEarliest').checked ? 0 : new Date($('backfillSince').value).getTime();
+const untilValue = () =>
+  $('backfillToNow').checked ? null : new Date($('backfillUntil').value).getTime();
+
+/** What is wrong with the range, or null when it can be checked. */
+function rangeProblem() {
+  const since = sinceValue();
+  const until = untilValue();
+  if (!Number.isFinite(since) || (until !== null && !Number.isFinite(until))) return t('backfill.badDate');
+  if (until !== null && until <= since) return t('backfill.badRange');
+  return null;
+}
+
+/**
+ * Show each end as it stands: a ticked end hides its date, so every date on screen is one the
+ * import will use. All lights up whenever the range is everything, however it got there.
+ */
+function renderRange() {
+  const earliest = $('backfillFromEarliest').checked;
+  const now = $('backfillToNow').checked;
+  $('backfillSince').hidden = earliest;
+  $('backfillUntil').hidden = now;
+  $('backfillEverything').hidden = !earliest;
+  if (earliest && now) markPreset('all');
+  else if (earliest || !now) markPreset(null);
+}
 
 /** Any change to the cutoff invalidates the preview, so Import has to be earned again. */
 function resetBackfillPreview(message) {
@@ -3155,10 +3185,19 @@ $('backfillFilterHint').onclick = (e) => {
   $('optFilter').click();
 };
 
+/** A preset: the last `hours` up to now, or with 'all' every play there is. */
+function applyPreset(hours) {
+  $('backfillFromEarliest').checked = hours === 'all';
+  $('backfillToNow').checked = true;
+  if (hours !== 'all') $('backfillSince').value = toLocalInput(Date.now() - hours * 3600_000);
+  markPreset(hours);
+  renderRange();
+}
+
 function openBackfill() {
   setMenuOpen(false);
-  markPreset(3);
-  $('backfillSince').value = toLocalInput(Date.now() - 3 * 3600_000);
+  applyPreset(3);
+  $('backfillUntil').value = '';
   // Ticked every time it opens: an import agreeing with live tracking is the default, and a
   // decision to bypass the filter should be made for the import in front of you.
   $('backfillFiltered').checked = true;
@@ -3172,9 +3211,10 @@ function closeBackfill() {
   $('backfillModal').hidden = true;
 }
 
+/** Light the preset the range came from: a number of hours, 'all', or null for none. */
 function markPreset(hours) {
   for (const b of $('backfillPresets').querySelectorAll('button')) {
-    b.classList.toggle('active', Number(b.dataset.hours) === hours);
+    b.classList.toggle('active', hours === 'all' ? 'all' in b.dataset : Number(b.dataset.hours) === hours);
   }
 }
 
@@ -3185,32 +3225,51 @@ $('backfillModal').onclick = (e) => {
 };
 
 $('backfillPresets').onclick = (e) => {
-  const b = e.target.closest('[data-hours]');
+  const b = e.target.closest('[data-hours], [data-all]');
   if (!b) return;
-  const hours = Number(b.dataset.hours);
-  markPreset(hours);
-  $('backfillSince').value = toLocalInput(Date.now() - hours * 3600_000);
+  applyPreset('all' in b.dataset ? 'all' : Number(b.dataset.hours));
   resetBackfillPreview(t('backfill.cutoffChanged'));
 };
 
-$('backfillSince').onchange = () => {
+/* A date typed by hand is a range of your own, so no preset is lit any more. */
+$('backfillSince').onchange = $('backfillUntil').onchange = () => {
   markPreset(null);
   resetBackfillPreview(t('backfill.cutoffChanged'));
 };
 
+$('backfillFromEarliest').onchange = () => {
+  // Opening From again starts where it was, or at a day ago if it never had a date.
+  if (!$('backfillFromEarliest').checked && !$('backfillSince').value) {
+    $('backfillSince').value = toLocalInput(Date.now() - 24 * 3600_000);
+  }
+  renderRange();
+  resetBackfillPreview(t('backfill.cutoffChanged'));
+};
+
+$('backfillToNow').onchange = () => {
+  // An end is picked starting from now: the one moment certain to be after any From.
+  if (!$('backfillToNow').checked && !$('backfillUntil').value) {
+    $('backfillUntil').value = toLocalInput(Date.now());
+  }
+  renderRange();
+  resetBackfillPreview(t('backfill.cutoffChanged'));
+};
+
 $('backfillCheck').onclick = async () => {
-  const since = sinceValue();
-  if (!Number.isFinite(since)) {
-    resetBackfillPreview(t('backfill.badDate'));
+  const problem = rangeProblem();
+  if (problem) {
+    resetBackfillPreview(problem);
     return;
   }
+  const since = sinceValue();
+  const until = untilValue();
 
   $('backfillCheck').disabled = true;
   $('backfillSummary').textContent = t('backfill.scanning');
   try {
     const d = await postJson(
       '/api/backfill/preview',
-      { since, applyFilter: backfillApplyFilter() },
+      { since, until, applyFilter: backfillApplyFilter() },
       'preview failed',
     );
 
@@ -3335,6 +3394,7 @@ $('backfillCheck').onclick = async () => {
 
 $('backfillConfirm').onclick = async () => {
   const since = sinceValue();
+  const until = untilValue();
   $('backfillConfirm').disabled = true;
   $('backfillCheck').disabled = true;
   $('backfillConfirm').textContent = 'Importing...';
@@ -3344,7 +3404,7 @@ $('backfillConfirm').onclick = async () => {
     );
     const d = await postJson(
       '/api/backfill',
-      { since, confirm: true, sources, applyFilter: backfillApplyFilter() },
+      { since, until, confirm: true, sources, applyFilter: backfillApplyFilter() },
       'import failed',
     );
     const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);

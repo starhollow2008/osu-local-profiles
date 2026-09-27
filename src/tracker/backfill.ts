@@ -78,6 +78,20 @@ export interface BackfillIdentityContext {
  */
 export type OtherPlayerFound = (file: string, score: ReplayScore, player: string) => void;
 
+export interface ScanOptions {
+  /**
+   * The end of the range, or null for now. A replay's file is written when its play ends, so
+   * its mtime says nothing about whether the play was *before* a moment -- only the time
+   * inside the file does, and that is what this is matched against.
+   */
+  until?: number | null;
+  /** What the scan needs to apply the filter. Omitted, it reports every play as unfiltered. */
+  filtering?: BackfillFilterContext;
+  /** Who the profile's plays belong to. Omitted, every replay found counts as the owner's. */
+  owner?: PlayerIdentity;
+  onOtherPlayer?: OtherPlayerFound;
+}
+
 function readHead(file: string, n: number): Buffer | null {
   let fd: number | undefined;
   try {
@@ -121,7 +135,7 @@ function* walk(dir: string): Generator<{ path: string; mtimeMs: number }> {
 }
 
 /**
- * Find replays played at or after `since`.
+ * Find replays played at or after `since`, and no later than `until` when there is one.
  *
  * A replay file is written when the play ends, so its mtime can never precede the moment
  * it was played -- which makes mtime a sound cheap filter over lazer's ~63k-file store.
@@ -134,9 +148,7 @@ export async function scanForReplays(
   profileId: number,
   dirs: string[],
   since: number,
-  filtering?: BackfillFilterContext,
-  owner: PlayerIdentity = UNKNOWN_IDENTITY,
-  onOtherPlayer?: OtherPlayerFound,
+  { until = null, filtering, owner = UNKNOWN_IDENTITY, onOtherPlayer }: ScanOptions = {},
 ): Promise<BackfillScan> {
   const candidates: BackfillCandidate[] = [];
   const others = new Map<string, number>();
@@ -164,7 +176,7 @@ export async function scanForReplays(
       }
 
       const playedAt = score.playedAt.getTime();
-      if (playedAt < since) continue;
+      if (playedAt < since || (until !== null && playedAt > until)) continue;
 
       /*
        * Somebody else's play. osu! caches a replay you watched in the same folders as the
