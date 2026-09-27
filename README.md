@@ -113,7 +113,7 @@ McOsu users only:
 |---|---|
 | `assets.ppy.sh` | beatmap cover art and medal icons |
 | `data.ppy.sh` | rank-curve dumps when manually running `npm run rank:refresh` |
-| `osu.ppy.sh` | import existing profile details and beatmap details |
+| `osu.ppy.sh` | import existing profile details, scores, beatmaps|
 | `b.ppy.sh` | song audio previews |
 | `github.com` | check for new app updates |
 
@@ -163,7 +163,7 @@ App reads from lazer's session log to track incomplete plays:
 | `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
 | `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Other settings -> Open in browser on start** |
-| `checkForUpdates` | `true` | ask GitHub once at startup whether a newer release exists |
+| `checkForUpdates` | `true` | ask GitHub at startup and once a day while running whether a newer release exists |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
