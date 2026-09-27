@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.27.0
+
+- **See every play the app didn't track, and bring one back.** **Options -> Other settings ->
+  Plays not tracked** lists each play the app turned away - declined by your play tracking
+  filter, set by another player, or a replay it couldn't read - with whose it was and why, so
+  a play that never appeared can be found. **Track anyway** brings one in regardless, and the
+  red minus deletes one for good.
+  - Removed scores and Plays not tracked are always shown now, even when empty.
+
+- **Import past plays over any time range, or everything.** Pick **From** and **To** to import
+  an evening last week without the week since, or press **All** to import every play osu! has
+  kept on this computer. Checking everything reads every replay, so it can take a minute or two.
+
+- **Import replay files.** **Import past plays -> Import replay files...** takes `.osr` files
+  you have yourself - downloaded from the osu! website, say, or kept from an old install. Choose
+  several at once, or drag them onto the window. The app keeps its own copy, so deleting the
+  file afterwards loses nothing, and **Back up everything** includes it.
+
+- **Import a score from its link on osu.ppy.sh**, for a play whose replay you no longer have.
+  Its pp is calculated here from the score's own numbers, exactly as osu! calculates it, and
+  recalculated here after a pp rework with no internet needed. A beatmap you don't have is
+  downloaded once and kept.
+
+- **Enter a score by hand, as a last resort.** For a play with no replay and no link: pick the
+  beatmap, type the judgements, combo and mods, and the pp is calculated from what you entered.
+  Everything is checked against the beatmap, and the score is marked "Manually entered by hand"
+  everywhere it appears, shared pages included.
+
+- **Best performances imported from your osu! account are calculated here too**, so a pp rework
+  updates them along with everything else. Those on beatmaps you have installed are converted
+  the first time this version starts; **Recalculate every score** in **Options -> Other
+  settings** does the rest, downloading the beatmaps it needs. If the real replay of one turns
+  up later, it takes that score's place, keeping its pin.
+
+- **Scores with no replay say so.** "No replay file" marks a score imported from osu!, and
+  "Manually entered by hand" one you typed in - on every row, the score's details and shared
+  pages. Any score osu! has now has **View on osu!** in its **···** menu.
+
 ## 1.26.0
 
 - **Your finished plays are tracked even if you imported someone else's osu! account.**
