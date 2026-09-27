@@ -488,6 +488,12 @@ imported, then confirm.
 - **From and To** pick a range of your own - an evening last week, without the week since. Tick
   **Earliest** to start from the oldest play there is, and **Now** (ticked by default) to run up
   to the present; a ticked end hides its date.
+- **Import replay files...** takes `.osr` files you have yourself - downloaded from osu!'s
+  website, say, or kept from an old install - that osu! no longer has. Choose as many as you like
+  at once, or select them in a folder and drag them onto the dialog. Each is imported straight
+  away, through the same checks as everything else (the filter box above included), and the
+  dialog says what came of them. The app keeps its own copy in `data/replays/`, so deleting the
+  file you chose loses nothing, and **Back up everything** includes it.
 
 It reads osu!lazer's own logs as well as your replays, so a past session comes back whole: the
 finished plays from their replays, the quits, fails and retries osu! counted, and the ones made

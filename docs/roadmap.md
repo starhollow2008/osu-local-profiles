@@ -3053,3 +3053,39 @@ rather than only "from then to now", done as simply and intuitively as possible.
   the one failure the existing McOsu badge check. The dialog was looked at by default, with a
   range, and after an All check: 80 seconds over this machine's osu! folders, reporting 52
   already tracked, 2,552 left out by that copy's test filter and 93 other players' replays.
+
+## 5.63 - Import replay files
+
+**Status:** done -- unreleased.
+
+The user's request: a button in Import past plays to import `.osr` files, several at once, with a
+line saying they can be dragged in too -- for replays downloaded from osu!'s website that are not
+in the game.
+
+- **Import replay files...** opens a multi-select file picker (`.osr`), and the whole dialog is a
+  drop target, outlined with "Drop replay files to import them" while files are dragged over it.
+  A drop of anything but `.osr` files is refused on the page; a file whose bytes are not a
+  replay, by the server.
+- **One request per file** (`POST /api/replays`, raw body, 64MB cap), each imported as it
+  arrives through `Tracker.importReplayFile`: no range and no cutoff -- choosing the file is the
+  decision -- and otherwise every check an import makes, the dialog's filter box included. What
+  it turns away is under Plays not tracked. The summary tallies imported, already here, filtered,
+  someone else's, unreadable and not `.osr`.
+- **A copy in `data/replays/<md5>.osr`** (`src/uploaded-replays.ts`), because the file chosen may
+  be in Downloads and gone next week: the score's `replay_path` points at it for recalculation
+  and Download Replay. Kept only while a score or a play not tracked points at it, and in every
+  backup -- it may be the only copy.
+
+### Verified
+
+- `npm run check`: 613 tests. `test/replay-upload.test.ts` covers an upload imported and its copy
+  kept, the same file again being the same score, a play already tracked from osu!'s own folder
+  keeping no copy, another player's replay listed and tracked anyway from the copy, the filter
+  box, a non-replay refused, and the copy in a backup.
+- Against a copy of this machine's profile: six real osu!stable replays from `Data/r`, all
+  declined by that copy's test filter and kept for Track anyway; two again with the box
+  unticked, imported (S 98.80%, B 89.92%) and off the list. A text file was refused.
+- `npm run ui` against that copy: 354/355 -- 8 new checks (the button, the picker taking several
+  `.osr` files, the drop hint, the outline and its words on a drag, a drop taken from the
+  browser, a non-replay refused before anything is sent). The one failure is the existing
+  McOsu badge check. The dialog and the drag outline were looked at.

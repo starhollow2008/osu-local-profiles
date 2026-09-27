@@ -58,6 +58,7 @@ import { appVersion } from '../config.ts';
 import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { filterNarrows } from '../tracking-filter.ts';
 import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
+import { MAX_REPLAY_BYTES, releaseUploadedReplay, storeUploadedReplay } from '../uploaded-replays.ts';
 import { clearDeclines, declineCount, deleteDeclines, listDeclines } from '../tracker/declined.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
@@ -846,6 +847,42 @@ export function startServer(opts: ServerOptions): http.Server {
         } catch (e) {
           return json(res, { error: (e as Error).message }, 500);
         }
+      });
+      return;
+    }
+
+    /*
+     * A replay file chosen or dropped into Import past plays, one per request: a raw body like
+     * the images above, capped and sniffed. A copy is kept in data/replays (src/uploaded-
+     * replays.ts) and imported through the same checks as any past play; one that brought in
+     * nothing and is not listed as turned away is not kept. `?applyFilter=0` is the dialog's
+     * box unticked, as for a range.
+     */
+    if (url.pathname === '/api/replays' && req.method === 'POST') {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      let aborted = false;
+      req.on('data', (chunk: Buffer) => {
+        if (aborted) return;
+        size += chunk.length;
+        if (size > MAX_REPLAY_BYTES) {
+          aborted = true;
+          json(res, { error: 'that file is too large to be a replay' }, 413);
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        if (aborted) return;
+        void (async () => {
+          const file = storeUploadedReplay(opts.dataDir, Buffer.concat(chunks));
+          if (file === null) return json(res, { error: 'that file is not an osu! replay' }, 400);
+          const result = await opts.tracker.importReplayFile(file, url.searchParams.get('applyFilter') !== '0');
+          // Kept only when a score, or a play not tracked, now points at it.
+          releaseUploadedReplay(opts.db, file);
+          return json(res, result);
+        })().catch((e: unknown) => json(res, { error: (e as Error).message }, 500));
       });
       return;
     }

@@ -920,6 +920,21 @@
     </label>
     <div class="setting__hint" id="backfillFilterHint"></div>
 
+    <!--
+      Replay files: ones downloaded from osu!'s website, or kept from an old install, that osu!
+      itself no longer has. Chosen several at once, or dropped anywhere on this dialog; each is
+      imported as soon as it arrives, through the same checks as a range, and the filter box
+      above applies to them too. See src/uploaded-replays.ts.
+    -->
+    <div class="backfill-files">
+      <button type="button" id="backfillChooseFiles" data-i18n="backfillChooseFiles">Import replay files…</button>
+      <input type="file" id="backfillFileInput" accept=".osr" multiple hidden>
+      <span class="setting__hint" data-i18n="backfillModal.dropHint">
+        Have .osr replays you downloaded or saved? Choose as many as you like, or select them in
+        a folder and drag them onto this window.
+      </span>
+    </div>
+
     <div class="backfill-summary" id="backfillSummary">
       Pick a time, then check what would be imported.
     </div>

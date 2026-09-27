@@ -3432,6 +3432,126 @@ $('backfillConfirm').onclick = async () => {
   }
 };
 
+/*
+ * Replay files, chosen or dropped: downloaded ones, say, that osu! no longer has.
+ *
+ * Imported one at a time as they upload, each through the same checks as a range (the server's
+ * /api/replays), with the filter box above deciding the filter's say. Choosing the files is
+ * the decision, so there is no preview to confirm; what came of them is said in the summary,
+ * and what was turned away is under Plays not tracked, where it can be tracked anyway.
+ */
+const isReplayFile = (file) => /\.osr$/i.test(file.name);
+
+async function importReplayFiles(files) {
+  const replays = files.filter(isReplayFile);
+  const tally = { added: 0, already: 0, filtered: 0, others: 0, unreadable: 0, notReplays: files.length - replays.length };
+  if (replays.length === 0) {
+    resetBackfillPreview(escapeHtml(t('files.noneWereReplays')));
+    return;
+  }
+
+  const buttons = ['backfillChooseFiles', 'backfillCheck', 'backfillConfirm'].map($);
+  for (const b of buttons) b.disabled = true;
+  try {
+    for (const [i, file] of replays.entries()) {
+      $('backfillSummary').textContent = t('files.importing', { n: fmt(i + 1), total: fmt(replays.length) });
+      const r = await fetch(`/api/replays${backfillApplyFilter() ? '' : '?applyFilter=0'}`, { method: 'POST', body: file });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) tally.unreadable++;
+      else if (d.status === 'added') tally.added++;
+      else if (d.status === 'filtered') tally.filtered++;
+      else if (d.reason === 'another-player') tally.others++;
+      else if (d.reason === 'unparseable') tally.unreadable++;
+      else tally.already++;
+    }
+  } catch (err) {
+    resetBackfillPreview(t('backfill.importFailed', { error: escapeHtml(err.message) }));
+    return;
+  } finally {
+    for (const b of buttons) b.disabled = false;
+  }
+
+  /*
+   * One sentence per outcome, each written out for the counts it can have -- see the note on
+   * `replays` in the Check handler for why a noun is never pluralised by gluing on an "s".
+   */
+  const parts = [
+    replays.length > 1
+      ? t('files.importedOf', { n: fmt(tally.added), total: fmt(replays.length) })
+      : tally.added === 1
+        ? t('files.importedTheOne')
+        : t('files.notImported'),
+  ];
+  if (tally.already > 0) parts.push(t('files.already', { n: fmt(tally.already) }));
+  if (tally.filtered > 0) parts.push(t('files.filtered', { n: fmt(tally.filtered) }));
+  if (tally.others > 0) parts.push(t('files.others', { n: fmt(tally.others) }));
+  if (tally.filtered + tally.others > 0) parts.push(t('files.seeNotTracked'));
+  if (tally.unreadable > 0) parts.push(t('files.unreadable', { n: fmt(tally.unreadable) }));
+  if (tally.notReplays > 0) parts.push(t('files.notReplays', { n: fmt(tally.notReplays) }));
+  // Through resetBackfillPreview: a range checked before is no longer what it would import.
+  resetBackfillPreview(escapeHtml(parts.join(' ')));
+  if (tally.added > 0) {
+    toast(
+      plural(
+        tally.added,
+        () => t('backfill.importedOne', { n: fmt(tally.added) }),
+        () => tOwn('backfill.importedFew', { n: fmt(tally.added) }),
+        () => t('backfill.importedMany', { n: fmt(tally.added) }),
+      ),
+    );
+  }
+  await Promise.all([loadProfile(), loadState()]);
+}
+
+$('backfillChooseFiles').onclick = () => $('backfillFileInput').click();
+$('backfillFileInput').onchange = () => {
+  const files = [...$('backfillFileInput').files];
+  // Cleared, so choosing the same files again is still a change.
+  $('backfillFileInput').value = '';
+  if (files.length > 0) void importReplayFiles(files);
+};
+
+/*
+ * Dropping, anywhere on the dialog or the dimmed page behind it. Only a drag that carries files
+ * lights it up, and the dialog says what letting go will do; the browser's own handling --
+ * opening the file in the tab -- is prevented only for those.
+ */
+{
+  const modal = $('backfillModal');
+  const panel = modal.querySelector('.modal');
+  const carriesFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  let depth = 0;
+  const lit = (on) => {
+    panel.dataset.dropLabel = t('files.dropToImport');
+    panel.classList.toggle('is-dropping', on);
+  };
+  modal.addEventListener('dragenter', (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    depth++;
+    lit(true);
+  });
+  modal.addEventListener('dragover', (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  modal.addEventListener('dragleave', (e) => {
+    if (!carriesFiles(e)) return;
+    // Enter and leave fire for every child crossed, so only the last leave turns it off.
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) lit(false);
+  });
+  modal.addEventListener('drop', (e) => {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    depth = 0;
+    lit(false);
+    if ($('backfillChooseFiles').disabled) return;
+    void importReplayFiles([...e.dataTransfer.files]);
+  });
+}
+
 /* ---------------------------------------------------- play tracking filter */
 
 /*

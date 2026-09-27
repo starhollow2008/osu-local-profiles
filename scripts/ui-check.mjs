@@ -339,6 +339,47 @@ check('a preset closes both ends again', same(importRange.preset, { lit: '1 hour
 check('a date typed by hand lights no preset', importRange.lit, '');
 check('an end before the start is refused', importRange.backwards, 'The end of the range is before its start.');
 
+/*
+ * Replay files, chosen or dropped. The drop here carries a text file: that is refused on the
+ * page, before anything is sent, so a real profile is never imported into by this check.
+ */
+const files = JSON.parse(await evaluate(`(async () => {
+  const $ = (id) => document.getElementById(id);
+  const input = $('backfillFileInput');
+  const panel = document.querySelector('#backfillModal .modal');
+  const drag = (type, file) => {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    const e = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+    panel.dispatchEvent(e);
+    return e;
+  };
+  const text = new File(['not a replay'], 'notes.txt', { type: 'text/plain' });
+  const out = {
+    button: getComputedStyle($('backfillChooseFiles')).display !== 'none',
+    accepts: input.accept,
+    multiple: input.multiple,
+    hint: $('backfillChooseFiles').nextElementSibling.nextElementSibling.textContent.includes('drag'),
+  };
+  drag('dragenter', text);
+  out.lit = panel.classList.contains('is-dropping');
+  out.label = getComputedStyle(panel, '::after').content;
+  const dropped = drag('drop', text);
+  out.handled = dropped.defaultPrevented;
+  out.unlit = !panel.classList.contains('is-dropping');
+  await new Promise((r) => setTimeout(r, 100));
+  out.said = $('backfillSummary').textContent.trim();
+  return JSON.stringify(out);
+})()`));
+check('there is a button to import replay files', files.button, true);
+check('it picks .osr files, several at once', `${files.accepts}|${files.multiple}`, '.osr|true');
+check('and says they can be dragged in too', files.hint, true);
+check('dragging files over the dialog lights it up', files.lit, true);
+check('and says what dropping will do', files.label, '"Drop replay files to import them"');
+check('a drop is the page’s, not the browser’s', files.handled, true);
+check('and the dialog goes back to normal', files.unlit, true);
+check('a file that is not a replay is refused before anything is sent', files.said, 'None of those are osu! replays (.osr files).');
+
 await evaluate("document.getElementById('backfillCancel').click()");
 check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
 

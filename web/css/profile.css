@@ -2961,6 +2961,56 @@
   margin-top: 10px;
 }
 
+/* Import replay files: the button, and the sentence that says dropping works too. */
+.backfill-files {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--hsl-b3));
+}
+
+.backfill-files button {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+}
+
+.backfill-files button:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.backfill-files .setting__hint {
+  margin: 0;
+}
+
+/*
+ * Replay files dragged over the dialog: it outlines itself and says what dropping will do, so a
+ * drop is never a guess. The words come from the page's language (`data-drop-label`).
+ */
+.modal.is-dropping {
+  position: relative;
+  outline: 2px dashed hsl(var(--hsl-h1));
+  outline-offset: -8px;
+}
+
+.modal.is-dropping::after {
+  content: attr(data-drop-label);
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: inherit;
+  background-color: hsla(var(--hsl-b6), 0.85);
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-title-small);
+  font-weight: 700;
+  pointer-events: none;
+}
+
 .modal .actions button.danger {
   background-color: #a11;
   color: #fff;

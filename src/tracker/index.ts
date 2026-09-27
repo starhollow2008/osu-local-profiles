@@ -27,7 +27,7 @@ import {
   type IncompleteContext,
   type IngestedIncomplete,
 } from './incomplete.ts';
-import { dedupeKey, describe, ingestReplayFile, type IngestedScore } from './ingest.ts';
+import { dedupeKey, describe, ingestReplayFile, type IngestedScore, type IngestOutcome } from './ingest.ts';
 import { scanForReplays, type BackfillScan, type OtherPlayerFound } from './backfill.ts';
 import { declineToTrack, forgetDeclineById, recordDecline, type DeclineSource } from './declined.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
@@ -708,6 +708,31 @@ export class Tracker extends EventEmitter<TrackerEvents> {
       }
 
       return { imported, unfinished, attempts, skipped, filtered, otherPlayers, scanned, since, until };
+    });
+  }
+
+  /**
+   * Import one replay file the user chose or dropped -- one they downloaded, say, that osu! no
+   * longer has. Choosing the file is the decision, so there is no range and no cutoff; every
+   * other check an import makes still applies: the filter (unless this import was told to
+   * ignore it), whose play it is, and whether it is already here. What it turns away is listed
+   * under Plays not tracked, as an import's is.
+   */
+  importReplayFile(file: string, applyFilter = true): Promise<IngestOutcome> {
+    return this.enqueue(async () => {
+      const result = await ingestReplayFile(file, {
+        db: this.opts.db,
+        resolver: this.opts.resolver,
+        profileId: this.opts.profileId,
+        trackingSince: 0,
+        official: this.opts.official,
+        filter: this.importFilter(applyFilter),
+        identity: this.currentIdentity(),
+        declines: 'import',
+      });
+      if (result.status === 'added') this.added++;
+      else if (result.status === 'filtered') this.filtered++;
+      return result;
     });
   }
 
