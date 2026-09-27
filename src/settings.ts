@@ -162,6 +162,14 @@ export interface Settings {
    */
   showCountingNote: boolean;
   /**
+   * How many rows a list's "show more" adds (roadmap 5.67): 25 by default, as osu! does, and
+   * anything from 1 to `MAX_PAGE_ROWS`. Favorite Beatmaps counts rows of two cards. Every list
+   * still opens with its first few; this is only what each press adds.
+   */
+  showMoreRows: number;
+  /** "Show more" shows the whole list in one press, whatever `showMoreRows` says. */
+  showMoreAll: boolean;
+  /**
    * Whether an empty Favorite Beatmaps says how to fill it -- favourite from a play's menu,
    * or import an osu! account's -- with a Don't show again, like the counting note.
    */
@@ -201,6 +209,14 @@ interface SettingDef<K extends keyof Settings> {
 }
 
 type Defs = { [K in keyof Settings]: SettingDef<K> };
+
+/**
+ * The most rows one list may be asked for: the ceiling on `showMoreRows`, and what "All at
+ * once" asks for. A limit arrives as a query parameter, and an unbounded one would let a
+ * stray URL ask the database to assemble every score ever tracked; this is far past any list
+ * a profile holds, so All still means all.
+ */
+export const MAX_PAGE_ROWS = 10_000;
 
 /**
  * Trim to one line and one length. Control characters become spaces rather than being
@@ -279,6 +295,18 @@ const DEFS: Defs = {
     default: true,
     // Defaults to on, so anything but an explicit "off" leaves the warning showing.
     coerce: (raw) => !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
+  },
+  showMoreRows: {
+    default: 25,
+    // A whole number of rows; anything else -- empty, zero, text -- is the default again.
+    coerce: (raw) => {
+      const n = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim());
+      return Number.isFinite(n) && n >= 1 ? Math.min(Math.floor(n), MAX_PAGE_ROWS) : 25;
+    },
+  },
+  showMoreAll: {
+    default: false,
+    coerce: (raw) => raw === true || raw === 'true' || raw === 1 || raw === '1',
   },
   showFavoritesHint: {
     default: true,

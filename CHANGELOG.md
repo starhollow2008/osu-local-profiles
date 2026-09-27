@@ -23,6 +23,10 @@
     at the foot of the page. Dismiss it and it stays away for a week.
   - `"checkForUpdates": false` in `config.json` still turns every check off.
 
+- **Choose how much show more shows.** **Options -> Other settings -> Show more** sets how
+  many rows each press adds to a list - 25 as before, or 50, 100, or any number you type - or
+  **All at once**, which shows the whole list in one press.
+
 - **See every play the app didn't track, and bring one back.** **Options -> Other settings ->
   Plays not tracked** lists each play the app turned away - declined by your play tracking
   filter, set by another player, or a replay it couldn't read - with whose it was and why, so

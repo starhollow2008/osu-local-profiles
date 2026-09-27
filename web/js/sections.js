@@ -350,13 +350,14 @@ const CHEVRON =
  * exactly full might still be the end of the list. Requiring both means the button appears
  * only when there is genuinely more behind it.
  */
-export function showMore(section, returned, requested, total) {
+export function showMore(section, returned, requested, total, all = false) {
   const complete = returned < requested || (Number.isFinite(total) && total <= returned);
   if (complete) return '';
 
+  // "show all" when a press shows the whole list (Other settings -> Show more -> All at once).
   return `<button class="show-more-link" type="button" data-show-more="${escapeHtml(section)}">
   ${CHEVRON}
-  <span class="show-more-link__text">show more</span>
+  <span class="show-more-link__text">${escapeHtml(all ? t('section.showAll') : t('section.showMore'))}</span>
   ${CHEVRON}
 </button>`;
 }

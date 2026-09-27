@@ -2821,6 +2821,29 @@
   color: hsl(var(--hsl-f1));
 }
 
+/* Show more: a number of rows, and All at once beside it overriding it (roadmap 5.67). */
+.rows-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rows-setting input[type="number"] {
+  width: 90px;
+}
+
+.rows-setting input[type="number"]:disabled {
+  opacity: 0.45;
+}
+
+.rows-setting__all {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
 /*
  * A button that reads as a link, inside a hint. For sending someone to the setting a hint is
  * talking about -- it is an action, so it is a button, and it sits in a sentence, so it is

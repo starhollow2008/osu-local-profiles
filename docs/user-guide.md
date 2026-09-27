@@ -606,6 +606,18 @@ play in the middle still breaks it up the way it happened.
 These rows carry no accuracy, mods or pp, and are shown dimmed with a "Didn't finish" note
 rather than with zeroes standing in for numbers nobody recorded.
 
+### Show more
+
+How far a list grows each time you press its **show more**: Best Performance, Most Played
+Beatmaps, Recent Plays, Milestones and Favorite Beatmaps. **25 rows** by default, as osu! does;
+type any number from 1 to 10,000 (the box suggests 25, 50 and 100). Favorite Beatmaps counts
+rows of two cards, so 25 rows is 50 beatmaps. Each list still opens with its first few.
+
+**All at once** makes one press show the whole list, and the button reads **show all**. The
+number stays beside it for when you turn All off again. A long Most Played or Favorite
+Beatmaps list then loads a cover image for every row at once. Recent Plays can show fewer rows
+than its play count, because retries on one map share a row (see above).
+
 ### Count plays osu! could not submit
 
 On by default. See [Offline or signed out](#offline-or-signed-out).

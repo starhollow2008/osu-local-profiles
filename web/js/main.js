@@ -144,6 +144,15 @@ const SETTINGS_FIELDS = [
       t('setting.unfinishedPlaysHint'),
   },
   {
+    // A number of rows, with All at once beside it overriding the number while it is ticked,
+    // so the number is still there when All is switched off again (roadmap 5.67).
+    key: 'showMoreRows',
+    type: 'rows',
+    allKey: 'showMoreAll',
+    label: () => t('setting.showMore'),
+    hint: () => t('setting.showMoreHint', { max: fmt(PAGE_ALL) }),
+  },
+  {
     key: 'countUnsubmittedAttempts',
     type: 'toggle',
     label: () => t('setting.countUnsubmitted'),
@@ -181,22 +190,26 @@ const SETTINGS_FIELDS = [
 /*
  * The paged sections, and how far each is currently expanded.
  *
- * Five rows to begin with, as on osu!, then a jump to 25 and 25 at a time after that. The
- * counts are sent with every profile request rather than the whole history being fetched
- * and sliced here, so a profile with thousands of plays costs the same to open as a new
- * one -- and expanding stays honest for however long the list actually is.
+ * Five rows to begin with, as on osu!, then a jump to 25 and 25 at a time after that -- or
+ * however many rows Other settings -> Show more says, or the whole list at once (roadmap
+ * 5.67). The counts are sent with every profile request rather than the whole history being
+ * fetched and sliced here, so a profile with thousands of plays costs the same to open as a
+ * new one -- and expanding stays honest for however long the list actually is.
  */
 const PAGE_FIRST = 5;
 const PAGE_STEP = 25;
+/** What "All at once" asks for, and the most the server gives: MAX_PAGE_ROWS in src/settings.ts. */
+const PAGE_ALL = 10_000;
 
 /*
  * Favorite Beatmaps pages as osu!'s does: its cards sit two to a row, so osu!'s three rows
- * are six cards, and "show more" goes to 25 rows (50 cards) and then 25 rows at a time.
+ * are six cards, and "show more" adds rows of two cards -- 25 rows, 50 cards, by default.
  */
-const PAGE_SIZES = { favorites: [6, 50] };
+const PAGE_FIRST_SIZES = { favorites: 6 };
+const CARDS_PER_ROW = { favorites: 2 };
 const PAGED = ['events', 'top', 'mostPlayed', 'recent', 'favorites'];
-const firstPage = (section) => PAGE_SIZES[section]?.[0] ?? PAGE_FIRST;
-const pageStep = (section) => PAGE_SIZES[section]?.[1] ?? PAGE_STEP;
+const firstPage = (section) => PAGE_FIRST_SIZES[section] ?? PAGE_FIRST;
+const pageStep = (section) => (settings.showMoreRows || PAGE_STEP) * (CARDS_PER_ROW[section] ?? 1);
 
 const shown = Object.fromEntries(PAGED.map((s) => [s, firstPage(s)]));
 const resetPaging = () => {
@@ -569,7 +582,7 @@ async function loadProfile() {
 
   $('recentActivity').innerHTML =
     activityList(data.events) +
-    showMore('events', data.events.length, shown.events, totalFor('events', data.events));
+    showMore('events', data.events.length, shown.events, totalFor('events', data.events), settings.showMoreAll);
 
   renderCountingNote(data.counting);
   renderMedals(data.medals, mode);
@@ -595,7 +608,7 @@ async function loadProfile() {
         settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
           ? t('empty.noPpPlays')
           : t('empty.noRankedPlays'),
-    }) + showMore('top', data.top.length, shown.top, topTotal);
+    }) + showMore('top', data.top.length, shown.top, topTotal, settings.showMoreAll);
 
   const chart = playHistoryChart(data.monthlyPlaycounts);
   $('playcountChart').innerHTML = chart;
@@ -605,7 +618,7 @@ async function loadProfile() {
   $('mostPlayedCount').textContent = fmt(mostPlayedTotal);
   $('mostPlayed').innerHTML =
     beatmapPlaycountList(data.mostPlayed) +
-    showMore('mostPlayed', data.mostPlayed.length, shown.mostPlayed, mostPlayedTotal);
+    showMore('mostPlayed', data.mostPlayed.length, shown.mostPlayed, mostPlayedTotal, settings.showMoreAll);
 
   const recentTotal = totalFor('recent', data.recent);
   $('recentCount').textContent = fmt(recentTotal);
@@ -613,7 +626,7 @@ async function loadProfile() {
     playList(data.recent, {
       actions: true,
       empty: t('empty.goSetAPlay'),
-    }) + showMore('recent', data.recent.length, shown.recent, recentTotal);
+    }) + showMore('recent', data.recent.length, shown.recent, recentTotal, settings.showMoreAll);
 
   // Favorite Beatmaps. An empty list is just the heading and its 0, as on osu!.
   favoriteSetIds = new Set(data.favoriteIds ?? []);
@@ -622,7 +635,7 @@ async function loadProfile() {
   setPopupCards(data.favorites ?? []);
   $('favoriteBeatmaps').innerHTML =
     favoriteList(data.favorites) +
-    showMore('favorites', (data.favorites ?? []).length, shown.favorites, favoritesTotal);
+    showMore('favorites', (data.favorites ?? []).length, shown.favorites, favoritesTotal, settings.showMoreAll);
   renderFavoritesNote(favoritesTotal);
   // The redraw replaced the playing card with one showing play; give it back its state. If
   // the card is gone the clip plays on, as osu!'s does, with the bar still in charge of it.
@@ -1340,7 +1353,8 @@ function moveSection(id, delta) {
 }
 
 /*
- * Lengthen a paged section: five rows to twenty-five, then twenty-five at a time.
+ * Lengthen a paged section: five rows to twenty-five, then twenty-five at a time -- the step
+ * being Other settings -> Show more -- or to the whole list, with All at once.
  *
  * The button is disabled while the request is in flight rather than removed, so the page
  * does not jump under a cursor that is about to press it again.
@@ -1353,7 +1367,9 @@ document.addEventListener('click', async (e) => {
   if (!PAGED.includes(section)) return;
 
   const step = pageStep(section);
-  shown[section] = shown[section] < step ? step : shown[section] + step;
+  if (settings.showMoreAll) shown[section] = PAGE_ALL;
+  // A step smaller than the first page still adds that step, rather than shrinking the list.
+  else shown[section] = shown[section] < step ? step : shown[section] + step;
   button.disabled = true;
   await loadProfile();
 });
@@ -2133,6 +2149,19 @@ function settingControl(f) {
       )
       .join('')}</div>`;
   }
+  if (f.type === 'rows') {
+    const all = settings[f.allKey] === true;
+    return `<span class="rows-setting">
+      <input type="number" id="${id}" min="1" max="${PAGE_ALL}" step="1" required inputmode="numeric"
+        list="${id}-presets" value="${Number(settings[f.key]) || PAGE_STEP}"${all ? ' disabled' : ''}
+        aria-label="${escapeHtml(f.label())}">
+      <datalist id="${id}-presets"><option value="25"></option><option value="50"></option><option value="100"></option></datalist>
+      <label class="rows-setting__all">
+        <input type="checkbox" id="set-${f.allKey}"${all ? ' checked' : ''}>
+        <span>${escapeHtml(t('setting.showMoreAll'))}</span>
+      </label>
+    </span>`;
+  }
   if (f.type === 'choice') {
     return `<select id="${id}">${f.options
       .map(
@@ -2153,6 +2182,7 @@ function readSettingControl(f) {
   if (f.type === 'checkboxes') {
     return [...el.querySelectorAll('input:checked')].map((i) => i.value);
   }
+  if (f.type === 'rows') return el.valueAsNumber;
   return el.value;
 }
 
@@ -2161,6 +2191,10 @@ function readSettingControl(f) {
  * what turning the toggle on would do, which is most of why someone opens this dialog.
  */
 function applySettingDependencies() {
+  // All at once makes the number moot while it is ticked, and says so by dimming it.
+  for (const f of SETTINGS_FIELDS) {
+    if (f.allKey) $(`set-${f.key}`).disabled = $(`set-${f.allKey}`).checked;
+  }
   for (const f of SETTINGS_FIELDS) {
     if (!f.dependsOn) continue;
     const enabled = Boolean($(`set-${f.dependsOn}`)?.checked);
@@ -2186,12 +2220,14 @@ function applySettingDependencies() {
 }
 
 function renderSettingsFields() {
+  // A `rows` field holds a label of its own (All at once), and labels cannot nest.
+  const wrapper = (f) => (f.type === 'rows' ? 'div' : 'label');
   $('settingsFields').innerHTML = SETTINGS_FIELDS.map(
     (f) => `<div class="setting">
-      <label class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
+      <${wrapper(f)} class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
         <span>${escapeHtml(f.label())}</span>
         ${settingControl(f)}
-      </label>
+      </${wrapper(f)}>
       <div class="setting__hint">${escapeHtml(f.hint?.() ?? '')}</div>
     </div>`,
   ).join('');
@@ -2535,7 +2571,18 @@ $('settingsSave').onclick = async () => {
   // cleaned result back, which is what gets rendered -- so a rejected country code shows
   // as empty here rather than appearing to have saved.
   const patch = {};
-  for (const f of SETTINGS_FIELDS) patch[f.key] = readSettingControl(f);
+  for (const f of SETTINGS_FIELDS) {
+    patch[f.key] = readSettingControl(f);
+    if (f.allKey) patch[f.allKey] = $(`set-${f.allKey}`).checked;
+  }
+
+  // A number of rows the server would quietly put back to 25 is said here instead.
+  const rows = $('set-showMoreRows');
+  if (!rows.disabled && !rows.checkValidity()) {
+    settingsHint(t('setting.showMoreInvalid', { max: fmt(PAGE_ALL) }), true);
+    rows.focus();
+    return;
+  }
 
   $('settingsSave').disabled = true;
   try {

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { openDb, getOrCreateProfile, type Db } from '../src/db/index.ts';
 import { createProfile, deleteProfile } from '../src/profiles.ts';
-import { defaultSettings, getSettings, updateSettings } from '../src/settings.ts';
+import { defaultSettings, getSettings, MAX_PAGE_ROWS, updateSettings } from '../src/settings.ts';
 
 function harness(): { db: Db; profileId: number; cleanup: () => void } {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-settings-'));
@@ -302,5 +302,38 @@ test('relax is priced as osu! prices it by default, and older profiles keep thei
     db.close();
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/*
+ * Other settings -> Show more (roadmap 5.67): a whole number of rows, 25 by default, and All
+ * at once beside it. Anything that is not a number of rows goes back to the default rather
+ * than making the lists page by nothing.
+ */
+test('show more adds a whole number of rows, or the whole list', () => {
+  const h = harness();
+  try {
+    assert.equal(getSettings(h.db, h.profileId).showMoreRows, 25);
+    assert.equal(getSettings(h.db, h.profileId).showMoreAll, false);
+    const cases: [unknown, number][] = [
+      [100, 100],
+      ['50', 50],
+      [7.9, 7],
+      [0, 25],
+      [-5, 25],
+      ['', 25],
+      ['lots', 25],
+      [null, 25],
+      [MAX_PAGE_ROWS * 10, MAX_PAGE_ROWS],
+    ];
+    for (const [raw, want] of cases) {
+      assert.equal(updateSettings(h.db, h.profileId, { showMoreRows: raw }).showMoreRows, want, String(raw));
+    }
+    const all = updateSettings(h.db, h.profileId, { showMoreRows: 40, showMoreAll: true });
+    assert.equal(all.showMoreAll, true);
+    // The number is kept under All, for when All is switched off again.
+    assert.equal(all.showMoreRows, 40);
+  } finally {
+    h.cleanup();
   }
 });

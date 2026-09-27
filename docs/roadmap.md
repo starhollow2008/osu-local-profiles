@@ -3227,3 +3227,35 @@ a metered connection. Balanced against the user's autonomy and data plans throug
   nothing. After the update to 1.27.1, what changed shown once and marked seen when closed.
 - The screenshots found the notice colliding with toasts and sitting over dialogs; it moved
   to the bottom left, beneath both.
+
+## 5.67 - How much show more shows
+
+**Status:** done -- unreleased.
+
+The user's request: a setting in Other settings for how many rows each list's show more adds
+-- 25, 50, 100, a number of one's own -- and All, which shows the whole list in one press. How
+to present it was left open; the user suggested a number field with 25 in it and All
+overriding it.
+
+- **One row in Other settings**: a number box (1 to 10,000; 25, 50 and 100 suggested by a
+  datalist) and **All at once** beside it, which dims the number rather than clearing it, so
+  switching All off gives back what was typed. Two per-profile settings, `showMoreRows` and
+  `showMoreAll`, like every other setting in that dialog. A number the server would put back
+  to 25 (0, empty) is refused in the dialog with a reason instead.
+- **Every paged list**: Best Performance, Most Played Beatmaps, Recent Plays, Milestones, and
+  Favorite Beatmaps, which counts rows of two cards as it always did (25 rows, 50 cards).
+  Lists still open with their first five (six cards); the first press still jumps to the step
+  when the step is larger, as 5 -> 25 did.
+- **All** asks for `MAX_PAGE_ROWS`, the server's cap on a list, raised from 2,000 to 10,000
+  and now defined once in src/settings.ts. The button reads "show all". "show more" was
+  untranslated; both labels are now in every language.
+
+### Verified
+
+- `npm run check`: 650 tests, 642 passing, 8 skipped (macOS and Linux shell scripts);
+  `test/settings.test.ts` pins how a typed number is cleaned.
+- In headless Chrome against a copy of this machine's profile (234 plays in Recent Plays):
+  5 rows, then 25 and 50 by default; 10 and 20 with 10 rows; with All, one press showed all
+  144 rows -- the whole list, since retries share a row -- and the button went. The dialog: All
+  ticked dims the number and keeps it, unticking restores it, 0 is refused with the reason and
+  nothing saved, 50 saved.

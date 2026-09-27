@@ -34,14 +34,8 @@ const TOP_PLAYS = 100;
 /** Rulesets by `Ruleset`, for naming one in a message about an import that failed. */
 const MODE_LABELS = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'] as const;
 
-/**
- * The most rows one request may ask a section for.
- *
- * The page expands 25 at a time and would have to be driven for a very long while to reach
- * this. It is here because the limits arrive as query parameters, and an unbounded one lets
- * a stray URL ask the database to assemble every score ever tracked.
- */
-const MAX_PAGE = 2000;
+/** The most rows one request may ask a section for: see `MAX_PAGE_ROWS`. */
+const MAX_PAGE = MAX_PAGE_ROWS;
 import { computeMedals, earnedMedalCount } from '../calc/medals.ts';
 import { estimateRank, rankTable } from '../calc/rank.ts';
 import {
@@ -53,7 +47,7 @@ import {
   renameProfile,
   setActiveProfile,
 } from '../profiles.ts';
-import { getSettings, updateSettings, type Settings } from '../settings.ts';
+import { getSettings, MAX_PAGE_ROWS, updateSettings, type Settings } from '../settings.ts';
 import { appVersion, installDir } from '../config.ts';
 import {
   applyUpdate,
