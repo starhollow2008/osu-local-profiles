@@ -757,9 +757,29 @@ exactly as it is.
   can sit in `profiles.db-wal` beside the database, and a copy taken then can miss them.
   `config.json` in the same folder is this install's own settings (osu! paths, port,
   language), which is why a backup leaves it out.
+- **Export to a spreadsheet**, under *Export*, with a button for each format:
+  - **.csv** - every score in this profile, all game modes, highest pp first, one row each.
+    Double-click it and it opens in Excel, Google Sheets (File -> Import), LibreOffice or
+    Numbers. The columns: date set, mode, artist and title (and each in the song's own script
+    where it differs), difficulty, mapper, stars, pp, whether it counts toward pp, its place
+    in Best Performance and its weighted pp, accuracy, grade, mods and their settings, score
+    on both of osu!'s scales, combo and the beatmap's maximum, full combo, each judgement,
+    passed, the beatmap's status and length, pp's own parts (Aim, Speed, ...), pp without
+    Relax/Autopilot, the osu! version that priced it, client, where the score came from,
+    player, beatmap and score links, and IDs. Delete whichever you do not want.
+  - **.xlsx** - the same scores as the first sheet, then a sheet for each game mode you have
+    played (when there is more than one), **Summary** (the figures at the top of the profile,
+    per mode), **Most played**, **Favorite beatmaps** and **Medals**. Every sheet has its
+    header row frozen and a filter on every column, so sorting and filtering is a click.
+
+  Both follow this profile's settings, so the pp and "counts toward pp" are what the page
+  shows, and a score you removed from the profile is not in either. Headers, sheet names and
+  words like Yes and No are in the language the page is in; names that are osu!'s own - modes,
+  grades, medals - stay as osu! writes them. Dates are your computer's local time. A title that begins with `=`, `+`, `-` or `@` is written with a `'` in
+  front in the .csv, so a spreadsheet does not run it as a formula.
 - **Export this profile's scores (JSON)**, under *Export*: every score with its beatmap, plus
-  the computed totals and rank, for a spreadsheet or another tool. It is not a backup and
-  cannot be restored from.
+  the computed totals and rank, for another tool. It is not a backup and cannot be restored
+  from.
 
 Replays on disk remain the real source of truth - `node scripts/reingest.mjs` rebuilds
 everything from them - but these are portable and outlive the app.

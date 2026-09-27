@@ -3357,3 +3357,25 @@ being unchanged between them. A throwaway copy with the total doubled built as
 `source 325c8f5+0983c51` and doubled every osu!standard play's pp exactly, stars unchanged. Driven
 from the page on a copy of the real database: built, switched, 442 scores recalculated, the total
 from 723.93 to 1,373.87, and back to 723.926 exactly on switching back.
+
+## 5.71 - Export to a spreadsheet
+
+**Status:** done -- unreleased.
+
+The user asked for a profile's scores as a spreadsheet, a .csv and an .xlsx button side by side
+under Export: rows of scores, highest pp first, no distinction for pinned ones, with as many
+columns as possible (people delete what they do not want) -- the scores first and foremost,
+since that is the record people who are not at home with computers want to keep -- and left
+the rest to a recommendation. What was built:
+
+- **.csv**: the scores alone, every mode in one file with a Mode column. One file a double-click
+  opens, rather than a zip of several a less technical person would have to unpack.
+- **.xlsx**: the same Scores sheet first; a sheet per mode when more than one has been played;
+  Summary, Most played, Favorite beatmaps and Medals. The workbook is what carries "everything",
+  one table per sheet, which is what the zip of CSVs would have been for.
+- 47 score columns on a real profile (the pp parts vary with the modes played). Written by hand
+  (`src/export/`), no library; the .xlsx opened cleanly in Excel 16 and openpyxl, the .csv in
+  Excel with Japanese titles intact and dates read as dates.
+- In the page's language, at the user's request: headers, sheet names and words, from the page's
+  own translation files (`src/export/words.ts`); checked in Excel with a Japanese workbook.
+- The JSON export left out `visibleSql`, so removed scores were in it; now they are not.

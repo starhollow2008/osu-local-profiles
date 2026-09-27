@@ -87,7 +87,8 @@ function profileImages(dataDir: string): string[] {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** `2026-09-23`, in local time: the day on the user's own clock. */
-const localDay = (at: Date) => `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
+/** The local calendar day, `2026-09-23`: what a file saved today is named by. */
+export const localDay = (at: Date) => `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}`;
 
 /** `osu-local-profiles-backup-2026-09-23.zip`. */
 export function backupFileName(at = new Date()): string {

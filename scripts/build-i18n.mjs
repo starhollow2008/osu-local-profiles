@@ -139,6 +139,13 @@ function collect() {
       if (!js.has(key)) js.set(key, file);
     }
   }
+  // The server's one user of these files: a spreadsheet export's headers, in the page's language.
+  const exportDir = path.join(root, 'src', 'export');
+  for (const file of fs.readdirSync(exportDir).filter((f) => f.endsWith('.ts'))) {
+    for (const key of keysFromJs(fs.readFileSync(path.join(exportDir, file), 'utf8'))) {
+      if (!js.has(key)) js.set(key, `src/export/${file}`);
+    }
+  }
   return { html, js };
 }
 

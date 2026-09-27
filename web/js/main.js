@@ -3330,6 +3330,17 @@ $('newProfileName').onkeydown = (e) => {
  * save dialog and the filename from content-disposition, and keeps a 20MB database out
  * of the page's memory.
  */
+/* Export to a spreadsheet: the browser saves what the server sends as an attachment. */
+$('shareCsv').onclick = () => {
+  // In the language the page is in: the export's headers follow it.
+  window.location.href = `/api/export/scores.csv?lang=${encodeURIComponent(currentLocale())}`;
+  toast(t('backup.exportingAs', { format: '.csv' }));
+};
+$('shareXlsx').onclick = () => {
+  window.location.href = `/api/export/profile.xlsx?lang=${encodeURIComponent(currentLocale())}`;
+  toast(t('backup.exportingAs', { format: '.xlsx' }));
+};
+
 $('shareExport').onclick = () => {
   window.location.href = '/api/export';
   toast(t('backup.exporting'));

@@ -1712,6 +1712,13 @@
   min-width: 0;
 }
 
+/* Two formats of one export, side by side. */
+.share-option__buttons {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
 .share-option button {
   flex: none;
   padding: 8px 16px;

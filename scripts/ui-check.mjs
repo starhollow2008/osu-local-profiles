@@ -943,6 +943,16 @@ check(
   true,
 );
 check(
+  'Export to a spreadsheet offers .csv and .xlsx side by side, first under Export',
+  await evaluate(`(() => {
+    const csv = document.getElementById('shareCsv').getBoundingClientRect();
+    const xlsx = document.getElementById('shareXlsx').getBoundingClientRect();
+    const beforeJson = !!(document.getElementById('shareXlsx').compareDocumentPosition(document.getElementById('shareExport')) & Node.DOCUMENT_POSITION_FOLLOWING);
+    return csv.width > 0 && Math.abs(csv.top - xlsx.top) < 2 && xlsx.left > csv.right && beforeJson;
+  })()`),
+  true,
+);
+check(
   'the web page export is the primary action',
   await evaluate("document.getElementById('shareHtml').classList.contains('primary')"),
   true,

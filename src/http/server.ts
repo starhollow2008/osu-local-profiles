@@ -9,7 +9,11 @@ import type { OsuInstall } from '../clients/detect.ts';
 import { isLocale } from '../i18n.ts';
 import type { Ruleset } from '../osr.ts';
 import { dismissWelcome, welcomePending } from '../welcome.ts';
-import { backupFileName, createBackup, discardRestore, markRestoreReady, stageRestore } from '../backup.ts';
+import { backupFileName, createBackup, discardRestore, localDay, markRestoreReady, stageRestore } from '../backup.ts';
+import { scoresTable, workbookTables } from '../export/tables.ts';
+import { toCsv } from '../export/csv.ts';
+import { toXlsx } from '../export/xlsx.ts';
+import { translator } from '../export/words.ts';
 import { openFolder } from '../browser.ts';
 import {
   unsubmittedAttemptCount,
@@ -77,7 +81,7 @@ import {
   type ManualInput,
 } from '../score-entry.ts';
 import { clearDeclines, declineCount, deleteDeclines, listDeclines } from '../tracker/declined.ts';
-import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
+import { eligibilityOf, visibleSql, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
 import { APP_ID, isOwnPage } from '../instance.ts';
@@ -1886,6 +1890,36 @@ export function startServer(opts: ServerOptions): http.Server {
       );
     }
 
+    /*
+     * Share & back up -> Export for a spreadsheet (src/export/). The scores alone as .csv, the one
+     * file almost anyone can open; or the whole profile as an .xlsx workbook, a sheet per table.
+     * Both are this profile, as its page shows it: its settings decide the pp, and removed
+     * scores are not in either.
+     */
+    if ((url.pathname === '/api/export/scores.csv' || url.pathname === '/api/export/profile.xlsx') && req.method === 'GET') {
+      const id = current();
+      const profile = getProfile(opts.db, id)!;
+      const e = eligibilityOf(settingsFor(id), opts.tracker.beatmaps.knowsStatus);
+      // Whatever the profile is called, bar what a file name cannot hold on some system.
+      const stem = `${profile.name.replace(/[\\/:*?"<>|]+/g, '-').trim() || 'profile'}-${localDay(new Date())}`;
+      const csv = url.pathname.endsWith('.csv');
+      // In the language the page is in, which it says; the saved one, or English, if it does not.
+      const lang = url.searchParams.get('lang');
+      const t = translator(isLocale(lang) ? lang : opts.appConfig.get().language || 'en');
+      const body = csv
+        ? toCsv(scoresTable(opts.db, id, e, null, t))
+        : toXlsx(workbookTables(opts.db, id, profile.name, e, favorites(), opts.tracker.beatmaps, t));
+      res.writeHead(200, {
+        'content-type': csv
+          ? 'text/csv; charset=utf-8'
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'content-disposition': attachmentHeader(csv ? `${stem}-scores.csv` : `${stem}.xlsx`),
+        'content-length': body.length,
+      });
+      res.end(body);
+      return;
+    }
+
     if (url.pathname === '/api/export') {
       const id = current();
       const profile = getProfile(opts.db, id)!;
@@ -1914,7 +1948,8 @@ export function startServer(opts: ServerOptions): http.Server {
               `SELECT s.*, b.artist, b.title, b.version, b.creator, b.beatmapset_id
                  FROM scores s
                  LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
-                WHERE s.profile_id = ? AND s.mode = ?
+                -- A score removed from the profile is not one of its scores, here as anywhere.
+                WHERE s.profile_id = ? AND s.mode = ? AND ${visibleSql()}
                 ORDER BY s.played_at ASC`,
             )
             .all(id, mode),

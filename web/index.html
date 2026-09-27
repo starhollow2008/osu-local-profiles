@@ -564,6 +564,26 @@
 
     <h4 class="identity-heading" data-i18n="shareModal.export">Export</h4>
 
+    <!--
+      For a spreadsheet: the scores alone as .csv, the file almost anything opens, or the whole
+      profile as an .xlsx workbook, one sheet per table. See src/export/.
+    -->
+    <div class="share-option">
+      <div class="share-option__detail">
+        <b data-i18n="shareModal.exportSpreadsheet">Export to a spreadsheet</b>
+        <div class="setting__hint" data-i18n="shareModal.exportSpreadsheetHint">
+          Every score in this profile, highest pp first, with its beatmap, stars, mods, accuracy,
+          date and more - one row each, ready for Excel or Google Sheets. The .xlsx also has a
+          sheet for each game mode, the profile's totals, most played beatmaps, favorite
+          beatmaps and medals.
+        </div>
+      </div>
+      <div class="share-option__buttons">
+        <button type="button" id="shareCsv" data-i18n="shareCsv">.csv</button>
+        <button type="button" id="shareXlsx" data-i18n="shareXlsx">.xlsx</button>
+      </div>
+    </div>
+
     <div class="share-option">
       <div class="share-option__detail">
         <b data-i18n="shareModal.exportScores">Export this profile's scores (JSON)</b>
