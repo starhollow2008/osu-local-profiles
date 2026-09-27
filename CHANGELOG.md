@@ -2,8 +2,7 @@
 
 ## 1.27.0
 
-- **Updates are easier to notice, smaller to download, and can install themselves if you
-  want.**
+- **Updates are easier to notice, and can install themselves if you want.**
   - **The app checks for updates while it's open, not just when it starts** - once a day, so
     leaving it running for weeks no longer leaves you on an old version. A new version appears
     on the page without reloading it.
@@ -15,8 +14,9 @@
     install when you quit the app, or when it next starts. Off unless you turn it on, and it
     never downloads on a connection Windows or Linux says is metered.
   - **When I quit**, in the update dialog: download now, install when you're done playing.
-  - **Updates download only what changed** - usually a few MB instead of the whole app.
-    Starts with the update *from* this version, since it's the first to publish its parts.
+  - *Withdrawn after release:* this version also shipped downloading only the parts of the
+    app that changed, but publishing those parts crowded every release page with files that
+    looked like downloads. Updates download the whole app, as before.
   - **The tray icon shows a dot** when an update is waiting, and its menu can **Update to
     ... and restart** or show **What's new**, without opening the page.
   - **An update that has waited two weeks, or one that fixes something important, says so**

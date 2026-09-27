@@ -34,7 +34,6 @@ declare module '*/release-notes.mjs' {
   export function isImportant(changelog: string, version: string): boolean;
   /** Every version with a section, newest first. */
   export function changelogVersions(changelog: string): string[];
-  export function notesAssetName(version: string): string;
   export const MAX_NOTES_VERSIONS: number;
   /** Every version's highlights as data, for the app. */
   export function notesJson(

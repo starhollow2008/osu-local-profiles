@@ -55,8 +55,14 @@ export function notesBetween(all: VersionNotes[], from: string | null, to: strin
 }
 
 /**
- * The notes of a release with no `-notes.json` -- every one before 1.27.0. Its body is what
- * `releaseNotes` wrote: a line per change, then a link to the CHANGELOG.
+ * Written into a release page by `releaseNotes` when the version's CHANGELOG section carries
+ * it (`IMPORTANT_MARK` in scripts/release-notes.mjs). An HTML comment, so GitHub shows nothing.
+ */
+export const IMPORTANT_MARK = '<!-- important -->';
+
+/**
+ * A release's notes from its page, which is what `releaseNotes` wrote: a line per change, then
+ * a link to the CHANGELOG, and the important mark when the version is one everyone should have.
  */
 export function notesFromBody(body: string, version: string, publishedAt: string | null): VersionNotes[] {
   const lines = body.replace(/\r\n/g, '\n').split('\n');
@@ -65,7 +71,8 @@ export function notesFromBody(body: string, version: string, publishedAt: string
     .filter((l) => l.startsWith('- '))
     .map((l) => l.slice(2).trim());
   const date = publishedAt !== null && /^\d{4}-\d{2}-\d{2}/.test(publishedAt) ? publishedAt.slice(0, 10) : null;
-  return parseNotes({ versions: [{ version, date, important: false, highlights }] });
+  const important = lines.some((l) => l.trim() === IMPORTANT_MARK);
+  return parseNotes({ versions: [{ version, date, important, highlights }] });
 }
 
 /** This package's own notes, for after an update. Empty in a checkout, which has none. */

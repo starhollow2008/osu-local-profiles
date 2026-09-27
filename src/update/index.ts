@@ -1,12 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { appVersion, dataDir as defaultDataDir, installDir } from '../config.ts';
-import { assetFor, compareVersions, fetchLatestRelease, namedAsset, parseRepo, type Release } from './github.ts';
+import { assetFor, compareVersions, fetchLatestRelease, fetchRecentReleases, parseRepo, type Release } from './github.ts';
 import { extractZip } from './zip.ts';
-import { launcherNameFor, manifestAssetName, parseManifest, planParts, ridFor } from './parts.ts';
-import { CHANGELOG_URL, notesBetween, notesFromBody, nudgeFor, parseNotes, type VersionNotes } from './notes.ts';
+import { CHANGELOG_URL, notesBetween, notesFromBody, nudgeFor, type VersionNotes } from './notes.ts';
 
 /**
  * The one-click update.
@@ -29,7 +27,8 @@ import { CHANGELOG_URL, notesBetween, notesFromBody, nudgeFor, parseNotes, type 
  *
  * Since 5.66 a build can also be downloaded ahead of time -- by Auto-update, or by "When I
  * quit" -- and wait, checked, in `data/update/<version>`, to be installed when the app is quit
- * or next starts. Only the parts of it that changed are downloaded (`./parts.ts`).
+ * or next starts. (5.66 also published each release in parts, to download only what changed;
+ * 5.69 took that out at the user's request, since it crowded every release page.)
  */
 
 /**
@@ -209,21 +208,21 @@ function changed(): void {
 /** Each newest version's notes, fetched once rather than on every daily check. */
 let notesCache: { version: string; notes: VersionNotes[] } | null = null;
 
-/** The notes every release since 1.27.0 carries (`notesJson` in scripts/release-notes.mjs). */
-export const notesAssetName = (version: string): string => `osu-local-profiles-${version}-notes.json`;
-
-async function releaseNotesFor(release: Release): Promise<VersionNotes[]> {
+/**
+ * What every version since this one changed, from each release page's own lines (5.69: the
+ * `-notes.json` asset of 5.66 is gone, with the rest of the update files). One request for the
+ * recent releases, made only when a new version is found. Should it fail, the newest
+ * release's own page, which the daily check already has, still says what that one changed.
+ */
+async function releaseNotesFor(repo: string, release: Release): Promise<VersionNotes[]> {
   if (notesCache?.version === release.version) return notesCache.notes;
-  let notes: VersionNotes[] = [];
-  const asset = namedAsset(release, notesAssetName(release.version));
-  if (asset !== null) {
-    try {
-      notes = parseNotes(JSON.parse((await download(asset.url, 0, 20_000, 2 * 1024 * 1024)).toString('utf8')));
-    } catch {
-      /* the release page's own lines, below, are nearly as good */
-    }
+  let releases: Release[] = [release];
+  try {
+    releases = await fetchRecentReleases(repo);
+  } catch {
+    /* the newest alone, below */
   }
-  if (notes.length === 0) notes = notesFromBody(release.body, release.version, release.publishedAt);
+  const notes = releases.flatMap((r) => notesFromBody(r.body, r.version, r.publishedAt));
   notesCache = { version: release.version, notes };
   return notes;
 }
@@ -271,7 +270,7 @@ export async function checkForUpdate(): Promise<UpdateState> {
       state.available = newer;
     }
 
-    state.notes = state.available ? notesBetween(await releaseNotesFor(release), current, release.version) : [];
+    state.notes = state.available ? notesBetween(await releaseNotesFor(repo, release), current, release.version) : [];
     state.nudge = nudgeFor(state.notes, Date.now());
   } catch (e) {
     state.error = (e as Error).message;
@@ -345,12 +344,11 @@ async function download(url: string, size: number, timeoutMs: number, maxBytes =
   return bytes;
 }
 
-async function hashFile(file: string): Promise<string | null> {
-  try {
-    return createHash('sha256').update(await fs.promises.readFile(file)).digest('hex');
-  } catch {
-    return null;
-  }
+/** What each platform's package opens (scripts/package-files.mjs, `trayLauncherFor`). */
+function launcherNameFor(platform: string): string {
+  if (platform === 'win32') return 'osu! local profiles.exe';
+  if (platform === 'darwin') return 'osu! local profiles.app';
+  return 'osu-local-profiles';
 }
 
 /** Everything an install needs; a staged tree missing any of it is not one. */
@@ -382,62 +380,7 @@ function verifyStaged(dir: string, expectedVersion: string, platform: string): v
   }
 }
 
-/**
- * The release assembled from its parts: those that changed downloaded, the rest copied from
- * this install, and then every file checked against the manifest. Throws on anything short
- * of that, and the full zip is used instead. Returns the bytes downloaded.
- */
-export async function stageFromParts(
-  release: Release,
-  stagedDir: string,
-  work: string,
-  install = installDir(),
-  platform: string = process.platform,
-  arch: string = process.arch,
-): Promise<number> {
-  const rid = ridFor(platform, arch);
-  const manifestAsset = namedAsset(release, manifestAssetName(release.version, rid));
-  if (manifestAsset === null) throw new Error(`${release.version} was not published in parts`);
-  const raw = await download(manifestAsset.url, manifestAsset.size, 60_000, 16 * 1024 * 1024);
-  const manifest = parseManifest(JSON.parse(raw.toString('utf8')), release.version, rid);
-
-  const here = new Map<string, string | null>();
-  for (const f of manifest.files) here.set(f.path, await hashFile(path.join(install, f.path)));
-  const plan = planParts(manifest, (p) => here.get(p) ?? null);
-
-  let bytes = raw.length;
-  for (const part of plan.download) {
-    const info = manifest.parts[part]!;
-    const asset = namedAsset(release, info.asset);
-    if (asset === null) throw new Error(`${release.version} has no ${info.asset}`);
-    const zipped = await download(asset.url, info.size, 30 * 60_000);
-    bytes += zipped.length;
-    const zip = path.join(work, asset.name);
-    fs.writeFileSync(zip, zipped);
-    try {
-      extractZip(zip, stagedDir, 1);
-    } finally {
-      fs.rmSync(zip, { force: true });
-    }
-  }
-
-  for (const f of plan.reuse) {
-    const to = path.join(stagedDir, f.path);
-    fs.mkdirSync(path.dirname(to), { recursive: true });
-    // copyFile keeps the mode, so a runtime copied from this install is still executable.
-    fs.copyFileSync(path.join(install, f.path), to);
-  }
-
-  // The staged tree is the whole release or nothing: every file, byte for byte.
-  for (const f of manifest.files) {
-    if ((await hashFile(path.join(stagedDir, f.path))) !== f.sha256) {
-      throw new Error(`${f.path} did not come out as the release has it`);
-    }
-  }
-  return bytes;
-}
-
-/** The release from its one full zip: what every update did before 5.66. */
+/** The release from its one full zip. */
 async function stageFromZip(release: Release, stagedDir: string, work: string): Promise<number> {
   const asset = assetFor(release, process.platform, process.arch);
   if (asset === null) {
@@ -461,15 +404,8 @@ async function stage(release: Release, data: string): Promise<string> {
   const stagedDir = path.join(work, release.version);
   fs.mkdirSync(work, { recursive: true });
 
-  let bytes: number;
-  try {
-    fs.rmSync(stagedDir, { recursive: true, force: true });
-    bytes = await stageFromParts(release, stagedDir, work);
-  } catch (e) {
-    console.log(`  update: downloading the whole of ${release.version} (${(e as Error).message})`);
-    fs.rmSync(stagedDir, { recursive: true, force: true });
-    bytes = await stageFromZip(release, stagedDir, work);
-  }
+  fs.rmSync(stagedDir, { recursive: true, force: true });
+  const bytes = await stageFromZip(release, stagedDir, work);
   verifyStaged(stagedDir, release.version, process.platform);
   state.downloadedBytes = bytes;
   console.log(`  update: ${release.version} downloaded (${(bytes / 1024 / 1024).toFixed(1)}MB) and checked`);

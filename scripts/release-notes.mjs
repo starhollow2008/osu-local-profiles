@@ -173,7 +173,11 @@ export function releaseNotes(changelog, version, assets = Object.values(assetsFo
   const downloads = PLATFORMS.filter(([rid]) => assets.some((a) => a.endsWith(`-${rid}.zip`)))
     .map(([rid, name]) => `${name} \`${rid}\``);
 
-  return `${opening ? `${opening}\n\n` : ''}${shown.join('\n')}
+  // Marked on the page itself, where the app reads it before an update (notesFromBody in
+  // src/update/notes.ts). An HTML comment, so GitHub shows nothing.
+  const mark = isImportant(changelog, version) ? `${IMPORTANT_MARK}\n\n` : '';
+
+  return `${mark}${opening ? `${opening}\n\n` : ''}${shown.join('\n')}
 
 Everything in this release: [CHANGELOG.md](${CHANGELOG_URL}#${anchor})
 
@@ -181,16 +185,13 @@ Everything in this release: [CHANGELOG.md](${CHANGELOG_URL}#${anchor})
 `;
 }
 
-/** The notes the app shows before and after an update, attached to every release. */
-export const notesAssetName = (version) => `osu-local-profiles-${version}-notes.json`;
-
 /** Enough history for any install worth updating; the rest is a link away. */
 export const MAX_NOTES_VERSIONS = 60;
 
 /**
  * The patch notes as data, for the app rather than a release page: `release-notes.json` in
- * every package (what changed, after an update) and the `-notes.json` asset of every release
- * (what is new, before one). `dates` is each version's release day where it is known.
+ * every package, what the first start after an update says it brought. `dates` is each
+ * version's release day where it is known.
  */
 export function notesJson(changelog, dates = {}) {
   return {
@@ -223,22 +224,10 @@ export function tagDates(cwd = root) {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const json = process.argv.includes('--json');
-  const version = (process.argv.slice(2).find((a) => a !== '--json') ?? '').replace(/^v/, '');
+  const version = (process.argv[2] ?? '').replace(/^v/, '');
   if (!version) {
-    console.error('usage: node scripts/release-notes.mjs [--json] <version>');
+    console.error('usage: node scripts/release-notes.mjs <version>');
     process.exit(1);
   }
-  const changelog = fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8');
-  if (json) {
-    if (changelogSection(changelog, version) === null) {
-      console.error(`CHANGELOG.md has no "## ${version}" section`);
-      process.exit(1);
-    }
-    // The version being released is dated today when its tag is not there to ask yet.
-    const dates = { [version]: new Date().toISOString().slice(0, 10), ...tagDates() };
-    process.stdout.write(`${JSON.stringify(notesJson(changelog, dates), null, 1)}\n`);
-  } else {
-    process.stdout.write(releaseNotes(changelog, version));
-  }
+  process.stdout.write(releaseNotes(fs.readFileSync(path.join(root, 'CHANGELOG.md'), 'utf8'), version));
 }

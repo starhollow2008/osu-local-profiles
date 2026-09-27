@@ -759,9 +759,8 @@ when you quit the app, or when it next starts - never in the middle of a session
 until you turn it on, and it never downloads on a connection Windows or Linux says is metered
 (macOS is not asked). An update you start yourself still downloads there.
 
-Updates download only the parts of the app that changed, usually a few MB, instead of the
-whole package; your `data/` is never touched. `"checkForUpdates": false` in `config.json` turns
-every check off.
+An update downloads the whole app for your system, about 65MB; your `data/` is never touched.
+`"checkForUpdates": false` in `config.json` turns every check off.
 
 ## What it contacts
 

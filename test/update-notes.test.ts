@@ -164,3 +164,19 @@ test('a dismissal is kept in the database', () => {
   w.db.close();
   fs.rmSync(w.dir, { recursive: true, force: true });
 });
+
+/*
+ * 5.69: releases carry only their four zips, so what the app knows before an update comes from
+ * each release page, which releaseNotes writes -- the important mark included.
+ */
+test('an important version says so on its release page, and the app reads it back', () => {
+  const changelog = `# Changelog\n\n## 1.28.0\n\n${IMPORTANT_MARK}\n\n- **Fixes lost plays.**\n\n## 1.27.0\n\n- **Faster.**\n`;
+  const important = releaseNotes(changelog, '1.28.0');
+  assert.ok(important.startsWith(IMPORTANT_MARK), 'the mark heads the page, where GitHub shows nothing');
+  const read = notesFromBody(important, '1.28.0', '2026-10-01T12:00:00Z');
+  assert.deepEqual(read, [{ version: '1.28.0', date: '2026-10-01', important: true, highlights: ['Fixes lost plays.'] }]);
+
+  const ordinary = releaseNotes(changelog, '1.27.0');
+  assert.ok(!ordinary.includes(IMPORTANT_MARK));
+  assert.equal(notesFromBody(ordinary, '1.27.0', null)[0]?.important, false);
+});

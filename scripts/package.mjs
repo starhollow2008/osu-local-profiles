@@ -12,7 +12,6 @@
  * are always built the same way.
  */
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -20,8 +19,6 @@ import { buildCheckedPpHelper, defaultRid } from './build-pp-helper.mjs';
 import { launcherFor, readmeFor } from './package-files.mjs';
 import { buildLauncher } from './build-launcher.mjs';
 import { notesJson, tagDates } from './release-notes.mjs';
-import { PARTS, manifestAssetName, partAssetName, partOf } from '../src/update/parts.ts';
-import { readZipEntries } from '../src/update/zip.ts';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
@@ -285,65 +282,3 @@ if (zipFolder(distRoot, name, zip)) {
   console.log('\n  could not create the zip -- ship the folder itself, it is complete');
 }
 
-/* ------------------------------------------------- 8. the update, in parts */
-
-/*
- * The same build again, as the updater downloads it (src/update/parts.ts, roadmap 5.66): one
- * zip per part, and a manifest of every file's SHA-256, so an install downloads only the
- * parts it does not already hold byte for byte -- usually just the app, a few MB, where the
- * whole package is tens. The full zip above stays the download for new installs, and the
- * update for anything older than 1.27.0.
- */
-function filesOf(dir, prefix = '') {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const rel = `${prefix}${entry.name}`;
-    return entry.isDirectory() ? filesOf(path.join(dir, entry.name), `${rel}/`) : [rel];
-  });
-}
-
-const platform = hostOs === 'win' ? 'win32' : hostOs === 'osx' ? 'darwin' : 'linux';
-const files = filesOf(out).map((rel) => {
-  const bytes = fs.readFileSync(path.join(out, rel));
-  return {
-    path: rel,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
-    size: bytes.length,
-    part: partOf(rel, platform),
-  };
-});
-
-const partsWork = path.join(distRoot, `${name}-parts`);
-fs.rmSync(partsWork, { recursive: true, force: true });
-const parts = {};
-try {
-  for (const part of PARTS) {
-    const inPart = files.filter((f) => f.part === part);
-    if (inPart.length === 0) continue;
-    const folder = path.join(partsWork, part);
-    for (const f of inPart) {
-      const to = path.join(folder, name, f.path);
-      fs.mkdirSync(path.dirname(to), { recursive: true });
-      // copyFile keeps the mode, so the runtime and the launcher stay executable in their zips.
-      fs.copyFileSync(path.join(out, f.path), to);
-    }
-    const asset = partAssetName(pkg.version, target, part);
-    if (!zipFolder(folder, name, path.join(distRoot, asset))) throw new Error(`could not zip the ${part} part`);
-    // Read back with the updater's own reader. Compress-Archive leaves out hidden files, and a
-    // part short of one would never check out -- every update would quietly go in full.
-    const held = readZipEntries(fs.readFileSync(path.join(distRoot, asset))).filter((e) => !e.isDirectory).length;
-    if (held !== inPart.length) throw new Error(`the ${part} part holds ${held} files, not ${inPart.length}`);
-    parts[part] = { asset, size: fs.statSync(path.join(distRoot, asset)).size };
-    console.log(`  ${asset}  (${mb(parts[part].size)})`);
-  }
-  fs.writeFileSync(
-    path.join(distRoot, manifestAssetName(pkg.version, target)),
-    `${JSON.stringify({ version: pkg.version, rid: target, parts, files })}\n`,
-  );
-  console.log(`  ${manifestAssetName(pkg.version, target)}  (${files.length} files)`);
-} catch (e) {
-  // A release without parts still updates, only in full; a release job should not ship one.
-  if (process.env.GITHUB_ACTIONS) throw e;
-  console.log(`\n  no update parts: ${e.message}`);
-} finally {
-  fs.rmSync(partsWork, { recursive: true, force: true });
-}

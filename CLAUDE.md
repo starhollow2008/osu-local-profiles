@@ -56,6 +56,8 @@ Each has its reasoning in `docs/architecture.md`.
   connection by itself, once per build (`attempts`). Never on stdin closing without
   `{"quit":true}` - that is the launcher dying or the system shutting down. Every swapper keeps
   `--no-relaunch`: an older app hands the swap to the newer one's.
+- **A release is its four zips and nothing else** (roadmap 5.69): no update parts, manifests or
+  notes files beside them. Anything the app needs to know about a release goes on its page.
 - **The app never outlives its tray launcher.** It stops when the launcher closes its stdin
   (`stopWhenLauncherCloses`). `start.sh` and the `.command` keep their names: 1.14-1.16
   launchers run them again after an update.

@@ -80,8 +80,9 @@ export function assetFor(release: Release, platform: string, arch: string): Rele
  * "no releases yet" -- so that case is named explicitly rather than reported as a missing
  * release, which would send someone looking for the wrong problem.
  */
-export async function fetchLatestRelease(repo: string, timeoutMs = 10_000): Promise<Release> {
-  const response = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+/** One request to GitHub's releases API, with its failures named for what they mean here. */
+async function githubApi(repo: string, pathname: string, timeoutMs: number): Promise<unknown> {
+  const response = await fetch(`https://api.github.com/repos/${repo}${pathname}`, {
     headers: {
       accept: 'application/vnd.github+json',
       // GitHub rejects an API request with no user agent.
@@ -99,10 +100,14 @@ export async function fetchLatestRelease(repo: string, timeoutMs = 10_000): Prom
   if (!response.ok) {
     throw new Error(`GitHub answered ${response.status}`);
   }
+  return response.json();
+}
 
-  const body = (await response.json()) as Record<string, unknown>;
+/** A release as the API describes it, or null for one that is not a usable release. */
+function releaseFrom(raw: unknown, repo: string): Release | null {
+  const body = raw as Record<string, unknown>;
   const tag = typeof body.tag_name === 'string' ? body.tag_name : null;
-  if (tag === null) throw new Error('the release has no tag');
+  if (tag === null || body.draft === true || body.prerelease === true) return null;
 
   const assets = Array.isArray(body.assets) ? body.assets : [];
   return {
@@ -111,21 +116,33 @@ export async function fetchLatestRelease(repo: string, timeoutMs = 10_000): Prom
       typeof body.html_url === 'string' ? body.html_url : `https://github.com/${repo}/releases`,
     body: typeof body.body === 'string' ? body.body : '',
     publishedAt: typeof body.published_at === 'string' ? body.published_at : null,
-    assets: assets.flatMap((raw): ReleaseAsset[] => {
-      const a = raw as Record<string, unknown>;
-      if (typeof a.name !== 'string' || typeof a.browser_download_url !== 'string') return [];
+    assets: assets.flatMap((a): ReleaseAsset[] => {
+      const asset = a as Record<string, unknown>;
+      if (typeof asset.name !== 'string' || typeof asset.browser_download_url !== 'string') return [];
       return [
         {
-          name: a.name,
-          url: a.browser_download_url,
-          size: typeof a.size === 'number' ? a.size : 0,
+          name: asset.name,
+          url: asset.browser_download_url,
+          size: typeof asset.size === 'number' ? asset.size : 0,
         },
       ];
     }),
   };
 }
 
-/** A release's own file, by name, or null. */
-export function namedAsset(release: Release, name: string): ReleaseAsset | null {
-  return release.assets.find((a) => a.name.toLowerCase() === name.toLowerCase()) ?? null;
+export async function fetchLatestRelease(repo: string, timeoutMs = 10_000): Promise<Release> {
+  const release = releaseFrom(await githubApi(repo, '/releases/latest', timeoutMs), repo);
+  if (release === null) throw new Error('the release has no tag');
+  return release;
+}
+
+/**
+ * The newest releases, newest first: what an install that is several versions behind has
+ * missed, each with its notes and its date. Asked once per new version found, never on the
+ * daily check itself, since it is a larger answer than the latest release alone.
+ */
+export async function fetchRecentReleases(repo: string, count = 30, timeoutMs = 15_000): Promise<Release[]> {
+  const list = await githubApi(repo, `/releases?per_page=${count}`, timeoutMs);
+  if (!Array.isArray(list)) throw new Error('GitHub did not answer with a list of releases');
+  return list.map((raw) => releaseFrom(raw, repo)).filter((r): r is Release => r !== null);
 }

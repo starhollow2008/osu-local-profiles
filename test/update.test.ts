@@ -12,6 +12,7 @@ import {
   type Release,
 } from '../src/update/github.ts';
 import { extractZip, readZipEntries } from '../src/update/zip.ts';
+import { appVersion } from '../src/config.ts';
 import {
   blockedReason,
   CHECK_EVERY_MS,
@@ -331,4 +332,41 @@ test('only an update this install can take is offered to the tray', () => {
   assert.equal(offeredVersion({ ...base, available: false }), null);
   // A source checkout is told about nothing it could not install.
   assert.equal(offeredVersion({ ...base, blocked: 'this copy is running from a source checkout' }), null);
+});
+
+/** Files under `dir`, by relative path. */
+function installWith(dir: string, files: Record<string, string>): void {
+  for (const [p, data] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, p)), { recursive: true });
+    fs.writeFileSync(path.join(dir, p), data);
+  }
+}
+
+// Roadmap 5.66: Auto-update and When I quit leave a build in data/update to install later.
+test('a build downloaded ahead of time survives the startup sweep while it is still newer', () => {
+  const dir = tmp();
+  const data = path.join(dir, 'data');
+  const ahead = '999.0.0';
+  installWith(path.join(data, 'update'), {
+    [`${ahead}/package.json`]: `{"version":"${ahead}"}`,
+    'ready.json': JSON.stringify({ version: ahead, requested: 'auto', attempts: 0 }),
+    '1.0.0/package.json': '{"version":"1.0.0"}',
+    'osu-local-profiles-1.0.0-win-x64.zip': 'an old download',
+  });
+
+  const result = pruneUpdateLeftovers(dir, data);
+  assert.ok(fs.existsSync(path.join(data, 'update', ahead, 'package.json')), 'the waiting build is kept');
+  assert.ok(fs.existsSync(path.join(data, 'update', 'ready.json')));
+  assert.equal(fs.existsSync(path.join(data, 'update', '1.0.0')), false);
+  assert.equal(fs.existsSync(path.join(data, 'update', 'osu-local-profiles-1.0.0-win-x64.zip')), false);
+  assert.equal(result.removed.length, 2);
+
+  // Once what waits is this version (or older), it is a leftover like any other.
+  fs.writeFileSync(
+    path.join(data, 'update', 'ready.json'),
+    JSON.stringify({ version: appVersion(), requested: 'auto', attempts: 0 }),
+  );
+  pruneUpdateLeftovers(dir, data);
+  assert.equal(fs.existsSync(path.join(data, 'update')), false);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

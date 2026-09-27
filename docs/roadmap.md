@@ -3293,3 +3293,27 @@ What changed:
   player's and its plays are not refused as someone else's.
 - Shown as "osu!lazer (development)" in osu! folders, and "lazer (development)" in the menu
   and the console.
+
+## 5.69 - A release is its four zips again
+
+**Status:** done -- unreleased.
+
+1.27.0 went out with 27 files on its release page where every earlier one had 6: the four zips
+and GitHub's two source archives, plus 21 from 5.66 -- each platform's build in four parts,
+their manifests, and the notes file. Sorted by name, the real download came last of six
+look-alikes, and the first of them, the app part, is 1.4MB that does not run. The user chose to
+drop the smaller updates rather than keep them some other way (reading changed files out of the
+full zip with ranged downloads, which GitHub supports, was the alternative offered), and to
+clear the 21 files from 1.27.0, which nothing depended on.
+
+- `scripts/package.mjs` makes the full zip only; the release workflow uploads `dist/*.zip` as it
+  did before 5.66. `src/update/parts.ts` and `stageFromParts` are gone; an update downloads the
+  full zip, as every one before 1.27.0 did.
+- **Before an update**, what is new comes from the release pages themselves: one API request for
+  the recent releases, once per new version found (`fetchRecentReleases`), each page's lines read
+  by `notesFromBody`. `releaseNotes` now writes `<!-- important -->` onto an important version's
+  page, so the notice at the foot of the page still knows. The dates are the pages' own.
+- **After an update**, unchanged: `release-notes.json` inside the package.
+- 1.27.0 installs look for the parts and the notes file, find neither, and fall back as designed:
+  the full zip, and the newest release page's lines.
+- 1.27.0's CHANGELOG entry says the parts were withdrawn, rather than promising them.
