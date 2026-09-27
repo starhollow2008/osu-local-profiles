@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
 import type { OsuInstall } from '../clients/detect.ts';
@@ -20,13 +21,15 @@ import {
   checkIncompletePlay,
   checkUnsubmittedAttempt,
   ingestIncompletePlay,
+  ingestRecording,
   ingestUnsubmittedAttempt,
   type IncompleteCheck,
   type IncompleteContext,
   type IngestedIncomplete,
 } from './incomplete.ts';
-import { ingestReplayFile, type IngestedScore } from './ingest.ts';
-import { scanForReplays, type BackfillScan } from './backfill.ts';
+import { dedupeKey, describe, ingestReplayFile, type IngestedScore } from './ingest.ts';
+import { scanForReplays, type BackfillScan, type OtherPlayerFound } from './backfill.ts';
+import { declineToTrack, forgetDeclineById, recordDecline, type DeclineSource } from './declined.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
 import {
   countStale,
@@ -47,7 +50,7 @@ import {
   type FilterCriterion,
   type TrackingFilter,
 } from '../tracking-filter.ts';
-import { resolveIdentity, type PlayerIdentity } from '../player-identity.ts';
+import { resolveIdentity, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
 
 export interface TrackerOptions {
   db: Db;
@@ -79,14 +82,15 @@ export interface TrackerEvents {
   /**
    * A play the profile's tracking filter turned away, which is deliberately not a `skip`: a
    * skip means the play was already here or could not be read, while this one is the user's
-   * own rule doing what it was set up to do -- and it is the only trace of a play that was
-   * never written down, so it names the beatmap and the criterion.
+   * own rule doing what it was set up to do -- and a play that is not written down has to be
+   * told of, so it names the beatmap and the criterion. It is also kept in Plays not tracked
+   * (src/tracker/declined.ts), for after the toast has gone.
    */
   filtered: [FilteredPlay];
   /**
    * A replay that arrived and was not tracked for a reason the user would want to hear about:
    * someone else set it, or it could not be read. Its own event rather than a `skip` for the
-   * same reason as `filtered` -- nothing is written, so this is the only trace of it -- while
+   * same reason as `filtered` -- no score is written, so it has to be told of -- while
    * the skips that are the app working as meant (a duplicate, a watched replay from before the
    * launch) stay quiet.
    */
@@ -187,6 +191,18 @@ export interface BackfillSources {
 /** Replays alone: what an import meant before it read logs, and what naming nothing still gets. */
 export const REPLAYS_ONLY: BackfillSources = { replays: true, unfinished: false, attempts: false };
 
+/**
+ * What Track anyway came to. `tracked` and `already` take the play off the list; the others
+ * leave it there, because it is still a play that was not tracked.
+ */
+export type TrackAnywayResult =
+  | { status: 'tracked'; kind: 'score' | 'incomplete' }
+  /** In the profile already -- tracked some other way since, or deleted for good from it. */
+  | { status: 'already' }
+  /** The replay is no longer where osu! kept it. */
+  | { status: 'missing' }
+  | { status: 'unparseable' };
+
 /** The logs' half of a preview, counted by the same checks the import makes before it writes. */
 export interface LogBackfillPreview {
   unfinished: number;
@@ -285,9 +301,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   /**
    * How many plays the tracking filter has declined since the app started.
    *
-   * A running count rather than a stored one: these plays leave no row anywhere by design, so
-   * there is nothing to count later. It is what stops a filter that is too tight from looking
-   * like tracking having stopped.
+   * A running count, for the Options menu: it is what stops a filter that is too tight from
+   * looking like tracking having stopped. The plays themselves are kept in `declined_plays`.
    */
   get playsFiltered(): number {
     return this.filtered;
@@ -295,8 +310,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   /**
    * How many replays were not tracked since the app started because someone else set them or
-   * they could not be read. Running, like `playsFiltered`, and for the same reason: they leave
-   * no row, and a play the owner thinks was theirs must not just disappear.
+   * they could not be read. Running, like `playsFiltered`, and for the same reason: a play the
+   * owner thinks was theirs must not just disappear.
    */
   get playsRefused(): number {
     return this.refused;
@@ -582,14 +597,18 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     return preview;
   }
 
-  /** An import's context: its chosen cutoff stands in for the profile's own, as for replays. */
-  private importContext(since: number, filter: TrackingFilter): IncompleteContext {
+  /**
+   * An import's context: its chosen cutoff stands in for the profile's own, as for replays.
+   * A preview names no `declines`, so it records nothing -- it turns nothing away.
+   */
+  private importContext(since: number, filter: TrackingFilter, declines?: DeclineSource): IncompleteContext {
     return {
       db: this.opts.db,
       resolver: this.opts.resolver,
       profileId: this.opts.profileId,
       trackingSince: since,
       filter,
+      declines,
     };
   }
 
@@ -601,11 +620,14 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * cannot interleave its writes. Individual plays are not emitted: importing a session can
    * add dozens at once, and a toast per play would bury the page. Naming no sources means
    * replays alone, which is what an import meant before it read logs.
+   *
+   * What it turns away is recorded, as coming from `origin`, so Settings can list it.
    */
   backfill(
     since: number,
     sources: BackfillSources = REPLAYS_ONLY,
     applyFilter = true,
+    origin: DeclineSource = 'import',
   ): Promise<BackfillResult> {
     return this.enqueue(async () => {
       let imported = 0;
@@ -631,6 +653,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           since,
           undefined,
           owner,
+          this.recordOtherPlayer(origin),
         );
         scanned = scan.scanned;
         otherPlayers = scan.otherPlayers.reduce((n, p) => n + p.count, 0);
@@ -649,6 +672,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             official: this.opts.official,
             filter,
             identity: owner,
+            declines: origin,
           });
           if (result.status === 'added') {
             imported++;
@@ -664,7 +688,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
       if (sources.unfinished || sources.attempts) {
         const scan = scanLogsForPlays(this.opts.db, this.opts.profileId, this.logDirs(), since);
-        const ctx = this.importContext(since, filter);
+        const ctx = this.importContext(since, filter, origin);
         const tally = (status: 'added' | 'skipped' | 'filtered'): boolean => {
           if (status === 'filtered') {
             filtered++;
@@ -709,13 +733,86 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     if (since === null) return null;
     if (!getSettings(this.opts.db, this.opts.profileId).importPlaysWhileClosed) return null;
 
-    const result = await this.backfill(since, {
-      replays: true,
-      unfinished: true,
-      attempts: true,
-    });
+    const result = await this.backfill(
+      since,
+      { replays: true, unfinished: true, attempts: true },
+      true,
+      'catch-up',
+    );
     this.emit('caughtUp', result);
     return result;
+  }
+
+  /**
+   * An import's scan turns away somebody else's replay before any ingest sees it, so it is
+   * recorded from here, named exactly as a live refusal names it.
+   */
+  private recordOtherPlayer(origin: DeclineSource): OtherPlayerFound {
+    return (file, score, player) => {
+      recordDecline(this.opts.db, this.opts.profileId, {
+        kind: 'score',
+        dedupeKey: dedupeKey(score),
+        reason: 'another-player',
+        criterion: null,
+        player,
+        source: origin,
+        ...describe(this.opts.resolver.resolve(score.beatmapMD5), score.beatmapMD5),
+        mode: score.mode,
+        playedAt: score.playedAt.getTime(),
+        replayPath: file,
+        recording: null,
+      });
+    };
+  }
+
+  /**
+   * Track anyway: bring in one play this profile turned away, past whatever turned it away.
+   *
+   * The one exception to "the filter's decision cannot be undone", and deliberately narrow: one
+   * play, pressed for by name, never a setting. It skips exactly the three checks that can turn
+   * a play away -- the filter, the owner check and the cutoff -- and nothing else, so a play
+   * already here is still not added twice and one deleted for good still stays out. Written
+   * through the same ingest as every other play, queued behind them, and announced the same
+   * way, so the page and the console show it like a play that just arrived.
+   */
+  trackAnyway(id: number): Promise<TrackAnywayResult> {
+    return this.enqueue(async () => {
+      const profileId = this.opts.profileId;
+      const declined = declineToTrack(this.opts.db, profileId, id);
+      if (declined === null) throw new Error('that play is not in the list any more');
+
+      if (declined.kind === 'incomplete') {
+        if (declined.recording === null) throw new Error('nothing was recorded to track that play from');
+        const result = ingestRecording(declined.recording, {
+          db: this.opts.db,
+          resolver: this.opts.resolver,
+          profileId,
+          trackingSince: 0,
+          filter: defaultTrackingFilter(),
+        });
+        forgetDeclineById(this.opts.db, profileId, id);
+        if (result.status !== 'added') return { status: 'already' };
+        this.emit('incomplete', result.play);
+        return { status: 'tracked', kind: 'incomplete' };
+      }
+
+      if (declined.replayPath === null || !fs.existsSync(declined.replayPath)) return { status: 'missing' };
+      const result = await ingestReplayFile(declined.replayPath, {
+        db: this.opts.db,
+        resolver: this.opts.resolver,
+        profileId,
+        trackingSince: 0,
+        official: this.opts.official,
+        filter: defaultTrackingFilter(),
+        identity: UNKNOWN_IDENTITY,
+      });
+      if (result.status === 'skipped' && result.reason === 'unparseable') return { status: 'unparseable' };
+      forgetDeclineById(this.opts.db, profileId, id);
+      if (result.status !== 'added') return { status: 'already' };
+      this.added++;
+      this.emit('score', result.score);
+      return { status: 'tracked', kind: 'score' };
+    });
   }
 
   /**
@@ -946,6 +1043,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             profileId: this.opts.profileId,
             trackingSince: this.liveCutoff,
             filter: this.currentFilter(),
+            declines: 'live',
           });
           if (result.status === 'added') this.emit('incomplete', result.play);
           else if (result.status === 'filtered') this.reportFiltered(result, 'incomplete');
@@ -975,6 +1073,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
             profileId: this.opts.profileId,
             trackingSince: this.liveCutoff,
             filter: this.currentFilter(),
+            declines: 'live',
           });
           if (result.status === 'added') this.emit('incomplete', result.play);
           else if (result.status === 'filtered') this.reportFiltered(result, 'incomplete');
@@ -1013,6 +1112,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           official: this.opts.official,
           filter: this.currentFilter(),
           identity: this.currentIdentity(),
+          declines: 'live',
         });
         if (result.status === 'added') {
           this.added++;

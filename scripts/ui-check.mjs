@@ -1640,6 +1640,91 @@ if (await evaluate('Number(document.getElementById("removedCount")?.textContent 
   await evaluate("document.getElementById('settingsCancel').click()");
 }
 
+/*
+ * Plays not tracked (src/tracker/declined.ts), laid out as Removed scores is. Like the delete
+ * buttons above, nothing here is pressed twice: Track anyway on another player's replay, the
+ * red minus and Delete all permanently only ask on the first press, and the second would be
+ * real on a real profile.
+ */
+console.log('\nplays not tracked');
+{
+  await evaluate("document.getElementById('optionsBtn').click()");
+  await evaluate("document.getElementById('optSettings').click()");
+  await sleep(900);
+  const declined = JSON.parse(await evaluate(`(async () => {
+    const state = await (await fetch('/api/state')).json();
+    const panel = document.getElementById('declinedPlays');
+    const rows = () => [...document.querySelectorAll('#declinedList .removed-row')];
+    const all = rows();
+    const out = {
+      count: state.declinedPlays,
+      hidden: panel.hidden,
+      removedHidden: document.getElementById('removedScores').hidden,
+      empty: all.length === 0 ? document.getElementById('declinedList').textContent.trim() : null,
+      rows: all.length,
+      minus: all.filter((r) => r.querySelector('[data-delete-declined]')).length,
+      label: Number(document.getElementById('declinedCount').textContent.replace(/\\D/g, '')),
+      buttons: all.filter((r) => r.querySelector('[data-track]')).length,
+      scrolls: getComputedStyle(document.getElementById('declinedList')).overflowY,
+      reasons: new Set(all.map((r) => r.querySelector('[data-track]')?.dataset.reason)).size,
+      picker: !document.getElementById('declinedReasonField').hidden,
+    };
+    const select = document.getElementById('declinedReason');
+    const other = [...select.options].find((o) => o.value === 'another-player');
+    if (other && out.picker) {
+      select.value = 'another-player';
+      select.dispatchEvent(new Event('change'));
+      const narrowed = rows();
+      out.narrowed = narrowed.length;
+      out.narrowedOnlyOthers = narrowed.every((r) => r.querySelector('[data-track]').dataset.reason === 'another-player');
+      const track = narrowed[0].querySelector('[data-track]');
+      track.click();
+      out.asked = track.textContent.trim();
+      await new Promise((r) => setTimeout(r, 400));
+      out.afterAsk = (await (await fetch('/api/state')).json()).declinedPlays;
+      select.value = 'all';
+      select.dispatchEvent(new Event('change'));
+    }
+    if (all.length > 0) {
+      // Looked up again: the reason picker above re-rendered the list.
+      const minus = rows()[0].querySelector('[data-delete-declined]');
+      minus.click();
+      out.minusAsked = minus.textContent.trim();
+      out.minusRed = parseInt(getComputedStyle(minus).backgroundColor.slice(4), 10) > 150;
+      const deleteAll = document.getElementById('declinedDeleteAll');
+      deleteAll.click();
+      out.allAsked = deleteAll.textContent.trim();
+      out.allRed = parseInt(getComputedStyle(deleteAll).backgroundColor.slice(4), 10) > 150;
+      await new Promise((r) => setTimeout(r, 400));
+      out.afterAsk2 = (await (await fetch('/api/state')).json()).declinedPlays;
+    }
+    return JSON.stringify(out);
+  })()`));
+  check('Plays not tracked is always shown', declined.hidden, false);
+  check('and so is Removed scores', declined.removedHidden, false);
+  if (declined.count === 0) {
+    check('an empty list says so', declined.empty, 'No plays have been turned away.');
+  } else {
+    check('every play not tracked is listed', declined.rows, declined.count);
+    check('and counted in the heading', declined.label, declined.count);
+    check('each has Track anyway', declined.buttons, declined.rows);
+    check('and a red minus, as a removed score has', declined.minus, declined.rows);
+    check('the list scrolls rather than growing the dialog', declined.scrolls, 'auto');
+    check('the reason picker shows only when there is a choice', declined.picker, declined.reasons > 1);
+    if (declined.narrowed !== undefined) {
+      check('picking a reason narrows the list to it', declined.narrowedOnlyOthers, true);
+      check("tracking another player's play first only asks", declined.asked, 'Track as yours?');
+      check('and tracks nothing', declined.afterAsk, declined.count);
+    }
+    check('the minus first only asks', declined.minusAsked, 'Delete?');
+    check('and it is red', declined.minusRed, true);
+    check('Delete all permanently first only asks', declined.allAsked, `Delete all ${declined.count.toLocaleString('en')} for good?`);
+    check('and it is red', declined.allRed, true);
+    check('and neither deletes anything', declined.afterAsk2, declined.count);
+  }
+  await evaluate("document.getElementById('settingsCancel').click()");
+}
+
 console.log('\nprofiles dialog');
 check('profiles dialog is hidden on load', await shown('profilesModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");

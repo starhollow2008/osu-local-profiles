@@ -27,9 +27,11 @@ Each has its reasoning in `docs/architecture.md`.
   without it.
 - **A `.osu` section ends at a line beginning with `[`** (`osuSection`), never at the next `[`,
   which is ordinary inside values.
-- **The play tracking filter decides what is written, so it cannot be undone.** Off by
-  default and widest when on; a fact it lacks never rejects a play; every declined play is
-  announced. `scripts/reingest.mjs` must not pass a filter.
+- **The play tracking filter decides what is written.** Off by default and widest when on; a
+  fact it lacks never rejects a play; every declined play is announced and recorded in
+  `declined_plays`, which no figure ever reads. The one way back is Track anyway, one play at a
+  time (`Tracker.trackAnyway`, roadmap 5.61), never a setting. `scripts/reingest.mjs` must not
+  pass a filter.
 - **The server refuses non-loopback requests, with no switch.** Do not bring back
   `shareOnNetwork`, and do not "fix" it by binding to `127.0.0.1` (drops `::1`).
 - **This repo is AGPL-3.0-or-later, as osu-web is, so osu-web's files may be used.** Its

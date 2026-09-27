@@ -14,6 +14,7 @@ import {
   pct,
   playTimeStrings,
   shortDate,
+  timeAgo,
 } from './format.js';
 import {
   coverUrl,
@@ -218,6 +219,8 @@ let welcomeOffered = false;
 /** Which osu! release prices scores, and how many of this profile's another one priced. */
 let ppCalculator = { version: null, outdated: 0 };
 let hiddenScoreCount = 0;
+/** Plays the app turned away and kept, for Settings' Plays not tracked (src/tracker/declined.ts). */
+let declinedPlayCount = 0;
 /** Whether the play tracking filter can turn a play away, and how many it has. */
 let filterNarrowing = false;
 let playsFiltered = 0;
@@ -640,6 +643,7 @@ async function loadState() {
   ppCalculator = s.ppCalculator ?? ppCalculator;
   renderPpCalculator();
   hiddenScoreCount = s.hiddenScores ?? 0;
+  declinedPlayCount = s.declinedPlays ?? 0;
   unsubmittedAttempts = s.unsubmittedAttempts ?? 0;
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
@@ -2018,12 +2022,17 @@ function renderSettingsFields() {
  * Fetched when the dialog opens rather than carried in /api/state: it is usually empty, and
  * a profile that has removed a hundred scores should not send them with every poll.
  */
-async function renderRemovedScores() {
-  const panel = $('removedScores');
-  panel.hidden = hiddenScoreCount === 0;
-  if (panel.hidden) return;
+/** What an empty list says, so a section that is always there never looks broken. */
+const emptyList = (message) => `<div class="setting__hint">${escapeHtml(message)}</div>`;
 
+async function renderRemovedScores() {
   $('removedCount').textContent = fmt(hiddenScoreCount);
+  $('removedDeleteAll').hidden = hiddenScoreCount === 0;
+  if (hiddenScoreCount === 0) {
+    $('removedList').innerHTML = emptyList(t('removedScores.none'));
+    return;
+  }
+
   $('removedList').innerHTML = `<div class="setting__hint">${escapeHtml(
     t('common.loading'),
   )}</div>`;
@@ -2156,9 +2165,166 @@ $('removedList').onclick = async (e) => {
   }
 };
 
+/**
+ * Plays the app turned away, so a missing play has an answer and one turned away by mistake can
+ * be tracked anyway.
+ *
+ * Fetched when the dialog opens, like Removed scores: an import can put hundreds here. Narrowed
+ * by reason on the page, because an import walks osu!'s folders and every replay watched there
+ * is somebody else's -- the few declined by the filter should not be buried under them.
+ */
+let declined = [];
+
+const DECLINE_REASONS = ['filtered', 'another-player', 'unparseable'];
+
+const declineReasonLabel = (reason) =>
+  reason === 'filtered'
+    ? t('declined.byFilter')
+    : reason === 'another-player'
+      ? t('declined.byOtherPlayer')
+      : t('declined.unreadable');
+
+function declineMeta(d) {
+  const why =
+    d.reason === 'filtered'
+      ? t('declined.filteredOn', { criterion: d.criterion ?? '' })
+      : d.reason === 'another-player'
+        ? t('declined.byOtherPlayer')
+        : t('declined.unreadable');
+  const source =
+    d.source === 'import'
+      ? t('declined.fromImport')
+      : d.source === 'catch-up'
+        ? t('declined.fromCatchUp')
+        : t('declined.fromLive');
+  const parts = [why];
+  if (d.kind === 'incomplete') parts.push(t('declined.unfinished'));
+  if (d.mode != null && MODE_NAMES[d.mode]) parts.push(MODE_NAMES[d.mode]);
+  parts.push(source, timeAgo(d.declinedAt));
+  // Whose replay it was, first, as a leaderboard names a score's player: the one fact that
+  // tells a watched replay from your own at a glance. An unfinished play has none to name.
+  const player = d.player ? `<span class="removed-row__player">${escapeHtml(d.player)}</span> &middot; ` : '';
+  return player + parts.map(escapeHtml).join(' &middot; ');
+}
+
+function renderDeclinedList() {
+  const reason = $('declinedReason').value || 'all';
+  const shown = reason === 'all' ? declined : declined.filter((d) => d.reason === reason);
+  $('declinedList').innerHTML = shown
+    .map((d) => {
+      const title = d.title === null ? d.fileName ?? t('declined.unreadable') : original(d.title, d.titleOriginal);
+      return `<div class="removed-row">
+        <div class="removed-row__detail">
+          <div class="u-ellipsis">${escapeHtml(title)}</div>
+          <div class="removed-row__meta">${declineMeta(d)}</div>
+        </div>
+        <button type="button" data-track="${d.id}" data-reason="${escapeHtml(d.reason)}">${escapeHtml(t('declined.trackAnyway'))}</button>
+        <button type="button" class="removed-row__delete" data-delete-declined="${d.id}"
+                title="${escapeHtml(t('removed.deletePermanently'))}" aria-label="${escapeHtml(t('removed.deletePermanently'))}">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3.5" y="7" width="9" height="2" rx="1" fill="currentColor"/></svg>
+        </button>
+      </div>`;
+    })
+    .join('');
+}
+
+function showDeclinedCount() {
+  $('declinedCount').textContent = fmt(declinedPlayCount);
+  $('declinedDeleteAll').hidden = declinedPlayCount === 0;
+  if (declinedPlayCount > 0) return false;
+  $('declinedReasonField').hidden = true;
+  $('declinedList').innerHTML = emptyList(t('declinedPlays.none'));
+  return true;
+}
+
+async function renderDeclinedPlays() {
+  if (showDeclinedCount()) return;
+  $('declinedList').innerHTML = emptyList(t('common.loading'));
+  try {
+    const r = await fetch('/api/declined');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? 'that did not work');
+    declined = d.plays;
+    declinedPlayCount = declined.length;
+    if (showDeclinedCount()) return;
+
+    // The reason picker only once there is more than one reason to pick between.
+    const present = DECLINE_REASONS.filter((r) => declined.some((d) => d.reason === r));
+    const select = $('declinedReason');
+    const before = select.value;
+    select.innerHTML = [
+      `<option value="all">${escapeHtml(t('declined.allReasons'))} (${fmt(declined.length)})</option>`,
+      ...present.map(
+        (r) => `<option value="${r}">${escapeHtml(declineReasonLabel(r))} (${fmt(
+          declined.filter((d) => d.reason === r).length,
+        )})</option>`,
+      ),
+    ].join('');
+    select.value = present.includes(before) ? before : 'all';
+    $('declinedReasonField').hidden = present.length < 2;
+    renderDeclinedList();
+  } catch (err) {
+    $('declinedList').innerHTML = `<div class="setting__hint">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+$('declinedReason').onchange = renderDeclinedList;
+
+/** Delete plays not tracked for good -- one, or all of them -- as Removed scores does. */
+async function deleteDeclined(payload, button) {
+  button.disabled = true;
+  try {
+    const d = await postJson('/api/declined', payload);
+    toast(d.deleted === 1 ? t('removed.deletedOnePlay') : t('removed.deletedPlays', { n: fmt(d.deleted) }));
+    declinedPlayCount = d.declinedPlays ?? 0;
+    await renderDeclinedPlays();
+  } catch (err) {
+    settingsHint(err.message, true);
+  } finally {
+    // The button survives only when it is Delete all, which stays for the next time.
+    button.disabled = false;
+  }
+}
+
+$('declinedDeleteAll').onclick = () => {
+  const button = $('declinedDeleteAll');
+  if (!armed(button, t('removed.deleteAllConfirm', { n: fmt(declinedPlayCount) }))) return;
+  void deleteDeclined({ action: 'delete-all' }, button);
+};
+
+$('declinedList').onclick = async (e) => {
+  const doomed = e.target.closest('[data-delete-declined]');
+  if (doomed) {
+    if (armed(doomed, t('removed.deleteConfirm'))) {
+      void deleteDeclined({ action: 'delete', id: Number(doomed.dataset.deleteDeclined) }, doomed);
+    }
+    return;
+  }
+  const button = e.target.closest('[data-track]');
+  if (!button) return;
+  // Somebody else's play takes a second press: tracking it as yours is the one way this list
+  // can put into a profile what the owner check was right to keep out.
+  if (button.dataset.reason === 'another-player' && !armed(button, t('declined.trackOtherConfirm'))) return;
+  button.disabled = true;
+  try {
+    const d = await postJson('/api/declined', { action: 'track', id: Number(button.dataset.track) });
+    // A play tracked is announced by the stream, like any play that arrives; the rest say why not.
+    const status = d.result?.status;
+    if (status === 'already') toast(t('declined.already'));
+    else if (status === 'missing') toast(t('declined.missing'));
+    else if (status === 'unparseable') toast(t('declined.stillUnreadable'));
+    declinedPlayCount = d.declinedPlays ?? declinedPlayCount;
+    await renderDeclinedPlays();
+  } catch (err) {
+    settingsHint(err.message, true);
+    button.disabled = false;
+  }
+};
+
 function openSettings() {
   setMenuOpen(false);
   void renderRemovedScores();
+  void renderDeclinedPlays();
   $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;

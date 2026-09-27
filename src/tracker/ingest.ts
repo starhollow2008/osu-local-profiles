@@ -11,6 +11,7 @@ import { priceAsPlayed, pricedColumns, priceTheRest } from './pricing.ts';
 import type { OfficialCalculator } from '../calc/official.ts';
 import { accuracy, gradeOf, passed } from '../calc/grade.ts';
 import { beatmapName, beatmapNameOriginal, resolvedNames } from '../calc/metadata.ts';
+import { forgetDecline, recordDecline, type Decline, type DeclineSource } from './declined.ts';
 import {
   beatmapFilterFacts,
   defaultTrackingFilter,
@@ -41,6 +42,12 @@ export interface IngestContext {
    * old behaviour and the right answer for a re-ingest of rows already here.
    */
   identity?: PlayerIdentity;
+  /**
+   * Record a play this turns away in `declined_plays`, as coming from this source, so Settings
+   * can list it and it can be tracked anyway. Omitted, nothing is recorded: a re-ingest, a
+   * preview and Track anyway itself are not declining anything anyone should be told about.
+   */
+  declines?: DeclineSource;
 }
 
 export interface IngestedScore {
@@ -133,9 +140,36 @@ export async function ingestReplayFile(file: string, ctx: IngestContext): Promis
   try {
     score = await parseReplay(fs.readFileSync(file));
   } catch {
+    // Keyed by its path: with nothing read, there is no play to key it by.
+    declined(ctx, {
+      dedupeKey: `file:${file}`,
+      reason: 'unparseable',
+      title: null,
+      titleOriginal: null,
+      mode: null,
+      playedAt: null,
+      replayPath: file,
+    });
     return { status: 'skipped', reason: 'unparseable' };
   }
   return await ingestScore(score, file, ctx);
+}
+
+/** Record a replay turned away, when the caller asked for declines to be kept. */
+function declined(
+  ctx: IngestContext,
+  d: Omit<Decline, 'kind' | 'source' | 'recording' | 'criterion' | 'player'> &
+    Partial<Pick<Decline, 'criterion' | 'player'>>,
+): void {
+  if (ctx.declines === undefined) return;
+  recordDecline(ctx.db, ctx.profileId, {
+    kind: 'score',
+    source: ctx.declines,
+    recording: null,
+    criterion: d.criterion ?? null,
+    player: d.player ?? null,
+    ...d,
+  });
 }
 
 export async function ingestScore(
@@ -158,16 +192,20 @@ export async function ingestScore(
    * as yours: not knowing must never cost anybody a play. See src/player-identity.ts.
    */
   const player = replayPlayer(score);
+  const key = dedupeKey(score);
+  // Named whatever the reason, so the list can say whose replay each one is.
+  const play = { dedupeKey: key, mode: score.mode, playedAt, replayPath, player: player.name.trim() || null };
   if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player) === false) {
+    const named = describe(ctx.resolver.resolve(score.beatmapMD5), score.beatmapMD5);
+    declined(ctx, { ...play, ...named, reason: 'another-player' });
     return {
       status: 'skipped',
       reason: 'another-player',
       player: player.name.trim(),
-      ...describe(ctx.resolver.resolve(score.beatmapMD5), score.beatmapMD5),
+      ...named,
     };
   }
 
-  const key = dedupeKey(score);
   const already = ctx.db
     .prepare('SELECT id FROM scores WHERE profile_id = ? AND dedupe_key = ?')
     .get(ctx.profileId, key);
@@ -210,7 +248,10 @@ export async function ingestScore(
   if (filter.enabled) {
     facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
     const rejected = filterRejects(filter, playFacts(facts, mode, mods));
-    if (rejected) return { status: 'filtered', criterion: rejected, ...named };
+    if (rejected) {
+      declined(ctx, { ...play, ...named, reason: 'filtered', criterion: rejected });
+      return { status: 'filtered', criterion: rejected, ...named };
+    }
   }
 
   /*
@@ -227,7 +268,10 @@ export async function ingestScore(
   // play whose rating could not be calculated is not rejected on it -- see filterRejects.
   if (facts !== null && computed !== null) {
     const rejected = filterRejects(filter, { stars: computed.stars });
-    if (rejected) return { status: 'filtered', criterion: rejected, ...named };
+    if (rejected) {
+      declined(ctx, { ...play, ...named, reason: 'filtered', criterion: rejected });
+      return { status: 'filtered', criterion: rejected, ...named };
+    }
   }
 
   /*
@@ -292,6 +336,8 @@ export async function ingestScore(
   const { lastInsertRowid } = ctx.db
     .prepare(`INSERT INTO scores (${columns.join(', ')}) VALUES (${columns.map(() => '?').join(', ')})`)
     .run(...(Object.values(row) as SQLInputValue[]));
+  // Tracked now, however it got here, so it is no longer a play the app turned away.
+  forgetDecline(ctx.db, ctx.profileId, 'score', key);
 
   return {
     status: 'added',

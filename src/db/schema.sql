@@ -252,6 +252,44 @@ CREATE TABLE IF NOT EXISTS deleted_scores (
   PRIMARY KEY (profile_id, dedupe_key)
 );
 
+-- Plays the app turned away rather than tracked: declined by the play tracking filter, set by
+-- another player, or a replay that could not be read. Live, by an import, or by the catch-up a
+-- launch runs. Kept so "why is my play missing?" has an answer after the toast is gone, and so
+-- one turned away by mistake can be tracked anyway -- see src/tracker/declined.ts.
+--
+-- Never read for a figure. Nothing here is a play of the profile's until it is tracked, which
+-- writes it to `scores` or `incomplete_plays` like any other and takes its row out of here.
+CREATE TABLE IF NOT EXISTS declined_plays (
+  id             INTEGER PRIMARY KEY,
+  profile_id     INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  -- 'score' for a replay, 'incomplete' for a play read out of lazer's log.
+  kind           TEXT    NOT NULL,
+  -- The key the play would be stored under, so the same play declined twice is one row; a
+  -- replay that could not be read has none, and is keyed by its path instead.
+  dedupe_key     TEXT    NOT NULL,
+  -- 'filtered', 'another-player' or 'unparseable', and the filter's criterion for the first.
+  reason         TEXT    NOT NULL,
+  criterion      TEXT,
+  -- The name written in the replay, whatever the reason. NULL for an unfinished play -- the log
+  -- names nobody -- and for a replay that could not be read.
+  player         TEXT,
+  -- 'live', 'import' or 'catch-up': what was running when it was turned away.
+  source         TEXT    NOT NULL,
+  -- The beatmap as the announcement named it, both scripts (src/calc/metadata.ts), so a row
+  -- still reads when the beatmap is gone. NULL for a replay that could not be read.
+  title          TEXT,
+  title_original TEXT,
+  mode           INTEGER,
+  played_at      INTEGER,
+  declined_at    INTEGER NOT NULL,
+  -- What tracking it anyway needs: a replay's file, or an unfinished play's JSON `Recording`,
+  -- which is everything the log said about it.
+  replay_path    TEXT,
+  recording      TEXT,
+  UNIQUE (profile_id, kind, dedupe_key)
+);
+CREATE INDEX IF NOT EXISTS declined_profile_at ON declined_plays (profile_id, declined_at DESC);
+
 -- What osu! itself said a linked account stood at, per ruleset, when best performances were
 -- last imported for it.
 --

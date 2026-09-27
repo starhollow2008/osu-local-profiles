@@ -72,6 +72,12 @@ export interface BackfillIdentityContext {
   identity: PlayerIdentity;
 }
 
+/**
+ * Told of each replay the scan found somebody else set, so an import can record it as declined.
+ * A preview passes none: it turns nothing away.
+ */
+export type OtherPlayerFound = (file: string, score: ReplayScore, player: string) => void;
+
 function readHead(file: string, n: number): Buffer | null {
   let fd: number | undefined;
   try {
@@ -130,6 +136,7 @@ export async function scanForReplays(
   since: number,
   filtering?: BackfillFilterContext,
   owner: PlayerIdentity = UNKNOWN_IDENTITY,
+  onOtherPlayer?: OtherPlayerFound,
 ): Promise<BackfillScan> {
   const candidates: BackfillCandidate[] = [];
   const others = new Map<string, number>();
@@ -168,6 +175,7 @@ export async function scanForReplays(
       if (ownsPlay(owner, player) === false) {
         const name = player.name.trim() || '(no name)';
         others.set(name, (others.get(name) ?? 0) + 1);
+        onOtherPlayer?.(entry.path, score, player.name.trim());
         continue;
       }
 

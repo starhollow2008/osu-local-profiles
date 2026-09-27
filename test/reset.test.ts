@@ -9,6 +9,7 @@ import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { Tracker } from '../src/tracker/index.ts';
 import { startServer } from '../src/http/server.ts';
 import { computeStats } from '../src/calc/stats.ts';
+import { listDeclines, recordDecline } from '../src/tracker/declined.ts';
 
 /** A minimal stored score, so reset has something real to erase. */
 function insertScore(db: Db, profileId: number, key: string, playedAt: number): void {
@@ -159,6 +160,85 @@ test('confirmed reset erases the profile and restarts tracking', async () => {
       'tracking_since should be after the erased scores',
     );
     assert.equal(profile.tracking_since, body.trackingSince);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * Plays not tracked, through the page's own routes -- and a reset forgets them, or Track anyway
+ * on a play from before it would bring back exactly what the reset cleared.
+ */
+test('the list of plays not tracked is served, deleted for good, and forgotten by a reset', async () => {
+  const h = harness();
+  try {
+    const decline = (key: string) =>
+      recordDecline(h.db, h.profileId, {
+        kind: 'score',
+        dedupeKey: key,
+        reason: 'another-player',
+        criterion: null,
+        player: 'mrekk',
+        source: 'live',
+        title: 'Reji - Shoujo wa Yoru to Azayaka ni [Vivid Collab]',
+        titleOriginal: null,
+        mode: 0,
+        playedAt: Date.now(),
+        replayPath: path.join('C:', 'osu!', 'Data', 'r', `${key}.osr`),
+        recording: null,
+      });
+    decline('a');
+    decline('b');
+
+    const state = (await (await fetch(`${h.base}/api/state`)).json()) as { declinedPlays: number };
+    assert.equal(state.declinedPlays, 2);
+    const listed = (await (await fetch(`${h.base}/api/declined`)).json()) as {
+      plays: { id: number; player: string; fileName: string | null }[];
+    };
+    assert.equal(listed.plays.length, 2);
+    assert.equal(listed.plays[0]!.player, 'mrekk');
+    assert.equal(listed.plays[0]!.fileName, null, 'a named play needs no file name, and never a path');
+
+    const send = (body: unknown) =>
+      fetch(`${h.base}/api/declined`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    assert.equal((await send({ action: 'nonsense' })).status, 400);
+    // The replay is not on this machine, so there is nothing to track it from -- and it stays.
+    const missing = (await (await send({ action: 'track', id: listed.plays[0]!.id })).json()) as {
+      result: { status: string };
+      declinedPlays: number;
+    };
+    assert.deepEqual(missing.result, { status: 'missing' });
+    assert.equal(missing.declinedPlays, 2);
+
+    assert.equal((await post(h.base, { confirm: true })).status, 200);
+    assert.equal(listDeclines(h.db, h.profileId).length, 0, 'a reset forgets what was turned away');
+
+    // The red minus and Delete all permanently: gone for good, as a removed score is deleted.
+    decline('c');
+    decline('d');
+    decline('e');
+    const [newest] = listDeclines(h.db, h.profileId);
+    const one = (await (await send({ action: 'delete', id: newest!.id })).json()) as {
+      deleted: number;
+      declinedPlays: number;
+    };
+    assert.equal(one.deleted, 1);
+    assert.equal(one.declinedPlays, 2);
+    assert.equal((await send({ action: 'delete', id: newest!.id })).status, 400, 'not in the list any more');
+    const all = (await (await send({ action: 'delete-all' })).json()) as { deleted: number; declinedPlays: number };
+    assert.equal(all.deleted, 2);
+    assert.equal(all.declinedPlays, 0);
+
+    // Remembered, so the same plays turned away again are never listed again.
+    const kept = h.db.prepare('SELECT dedupe_key FROM deleted_scores ORDER BY dedupe_key').all() as { dedupe_key: string }[];
+    assert.deepEqual(kept.map((r) => r.dedupe_key), ['c', 'd', 'e']);
+    decline('c');
+    decline('e');
+    assert.equal(listDeclines(h.db, h.profileId).length, 0);
   } finally {
     h.cleanup();
   }

@@ -4,6 +4,7 @@ import { beatmapMode, type BeatmapResolver } from '../clients/beatmaps.ts';
 import type { ResolvedLoggedPlay, SessionAttempt } from '../clients/lazer-log.ts';
 import { deletedIncompleteKey, wasDeleted } from '../scores.ts';
 import { describe } from './ingest.ts';
+import { forgetDecline, recordDecline, type DeclineSource } from './declined.ts';
 import {
   beatmapFilterFacts,
   defaultTrackingFilter,
@@ -49,6 +50,11 @@ export interface IncompleteContext {
    * still do; see src/tracking-filter.ts for why that is the right way round.
    */
   filter?: TrackingFilter;
+  /**
+   * Record a play the filter turns away in `declined_plays`, as coming from this source.
+   * Omitted, nothing is recorded -- which is what a preview must do, since it declines nothing.
+   */
+  declines?: DeclineSource;
 }
 
 export interface IngestedIncomplete {
@@ -66,7 +72,17 @@ export type IncompleteOutcome =
   | { status: 'added'; play: IngestedIncomplete }
   | { status: 'skipped'; reason: 'passed' | 'too-old' | 'duplicate' | 'unresolved' }
   /** Turned away by the play tracking filter, exactly as in tracker/ingest.ts. */
-  | { status: 'filtered'; criterion: FilterCriterion; title: string; titleOriginal: string | null };
+  | FilteredIncomplete;
+
+/** A play the filter turned away, with what tracking it anyway would write. */
+export interface FilteredIncomplete {
+  status: 'filtered';
+  criterion: FilterCriterion;
+  title: string;
+  titleOriginal: string | null;
+  recording: Recording;
+  mode: Ruleset;
+}
 
 /** What both kinds have in common once their beatmap is known. */
 export interface Recording {
@@ -132,7 +148,7 @@ function assess(entry: Recording, ctx: IncompleteContext): IncompleteCheck {
   if (filter.enabled) {
     const facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
     const rejected = filterRejects(filter, playFacts(facts, mode, null));
-    if (rejected) return { status: 'filtered', criterion: rejected, ...named };
+    if (rejected) return { status: 'filtered', criterion: rejected, ...named, recording: entry, mode };
   }
 
   return { status: 'ready', recording: entry, mode, ...named, beatmapId: beatmap.beatmapId };
@@ -161,6 +177,7 @@ function write(ready: ReadyIncomplete, ctx: IncompleteContext): IncompleteOutcom
     );
 
   const id = (ctx.db.prepare('SELECT last_insert_rowid() AS id').get() as { id: number }).id;
+  forgetDecline(ctx.db, ctx.profileId, 'incomplete', entry.dedupeKey);
 
   return {
     status: 'added',
@@ -215,8 +232,38 @@ export function ingestIncompletePlay(
   play: ResolvedLoggedPlay,
   ctx: IncompleteContext,
 ): IncompleteOutcome {
-  const checked = checkIncompletePlay(play, ctx);
-  return checked.status === 'ready' ? write(checked, ctx) : checked;
+  return settle(checkIncompletePlay(play, ctx), ctx);
+}
+
+/** Write a play that is ready, and record one the filter turned away. */
+function settle(checked: IncompleteCheck, ctx: IncompleteContext): IncompleteOutcome {
+  if (checked.status === 'ready') return write(checked, ctx);
+  if (checked.status === 'filtered' && ctx.declines !== undefined) {
+    recordDecline(ctx.db, ctx.profileId, {
+      kind: 'incomplete',
+      dedupeKey: checked.recording.dedupeKey,
+      reason: 'filtered',
+      criterion: checked.criterion,
+      player: null,
+      source: ctx.declines,
+      title: checked.title,
+      titleOriginal: checked.titleOriginal,
+      mode: checked.mode,
+      playedAt: checked.recording.playedAt,
+      replayPath: null,
+      recording: checked.recording,
+    });
+  }
+  return checked;
+}
+
+/**
+ * Write a play the filter once turned away, from what was recorded when it did -- Track anyway.
+ * The duplicate and deleted checks still apply; the filter, and the cutoff, are the caller's.
+ */
+export function ingestRecording(entry: Recording, ctx: IncompleteContext): IncompleteOutcome {
+  if (isRecorded(ctx, entry.dedupeKey)) return { status: 'skipped', reason: 'duplicate' };
+  return settle(assess(entry, ctx), ctx);
 }
 
 /**
@@ -269,6 +316,5 @@ export function ingestUnsubmittedAttempt(
   attempt: SessionAttempt,
   ctx: IncompleteContext,
 ): IncompleteOutcome {
-  const checked = checkUnsubmittedAttempt(attempt, ctx);
-  return checked.status === 'ready' ? write(checked, ctx) : checked;
+  return settle(checkUnsubmittedAttempt(attempt, ctx), ctx);
 }

@@ -2380,6 +2380,12 @@
   font-size: var(--fs-normal);
 }
 
+/* Plays not tracked: whose replay it was, read before anything else on the line. */
+.removed-row__player {
+  color: hsl(var(--hsl-c1));
+  font-weight: 600;
+}
+
 .removed-row button {
   flex: none;
   padding: 5px 10px;
@@ -2423,6 +2429,11 @@
 .removed-scores__actions {
   display: flex;
   justify-content: flex-end;
+  margin-top: 8px;
+}
+
+/* Plays not tracked: which reason the list shows, once there is more than one. */
+.declined-reason {
   margin-top: 8px;
 }
 
@@ -2683,12 +2694,14 @@
 }
 
 .setting .field input[type="text"],
-.setting .field select {
+.setting .field select,
+.declined-reason select {
   flex: 0 1 240px;
   min-width: 0;
 }
 
-.setting .field select {
+.setting .field select,
+.declined-reason select {
   background-color: hsl(var(--hsl-b6));
   color: hsl(var(--hsl-c1));
   border: 1px solid hsl(var(--hsl-b3));

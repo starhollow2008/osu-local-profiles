@@ -161,11 +161,24 @@ Every source, because a gap is a gap - replays, counted unfinished plays and uns
 
 ## Play tracking filter
 
-Decides whether a play is **written**. Declined play leaves no row anywhere.
+Decides whether a play is **written**. A declined play is never a row of `scores` or `incomplete_plays`; it is recorded in `declined_plays`, which nothing that computes a figure reads.
 
 - Off by default. Switching it on narrows nothing (every criterion starts widest). `filterNarrows` separate from `enabled`.
 - A fact the filter doesn't have never rejects a play (quit/HP fail/retry has no mod list or star rating - those two criteria don't judge it).
-- Declined play announced: console line, SSE `filtered` event, toast naming criterion, running count in `/api/state`.
+- Declined play announced: console line, SSE `filtered` event, toast naming criterion, running count in `/api/state`, and a row in `declined_plays`.
+
+### Plays not tracked, and Track anyway
+
+A toast reaches only a visible tab, the tray launcher hides the console, the running count resets at launch, and an import declines hundreds of plays without a word per play. So "why is my play missing?" had no answer a day later. `src/tracker/declined.ts` keeps what the app announces: plays the **filter** declined, replays **another player** set, and replays that **could not be read** - live, from Import past plays, and from the catch-up at launch (`source`). Skips that are the app working as meant (duplicate, deleted for good, before the cutoff) are not kept; they would bury the rest.
+
+- **Recorded by whoever turned the play away**, when its context names a `declines` source: `ingestScore`/`ingestReplayFile`, `settle` in `incomplete.ts`, and the import scan's `onOtherPlayer` for other players' replays (it turns them away before any ingest sees them). A preview, a re-ingest and Track anyway name none, so they record nothing.
+- **One row per play** (`UNIQUE (profile_id, kind, dedupe_key)`); declined again, it is updated and moves to the top. At most `MAX_DECLINES` (1,000) per profile, newest kept: an import walks osu!'s folders, where every watched replay is someone else's.
+- **Named when declined**, through `describe` (both scripts), so a row still reads if the beatmap goes.
+- **A play tracked by any route leaves the list** - the insert into `scores`/`incomplete_plays` forgets its decline - **and never re-enters it.** `recordDecline` refuses a play already in the profile, because the import scan turns another player's replay away before anything asks whether it is tracked: without that, one tracked anyway came back at the next import. A reset clears the list: Track anyway on a play from before it would undo the reset.
+- **Deleted for good** (the red minus, and Delete all permanently) as a removed score is: `deleteDeclines` writes the play's key to `deleted_scores` - `incomplete:`-prefixed for an unfinished play, as `deleteRemovedScores` does - so ingest refuses it and `recordDecline` never lists it again. An unreadable replay has no such key (it is keyed `file:<path>`), so deleting one only takes it off the list.
+- **Every replay row names its player**, whatever the reason, from the replay itself; an unfinished play has none, as lazer's log names nobody.
+
+**Track anyway** (`Tracker.trackAnyway`, `POST /api/declined`) is the one exception to "the filter's decision stands", and deliberately narrow: one play, pressed by name, never a setting. It re-ingests that play with a filter that permits everything, no owner (`UNKNOWN_IDENTITY`) and no cutoff - the three checks that turn a play away - and nothing else is skipped, so the duplicate and deleted-for-good checks still hold. A replay is read again from its file (gone → `missing`, stays listed); an unfinished play is written from the `Recording` stored when it was declined, since the log it came from is not re-read. The play is announced by the tracker's `score`/`incomplete` event, like one that just arrived. The page asks twice before tracking someone else's play as yours.
 
 Nine criteria matched against replay, `.osu`, `online.db`. Same answer at live ingest and Import past plays - **unless that import says otherwise**. Import past plays carries a checkbox, ticked by default, and unticking it runs that one import against `defaultTrackingFilter()` (permits everything) rather than the profile's. The filter is a rule about how you play *now*; an import reaches back to evenings it was never written for, and the alternative was turning the filter off, importing, and turning it back on. `applyFilter` is absent-means-true on the API, so an older page or a script keeps the old behaviour. Preview and import are given the same answer, so the counts shown are the counts imported. `scripts/reingest.mjs` must NOT pass a filter.
 

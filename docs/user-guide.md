@@ -420,12 +420,28 @@ wide open, so the filter only ever narrows on purpose. There are nine:
 | **Date submitted** | When it was first uploaded to osu!. |
 | **Date ranked** | When it was ranked, approved or loved. |
 
-**A play the filter turns away is not recorded at all** - no score, no pp, no play count - and
-it cannot be brought back afterwards. So the app says so every time: a line in the log, a
-message on the page naming the criterion that declined it, a count in the Options menu, and a
-mark on the menu entry for as long as a filter is narrowing anything. **Import past plays
-applies the filter too**, and says how many it would leave out; it can be told to ignore the
-filter for that one import.
+**A play the filter turns away is not tracked** - no score, no pp, no play count. So the app
+says so every time: a line in the log, a message on the page naming the criterion that declined
+it, a count in the Options menu, and a mark on the menu entry for as long as a filter is
+narrowing anything. It is also listed under **Plays not tracked** (below), where it can be
+tracked anyway. **Import past plays applies the filter too**, and says how many it would leave
+out; it can be told to ignore the filter for that one import.
+
+### Plays not tracked
+
+**Options → Other settings → Plays not tracked** lists every play this profile turned away, and
+why: declined by the filter (naming the criterion), set by another player, or a replay that
+could not be read. Each replay shows the name of the player who set it. Each says whether it was turned away while tracking, by Import
+past plays, or by the import at launch. It is the first place to look when a play you expected
+never appeared. When the list holds more than one kind, a **Show** menu narrows it to one.
+
+**Track anyway** brings that one play in regardless, exactly as if you had just played it. It
+never adds a play twice, and it cannot bring back a replay osu! has since deleted. Tracking
+another player's replay asks you to press twice, because it puts their play in your profile.
+The red minus deletes a play for good, exactly as it does under Removed scores: it is never
+tracked or listed again, and **Delete all permanently** does that for every play in the list.
+The list keeps the newest 1,000 plays, and resetting the profile empties it. Like Removed
+scores, it is always in Other settings, and says so when it is empty.
 
 ### The mods section
 

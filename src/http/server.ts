@@ -58,6 +58,7 @@ import { appVersion } from '../config.ts';
 import { applyUpdate, checkForUpdate, updateState } from '../update/index.ts';
 import { filterNarrows } from '../tracking-filter.ts';
 import { REPLAYS_ONLY, type BackfillSources } from '../tracker/index.ts';
+import { clearDeclines, declineCount, deleteDeclines, listDeclines } from '../tracker/declined.ts';
 import { eligibilityOf, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
@@ -266,13 +267,13 @@ export function startServer(opts: ServerOptions): http.Server {
   // told about it -- it just has nothing to put in a toast beyond which map it was.
   opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
   /*
-   * A play the tracking filter declined. Broadcast because it is the only trace of it: nothing
-   * is written, so a page that said nothing would leave "why was that play not counted?"
-   * unanswerable -- and that question is exactly what a too-tight filter produces.
+   * A play the tracking filter declined. Broadcast because no score is written, so a page that
+   * said nothing would leave "why was that play not counted?" to be dug out of Plays not
+   * tracked -- and that question is exactly what a too-tight filter produces.
    */
   opts.tracker.on('filtered', (play) => broadcast('filtered', play));
   // A replay turned away as someone else's, or unreadable: the same reasoning. The tray
-  // launcher hides the console, so without this a wrongly refused play leaves no trace at all.
+  // launcher hides the console, so without this a wrongly refused play would go unnoticed.
   opts.tracker.on('refused', (play) => broadcast('refused', play));
   /*
    * A launch brought in what was played while the app was closed. Its own event rather than
@@ -462,11 +463,10 @@ export function startServer(opts: ServerOptions): http.Server {
         profiles: listProfiles(opts.db),
         tracking: opts.tracker.isTracking,
         scoresThisSession: opts.tracker.scoresAdded,
-        // Plays the tracking filter has declined since the app started. They leave no row
-        // anywhere, so this running count is the only record there is.
+        // Plays the tracking filter has declined since the app started, for the Options menu.
+        // The plays themselves are in `declinedPlays` below.
         playsFiltered: opts.tracker.playsFiltered,
-        // Replays refused as another player's or unreadable since the app started. The same:
-        // no row, so this count is the only record.
+        // Replays refused as another player's or unreadable since the app started. The same.
         playsRefused: opts.tracker.playsRefused,
         // Whether that filter can actually turn a play away, decided by src/tracking-filter.ts
         // rather than by the page -- there is one definition of "this filter narrows something".
@@ -492,6 +492,8 @@ export function startServer(opts: ServerOptions): http.Server {
         staleScores: opts.tracker.staleScores,
         // Scores removed from the profile. They are never deleted, so they can be put back.
         hiddenScores: hiddenCount(opts.db, current()),
+        // Plays the app turned away, kept so Settings can list them and track one anyway.
+        declinedPlays: declineCount(opts.db, current()),
         // Attempts osu! could not submit -- offline, signed out, or an unsubmittable beatmap.
         // Recorded whether or not they count, so Settings can say how many there are before
         // anyone decides to count them.
@@ -1128,6 +1130,41 @@ export function startServer(opts: ServerOptions): http.Server {
     }
 
     /*
+     * Plays the app turned away rather than tracked -- the filter, another player's replay, one
+     * that could not be read -- and Track anyway for one of them. See src/tracker/declined.ts.
+     *
+     * The list is fetched when Settings opens rather than carried in /api/state, like Removed
+     * scores: an import can put hundreds in it.
+     */
+    if (url.pathname === '/api/declined' && req.method === 'GET') {
+      return json(res, { plays: listDeclines(opts.db, current()) });
+    }
+    if (url.pathname === '/api/declined' && req.method === 'POST') {
+      return readBody(req, res, async (body) => {
+        const action = String(body['action'] ?? '');
+        // For good, as a removed score is deleted: see deleteDeclines.
+        if (action === 'delete' || action === 'delete-all') {
+          try {
+            const deleted = deleteDeclines(opts.db, current(), action === 'delete' ? [Number(body['id'])] : 'all');
+            return json(res, { ok: true, deleted, declinedPlays: declineCount(opts.db, current()) });
+          } catch (e) {
+            return json(res, { error: (e as Error).message }, 400);
+          }
+        }
+        if (action !== 'track') return json(res, { error: `unknown action ${JSON.stringify(action)}` }, 400);
+        const id = Number(body['id']);
+        if (!Number.isInteger(id)) return json(res, { error: 'a play id is needed' }, 400);
+        try {
+          // A play tracked this way is announced by the tracker, as a live one is.
+          const result = await opts.tracker.trackAnyway(id);
+          return json(res, { ok: true, result, declinedPlays: declineCount(opts.db, current()) });
+        } catch (e) {
+          return json(res, { error: (e as Error).message }, 400);
+        }
+      });
+    }
+
+    /*
      * One score, for the View Details card, and its replay file, for Download Replay.
      *
      * The replay is streamed from wherever osu! keeps it -- lazer's file store or stable's
@@ -1356,6 +1393,9 @@ export function startServer(opts: ServerOptions): http.Server {
           opts.db.prepare('DELETE FROM incomplete_plays WHERE profile_id = ?').run(current());
           // A fresh start forgets deletions too; tracking_since keeps the old replays out.
           opts.db.prepare('DELETE FROM deleted_scores WHERE profile_id = ?').run(current());
+          // And what it turned away: Track anyway on a play from before the reset would bring
+          // back exactly what the reset cleared.
+          clearDeclines(opts.db, current());
           // And what it borrowed from osu!: a profile with no scores left must not still be
           // priced against an account none of them came from any more.
           clearStanding(opts.db, current());

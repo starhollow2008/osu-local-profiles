@@ -2971,3 +2971,52 @@ because a new check proves nothing it answers has changed.
   1,820/1,820 (the whole checked build 46 seconds), Linux through WSL 1,820/1,820 (58
   seconds). Failing safe: a slim helper missing a ruleset library fails the check, and so does
   a fully trimmed one.
+
+## 5.61 - Plays not tracked, and Track anyway
+
+**Status:** done -- unreleased.
+
+The user's request: somewhere to see the plays the app declined -- the tracking filter, another
+player's replay -- for debugging "my scores aren't being tracked", and a way to add one back that
+the app or the user filtered out by mistake. Until now a declined play left a toast, a console
+line and a count that reset at launch: no help a day later, with the tray launcher hiding the
+console and an import declining hundreds without a word per play.
+
+- **`declined_plays`, read by no figure.** What the app announces is recorded: declined by the
+  filter (with the criterion), set by another player (with the name), and a replay that could
+  not be read -- live, from Import past plays, and from the catch-up at launch. Skips that are
+  the app working as meant (duplicate, deleted for good, before the cutoff) are not.
+- **Imports too**, at the user's request. An import's scan turns other players' replays away
+  before any ingest sees them, so it reports each through `onOtherPlayer`. A preview records
+  nothing. One row per play, newest 1,000 per profile kept.
+- **A play tracked by any route leaves the list** and never comes back to it, and a reset clears
+  it. The second half was a bug caught against the real profile: an import turned the other
+  player's replay tracked anyway away again, before asking whether it was already tracked.
+- **Laid out as Removed scores is**, at the user's request: every replay row names its player,
+  the red minus deletes one for good (its key into `deleted_scores`, never tracked or listed
+  again) and Delete all permanently does it for all. Both lists are always shown, saying so when
+  empty, rather than appearing only once something is in them.
+- **Track anyway**, one play at a time, is an exception to "the filter's decision cannot be
+  undone" that the user approved; CLAUDE.md now says so. It skips the filter, the owner check
+  and the cutoff and nothing else, so it never adds a play twice. An unfinished play is written
+  from the `Recording` stored when it was declined. Someone else's play asks twice.
+- **Other settings -> Plays not tracked**, below Removed scores, with a reason picker once there
+  is more than one reason.
+
+### Verified
+
+- `npm run check`: 606 tests (7 skipped: no Go here, and a reference score this profile lacks).
+  `test/declined.test.ts` covers live and import declines, the owner check and the filter being
+  passed only by Track anyway, no duplicates, a play tracked anyway not coming back at the next
+  import, a gone replay staying listed, an unfinished play written from its recording, a preview
+  recording nothing, deleting for good (never listed or tracked again, by any import), and the
+  bound. `test/reset.test.ts` covers the routes, the count in `/api/state`, deleting one and all,
+  and a reset clearing the list.
+- Against a copy of this machine's profile, with an osu!taiko-only filter: a 60-day import
+  recorded 492 (343 replays and 143 unfinished plays declined by the filter, 6 other players'
+  replays). Track anyway brought in one of each kind; a second press was refused. Imported
+  again, the replays carried their players (Tangy, Guest for lazer plays set signed out, and the
+  other players) and the play tracked anyway stayed out of the list.
+- `npm run ui` against that copy: 344/345. The 16 checks here pass. The one failure is the
+  existing McOsu badge check, which finds the tracking filter's own MC badge on a profile with
+  no McOsu plays. The panel was looked at on desktop and phone widths, and both sections empty.

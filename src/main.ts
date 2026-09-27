@@ -562,10 +562,11 @@ async function main(): Promise<void> {
   /*
    * Said at start-up only when the filter can actually turn a play away. A profile that has
    * set one and forgotten about it would otherwise look broken the first time a play did not
-   * appear, and this is the one setting whose effect cannot be undone afterwards.
+   * appear, and this is the one setting that decides what is written at all.
    */
   if (tracker.filterNarrowing) {
-    console.log('  A play tracking filter is on -- plays it declines are not recorded at all.');
+    console.log('  A play tracking filter is on -- plays it declines are not tracked.');
+    console.log('  They are listed in Options -> Other settings -> Plays not tracked.');
   }
   /*
    * Who the profile belongs to, and how it knows. Worth a line because it decides which
