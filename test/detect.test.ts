@@ -6,12 +6,17 @@ import path from 'node:path';
 import {
   detectInstalls,
   lazerCandidates,
+  lazerDevelopmentCandidates,
   lazerInstall,
   stableInstall,
   wineStableCandidates,
   wineStableRoots,
   type DetectEnvironment,
 } from '../src/clients/detect.ts';
+import { detectLocalSessions } from '../src/clients/session.ts';
+import { osuFolderService } from '../src/clients/folders.ts';
+import { loadConfig } from '../src/config.ts';
+import { discoverInstalls, looksLikeInstall } from '../src/clients/discover.ts';
 import { explainWatchError } from '../src/tracker/watcher.ts';
 
 /*
@@ -305,6 +310,123 @@ test('with no setting, or one pointing nowhere, stable keeps its default Songs',
     // A stale setting must not cost the player the beatmaps that are still there.
     fs.writeFileSync(path.join(tmp, 'osu!.player.cfg'), 'BeatmapDirectory = D:/gone\n');
     assert.deepEqual(stableInstall(tmp)?.beatmapRoots, [songs], 'a setting pointing nowhere');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------ the development client */
+
+/*
+ * osu!'s development client: a Debug build of ppy/osu, run from source (roadmap 5.68). It
+ * keeps `osu-development` beside lazer's `osu` (or `osu-development-<n>` with
+ * --debug-client-id), its realm as `client_<schema>.realm`, and its settings in
+ * `game.dev.ini` -- all as a real run of it on this machine laid them out. A player reported
+ * that even pointing `installRoots` at it tracked release lazer instead.
+ */
+
+/** A lazer folder as either client leaves it. */
+function lazerFolder(root: string, realm: string, ini?: [string, string]): string {
+  fs.mkdirSync(path.join(root, 'files'), { recursive: true });
+  fs.writeFileSync(path.join(root, realm), '');
+  if (ini) fs.writeFileSync(path.join(root, ini[0]), `Username = ${ini[1]}\n`);
+  return root;
+}
+
+test('the development client is recognised by its numbered realm, whatever its folder is called', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
+  try {
+    const dev = lazerFolder(path.join(tmp, 'anything'), 'client_52.realm');
+    const found = lazerInstall(dev);
+    assert.equal(found?.kind, 'lazer');
+    assert.equal(found?.development, true);
+    assert.equal(found?.replayDir, path.join(dev, 'files'));
+
+    // Release lazer is not development, and says nothing about it.
+    const release = lazerFolder(path.join(tmp, 'osu'), 'client.realm');
+    assert.equal(lazerInstall(release)?.development, undefined);
+
+    // A development folder that began as a copy of release lazer keeps both files.
+    fs.writeFileSync(path.join(dev, 'client.realm'), '');
+    assert.equal(lazerInstall(dev)?.development, true);
+
+    // The disk search stops at one too.
+    assert.equal(looksLikeInstall(['client_52.realm', 'files']), true);
+    assert.equal(looksLikeInstall(['client_backup.realm']), false);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('the development client is looked for beside lazer, numbered ones after the plain one', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
+  try {
+    const share = path.join(tmp, '.local', 'share');
+    for (const name of ['osu', 'osu-development-2', 'osu-development', 'osu-development-10', 'osu-developmentx']) {
+      fs.mkdirSync(path.join(share, name), { recursive: true });
+    }
+    const e: DetectEnvironment = { ...LINUX, home: tmp, env: {} };
+    assert.deepEqual(
+      lazerDevelopmentCandidates(e).map((p) => path.basename(p)),
+      ['osu-development', 'osu-development-2', 'osu-development-10'],
+    );
+    // Nowhere to look is nothing found, not an error.
+    assert.deepEqual(lazerDevelopmentCandidates({ ...LINUX, home: path.join(tmp, 'nope'), env: {} }), []);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('the development client is tracked beside release lazer, not instead of it', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
+  try {
+    const share = path.join(tmp, '.local', 'share');
+    const release = lazerFolder(path.join(share, 'osu'), 'client.realm', ['game.ini', 'Player']);
+    const dev = lazerFolder(path.join(share, 'osu-development'), 'client_52.realm', ['game.dev.ini', 'DevAccount']);
+    const e: DetectEnvironment = { ...LINUX, home: tmp, env: {} };
+
+    const found = detectInstalls([], e).filter((i) => i.kind === 'lazer');
+    assert.deepEqual(
+      found.map((i) => [path.basename(i.root), i.development === true]),
+      [['osu', false], ['osu-development', true]],
+    );
+
+    // The case that was reported: installRoots naming it, with release lazer also present.
+    const configured = detectInstalls([dev], e).filter((i) => i.kind === 'lazer');
+    assert.deepEqual(configured.map((i) => i.root).sort(), [dev, release].sort());
+
+    // The same through discovery, which a launch uses, even with both clients remembered.
+    const discovered = await discoverInstalls({ env: e, remembered: [release], noSearch: true });
+    assert.ok(discovered.installs.some((i) => i.root === dev && i.development));
+    assert.ok(discovered.installs.some((i) => i.root === release && !i.development));
+
+    // Its account is the development server's, from game.dev.ini: the name its replays carry.
+    assert.deepEqual(
+      detectLocalSessions(found).map((s) => s.username),
+      ['Player', 'DevAccount'],
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('a development client folder can be added by hand, and is shown as one', async () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-detect-'));
+  try {
+    const dev = lazerFolder(path.join(tmp, 'my osu build data'), 'client_52.realm');
+    const config = { ...loadConfig(), installRoots: [], discoveredRoots: [], searchedForInstalls: true };
+    const service = osuFolderService({
+      config,
+      save: () => {},
+      tracking: [],
+      initial: { installs: [], candidates: [], searched: true },
+    });
+    const listed = await service.add(dev);
+    const found = listed.candidates.find((c) => c.root === dev);
+    assert.equal(found?.kind, 'lazer');
+    assert.equal(found?.development, true);
+    assert.equal(found?.configured, true);
+    assert.deepEqual(config.installRoots, [dev]);
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

@@ -180,6 +180,7 @@
   "folders.added": "Carpeta añadida",
   "folders.addFailed": "esa carpeta no se pudo añadir",
   "folders.checking": "Comprobando esa carpeta...",
+  "folders.development": "desarrollo",
   "folders.forget": "Olvidar esta carpeta",
   "folders.inUse": "en uso",
   "folders.loadFailed": "No se pudo leer la lista de carpetas.",

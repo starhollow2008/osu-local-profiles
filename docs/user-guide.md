@@ -72,6 +72,15 @@ Anything else needs `installRoots`.
 **Options -> osu! folders** shows what was found and takes a folder by hand. "No osu!
 installation found" does not close the app - the page opens so you can point at one.
 
+**osu!'s development client** - a Debug build of [ppy/osu](https://github.com/ppy/osu) run from
+source - is found too, and tracked **beside** osu!lazer rather than instead of it. It keeps its
+own folder next to lazer's (`osu-development`, or `osu-development-2` and so on when started
+with `--debug-client-id`), which is looked in on every launch; one anywhere else can be added
+in osu! folders or `installRoots` like any other. Its plays count toward the same profile, and
+so do mods you have made yourself, though their pp is osu!'s current formula, since the app's
+calculator is the released one. It signs in to osu!'s development server, so the account its
+replays carry is the one in its own `game.dev.ini`, and that account counts as you.
+
 ## Plays that were never finished
 
 osu! counts a play you quit, retried or failed. lazer does not *keep* one: it saves a score

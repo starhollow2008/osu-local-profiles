@@ -180,6 +180,7 @@
   "folders.added": "Mappe tilføjet",
   "folders.addFailed": "mappen kunne ikke tilføjes",
   "folders.checking": "Kontrollerer mappen…",
+  "folders.development": "udvikling",
   "folders.forget": "Glem denne mappe",
   "folders.inUse": "i brug",
   "folders.loadFailed": "Listen over mapper kunne ikke læses.",

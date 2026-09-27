@@ -180,6 +180,7 @@
   "folders.added": "Map toegevoegd",
   "folders.addFailed": "die map kon niet worden toegevoegd",
   "folders.checking": "Die map wordt gecontroleerd…",
+  "folders.development": "ontwikkeling",
   "folders.forget": "Deze map vergeten",
   "folders.inUse": "in gebruik",
   "folders.loadFailed": "De lijst met mappen kon niet worden gelezen.",

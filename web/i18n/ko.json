@@ -180,6 +180,7 @@
   "folders.added": "폴더를 추가했습니다",
   "folders.addFailed": "그 폴더는 추가할 수 없었습니다",
   "folders.checking": "그 폴더를 확인하는 중…",
+  "folders.development": "개발판",
   "folders.forget": "이 폴더 잊기",
   "folders.inUse": "사용 중",
   "folders.loadFailed": "폴더 목록을 읽을 수 없었습니다.",

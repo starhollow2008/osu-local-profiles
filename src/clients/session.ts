@@ -45,7 +45,14 @@ export function detectLocalSessions(installs: readonly OsuInstall[]): LocalSessi
 
   for (const install of installs) {
     if (install.kind === 'lazer') {
-      const username = readIniValue(path.join(install.root, 'game.ini'), 'Username');
+      /*
+       * osu!'s development client writes `game.dev.ini` instead (DevelopmentOsuConfigManager)
+       * and signs in to the development server, so its account is the one its replays name.
+       * `game.ini` is its fallback, for a folder carried over from release lazer.
+       */
+      const username =
+        (install.development ? readIniValue(path.join(install.root, 'game.dev.ini'), 'Username') : null) ??
+        readIniValue(path.join(install.root, 'game.ini'), 'Username');
       if (username) found.push({ client: 'lazer', username });
       continue;
     }

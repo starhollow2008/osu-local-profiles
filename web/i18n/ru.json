@@ -180,6 +180,7 @@
   "folders.added": "Папка добавлена",
   "folders.addFailed": "эту папку не удалось добавить",
   "folders.checking": "Проверка этой папки…",
+  "folders.development": "разработка",
   "folders.forget": "Забыть эту папку",
   "folders.inUse": "используется",
   "folders.loadFailed": "Не удалось прочитать список папок.",

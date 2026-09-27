@@ -180,6 +180,7 @@
   "folders.added": "Pasta adicionada",
   "folders.addFailed": "essa pasta não pôde ser adicionada",
   "folders.checking": "Verificando essa pasta…",
+  "folders.development": "desenvolvimento",
   "folders.forget": "Esquecer esta pasta",
   "folders.inUse": "em uso",
   "folders.loadFailed": "Não foi possível ler a lista de pastas.",

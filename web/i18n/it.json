@@ -180,6 +180,7 @@
   "folders.added": "Cartella aggiunta",
   "folders.addFailed": "quella cartella non è stata aggiunta",
   "folders.checking": "Controllo di quella cartella…",
+  "folders.development": "sviluppo",
   "folders.forget": "Dimentica questa cartella",
   "folders.inUse": "in uso",
   "folders.loadFailed": "Non è stato possibile leggere l'elenco delle cartelle.",

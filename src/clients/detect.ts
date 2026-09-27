@@ -16,6 +16,13 @@ export interface OsuInstall {
   beatmapRoots: string[];
   /** lazer's cached beatmap metadata database, if present. */
   onlineDb: string | null;
+  /**
+   * osu!'s development client: a Debug build of ppy/osu, run from source (roadmap 5.68). It
+   * keeps its own data folder (`osu-development`), its realm as `client_<schema>.realm`, and
+   * its settings -- the development server's account among them -- in `game.dev.ini`. Tracked
+   * beside release lazer, not instead of it.
+   */
+  development?: boolean;
 }
 
 /**
@@ -85,10 +92,40 @@ function xdgDataHome(e: DetectEnvironment): string {
  * unusual. Each is a single `access()` away from being ruled out.
  */
 export function lazerCandidates(e: DetectEnvironment): string[] {
+  return lazerDataHomes(e).map((home) => path.join(home, 'osu'));
+}
+
+/** The folders each platform keeps application data in, where lazer's own folder goes. */
+function lazerDataHomes(e: DetectEnvironment): string[] {
   const out: string[] = [];
-  if (e.env['APPDATA']) out.push(path.join(e.env['APPDATA'], 'osu'));
-  out.push(path.join(e.home, 'Library', 'Application Support', 'osu'));
-  out.push(path.join(xdgDataHome(e), 'osu'));
+  if (e.env['APPDATA']) out.push(e.env['APPDATA']);
+  out.push(path.join(e.home, 'Library', 'Application Support'));
+  out.push(xdgDataHome(e));
+  return out;
+}
+
+/**
+ * osu!'s development client names its folder `osu-development` beside lazer's `osu`, or
+ * `osu-development-<n>` when started with `--debug-client-id=<n>` to test multiplayer against
+ * itself (osu.Desktop/Program.cs). The plain one first; the numbered ones in order.
+ */
+export const DEVELOPMENT_FOLDER = /^osu-development(?:-(\d+))?$/i;
+
+export function lazerDevelopmentCandidates(e: DetectEnvironment): string[] {
+  const out: string[] = [];
+  for (const home of lazerDataHomes(e)) {
+    let names: string[];
+    try {
+      names = fs.readdirSync(home);
+    } catch {
+      continue;
+    }
+    const found = names
+      .map((name) => ({ name, n: DEVELOPMENT_FOLDER.exec(name) }))
+      .filter((f): f is { name: string; n: RegExpExecArray } => f.n !== null)
+      .sort((a, b) => Number(a.n[1] ?? -1) - Number(b.n[1] ?? -1));
+    for (const f of found) out.push(path.join(home, f.name));
+  }
   return out;
 }
 
@@ -250,12 +287,40 @@ export function wineStableRoots(e: DetectEnvironment): string[] {
   return out;
 }
 
+/**
+ * A Debug build's realm: `client_<schema version>.realm`, so a database from a newer schema
+ * never has to be migrated back (osu.Game/Database/RealmAccess.cs, `applyFilenameSchemaSuffix`).
+ * Release builds never write one, so it is also what says a folder is the development client's.
+ */
+export const DEVELOPMENT_REALM = /^client_\d+\.realm$/i;
+
+/**
+ * lazer's realm in `root`: `client.realm`, or a development client's `client_<n>.realm`, and
+ * which. From one directory listing, since the numbered name moves with every schema bump.
+ */
+export function lazerRealm(root: string): { file: string; development: boolean } | null {
+  let names: string[];
+  try {
+    names = fs.readdirSync(root);
+  } catch {
+    return null;
+  }
+  const development = names.filter((n) => DEVELOPMENT_REALM.test(n)).sort((a, b) => schemaOf(b) - schemaOf(a))[0];
+  if (development !== undefined) return { file: path.join(root, development), development: true };
+  const release = names.find((n) => n.toLowerCase() === 'client.realm');
+  return release === undefined ? null : { file: path.join(root, release), development: false };
+}
+
+const schemaOf = (name: string): number => Number(/_(\d+)\./.exec(name)?.[1] ?? 0);
+
 /** A lazer install, if that is what is at `root`. */
 export function lazerInstall(root: string): OsuInstall | null {
-  // client.realm is the reliable marker: `files/` alone can exist for other reasons.
-  if (!exists(path.join(root, 'client.realm'))) return null;
+  // `files/` first, since it is one `access()`; the realm is the reliable marker, as `files/`
+  // alone can exist for other reasons.
   const files = path.join(root, 'files');
   if (!exists(files)) return null;
+  const realm = lazerRealm(root);
+  if (realm === null) return null;
   const onlineDb = path.join(root, 'online.db');
   return {
     kind: 'lazer',
@@ -264,6 +329,7 @@ export function lazerInstall(root: string): OsuInstall | null {
     replayDir: files,
     beatmapRoots: [files],
     onlineDb: exists(onlineDb) ? onlineDb : null,
+    ...(realm.development ? { development: true } : {}),
   };
 }
 
@@ -430,6 +496,7 @@ export function candidateRoots(
   return [
     ...configured,
     ...lazerCandidates(e),
+    ...lazerDevelopmentCandidates(e),
     ...windowsStableCandidates(e, drives.length > 0 ? drives : undefined),
     ...wineStableCandidates(e),
     ...wineStableRoots(e),
@@ -450,17 +517,23 @@ export function installsFrom(
   _e: DetectEnvironment = currentEnvironment(),
 ): OsuInstall[] {
   const found: OsuInstall[] = [];
+  // The development client has a slot of its own, so finding it never costs release lazer's.
   let lazer: OsuInstall | null = null;
+  let development: OsuInstall | null = null;
   let stable: OsuInstall | null = null;
   let mcosu: OsuInstall | null = null;
 
   for (const root of roots) {
-    if (!lazer) lazer = lazerInstall(root);
+    if (!lazer || !development) {
+      const install = lazerInstall(root);
+      if (install?.development) development ??= install;
+      else if (install) lazer ??= install;
+    }
     if (!stable) stable = stableInstall(root);
     if (!mcosu) mcosu = mcosuInstall(root);
-    if (lazer && stable && mcosu) break;
   }
   if (lazer) found.push(lazer);
+  if (development) found.push(development);
   if (stable) found.push(stable);
   if (mcosu) found.push(mcosu);
   return found;

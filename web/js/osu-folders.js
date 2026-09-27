@@ -28,6 +28,12 @@ const setHint = (message, isError = false) => hint('foldersHint', message, isErr
 /** Each kind of folder, by the name its game goes by. */
 const KIND_NAMES = { lazer: 'osu!lazer', stable: 'osu!stable', mcosu: 'McOsu' };
 
+/** A folder's name, the development client told apart from release lazer (roadmap 5.68). */
+export function installName(install) {
+  const name = KIND_NAMES[install.kind] ?? install.kind;
+  return install.development ? `${name} (${t('folders.development')})` : name;
+}
+
 function render() {
   const list = $('folderList');
   if (!folders) {
@@ -53,7 +59,7 @@ function render() {
         return `
           <div class="folder${c.active ? ' folder--active' : ''}">
             <div class="folder__info">
-              <div class="folder__kind">${KIND_NAMES[c.kind] ?? c.kind}${badges.join('')}</div>
+              <div class="folder__kind">${escapeHtml(installName(c))}${badges.join('')}</div>
               <div class="folder__path" title="${escapeHtml(c.root)}">${escapeHtml(c.root)}</div>
             </div>
             ${

@@ -180,6 +180,7 @@
   "folders.added": "已新增資料夾",
   "folders.addFailed": "無法新增該資料夾",
   "folders.checking": "正在檢查該資料夾……",
+  "folders.development": "開發版",
   "folders.forget": "忘記此資料夾",
   "folders.inUse": "使用中",
   "folders.loadFailed": "無法讀取資料夾清單。",

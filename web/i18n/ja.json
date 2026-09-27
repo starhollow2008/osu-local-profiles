@@ -180,6 +180,7 @@
   "folders.added": "フォルダーを追加しました",
   "folders.addFailed": "そのフォルダーは追加できませんでした",
   "folders.checking": "そのフォルダーを確認しています…",
+  "folders.development": "開発版",
   "folders.forget": "このフォルダーを忘れる",
   "folders.inUse": "使用中",
   "folders.loadFailed": "フォルダー一覧を読み取れませんでした。",

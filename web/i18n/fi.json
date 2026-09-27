@@ -180,6 +180,7 @@
   "folders.added": "Kansio lisätty",
   "folders.addFailed": "kansiota ei voitu lisätä",
   "folders.checking": "Tarkistetaan kansiota…",
+  "folders.development": "kehitys",
   "folders.forget": "Unohda tämä kansio",
   "folders.inUse": "käytössä",
   "folders.loadFailed": "Kansioluetteloa ei voitu lukea.",

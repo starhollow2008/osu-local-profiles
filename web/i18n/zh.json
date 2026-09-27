@@ -180,6 +180,7 @@
   "folders.added": "已添加文件夹",
   "folders.addFailed": "无法添加该文件夹",
   "folders.checking": "正在检查该文件夹……",
+  "folders.development": "开发版",
   "folders.forget": "忘记此文件夹",
   "folders.inUse": "使用中",
   "folders.loadFailed": "无法读取文件夹列表。",

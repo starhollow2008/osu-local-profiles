@@ -200,7 +200,8 @@ async function main(): Promise<void> {
   }
 
   for (const i of installs) {
-    console.log(`  found ${i.kind.padEnd(6)} ${i.root}${i.onlineDb ? '  (+ online.db)' : ''}`);
+    const kind = i.development ? 'lazer (development)' : i.kind;
+    console.log(`  found ${kind.padEnd(6)} ${i.root}${i.onlineDb ? '  (+ online.db)' : ''}`);
   }
   // More than one of a kind means a choice was made on the user's behalf. Say so, once,
   // rather than leaving them to wonder why it is tracking the practice copy.

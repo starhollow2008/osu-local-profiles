@@ -681,7 +681,10 @@ async function loadState() {
   renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
   renderStableNote();
-  const kinds = installKinds.join(' + ') || t('menu.noClientFound');
+  // osu!'s development client is a lazer of its own, and says which (roadmap 5.68).
+  const kinds =
+    s.installs.map((i) => (i.development ? `${i.kind} (${t('folders.development')})` : i.kind)).join(' + ') ||
+    t('menu.noClientFound');
   const session = { name: s.profile.name, kinds, n: s.scoresThisSession };
   filterNarrowing = Boolean(s.filterNarrowing);
   playsFiltered = s.playsFiltered ?? 0;

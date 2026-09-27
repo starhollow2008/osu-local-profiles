@@ -23,6 +23,11 @@
     at the foot of the page. Dismiss it and it stays away for a week.
   - `"checkForUpdates": false` in `config.json` still turns every check off.
 
+- **osu!'s development client is tracked too.** A Debug build of osu! run from source is found
+  beside osu!lazer and tracked alongside it, so plays with mods you've made yourself land on
+  your profile. Before, it was never found, even when named in `installRoots`. Thanks to
+  Crafterdark2 on Reddit for tracking down exactly what was missing.
+
 - **Choose how much show more shows.** **Options -> Other settings -> Show more** sets how
   many rows each press adds to a list - 25 as before, or 50, 100, or any number you type - or
   **All at once**, which shows the whole list in one press.

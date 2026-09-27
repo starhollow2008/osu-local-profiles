@@ -6,8 +6,11 @@ import { promisify } from 'node:util';
 import {
   currentEnvironment,
   candidateRoots,
+  DEVELOPMENT_REALM,
   lazerCandidates,
+  lazerDevelopmentCandidates,
   lazerInstall,
+  lazerRealm,
   mcosuCandidates,
   mcosuInstall,
   stableInstall,
@@ -63,7 +66,8 @@ export function storageIniPath(contents: string): string | null {
 /** Every directory a lazer candidate's `storage.ini` redirects to. */
 export function lazerRedirects(e: DetectEnvironment = currentEnvironment()): string[] {
   const out: string[] = [];
-  for (const root of lazerCandidates(e)) {
+  // The development client can be moved the same way, from its own folder.
+  for (const root of [...lazerCandidates(e), ...lazerDevelopmentCandidates(e)]) {
     let contents: string;
     try {
       contents = fs.readFileSync(path.join(root, 'storage.ini'), 'utf8');
@@ -304,7 +308,13 @@ export function skipDir(name: string): boolean {
  */
 export function looksLikeInstall(names: readonly string[]): boolean {
   const lower = new Set(names.map((n) => n.toLowerCase()));
-  return lower.has('osu!.exe') || lower.has('client.realm') || lower.has('mcengine.exe') || lower.has('mcosu.exe');
+  return (
+    lower.has('osu!.exe') ||
+    lower.has('client.realm') ||
+    names.some((n) => DEVELOPMENT_REALM.test(n)) ||
+    lower.has('mcengine.exe') ||
+    lower.has('mcosu.exe')
+  );
 }
 
 export interface ScanLimits {
@@ -435,7 +445,9 @@ export function installScore(root: string): number {
   // A database means beatmaps have been loaded; a per-user config means somebody signed in.
   if (stat('osu!.db')) score += 40;
   if (stat('scores.db')) score += 20;
-  if (stat('client.realm')) score += 40;
+  // lazer's realm, or the development client's numbered one.
+  const realm = lazerRealm(root);
+  if (realm) score += 40;
   if (stat('Songs')) score += 10;
   if (stat('Data')) score += 10;
   try {
@@ -445,7 +457,8 @@ export function installScore(root: string): number {
   }
   // Recency breaks the tie between two installs that both look real. Capped so it can never
   // outweigh having a database at all.
-  const marker = stat('osu!.db') ?? stat('client.realm') ?? stat('osu!.exe') ?? stat('scores.db');
+  const marker =
+    stat('osu!.db') ?? (realm ? stat(path.basename(realm.file)) : null) ?? stat('osu!.exe') ?? stat('scores.db');
   if (marker) {
     const days = (Date.now() - marker.mtimeMs) / 86_400_000;
     score += Math.max(0, 30 - days);
@@ -482,6 +495,8 @@ export async function targetedRoots(
 export interface InstallCandidate {
   root: string;
   kind: OsuInstall['kind'];
+  /** osu!'s development client: a lazer of its own, tracked beside release lazer. */
+  development?: boolean;
   /** How likely this is the install being played. See `installScore`. */
   score: number;
   /** How it was found, so the page can say "you chose this" rather than "we guessed". */
@@ -506,7 +521,15 @@ function rank(roots: readonly string[], source: InstallCandidate['source']): Ins
   const out: InstallCandidate[] = [];
   for (const root of roots) {
     const install = classify(root);
-    if (install) out.push({ root: install.root, kind: install.kind, score: installScore(root), source });
+    if (install) {
+      out.push({
+        root: install.root,
+        kind: install.kind,
+        ...(install.development ? { development: true } : {}),
+        score: installScore(root),
+        source,
+      });
+    }
   }
   return out;
 }
@@ -571,6 +594,10 @@ export async function discoverInstalls(opts: DiscoverOptions = {}): Promise<Disc
    * `missing()` -- not having McOsu is normal, and must not cost every launch a disk walk.
    */
   add(mcosuCandidates(e), 'detected');
+  // osu!'s development client, for the same reason: it is looked for beside lazer's own
+  // folder, which is three directory listings, and someone who has both clients already would
+  // otherwise never reach the tier below (roadmap 5.68).
+  add(lazerDevelopmentCandidates(e), 'detected');
   if (force || missing()) add(candidateRoots([], e), 'detected');
   if (force || missing()) {
     add(lazerRedirects(e), 'detected');
@@ -593,9 +620,16 @@ export async function discoverInstalls(opts: DiscoverOptions = {}): Promise<Disc
   const bySource = { configured: 0, remembered: 1, detected: 2, searched: 2 };
   candidates.sort((a, b) => bySource[a.source] - bySource[b.source] || b.score - a.score);
 
+  // One of each, and osu!'s development client in a slot of its own beside release lazer.
   const installs: OsuInstall[] = [];
-  for (const kind of ['lazer', 'stable', 'mcosu'] as const) {
-    const best = candidates.find((c) => c.kind === kind);
+  const slots = [
+    ['lazer', false],
+    ['lazer', true],
+    ['stable', false],
+    ['mcosu', false],
+  ] as const;
+  for (const [kind, development] of slots) {
+    const best = candidates.find((c) => c.kind === kind && (c.development === true) === development);
     if (!best) continue;
     const install = classify(best.root);
     if (install) installs.push(install);

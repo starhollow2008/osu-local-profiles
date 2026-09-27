@@ -65,6 +65,7 @@ export function osuFolderService(deps: FolderDeps): FolderService {
     const candidates = discovery.candidates.map((c) => ({
       root: c.root,
       kind: c.kind,
+      development: c.development === true,
       configured: configured.some((r) => sameRoot(r, c.root)),
       active: deps.tracking.some((i) => sameRoot(i.root, c.root)),
     }));
@@ -76,7 +77,7 @@ export function osuFolderService(deps: FolderDeps): FolderService {
 
     return {
       candidates,
-      tracking: deps.tracking.map((i) => ({ root: i.root, kind: i.kind })),
+      tracking: deps.tracking.map((i) => ({ root: i.root, kind: i.kind, development: i.development === true })),
       searched: deps.config.searchedForInstalls,
       needsRestart,
     };
@@ -140,7 +141,8 @@ export function osuFolderService(deps: FolderDeps): FolderService {
         }
         throw new Error(
           `${root} does not look like an osu! install -- an osu!stable folder has osu!.exe ` +
-            'in it, an osu!lazer folder has client.realm, and a McOsu folder has McEngine.exe.',
+            'in it, an osu!lazer folder has client.realm (client_<number>.realm for osu!\'s ' +
+            'development client), and a McOsu folder has McEngine.exe.',
         );
       }
 

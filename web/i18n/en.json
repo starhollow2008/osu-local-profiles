@@ -225,6 +225,7 @@
   "folders.added": "Folder added",
   "folders.addFailed": "that folder could not be added",
   "folders.checking": "Checking that folder…",
+  "folders.development": "development",
   "folders.forget": "Forget this folder",
   "folders.inUse": "in use",
   "folders.loadFailed": "Could not read the folder list.",

@@ -219,13 +219,15 @@ export interface OsuFolders {
   candidates: {
     root: string;
     kind: OsuInstall['kind'];
+    /** osu!'s development client, tracked beside release lazer rather than instead of it. */
+    development: boolean;
     /** Set by the user, rather than found. Shown differently, and removable. */
     configured: boolean;
     /** Whether this is the one being tracked for its client. */
     active: boolean;
   }[];
   /** The roots in use right now, which change only on a restart. */
-  tracking: { root: string; kind: OsuInstall['kind'] }[];
+  tracking: { root: string; kind: OsuInstall['kind']; development: boolean }[];
   /** Whether the app has ever walked the drives, so the page can offer to. */
   searched: boolean;
   /** True once the list no longer matches what is being tracked. */
@@ -544,6 +546,8 @@ export function startServer(opts: ServerOptions): http.Server {
         welcome: welcomePending(opts.db),
         installs: opts.installs.map((i) => ({
           kind: i.kind,
+          // osu!'s development client, a lazer of its own beside release lazer.
+          development: i.development === true,
           root: i.root,
           hasOnlineDb: i.onlineDb !== null,
         })),

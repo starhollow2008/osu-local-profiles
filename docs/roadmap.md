@@ -3259,3 +3259,37 @@ overriding it.
   144 rows -- the whole list, since retries share a row -- and the button went. The dialog: All
   ticked dims the number and keeps it, unticking restores it, 0 is refused with the reason and
   nothing saved, 50 saved.
+
+## 5.68 - osu!'s development client
+
+**Status:** done -- unreleased.
+
+A player running osu! from source (the master branch with local mods, in Debug) found the app
+always tracked release lazer instead -- even with `installRoots` pointing at the development
+client's folder -- and traced it to `lazerInstall` wanting `client.realm`. The user asked for
+the development client to be detected, and chose to track it **beside** release lazer, both
+automatically.
+
+What osu!'s own source says (ppy/osu, checked against a Debug build run on this machine):
+
+- **Folder**: `osu-development` beside lazer's `osu` (`base_game_name` in
+  osu.Desktop/Program.cs), or `osu-development-<n>` with `--debug-client-id=<n>`.
+- **Realm**: `client_<schema version>.realm` (`applyFilenameSchemaSuffix` in
+  osu.Game/Database/RealmAccess.cs; 52 today, and it moves), so it is matched as a pattern.
+  Release builds never write one, so it also marks a folder as the development client's.
+- **Settings**: `game.dev.ini` (`DevelopmentOsuConfigManager`), signed in to the development
+  server, whose account is the one its replays name.
+- `files/`, `logs/` and `online.db` as lazer's.
+
+What changed:
+
+- `lazerRealm`/`DEVELOPMENT_REALM` in src/clients/detect.ts, and `OsuInstall.development`.
+- A slot of its own in `installsFrom` and in `discoverInstalls`, so it never displaces
+  release lazer; its folders (`lazerDevelopmentCandidates`) are looked in on every launch, as
+  McOsu's are, since someone with both clients remembered never reaches the fuller tiers.
+  `storage.ini` redirects are followed from it too. The disk search and `installScore` know
+  the numbered realm.
+- `detectLocalSessions` reads `game.dev.ini` first for it, so its account counts as the
+  player's and its plays are not refused as someone else's.
+- Shown as "osu!lazer (development)" in osu! folders, and "lazer (development)" in the menu
+  and the console.

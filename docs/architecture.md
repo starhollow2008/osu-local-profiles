@@ -292,6 +292,15 @@ McOsu writes **no replays and no log** - only its own `scores.db` (and `scoresvr
 - **The helper takes McOsu's mods after decoding** (`mods` on a calculation request) and can withhold the stable total (`ignoreLegacyTotalScore`), which osu! uses to estimate combo breaks assuming stable's mod multipliers. Withheld only where McOsu's multipliers for its bits differ from osu!'s for the priced mods (`legacyTotalComparable`).
 - **Scored as stable everywhere** (`scoredAsStable`). Its player name is McOsu's `name` setting and is left out of `dominantTrackedName`. Found on every launch from Steam's libraries, outside `missing()` so it never triggers a drive walk.
 
+## osu!'s development client (roadmap 5.68)
+
+A Debug build of ppy/osu is a lazer of its own, tracked **beside** release lazer: `OsuInstall.development`, with its own slot in `installsFrom` and `discoverInstalls`, so finding it never displaces release lazer.
+
+- **Recognised by its realm, not its folder**: `client_<schema>.realm` (`DEVELOPMENT_REALM`, `lazerRealm`). The number is osu!'s realm schema version and moves, so never match a fixed name. Release builds never write one. A folder with both (a copy of release lazer) is development.
+- **Looked for on every launch** (`lazerDevelopmentCandidates`: `osu-development`, then `osu-development-<n>`, beside lazer's `osu`), outside `missing()`, like McOsu. Its `storage.ini` is followed.
+- **Its account is `game.dev.ini`'s** (development server), read first in `detectLocalSessions`, so its replays are not refused as another player's. Everything else (`files/`, `logs/`, `online.db`) is lazer's, and read as lazer's.
+- Its plays are lazer plays in every other respect: nothing here records which of the two a score came from.
+
 ## Windows: only verified platform
 
 macOS and Linux written, CI-covered, never run against real osu! install. Since 1.10.0: `osx-arm64` + `linux-x64` zips in releases.

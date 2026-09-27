@@ -182,6 +182,7 @@
   "folders.added": "Dodano folder",
   "folders.addFailed": "nie udało się dodać tego folderu",
   "folders.checking": "Sprawdzanie tego folderu…",
+  "folders.development": "wersja deweloperska",
   "folders.forget": "Zapomnij ten folder",
   "folders.inUse": "w użyciu",
   "folders.loadFailed": "Nie udało się odczytać listy folderów.",

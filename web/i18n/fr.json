@@ -180,6 +180,7 @@
   "folders.added": "Dossier ajouté",
   "folders.addFailed": "ce dossier n'a pas pu être ajouté",
   "folders.checking": "Vérification de ce dossier…",
+  "folders.development": "développement",
   "folders.forget": "Oublier ce dossier",
   "folders.inUse": "utilisé",
   "folders.loadFailed": "Impossible de lire la liste des dossiers.",
