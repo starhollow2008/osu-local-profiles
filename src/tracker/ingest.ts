@@ -1,7 +1,7 @@
 import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replaces, replayIdentity } from './online-import.ts';
 import { releaseUploadedReplay } from '../uploaded-replays.ts';
-import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
+import { ownsPlay, replayPlayer, setJustNow, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
 import type { SQLInputValue } from 'node:sqlite';
 import type { Db } from '../db/index.ts';
@@ -49,6 +49,12 @@ export interface IngestContext {
    * preview and Track anyway itself are not declining anything anyone should be told about.
    */
   declines?: DeclineSource;
+  /**
+   * When a live replay turned up, so one set moments before is known to be set here whatever
+   * name it carries (`setJustNow`). Only live tracking has one: an import or a catch-up finds
+   * files long after they were written, so the time says nothing about who wrote them.
+   */
+  arrivedAt?: number;
 }
 
 export interface IngestedScore {
@@ -186,8 +192,9 @@ export async function ingestScore(
    *
    * osu! keeps the replays you watch in the same folders as the ones you set -- stable caches
    * a downloaded leaderboard replay in `Data/r`, lazer imports one into its store -- and
-   * nothing about the file says which it is. Only the name inside it does. Checked before
-   * anything is read or priced, because a play that is not yours is not a play at all.
+   * nothing about the file says which it is. The name inside it does, and so does its time: a
+   * live replay set moments before it arrived was set here. Checked before anything is read or
+   * priced, because a play that is not yours is not a play at all.
    *
    * `ownsPlay` answers null when the profile cannot say who it belongs to, and null is taken
    * as yours: not knowing must never cost anybody a play. See src/player-identity.ts.
@@ -196,7 +203,8 @@ export async function ingestScore(
   const key = dedupeKey(score);
   // Named whatever the reason, so the list can say whose replay each one is.
   const play = { dedupeKey: key, mode: score.mode, playedAt, replayPath, player: player.name.trim() || null };
-  if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player) === false) {
+  const justSet = ctx.arrivedAt !== undefined && setJustNow(playedAt, ctx.arrivedAt);
+  if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player, justSet) === false) {
     const named = describe(ctx.resolver.resolve(score.beatmapMD5), score.beatmapMD5);
     declined(ctx, { ...play, ...named, reason: 'another-player' });
     return {

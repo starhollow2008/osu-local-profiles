@@ -87,6 +87,19 @@ export interface Settings {
    */
   linkedNamesKnown: boolean;
   /**
+   * Every name of the osu! account signed in on this computer, as osu! listed them when asked
+   * with "It's me" on a play set by another player: its name now and each it had before.
+   *
+   * What closes the gap a rename leaves. osu! keeps whatever name was typed to sign in in its
+   * config, which after a rename can be the old one, while every replay since carries the new
+   * one -- so each play of the player's own was refused as a stranger's. Nothing on this
+   * computer ties the two names together; osu!'s list of previous usernames does, and it counts
+   * even when someone else has since taken the old name. Separate from `linkedPreviousNames`
+   * because a link is for pictures and may be anyone's (see `resolveIdentity`), and adds names
+   * only while one of them is signed in here.
+   */
+  accountNames: string[];
+  /**
    * The profile's own description -- osu!'s "me!" box.
    *
    * osu!'s BBCode, stored exactly as it was typed or imported. It is never trusted: the page
@@ -249,6 +262,22 @@ function cleanMultiline(raw: unknown, maxLength: number): string {
   return out.replace(/\n{3,}/g, '\n\n').trim().slice(0, maxLength);
 }
 
+/** osu! usernames, each once whatever its case. */
+function nameList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  // Capped: this comes from osu! and is only ever compared against, but a stored list
+  // written by something else must not grow without bound.
+  for (const value of raw.slice(0, 64)) {
+    const name = cleanText(value, 32);
+    if (name === '' || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    out.push(name);
+  }
+  return out;
+}
+
 const DEFS: Defs = {
   country: {
     default: '',
@@ -360,20 +389,11 @@ const DEFS: Defs = {
   },
   linkedPreviousNames: {
     default: [] as string[],
-    coerce: (raw) => {
-      if (!Array.isArray(raw)) return [];
-      const seen = new Set<string>();
-      const out: string[] = [];
-      // Capped: this comes from osu! and is only ever compared against, but a stored list
-      // written by something else must not grow without bound.
-      for (const value of raw.slice(0, 64)) {
-        const name = cleanText(value, 32);
-        if (name === '' || seen.has(name.toLowerCase())) continue;
-        seen.add(name.toLowerCase());
-        out.push(name);
-      }
-      return out;
-    },
+    coerce: nameList,
+  },
+  accountNames: {
+    default: [] as string[],
+    coerce: nameList,
   },
   includeUnrankedMaps: {
     // Every status there is, so no play is left out of pp for its beatmap until asked.

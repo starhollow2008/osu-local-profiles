@@ -30,7 +30,13 @@ import {
 import { dedupeKey, describe, ingestReplayFile, ingestScore, type IngestedScore, type IngestOutcome } from './ingest.ts';
 import { scanForReplays, type BackfillScan, type OtherPlayerFound } from './backfill.ts';
 import { findLocalReplays } from './replay-search.ts';
-import { declineToTrack, forgetDeclineById, recordDecline, type DeclineSource } from './declined.ts';
+import {
+  declineToTrack,
+  forgetDeclineById,
+  otherPlayerDeclines,
+  recordDecline,
+  type DeclineSource,
+} from './declined.ts';
 import { scanLogsForPlays } from './log-backfill.ts';
 import { parseReplay } from '../osr.ts';
 import { scorePricing, type PpResult } from '../calc/pp.ts';
@@ -933,6 +939,46 @@ export class Tracker extends EventEmitter<TrackerEvents> {
   }
 
   /**
+   * Judge again every play turned away as another player's under a name that is now this
+   * profile's own -- after "It's me" confirmed a rename -- as if each had just arrived.
+   *
+   * Not Track anyway: nothing is waved past. Each goes through the same ingest with today's
+   * identity and today's filter, so a play the filter declines is listed again as the filter's,
+   * and one that is still somebody else's (a lazer id that differs) stays where it was. Only a
+   * play already in the profile some other way leaves the list without being written. Returns
+   * how many were tracked.
+   */
+  retrackOwnNames(): Promise<number> {
+    return this.enqueue(async () => {
+      const profileId = this.opts.profileId;
+      const identity = this.currentIdentity();
+      let tracked = 0;
+      for (const row of otherPlayerDeclines(this.opts.db, profileId)) {
+        if (row.player === null || !identity.names.has(row.player.trim().toLowerCase())) continue;
+        if (row.replayPath === null || !fs.existsSync(row.replayPath)) continue;
+        const result = await ingestReplayFile(row.replayPath, {
+          db: this.opts.db,
+          resolver: this.opts.resolver,
+          profileId,
+          trackingSince: 0,
+          official: this.opts.official,
+          filter: this.currentFilter(),
+          identity,
+          declines: row.source,
+        });
+        if (result.status === 'added') {
+          tracked++;
+          this.added++;
+          this.emit('score', result.score);
+        } else if (result.status === 'skipped' && result.reason !== 'another-player' && result.reason !== 'unparseable') {
+          forgetDeclineById(this.opts.db, profileId, row.id);
+        }
+      }
+      return tracked;
+    });
+  }
+
+  /**
    * How many stored scores predate the eligibility columns, so the page can offer a
    * recompute only when there is something to gain from it.
    */
@@ -1254,6 +1300,9 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   private handleReplay(file: string): void {
     this.arrived();
+    // Taken now, not when the queue reaches it: a first launch holds plays until the beatmap
+    // index is built, and a play set then must still count as set just now.
+    const arrivedAt = Date.now();
     this.queue = this.queue
       .then(async () => {
         const result = await ingestReplayFile(file, {
@@ -1265,6 +1314,7 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           filter: this.currentFilter(),
           identity: this.currentIdentity(),
           declines: 'live',
+          arrivedAt,
         });
         if (result.status === 'added') {
           this.added++;

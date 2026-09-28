@@ -270,6 +270,29 @@ export function listDeclines(db: Db, profileId: number): DeclinedPlay[] {
   }));
 }
 
+/** The name in the replay one decline was for, when it was turned away as another player's. */
+export function declinedPlayer(db: Db, profileId: number, id: number): string | null {
+  const row = db
+    .prepare(`SELECT player FROM declined_plays WHERE profile_id = ? AND id = ? AND reason = 'another-player'`)
+    .get(profileId, id) as Pick<DeclineRow, 'player'> | undefined;
+  return row?.player ?? null;
+}
+
+/** Every play turned away as another player's, for judging again once more names are known. */
+export function otherPlayerDeclines(
+  db: Db,
+  profileId: number,
+): { id: number; player: string | null; replayPath: string | null; source: DeclineSource }[] {
+  const rows = db
+    .prepare(
+      `SELECT id, player, replay_path, source FROM declined_plays
+        WHERE profile_id = ? AND kind = 'score' AND reason = 'another-player'
+        ORDER BY played_at, id`,
+    )
+    .all(profileId) as Pick<DeclineRow, 'id' | 'player' | 'replay_path' | 'source'>[];
+  return rows.map((r) => ({ id: r.id, player: r.player, replayPath: r.replay_path, source: r.source }));
+}
+
 /** What tracking one anyway needs, or null when this profile has no such decline. */
 export function declineToTrack(
   db: Db,

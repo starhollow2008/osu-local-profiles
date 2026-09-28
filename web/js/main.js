@@ -2460,6 +2460,9 @@ function renderDeclinedList() {
           <div class="u-ellipsis">${escapeHtml(title)}</div>
           <div class="removed-row__meta">${declineMeta(d)}</div>
         </div>
+        ${d.reason === 'another-player' && d.kind === 'score' && d.player
+          ? `<button type="button" data-its-me="${d.id}" title="${escapeHtml(t('declined.itsMeTitle'))}">${escapeHtml(t('declined.itsMe'))}</button>`
+          : ''}
         <button type="button" data-track="${d.id}" data-reason="${escapeHtml(d.reason)}">${escapeHtml(t('declined.trackAnyway'))}</button>
         <button type="button" class="removed-row__delete" data-delete-declined="${d.id}"
                 title="${escapeHtml(t('removed.deletePermanently'))}" aria-label="${escapeHtml(t('removed.deletePermanently'))}">
@@ -2539,6 +2542,23 @@ $('declinedList').onclick = async (e) => {
   if (doomed) {
     if (armed(doomed, t('removed.deleteConfirm'))) {
       void deleteDeclined({ action: 'delete', id: Number(doomed.dataset.deleteDeclined) }, doomed);
+    }
+    return;
+  }
+  // A name osu! changed: osu! is asked, once, whether this name and the one signed in here are
+  // the same account. On a yes every play refused under it is judged again, and arrives as a
+  // play does.
+  const mine = e.target.closest('[data-its-me]');
+  if (mine) {
+    mine.disabled = true;
+    try {
+      const d = await postJson('/api/declined', { action: 'its-me', id: Number(mine.dataset.itsMe) });
+      toast(t('declined.itsMeDone', { name: d.account, n: fmt(d.tracked) }));
+      declinedPlayCount = d.declinedPlays ?? declinedPlayCount;
+      await renderDeclinedPlays();
+    } catch (err) {
+      settingsHint(err.message, true);
+      mine.disabled = false;
     }
     return;
   }

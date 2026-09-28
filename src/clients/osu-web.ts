@@ -170,6 +170,9 @@ function extractUser(html: string): OsuWebUser | null {
   };
 }
 
+/** osu! answered, and has no account by that name or id -- as opposed to not answering at all. */
+export class NoSuchUser extends Error {}
+
 /**
  * Look up one osu! account. Throws with a message worth showing the user.
  *
@@ -192,7 +195,7 @@ export async function lookupUser(query: string): Promise<OsuWebUser> {
     throw new Error('could not reach osu.ppy.sh -- check your connection, or type a name instead');
   }
 
-  if (response.status === 404) throw new Error(`osu! has no user called "${clean}"`);
+  if (response.status === 404) throw new NoSuchUser(`osu! has no user called "${clean}"`);
   if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
 
   const user = extractUser(await response.text());

@@ -107,6 +107,53 @@ test('Track anyway brings a declined replay in past the filter and the owner che
   }
 });
 
+/*
+ * "It's me": osu! confirmed a name is the signed-in account's under another name. What was
+ * refused under it is judged again as if it had just arrived -- not waved through: the filter
+ * still decides, and somebody else's play stays refused.
+ */
+async function refusedUnderANewName() {
+  const h = await harness();
+  h.write('new-name.osr', stableReplay({ player: 'TangyRenamed', playedAt: SINCE + 60_000, onlineId: 900_000_002n }));
+  h.write('mrekk.osr', stableReplay({ player: 'mrekk', playedAt: SINCE + 120_000, onlineId: 900_000_001n }));
+  assert.equal((await h.tracker.backfill(SINCE)).otherPlayers, 2);
+  return h;
+}
+
+const listed = (h: { db: Parameters<typeof listDeclines>[0]; profileId: number }) =>
+  listDeclines(h.db, h.profileId)
+    .map((d) => `${d.player}: ${d.reason}`)
+    .sort();
+
+test('plays refused under a name confirmed as yours are tracked, and nobody else’s', async () => {
+  const h = await refusedUnderANewName();
+  try {
+    // Nothing confirmed yet: nothing changes.
+    assert.equal(await h.tracker.retrackOwnNames(), 0);
+    assert.equal(h.count('scores'), 0);
+
+    updateSettings(h.db, h.profileId, { accountNames: ['TangyRenamed', 'Tangy'] });
+    assert.equal(await h.tracker.retrackOwnNames(), 1);
+    assert.equal(h.count('scores'), 1);
+    assert.deepEqual(listed(h), ['mrekk: another-player']);
+  } finally {
+    h.cleanup();
+  }
+});
+
+test('the filter still decides a play judged again, as it would a play just arrived', async () => {
+  const h = await refusedUnderANewName();
+  try {
+    updateSettings(h.db, h.profileId, { accountNames: ['TangyRenamed', 'Tangy'], trackingFilter: TAIKO_ONLY });
+    assert.equal(await h.tracker.retrackOwnNames(), 0);
+    assert.equal(h.count('scores'), 0);
+    // Still listed, now as the filter's -- where Track anyway is the only way in.
+    assert.deepEqual(listed(h), ['TangyRenamed: filtered', 'mrekk: another-player']);
+  } finally {
+    h.cleanup();
+  }
+});
+
 test('Track anyway never adds a play twice, and says when its replay is gone', async () => {
   const h = await harness();
   try {

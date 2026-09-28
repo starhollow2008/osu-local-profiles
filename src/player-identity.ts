@@ -24,7 +24,12 @@ import { getSettings } from './settings.ts';
  * - **A name you used to have is yours.** osu! publishes `previous_usernames`, and a stable
  *   replay carries no user id at all -- only the name that was current when it was set -- so
  *   without that list every play from before a rename would look like a stranger's. The
- *   account this was built on has two.
+ *   account this was built on has two. It comes from a linked account, or from "It's me" on a
+ *   play turned away (`confirmSameAccount`) -- which also covers the other way round, osu!
+ *   still remembering the old name while every replay carries the new one.
+ * - **A play set just now is yours.** A replay that turns up while tracking, set moments
+ *   before, was set on this computer whatever name it carries (`setJustNow`) -- a downloaded
+ *   one carries the time it was set on osu!. Only a lazer user id that differs outweighs it.
  * - **Not knowing means not filtering.** A profile that cannot say who it belongs to tracks
  *   everything, exactly as it always has.
  * - **Who you are is who osu! says is signed in here**, not an account linked for its
@@ -144,10 +149,12 @@ export function resolveIdentity(
   profileId: number,
   installs: readonly OsuInstall[],
 ): PlayerIdentity {
+  const settings = getSettings(db, profileId);
   const signedIn = detectLocalSessions(installs).map((s) => s.username);
   if (signedIn.length > 0) {
-    const names = new Set(signedIn.map((name) => name.toLowerCase()));
-    const settings = getSettings(db, profileId);
+    // Before the link is compared, so a link to the account's new name matches an old one
+    // still signed in.
+    const names = withAccountNames(new Set(signedIn.map((name) => name.toLowerCase())), settings.accountNames);
     const linkedNames = [settings.linkedUsername, ...settings.linkedPreviousNames]
       .filter((name) => name !== '')
       .map((name) => name.toLowerCase());
@@ -174,7 +181,7 @@ export function resolveIdentity(
   if (tracked !== null) {
     return {
       userId: tracked.userId,
-      names: new Set([tracked.name.toLowerCase()]),
+      names: withAccountNames(new Set([tracked.name.toLowerCase()]), settings.accountNames),
       displayName: tracked.name,
       namesComplete: false,
       source: 'tracked-plays',
@@ -182,6 +189,78 @@ export function resolveIdentity(
   }
 
   return UNKNOWN_IDENTITY;
+}
+
+/**
+ * The names osu! confirmed are one account (`Settings.accountNames`), added when one of them
+ * is already a name of this profile's -- and only then, so a list left from an account nobody
+ * signs in to here any more adds nothing.
+ */
+function withAccountNames(names: Set<string>, accountNames: readonly string[]): Set<string> {
+  const account = accountNames.map((name) => name.toLowerCase());
+  return account.some((name) => names.has(name)) ? new Set([...names, ...account]) : names;
+}
+
+/** An osu! account as `confirmSameAccount` needs it: what `lookupUser` answers. */
+export interface OsuAccount {
+  id: number;
+  username: string;
+  previousUsernames: string[];
+}
+
+/** Every name an account has had, lowercased: its name now first. */
+const accountNamesOf = (account: OsuAccount): string[] =>
+  [account.username, ...account.previousUsernames].map((name) => name.toLowerCase());
+
+/** How many of the profile's own names are looked up the other way round, at most. */
+const MAX_REVERSE_LOOKUPS = 3;
+
+/**
+ * Ask osu! whether `name` -- the one in a replay the profile turned away -- is an account this
+ * profile already is, under a name it had before or has since. The answer is that account's
+ * every name, or null when osu! lists no such thing.
+ *
+ * Nothing on this computer can say it. osu! remembers whatever name was typed to sign in,
+ * which after a rename may be the old one, and a stable replay carries only the name, so a
+ * player's own new plays and a stranger's downloaded ones look the same. osu!'s list of
+ * previous usernames settles it, and still does once somebody else has taken the old name.
+ *
+ * One request for the replay's name, which finds the account whatever the profile's names
+ * are; then, only if that says no, the profile's own names the other way round, for a replay
+ * set under a name the account has since left. An account osu! does not have is a no, and
+ * anything else -- no network, osu! down -- is thrown, so it reads as "could not ask" rather
+ * than "not you".
+ */
+export async function confirmSameAccount(
+  name: string,
+  identity: PlayerIdentity,
+  lookup: (query: string) => Promise<OsuAccount>,
+  isNoSuchUser: (e: unknown) => boolean,
+): Promise<OsuAccount | null> {
+  const wanted = name.trim().toLowerCase();
+  if (wanted === '' || !identityKnown(identity)) return null;
+
+  const find = async (query: string): Promise<OsuAccount | null> => {
+    try {
+      return await lookup(query);
+    } catch (e) {
+      if (isNoSuchUser(e)) return null;
+      throw e;
+    }
+  };
+
+  const account = await find(wanted);
+  if (account !== null) {
+    if (identity.userId !== null && account.id === identity.userId) return account;
+    if (accountNamesOf(account).some((n) => identity.names.has(n))) return account;
+  }
+
+  const ours = [...identity.names].filter((n) => n !== wanted).slice(0, MAX_REVERSE_LOOKUPS);
+  for (const own of ours) {
+    const other = await find(own);
+    if (other !== null && accountNamesOf(other).includes(wanted)) return other;
+  }
+  return null;
 }
 
 /** What a replay says about who set it. Split out so it can be read off a stored row too. */
@@ -233,13 +312,37 @@ export function wasSubmitted(player: ReplayPlayer): boolean {
 }
 
 /**
+ * How long before it turns up a replay may have been set and still count as set just now.
+ *
+ * A replay arriving while tracking is either a play just set or one just downloaded to watch,
+ * and the file alone cannot say which -- but the time written inside it can. A play set here
+ * is written the moment it ends, so it arrives seconds after its own timestamp; a downloaded
+ * one carries the time it was set on osu!, days or years ago. Five minutes is far past any
+ * write, and a leaderboard replay watched within five minutes of being set is rare -- and
+ * would be a play shown, not one lost.
+ */
+export const JUST_SET_MS = 5 * 60_000;
+
+/** A replay's timestamp may run this far ahead of the clock it arrives by. */
+const CLOCK_SLACK_MS = 60_000;
+
+/** Whether a replay that turned up at `arrivedAt` was set moments before. See `JUST_SET_MS`. */
+export function setJustNow(playedAt: number, arrivedAt: number): boolean {
+  return playedAt <= arrivedAt + CLOCK_SLACK_MS && arrivedAt - playedAt <= JUST_SET_MS;
+}
+
+/**
  * Is this play the profile's own?
  *
  * `null` means there is not enough to say, which every caller treats as yours -- see the
  * module note. Only `false` is a refusal, and it is only ever returned on positive evidence
  * that someone else set the play.
+ *
+ * `justSet` is a replay that arrived while tracking moments after it was set (`setJustNow`):
+ * set on this computer, whatever name osu! wrote in it -- which after a rename may be one the
+ * profile has never seen. Only a lazer user id that differs outweighs it.
  */
-export function ownsPlay(identity: PlayerIdentity, player: ReplayPlayer): boolean | null {
+export function ownsPlay(identity: PlayerIdentity, player: ReplayPlayer, justSet = false): boolean | null {
   if (!identityKnown(identity)) return null;
 
   const name = player.name.trim();
@@ -263,6 +366,8 @@ export function ownsPlay(identity: PlayerIdentity, player: ReplayPlayer): boolea
   if (identity.userId !== null && player.userId !== null) {
     return identity.userId === player.userId;
   }
+
+  if (justSet) return true;
 
   if (identity.names.size === 0) return null;
   return identity.names.has(name.toLowerCase());

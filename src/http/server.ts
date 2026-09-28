@@ -80,7 +80,7 @@ import {
   type EntryResult,
   type ManualInput,
 } from '../score-entry.ts';
-import { clearDeclines, declineCount, deleteDeclines, listDeclines } from '../tracker/declined.ts';
+import { clearDeclines, declineCount, declinedPlayer, deleteDeclines, listDeclines } from '../tracker/declined.ts';
 import { eligibilityOf, visibleSql, type Eligibility } from '../calc/eligibility.ts';
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
@@ -93,7 +93,9 @@ import {
   fetchPinnedScores,
   fetchStanding,
   lookupUser,
+  NoSuchUser,
 } from '../clients/osu-web.ts';
+import { confirmSameAccount } from '../player-identity.ts';
 import { importMode, type ModeImportResult } from '../tracker/online-import.ts';
 import { clearStanding, importedStanding } from '../standing.ts';
 import {
@@ -1375,6 +1377,60 @@ export function startServer(opts: ServerOptions): http.Server {
           try {
             const deleted = deleteDeclines(opts.db, current(), action === 'delete' ? [Number(body['id'])] : 'all');
             return json(res, { ok: true, deleted, declinedPlays: declineCount(opts.db, current()) });
+          } catch (e) {
+            return json(res, { error: (e as Error).message }, 400);
+          }
+        }
+        /*
+         * "It's me": a play refused as another player's that is the owner's own, under a name
+         * osu! changed. One request to osu! on the press -- see `confirmSameAccount` -- and on a
+         * yes, the account's every name is kept and each play refused under one is judged again.
+         */
+        if (action === 'its-me') {
+          const profileId = current();
+          const player = declinedPlayer(opts.db, profileId, Number(body['id']));
+          if (player === null) return json(res, { error: 'that play is not in the list any more' }, 400);
+          try {
+            const account = await confirmSameAccount(
+              player,
+              opts.tracker.playerIdentity,
+              lookupUser,
+              (e) => e instanceof NoSuchUser,
+            );
+            if (account === null) {
+              const owner = opts.tracker.playerIdentity.displayName;
+              return json(
+                res,
+                {
+                  error:
+                    owner === ''
+                      ? `osu! cannot say whether ${player} is you. If this play is yours, use Track anyway.`
+                      : `osu! does not list ${player} as a name of ${owner}, the account signed in here. ` +
+                        'If this play is yours, use Track anyway.',
+                },
+                400,
+              );
+            }
+            updateSettings(
+              opts.db,
+              profileId,
+              {
+                // The newest first, so the list's cap never costs the account just confirmed.
+                accountNames: [
+                  account.username,
+                  ...account.previousUsernames,
+                  ...settingsFor(profileId).accountNames,
+                ],
+              },
+              configFallbacks,
+            );
+            const tracked = await opts.tracker.retrackOwnNames();
+            return json(res, {
+              ok: true,
+              account: account.username,
+              tracked,
+              declinedPlays: declineCount(opts.db, profileId),
+            });
           } catch (e) {
             return json(res, { error: (e as Error).message }, 400);
           }

@@ -9,15 +9,20 @@ import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { ingestScore } from '../src/tracker/ingest.ts';
 import {
   certainlySomeoneElse,
+  confirmSameAccount,
   dominantTrackedName,
+  JUST_SET_MS,
   ownsPlay,
   replayPlayer,
   resolveIdentity,
+  setJustNow,
   sweepForeignScores,
   UNKNOWN_IDENTITY,
+  type OsuAccount,
   type PlayerIdentity,
   type ReplayPlayer,
 } from '../src/player-identity.ts';
+import { NoSuchUser } from '../src/clients/osu-web.ts';
 import type { OsuInstall } from '../src/clients/detect.ts';
 import type { ReplayScore } from '../src/osr.ts';
 
@@ -576,6 +581,171 @@ test('an offline play under someone else\u2019s name survives the sweep', async 
       .prepare('SELECT dedupe_key FROM scores WHERE hidden_at IS NOT NULL')
       .all() as { dedupe_key: string }[];
     assert.deepEqual(gone.map((r) => r.dedupe_key), ['watched']);
+  } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * The rename a friend's profile hit: osu! remembered the name typed to sign in, `ninjakid0104`,
+ * while every replay since the rename says `chushberry` -- so each of their own new plays was
+ * refused as a stranger's.
+ */
+
+const account = (id: number, username: string, previousUsernames: string[] = []): OsuAccount => ({
+  id,
+  username,
+  previousUsernames,
+});
+
+/** osu! as a lookup table, finding an account by a previous name as osu-web does, and what it was asked. */
+function fakeOsu(accounts: OsuAccount[]) {
+  const asked: string[] = [];
+  const lookup = async (query: string): Promise<OsuAccount> => {
+    asked.push(query);
+    const q = query.toLowerCase();
+    const found =
+      accounts.find((a) => a.username.toLowerCase() === q) ??
+      accounts.find((a) => a.previousUsernames.some((n) => n.toLowerCase() === q));
+    if (!found) throw new NoSuchUser(`osu! has no user called "${query}"`);
+    return found;
+  };
+  return { lookup, asked };
+}
+
+const isNoSuchUser = (e: unknown) => e instanceof NoSuchUser;
+
+const OLD_NAME_SIGNED_IN: PlayerIdentity = {
+  userId: null,
+  names: new Set(['ninjakid0104']),
+  displayName: 'ninjakid0104',
+  namesComplete: false,
+  source: 'signed-in',
+};
+
+test('osu! confirms a new name belongs to the account signed in under the old one', async () => {
+  const osu = fakeOsu([account(111, 'chushberry', ['ninjakid0104'])]);
+  const found = await confirmSameAccount('chushberry', OLD_NAME_SIGNED_IN, osu.lookup, isNoSuchUser);
+  assert.equal(found?.username, 'chushberry');
+  assert.deepEqual(osu.asked, ['chushberry'], 'one request when the first answer settles it');
+});
+
+test('it still does once somebody else has taken the old name', async () => {
+  // A lookup of the old name finds the stranger who has it now, but the renamed account's own
+  // list still names it.
+  const osu = fakeOsu([account(222, 'ninjakid0104'), account(111, 'chushberry', ['ninjakid0104'])]);
+  const found = await confirmSameAccount('chushberry', OLD_NAME_SIGNED_IN, osu.lookup, isNoSuchUser);
+  assert.equal(found?.id, 111);
+});
+
+test('a replay under a name the account has since left is found the other way round', async () => {
+  // Signed in as the new name; the replay carries the old one, which somebody else now has.
+  const identity: PlayerIdentity = { ...OLD_NAME_SIGNED_IN, names: new Set(['chushberry']), displayName: 'chushberry' };
+  const osu = fakeOsu([account(222, 'ninjakid0104'), account(111, 'chushberry', ['ninjakid0104'])]);
+  const found = await confirmSameAccount('ninjakid0104', identity, osu.lookup, isNoSuchUser);
+  assert.equal(found?.id, 111);
+  assert.deepEqual(osu.asked, ['ninjakid0104', 'chushberry']);
+});
+
+test('a stranger is not confirmed, and osu! being unreachable is not a no', async () => {
+  const osu = fakeOsu([account(111, 'chushberry', ['ninjakid0104']), account(7562902, 'mrekk')]);
+  assert.equal(await confirmSameAccount('mrekk', OLD_NAME_SIGNED_IN, osu.lookup, isNoSuchUser), null);
+  assert.equal(await confirmSameAccount('nobody-at-all', OLD_NAME_SIGNED_IN, osu.lookup, isNoSuchUser), null);
+  // An identity that knows nothing refuses nothing, so there is nothing to confirm against.
+  assert.equal(await confirmSameAccount('chushberry', UNKNOWN_IDENTITY, osu.lookup, isNoSuchUser), null);
+
+  const down = async (): Promise<OsuAccount> => {
+    throw new Error('could not reach osu.ppy.sh');
+  };
+  await assert.rejects(confirmSameAccount('chushberry', OLD_NAME_SIGNED_IN, down, isNoSuchUser), /could not reach/);
+});
+
+test("confirmed names join the profile's while one of them is signed in", () => {
+  const h = harness();
+  const stable = signedIn('stable', 'ninjakid0104');
+  const other = signedIn('stable', 'SomeoneElse');
+  try {
+    assert.equal(ownsPlay(resolveIdentity(h.db, h.profileId, [stable.install]), player('chushberry')), false, 'the bug');
+
+    updateSettings(h.db, h.profileId, { accountNames: ['chushberry', 'ninjakid0104'] });
+    const identity = resolveIdentity(h.db, h.profileId, [stable.install]);
+    assert.deepEqual([...identity.names].sort(), ['chushberry', 'ninjakid0104']);
+    assert.equal(ownsPlay(identity, player('chushberry')), true);
+    assert.equal(ownsPlay(identity, player('mrekk')), false);
+
+    // A list from an account nobody signs in to here any more adds nothing.
+    assert.deepEqual([...resolveIdentity(h.db, h.profileId, [other.install]).names], ['someoneelse']);
+  } finally {
+    stable.cleanup();
+    other.cleanup();
+    h.cleanup();
+  }
+});
+
+test('a confirmed old name lets a link to the new one match again', () => {
+  const h = harness();
+  const stable = signedIn('stable', 'ninjakid0104');
+  try {
+    // Linked by a version that never fetched previous names, so the link could not match.
+    updateSettings(h.db, h.profileId, {
+      linkedUserId: 111,
+      linkedUsername: 'chushberry',
+      accountNames: ['chushberry', 'ninjakid0104'],
+    });
+    assert.equal(resolveIdentity(h.db, h.profileId, [stable.install]).source, 'linked');
+  } finally {
+    stable.cleanup();
+    h.cleanup();
+  }
+});
+
+/*
+ * A replay turning up while tracking is either a play just set or one just downloaded to watch.
+ * Only the time inside it tells them apart: a downloaded one carries the time it was set on osu!.
+ */
+test('a replay set moments before it turned up is yours whatever its name', async () => {
+  assert.equal(ownsPlay(OLD_NAME_SIGNED_IN, player('chushberry'), true), true);
+  // A lazer id that differs still outweighs it.
+  assert.equal(ownsPlay(OWNER, player('mrekk', 7562902), true), false);
+
+  const now = Date.parse('2026-09-27T12:00:00Z');
+  assert.equal(setJustNow(now - 5_000, now), true, 'written as it ended');
+  assert.equal(setJustNow(now - JUST_SET_MS - 1, now), false, 'too long ago to be a play just set');
+  assert.equal(setJustNow(now - 90 * 86_400_000, now), false, 'a leaderboard replay from months ago');
+  assert.equal(setJustNow(now + 30_000, now), true, 'a clock a little ahead');
+  assert.equal(setJustNow(now + 10 * 60_000, now), false);
+
+  const h = harness();
+  try {
+    const ctx = {
+      db: h.db,
+      resolver: h.resolver,
+      profileId: h.profileId,
+      trackingSince: 0,
+      official: null,
+      identity: OLD_NAME_SIGNED_IN,
+    };
+    const fresh = await ingestScore(
+      replay({ username: 'chushberry', onlineScoreId: 900_000_002n, playedAt: new Date(now - 10_000) }),
+      '/replays/fresh.osr',
+      { ...ctx, arrivedAt: now },
+    );
+    assert.equal(fresh.status, 'added', 'just set here');
+
+    const watched = await ingestScore(
+      replay({ username: 'mrekk', onlineScoreId: 900_000_003n, playedAt: new Date(now - 30 * 86_400_000) }),
+      '/replays/watched.osr',
+      { ...ctx, arrivedAt: now },
+    );
+    assert.ok(watched.status === 'skipped' && watched.reason === 'another-player', 'downloaded to watch');
+
+    // An import has no arrival time: finding a file says nothing about who wrote it.
+    const imported = await ingestScore(
+      replay({ username: 'someone', onlineScoreId: 900_000_004n, playedAt: new Date(now - 10_000), totalScore: 2 }),
+      '/replays/imported.osr',
+      ctx,
+    );
+    assert.ok(imported.status === 'skipped' && imported.reason === 'another-player');
   } finally {
     h.cleanup();
   }

@@ -3400,3 +3400,33 @@ with the name on hover, and whether the licence allows it.
 - **The name on hover**: `web/js/tooltip.js`, a port of osu-web's `tooltip-default` (above and
   centred, 10x8 tip, shown at once, gone on leaving or clicking), for any `data-tooltip`. The
   name is also each link's `aria-label`.
+
+## 5.73 - A name osu! changed is still yours
+
+**Status:** done -- unreleased.
+
+Reported from a friend's machine on 1.28: every play set live was listed under Plays not tracked
+as "set by another player", under their own name. Their `app.log` said `Tracking plays set by
+ninjakid0104`, a name the account had before a rename. osu! keeps whatever name was typed to sign
+in, while every replay since the rename says the new one, `chushberry`. Nothing on the computer
+ties the two together, and 5.51's previous usernames came only from a linked account whose name
+matched the one signed in, which this profile did not have. Not a regression: the ownership
+rules had not changed since 1.26, and 1.27's list only made the refusals visible.
+
+- **A play set just now is yours** (`setJustNow`, `JUST_SET_MS`). A replay arriving while
+  tracking is either a play just set or one just downloaded to watch, and the file cannot say
+  which, but the time inside it can: a play set here arrives seconds after its timestamp, and a
+  downloaded one carries the time it was set on osu!. Live only (`IngestContext.arrivedAt`, taken
+  on arrival, not when the queue reaches it). A lazer user id that differs still outweighs it.
+  This alone fixes the report, offline.
+- **"It's me"** on a play refused as another player's asks osu! once, on the press, whether that
+  name and the profile's are one account (`confirmSameAccount`): the replay's name first, then
+  the profile's own names the other way round. osu!'s `previous_usernames` settles it even once
+  somebody else has taken the old name. On a yes, the account's every name goes into
+  `accountNames`, which joins the profile's names only while one of them is signed in, before the
+  link is compared, so a link to the new name matches an old one again.
+- **What was refused is judged again, not waved through** (`Tracker.retrackOwnNames`): each play
+  refused under a name now the profile's goes through the ordinary ingest with today's identity
+  and filter. The filter still decides, and a play it declines is listed as the filter's, where
+  Track anyway is still the only way in.
+- osu! unreachable is an error, never a "not you" (`NoSuchUser` is the only no).
