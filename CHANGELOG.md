@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.28.1
+
+<!-- important -->
+
+- **Plays set after an osu! name change are tracked again.** If osu! still remembered the name
+  you had before a rename, every play you set went to **Plays not tracked** as "set by another
+  player", under your own new name. A play that arrives while the app is tracking and was set
+  moments before is now always yours, whatever name is in it - a replay you download to watch
+  carries the time it was first set, so those are still told apart.
+
+- **"It's me" for a play set by another player.** The new button beside **Track anyway** asks
+  osu! whether that name is yours under another name. If it is, every name your account has had counts as yours from then
+  on, and the plays turned away under them are tracked - the play tracking filter still applies.
+
+- **Everything new in this release is translated** into all 15 languages.
+
 ## 1.28.0
 
 - **Export your scores to a spreadsheet.** **Share & back up -> Export** has a **.csv** and an
