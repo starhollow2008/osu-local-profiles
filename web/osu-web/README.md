@@ -16,9 +16,14 @@ by ppy.
 | `grades/` | `public/images/badges/score-ranks-v2019/` | the small grade badges |
 | `scores/` | `resources/images/scores/` | a stable score's big grade letter |
 | `layout/` | `public/images/layout/` | the avatar of a profile with no picture |
+| `covers/` | `public/images/headers/profile-covers/c3.jpg` at commit `770e5d41a20f6b3fd62be5b599a2f1c8cce6c87c` | the banner of a profile with none of its own |
 | `modes/` | `resources/fonts/extra/extra.svg`, glyphs mode-osu, mode-taiko, mode-ctb, mode-mania | the mode switcher's ruleset icons |
 
 `modes/` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
 glyphs of its icon font, so each glyph's outline is written out as an SVG of its own, unchanged
 but for the flip from the font's upward y axis to an image's downward one. The font itself is
 not taken: it also holds the osu! logo.
+
+`covers/` is the one folder from another commit: osu-web's built-in profile banners were
+removed from the repository in 6b22ecb, when cover presets moved to a database table, so the
+banner comes from the last commit that still had them.

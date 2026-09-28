@@ -64,7 +64,10 @@ test('nothing is vendored that the licence does not cover', () => {
   walk(artDir);
   assert.deepEqual(files.filter((f) => /logo|pippi|font|\.(?:otf|ttf|woff2?)$/i.test(f)), []);
   const folders = new Set(files.map((f) => f.split('/')[0]));
-  assert.deepEqual([...folders].sort(), ['README.md', 'grades', 'layout', 'modes', 'mods', 'scores']);
+  assert.deepEqual([...folders].sort(), ['README.md', 'covers', 'grades', 'layout', 'modes', 'mods', 'scores']);
+  // The default banner is osu-web's own c3, from its repository. osu!'s newer cover presets live
+  // on assets.ppy.sh with no licence, and some carry the osu! logo.
+  assert.deepEqual(fs.readdirSync(path.join(artDir, 'covers')), ['c3.jpg']);
 });
 
 /*

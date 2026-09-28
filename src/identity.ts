@@ -73,7 +73,7 @@ export function saveImage(
 }
 
 /**
- * Remove this profile's image, returning to the generated avatar or the best play's cover.
+ * Remove this profile's image, returning to the generated avatar or osu-web's default banner.
  *
  * Only touches this profile's own files: a legacy `data/avatar.png` is left alone, because
  * it was put there by hand and is shared by every profile that has not set its own.

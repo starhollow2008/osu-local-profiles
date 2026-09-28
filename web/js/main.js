@@ -18,7 +18,6 @@ import {
 } from './format.js';
 import { hideTooltip } from './tooltip.js';
 import {
-  coverUrl,
   guestAvatar,
   gradeBadge,
   levelBadge,
@@ -272,17 +271,14 @@ function renderIdentity() {
 }
 
 /**
- * osu! shows a user-chosen cover here. A new profile has none, so it falls back to the
- * beatmap art of its best play -- and to the flat panel colour when offline.
+ * osu! shows a user-chosen cover here. A profile with none of its own shows osu-web's default
+ * banner (`.cover-default`, osu-web-art.css), bundled, so it is there offline too.
  */
-function renderCover(top) {
+function renderCover() {
   const el = $('cover');
-  if (profile?.hasCover) {
-    el.style.setProperty('--cover', `url('${assetUrl('/api/image/cover')}')`);
-    return;
-  }
-  const url = coverUrl(top?.[0]?.beatmapsetId, 'cover@2x');
-  el.style.setProperty('--cover', url ? `url('${url}')` : 'none');
+  el.classList.toggle('cover-default', !profile?.hasCover);
+  if (profile?.hasCover) el.style.setProperty('--cover', `url('${assetUrl('/api/image/cover')}')`);
+  else el.style.removeProperty('--cover');
 }
 
 /** osu-web's name for each ruleset, which names its icon (osu-web-art.css). */
@@ -575,7 +571,7 @@ async function loadProfile() {
   const totalFor = (section, list) => totals[section] ?? list.length;
 
   renderStats(data.stats, data.medalTotal, data.imported);
-  renderCover(data.top);
+  renderCover();
 
   renderRank(data);
 

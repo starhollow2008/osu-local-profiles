@@ -104,6 +104,9 @@
 
 .avatar-guest { background-image: url("../osu-web/layout/avatar-guest@2x.png"); }
 
+/* osu-web's default profile banner, for a profile with none of its own. */
+.cover-default { background-image: url("../osu-web/covers/c3.jpg"); }
+
 .mode-icon--osu { -webkit-mask-image: url("../osu-web/modes/mode-osu.svg"); mask-image: url("../osu-web/modes/mode-osu.svg"); }
 .mode-icon--taiko { -webkit-mask-image: url("../osu-web/modes/mode-taiko.svg"); mask-image: url("../osu-web/modes/mode-taiko.svg"); }
 .mode-icon--fruits { -webkit-mask-image: url("../osu-web/modes/mode-fruits.svg"); mask-image: url("../osu-web/modes/mode-fruits.svg"); }

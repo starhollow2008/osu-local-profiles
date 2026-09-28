@@ -191,7 +191,7 @@ Profiles there.
   account (below). Both are stored per profile, so two playstyles are two identities.
 
 Nothing here is required. With no picture the page draws an avatar from the profile's name, and
-the banner falls back to the cover art of the profile's best play.
+with no banner it shows osu!'s default one.
 
 `country` and `tagline` in `data/config.json` are only the starting point; once edited here
 they are stored per profile, so two playstyles can carry different descriptions and clearing

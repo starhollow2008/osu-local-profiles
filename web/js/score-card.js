@@ -333,9 +333,10 @@ function userCard(who) {
          title="${escapeHtml(who.countryName)}" aria-label="${escapeHtml(who.countryName)}"
          style="background-image: url('${assetUrl(`/flags/${escapeHtml(who.country.toLowerCase())}.svg`)}')"></span></div>`
     : '';
+  // With no banner of its own, osu-web's default one, as on the profile.
   const background = who.cover
     ? `<div class="user-card__background" style="background-image: url('${escapeHtml(who.cover)}')"></div>`
-    : '';
+    : '<div class="user-card__background cover-default"></div>';
   return `<div class="user-card">
   <div class="user-card__background-container">${background}<div class="user-card__background-overlay"></div></div>
   <div class="user-card__card">

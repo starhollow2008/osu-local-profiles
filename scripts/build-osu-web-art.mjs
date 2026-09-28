@@ -4,10 +4,11 @@
  *
  * This project is AGPL-3.0-or-later, the licence osu-web is under, so osu!'s own files are
  * used rather than redrawn: the 70-odd mod glyphs and the badge blanks they sit in, the small
- * grade badges, stable's big grade letters, the guest avatar and the four ruleset icons. They
- * are copied byte for byte and never edited, from one osu-web commit, which
- * `web/osu-web/README.md` records -- all but the ruleset icons, which osu-web keeps only as
- * glyphs of an icon font, and are each written out as an SVG of its own (see `MODE_GLYPHS`).
+ * grade badges, stable's big grade letters, the guest avatar, the default profile banner and the
+ * four ruleset icons. They are copied byte for byte and never edited, from one osu-web commit,
+ * which `web/osu-web/README.md` records -- all but the ruleset icons, which osu-web keeps only as
+ * glyphs of an icon font, and are each written out as an SVG of its own (see `MODE_GLYPHS`),
+ * and the banner, which osu-web no longer has (see `COVERS_COMMIT`).
  * THIRD-PARTY-NOTICES.md credits them.
  *
  * Which glyph belongs to which acronym is read out of osu-web's own `mod.less`, so a mod
@@ -27,6 +28,16 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const REPO = 'ppy/osu-web';
+
+/*
+ * osu-web's own default profile banners, `public/images/headers/profile-covers/c1`-`c8`, left
+ * the repository in 6b22ecb (March 2024), when cover presets moved into a database table and
+ * their images onto assets.ppy.sh -- where they come with no licence, and some carry the osu!
+ * logo. So the banner a profile with none of its own shows, c3, comes from the last commit that
+ * still had them rather than from `commit`.
+ */
+const COVERS_COMMIT = '770e5d41a20f6b3fd62be5b599a2f1c8cce6c87c';
+const DEFAULT_COVER = 'public/images/headers/profile-covers/c3.jpg';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = path.join(root, 'web', 'osu-web');
@@ -59,13 +70,20 @@ async function resolveCommit() {
 
 const commit = await resolveCommit();
 
-async function read(file) {
+async function read(file, at = commit) {
+  if (localSource && at !== commit) {
+    try {
+      return execFileSync('git', ['-C', localSource, 'show', `${at}:${file}`], { maxBuffer: 64 << 20 });
+    } catch {
+      throw new Error(`${file} at ${at} is not in ${localSource}'s history; fetch that commit or run without --source`);
+    }
+  }
   if (localSource) {
     const full = path.join(localSource, file);
     if (!fs.existsSync(full)) throw new Error(`${file} is not in ${localSource}; widen its sparse checkout`);
     return fs.readFileSync(full);
   }
-  const url = `https://raw.githubusercontent.com/${REPO}/${commit}/${file}`;
+  const url = `https://raw.githubusercontent.com/${REPO}/${at}/${file}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`could not download ${url}: HTTP ${response.status}`);
   return Buffer.from(await response.arrayBuffer());
@@ -120,6 +138,7 @@ files.push(['public/images/layout/avatar-guest@2x.png', 'layout/avatar-guest@2x.
 // Read everything before touching the folder, so a failed download leaves the old set whole.
 const contents = [];
 for (const [from, to] of files) contents.push([to, await read(from), from]);
+contents.push(['covers/c3.jpg', await read(DEFAULT_COVER, COVERS_COMMIT), DEFAULT_COVER]);
 
 /*
  * The ruleset icons osu-web's mode switcher shows (`playmode-tabs.tsx`): not image files there
@@ -183,12 +202,17 @@ by ppy.
 | \`grades/\` | \`public/images/badges/score-ranks-v2019/\` | the small grade badges |
 | \`scores/\` | \`resources/images/scores/\` | a stable score's big grade letter |
 | \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture |
+| \`covers/\` | \`${DEFAULT_COVER}\` at commit \`${COVERS_COMMIT}\` | the banner of a profile with none of its own |
 | \`modes/\` | \`${EXTRA_FONT}\`, glyphs ${Object.values(MODE_GLYPHS).join(', ')} | the mode switcher's ruleset icons |
 
 \`modes/\` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
 glyphs of its icon font, so each glyph's outline is written out as an SVG of its own, unchanged
 but for the flip from the font's upward y axis to an image's downward one. The font itself is
 not taken: it also holds the osu! logo.
+
+\`covers/\` is the one folder from another commit: osu-web's built-in profile banners were
+removed from the repository in 6b22ecb, when cover presets moved to a database table, so the
+banner comes from the last commit that still had them.
 `,
 );
 
@@ -219,13 +243,16 @@ ${LEGACY.map((rank) => `.legacy-rank--${rank} { background-image: ${url(`scores/
 
 .avatar-guest { background-image: ${url('layout/avatar-guest@2x.png')}; }
 
+/* osu-web's default profile banner, for a profile with none of its own. */
+.cover-default { background-image: ${url('covers/c3.jpg')}; }
+
 ${Object.keys(MODE_GLYPHS).map((ruleset) => `.mode-icon--${ruleset} { ${mask(`modes/mode-${ruleset}.svg`)} }`).join('\n')}
 `;
 
 fs.writeFileSync(cssFile, css);
 
 console.log(
-  `${glyphs.length} mod glyphs, ${Object.keys(GRADES).length} grades, ${LEGACY.length} stable letters, ` +
+  `${glyphs.length} mod glyphs, ${Object.keys(GRADES).length} grades, ${LEGACY.length} stable letters, a banner, ` +
     `${Object.keys(MODE_GLYPHS).length} ruleset icons ` +
     `-> web/osu-web/ (${(bytes / 1024).toFixed(0)} KB) from ${REPO}@${commit.slice(0, 12)}`,
 );

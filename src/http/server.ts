@@ -1490,10 +1490,6 @@ export function startServer(opts: ServerOptions): http.Server {
             detail = scoreDetail(opts.db, owner.id, id, rules) ?? detail;
           }
           const images = imageState(opts.dataDir, owner.id);
-          // With no banner of its own, a profile shows its best play's art -- in this mode.
-          const best = images.hasCover
-            ? null
-            : topPlays(opts.db, owner.id, detail.mode, 1, rules)[0];
           return json(res, {
             score: detail,
             // What prices scores now, so the card can say when this one came from another.
@@ -1503,11 +1499,8 @@ export function startServer(opts: ServerOptions): http.Server {
               name: owner.name,
               country: settingsFor(owner.id).country,
               avatar: images.hasAvatar ? `/api/image/avatar?profile=${owner.id}` : null,
-              cover: images.hasCover
-                ? `/api/image/cover?profile=${owner.id}`
-                : best?.beatmapsetId
-                  ? `https://assets.ppy.sh/beatmaps/${best.beatmapsetId}/covers/cover@2x.jpg`
-                  : null,
+              // None of its own: the card shows osu-web's default banner.
+              cover: images.hasCover ? `/api/image/cover?profile=${owner.id}` : null,
               active: owner.id === current(),
               tracking: owner.id === current() && opts.tracker.isTracking,
             },
