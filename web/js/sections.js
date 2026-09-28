@@ -70,25 +70,22 @@ function countingNoteRest(counting) {
   }
 
   const included = [];
-  if (counting?.includeUnrankedMods) included.push(t('note.mods'));
   if (counting?.extraMapStatuses?.length) included.push(t('note.beatmaps'));
+  if (counting?.includeUnrankedMods) included.push(t('note.mods'));
   if (included.length === 0) return plays;
 
-  // "mods", "beatmaps", or both joined. The joining word is translated too: a language that
+  // "beatmaps", "mods", or both joined. The joining word is translated too: a language that
   // does not put "and" between two nouns the way English does still reads correctly.
-  let text = `${t('note.countsUnranked', { what: included.join(t('note.and')) })} `;
+  let text = t('note.countsUnranked', { what: included.join(t('note.and')) });
   // On by default for a new profile (roadmap 5.59), so say so and where to turn it off -- by
   // the names the menu and the dialog go by in this language.
-  text += `${t('note.turnOff', {
+  text += ` ${t('note.turnOff', {
     options: t('optionsBtn').replace('▾', '').trim(),
     settings: t('optSettings'),
-  })} `;
-  if (counting.includeUnrankedMods) {
-    text += counting.preferStrippedPp
-      ? `${t('note.strippedPp')} `
-      : `${t('note.officialPp')} `;
-  }
-  return `${text}${t('note.notComparable')}${plays ? ` ${plays}` : ''}`;
+  })}`;
+  // The * on a score priced as if the mod were off needs saying; osu!'s own pricing does not.
+  if (counting.includeUnrankedMods && counting.preferStrippedPp) text += ` ${t('note.strippedPp')}`;
+  return `${text}${plays ? ` ${plays}` : ''}`;
 }
 
 /**

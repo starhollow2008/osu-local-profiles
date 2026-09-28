@@ -82,7 +82,7 @@ const MOD_STATE_WORDS = {
 
 /* The filter being edited, and the machine facts that decide what the dialog can offer. */
 let draft = null;
-let context = { profileName: 'this profile', statusKnown: true, hasLazer: true, onSaved: null };
+let context = { statusKnown: true, hasLazer: true, onSaved: null };
 
 const filterHint = (message, isError) => hint('filterHint', message, isError);
 
@@ -221,7 +221,7 @@ function modesSection() {
   return section(
     t('filter.mode'),
     `<div class="checkgroup">${boxes}</div>`,
-    t('filter.modeHelp'),
+    '',
   );
 }
 
@@ -268,7 +268,7 @@ function categoriesSection(suffix) {
   return section(
     t('filter.categories'),
     `<div class="checkgroup">${boxes}</div>`,
-    t('filter.categoriesHelp') + suffix,
+    suffix.trim(),
     { html: true, id: 'tf-categories' },
   );
 }
@@ -372,7 +372,7 @@ function section(title, control, help, { html = false, id = null } = {}) {
   return `<section class="tfilter-section"${id ? ` id="${id}"` : ''}>
     <h4>${escapeHtml(title)}</h4>
     ${control}
-    <div class="setting__hint">${html ? help : escapeHtml(help)}</div>
+    ${help ? `<div class="setting__hint">${html ? help : escapeHtml(help)}</div>` : ''}
   </section>`;
 }
 
@@ -809,7 +809,6 @@ export function openTrackingFilter(options) {
   context = { ...context, ...options };
   draft = copyFilter(options.filter);
 
-  $('filterProfileName').textContent = context.profileName;
   // One or several, as whole sentences: a plural suffix glued onto a number does not
   // survive translation.
   const filtered = { n: context.playsFiltered };

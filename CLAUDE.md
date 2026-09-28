@@ -143,6 +143,13 @@ Tests: `node --test "test/**/*.test.ts"` (quoted glob required).
 - Live feed is SSE, and a browser allows 6 connections per origin. Only a *visible* tab may
   hold the stream open, or open tabs starve the page itself (`web/js/main.js`)
 
+## UI text
+
+Option descriptions and hints are short, plain and human: say what it does in one sentence,
+or a couple of words ("Optional", "Installation locations"). No copywriting: no dashes for
+dramatic pauses, no grandiose asides, no explaining the app's reasoning, no "always/never/
+nothing is lost". Every language gets the same (`web/i18n/*.json`).
+
 ## UI checks
 
 `npm run ui` drives the **running app** (`http://localhost:7272/`, override with an argv

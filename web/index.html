@@ -456,11 +456,7 @@
 <div class="backdrop" id="foldersModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="foldersTitle">
     <h3 id="foldersTitle" data-i18n="foldersTitle">osu! folders</h3>
-    <p data-i18n="foldersModal.theFoldersThisAppReads">
-      The folders this app reads your plays from. It finds them by itself on start - in
-      the registry, in your shortcuts, and by searching your drives - but osu! can be
-      installed anywhere, so you can also point at one here.
-    </p>
+    <p data-i18n="foldersModal.theFoldersThisAppReads">Installation locations</p>
 
     <div class="folder-list" id="folderList"></div>
 
@@ -508,10 +504,8 @@
       <div class="share-option__detail">
         <b data-i18n="shareModal.saveAsAWebPage">Save as a web page</b>
         <div class="setting__hint" data-i18n-html="shareModal.thisPageAsOneHtml">
-          This page as one <code>.html</code> file that works like it: show more, the mode
-          tabs, View Details and the medals all respond. It opens anywhere without this app,
-          nothing in it can change the profile, and it holds nothing about this computer, so
-          it can be put online as it is.
+          This page as a <code>.html</code> file that can be opened anywhere without the app,
+          sent to others as a file, or hosted as a web page.
         </div>
       </div>
       <button type="button" id="shareHtml" class="primary" data-i18n="shareHtml">Save&hellip;</button>
@@ -531,8 +525,7 @@
       <div class="share-option__detail">
         <b data-i18n="shareModal.backUpEverything">Back up everything</b>
         <div class="setting__hint" data-i18n="shareModal.backUpEverythingHint">
-          Every profile, with its scores, pictures and me! images, as one .zip file. Restore it
-          below, on this computer or another.
+          Back up all profiles into one .zip file, can be restored below.
         </div>
       </div>
       <button type="button" id="shareBackup" data-i18n="shareBackup">Download</button>
@@ -572,10 +565,8 @@
       <div class="share-option__detail">
         <b data-i18n="shareModal.exportSpreadsheet">Export to a spreadsheet</b>
         <div class="setting__hint" data-i18n="shareModal.exportSpreadsheetHint">
-          Every score in this profile, highest pp first, with its beatmap, stars, mods, accuracy,
-          date and more - one row each, ready for Excel or Google Sheets. The .xlsx also has a
-          sheet for each game mode, the profile's totals, most played beatmaps, favorite
-          beatmaps and medals.
+          List of every score in this profile. The .xlsx file contains multiple sheets for more
+          info.
         </div>
       </div>
       <div class="share-option__buttons">
@@ -588,8 +579,8 @@
       <div class="share-option__detail">
         <b data-i18n="shareModal.exportScores">Export this profile's scores (JSON)</b>
         <div class="setting__hint" data-i18n="shareModal.exportScoresHint">
-          Every score with its beatmap, plus the totals and rank, for a spreadsheet or another
-          tool. It cannot be restored from: Back up is for that.
+          Contains scores, totals, and rank. Note: this file cannot be restored from, use Back up
+          instead.
         </div>
       </div>
       <button type="button" id="shareExport" data-i18n="shareExport">Download</button>
@@ -614,11 +605,8 @@
 <div class="backdrop" id="filterModal" hidden>
   <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
     <h3 id="filterTitle" data-i18n="filterTitle">Play tracking filter</h3>
-    <p>
-      Which plays <b id="filterProfileName">this profile</b> records at all. A play this filter
-      turns away is not saved as a score - no pp, no play count. It is listed under Other
-      settings, Plays not tracked, where Track anyway brings it in one play at a time; to bring
-      in a whole import regardless, untick the filter in Import past plays.
+    <p data-i18n="filterModal.filteredOutPlays">
+      Plays that are filtered out can be found under Other settings.
     </p>
 
     <div class="setting">
@@ -637,12 +625,6 @@
 
     <div class="tfilter" id="filterBody"></div>
 
-    <p class="setting__hint" data-i18n="filterModal.twoCriteriaCannotJudgeA">
-      Two criteria cannot judge a play that was quit, failed or retried: osu!lazer records no
-      mods and no star rating for a play it discards, so those plays are matched on the other
-      seven. That is deliberate - osu! counts them, so this does.
-    </p>
-
     <div class="profile-hint" id="filterHint">&nbsp;</div>
 
     <div class="actions">
@@ -658,9 +640,8 @@
 <div class="backdrop" id="settingsModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
     <h3 id="settingsTitle" data-i18n="settingsTitle">Other settings</h3>
-    <p>
-      These belong to <b id="settingsProfileName">this profile</b>. Every profile keeps its
-      own, so a setting changed here does not follow you to another playstyle.
+    <p data-i18n="settingsModal.perProfile">
+      Note: Settings only apply to current profile and can differ across profiles.
     </p>
 
     <div id="settingsFields"></div>
@@ -672,11 +653,6 @@
           <span data-i18n="installSettings.openInBrowserOnStart">Open in browser on start</span>
           <input type="checkbox" id="openBrowserSetting">
         </label>
-        <div class="setting__hint" data-i18n-html="installSettings.openThisPageInYour">
-          Open this page in your browser whenever the app starts. This one is not a profile's:
-          it decides what happens before any profile is on screen, so it is saved for the whole
-          install, in <code>data/config.json</code>.
-        </div>
       </div>
       <!--
         The same switch as the one in the flag menu, and the same stored answer. Here as well
@@ -688,21 +664,11 @@
           <span data-i18n="installSettings.originalLanguage">Show beatmap metadata in original language</span>
           <input type="checkbox" id="originalMetadataSetting">
         </label>
-        <div class="setting__hint" data-i18n="installSettings.originalLanguageHint">
-          Show each beatmap's artist and title the way the song writes them, instead of
-          romanised. Like the language, this belongs to the whole install rather than to one
-          profile; it is also in the flag menu at the top of the page.
-        </div>
       </div>
     </div>
 
     <div class="removed-scores" id="removedScores">
       <h4><span data-i18n="heading.removedScores">Removed scores</span><span class="title__count" id="removedCount">0</span></h4>
-      <p class="setting__hint" data-i18n="removedScores.removingAScoreOrA">
-        Removing a score, or a play that was not finished or submitted, never deletes it. Put
-        one back and it returns to every section and to the totals. The red minus deletes one
-        for good: it cannot be put back, and it is never imported again.
-      </p>
       <div class="removed-list" id="removedList"></div>
       <div class="removed-scores__actions">
         <button type="button" class="danger-button" id="removedDeleteAll" data-i18n="removedDeleteAll">Delete all permanently</button>
@@ -718,10 +684,7 @@
     <div class="removed-scores" id="declinedPlays">
       <h4><span data-i18n="heading.declinedPlays">Plays not tracked</span><span class="title__count" id="declinedCount">0</span></h4>
       <p class="setting__hint" data-i18n="declinedPlays.hint">
-        Plays this profile turned away: declined by the play tracking filter, set by another
-        player, or a replay that could not be read. None of them count toward anything. Track
-        anyway brings one in regardless, as if it had just been played. The red minus deletes
-        one for good: it is never tracked or listed again.
+        Plays that were declined by the play tracking filter, or replays set by another player.
       </p>
       <label class="field declined-reason" id="declinedReasonField" hidden>
         <span data-i18n="declinedPlays.show">Show</span>
@@ -739,9 +702,8 @@
       <p class="setting__hint" id="ppCalculatorOutdated" hidden></p>
       <div class="pp-calculator__row" id="ppCalculatorAll">
         <p class="setting__hint" data-i18n="ppCalculator.recalculateHint">
-          When an update brings a new osu! release, scores priced by the old one are recalculated
-          by themselves on its first launch. This recalculates every score in every profile now,
-          from its replay; one whose replay is gone is left as it is.
+          New pp reworks are automatically recalculated on launch, click to manually recalculate
+          now.
         </p>
         <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate every score</button>
       </div>
@@ -787,8 +749,7 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profilesTitle">
     <h3 id="profilesTitle" data-i18n="profilesTitle">Profiles</h3>
     <p data-i18n="profilesModal.eachProfileIsASeparate">
-      Each profile is a separate playstyle with its own scores, pp and level. Only the
-      selected one records the plays you set.
+      Plays are only recorded to the current profile.
     </p>
 
     <div class="profile-list" id="profileList"></div>
@@ -798,17 +759,11 @@
              aria-label="New profile name" data-i18n-attr="placeholder:newProfileName.placeholder;aria-label:newProfileName.label">
       <button id="profileCreate" type="button" data-i18n="profileCreate">Create &amp; switch</button>
     </div>
-    <div class="profile-hint" id="profileHint">
-      A new profile starts empty and tracks from the moment you create it.
-    </div>
+    <div class="profile-hint" id="profileHint">&nbsp;</div>
 
     <section class="profile-section" id="profileEdit">
       <h4 class="identity-heading" data-i18n="profileEdit.editProfile">Edit profile</h4>
-      <p class="setting__hint">
-        The name, flag, playstyle, picture and banner for <b id="identityProfileName">this
-        profile</b>, the one being tracked. None of this is required - a new profile starts
-        with a drawn avatar and the cover art of its best play.
-      </p>
+      <p class="setting__hint" data-i18n="profileEdit.optional">Optional</p>
 
       <label class="field">
         <span data-i18n="profileEdit.name">Name</span>
@@ -818,12 +773,12 @@
         <span data-i18n="profileEdit.country">Country</span>
         <input type="text" id="identityCountry" maxlength="2" placeholder="e.g. US" data-i18n-attr="placeholder:identityCountry.placeholder">
       </label>
-      <div class="setting__hint" data-i18n="profileEdit.twoLetterCodeShownBeside">Two-letter code, shown beside the profile name. Leave empty for none.</div>
+      <div class="setting__hint" data-i18n="profileEdit.twoLetterCodeShownBeside">Two-letter code</div>
       <label class="field">
         <span data-i18n="profileEdit.playstyle">Playstyle</span>
         <input type="text" id="identityTagline" maxlength="120" placeholder="e.g. left hand, mouse only" data-i18n-attr="placeholder:identityTagline.placeholder">
       </label>
-      <div class="setting__hint" data-i18n="profileEdit.whatThisProfileIsTracking">What this profile is tracking. Shown under the name.</div>
+      <div class="setting__hint" data-i18n="profileEdit.whatThisProfileIsTracking">Short description next to name - e.g. mod, playstyle</div>
       <div class="actions actions--inline">
         <button id="identitySave" class="primary" type="button" data-i18n="identitySave">Save</button>
       </div>
@@ -852,10 +807,6 @@
       <div class="share-option profile-danger">
         <div class="share-option__detail">
           <b data-i18n="profileEdit.resetThisProfile">Reset this profile</b>
-          <div class="setting__hint" data-i18n="profileEdit.erasesEverythingTrackedForThis">
-            Erases everything tracked for this profile and starts it again from zero. It asks
-            first, and your osu! account and replay files are not touched.
-          </div>
         </div>
         <button type="button" class="danger-button" id="profileReset" data-i18n="profileReset">Reset</button>
       </div>
@@ -888,8 +839,7 @@
       <p class="setting__hint" id="importNote"></p>
       <p class="setting__hint" data-i18n-html="importSection.oneRequestToOsuPpy">
         One request to <code>osu.ppy.sh</code> to find the account, one per picture, one per
-        hundred favorites, and a few per game mode for scores -- all when you press Import. No
-        login and no API key.
+        hundred favorites, and a few per game mode for scores, no login and no API key needed.
       </p>
 
       <div class="profile-hint" id="importHint">&nbsp;</div>
@@ -905,11 +855,6 @@
           <span data-i18n="sharedSection.keepFavoriteBeatmapsTheSame">Keep Favorite Beatmaps the same on every profile</span>
           <input type="checkbox" id="sharedFavorites">
         </label>
-        <div class="setting__hint" data-i18n="sharedSection.onByDefaultOneList">
-          On by default: one list, shared by every profile. Turn it off and each profile keeps
-          its own copy of the list as it stands; turn it back on and the lists are merged.
-          Nothing is lost either way.
-        </div>
       </div>
     </section>
 
@@ -923,15 +868,8 @@
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">
     <h3 id="backfillTitle" data-i18n="backfillTitle">Import past plays</h3>
     <p data-i18n="backfillModal.playsSetWhileThisApp">
-      Plays set while this app was closed were never tracked. Choose when you played them
-      and they will be imported - finished plays from their replays, and quits, fails and
-      retries from osu!lazer&rsquo;s own logs.
+      Import plays from osu! client, including from before this app was installed.
     </p>
-    <div class="warn" data-i18n="backfillModal.goBackOnlyAsFar">
-      Go back only as far as the session you played with this playstyle. Anything earlier
-      pulls in plays set with your normal one - which is exactly what a separate profile
-      exists to keep out.
-    </div>
 
     <div class="presets" id="backfillPresets">
       <button type="button" data-hours="1" data-i18n="backfillPresets.1Hour">1 hour</button>
@@ -998,8 +936,7 @@
       <button type="button" id="backfillChooseFiles" data-i18n="backfillChooseFiles">Import replay files…</button>
       <input type="file" id="backfillFileInput" accept=".osr" multiple hidden>
       <span class="setting__hint" data-i18n="backfillModal.dropHint">
-        Have .osr replays you downloaded or saved? Choose as many as you like, or select them in
-        a folder and drag them onto this window.
+        You can drag multiple .osr replays into this window to import them.
       </span>
     </div>
     <!-- No replay at all: a score's link on osu!, or, as a last resort, typing it in. -->

@@ -157,12 +157,7 @@ const SETTINGS_FIELDS = [
     key: 'countUnsubmittedAttempts',
     type: 'toggle',
     label: () => t('setting.countUnsubmitted'),
-    // A function, so it can say how many have been recorded before anyone decides to count them.
-    hint: () =>
-      t('setting.countUnsubmittedHint') +
-      (unsubmittedAttempts > 0
-        ? t('setting.countUnsubmittedSoFar', { n: fmt(unsubmittedAttempts) })
-        : t('setting.countUnsubmittedNone')),
+    hint: () => t('setting.countUnsubmittedHint'),
   },
   {
     key: 'importPlaysWhileClosed',
@@ -1699,7 +1694,6 @@ function renderIdentitySuggestions() {
 function renderProfileEdit() {
   editing = { id: profile?.id ?? null, name: profile?.name ?? null };
   const name = profile?.name ?? 'this profile';
-  $('identityProfileName').textContent = name;
   $('importProfileName').textContent = name;
   $('identityName').value = profile?.name ?? '';
   $('identityCountry').value = settings.country ?? '';
@@ -1736,7 +1730,6 @@ function refreshOpenProfiles() {
   if (profile?.name !== editing.name) {
     if ($('identityName').value === editing.name) $('identityName').value = profile?.name ?? '';
     editing = { ...editing, name: profile?.name ?? null };
-    $('identityProfileName').textContent = profile?.name ?? 'this profile';
     $('importProfileName').textContent = profile?.name ?? 'this profile';
   }
 }
@@ -1894,9 +1887,6 @@ function importChoices() {
 function renderImportNote() {
   const choices = importChoices();
   const notes = [];
-  if (choices.aboutMe && (settings.aboutMe ?? '').trim()) {
-    notes.push(t('import.meReplaces'));
-  }
   if (choices.favorites) {
     notes.push(
       app.config?.sharedFavorites === false
@@ -2587,7 +2577,6 @@ function openSettings() {
   setMenuOpen(false);
   void renderRemovedScores();
   void renderDeclinedPlays();
-  $('settingsProfileName').textContent = profile?.name ?? 'this profile';
   renderSettingsFields();
   void loadPpSource();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
@@ -3261,7 +3250,7 @@ function openProfiles({ section = null, favoritesOnly = false } = {}) {
   if (isStatic) return;
   setMenuOpen(false);
   $('newProfileName').value = '';
-  profileHint(t('profiles.newStartsEmpty'));
+  profileHint('\u00a0');
   renderProfiles();
   renderProfileEdit();
   resetImport({ favoritesOnly });
@@ -4338,7 +4327,6 @@ $('optFilter').onclick = () => {
   setMenuOpen(false);
   openTrackingFilter({
     filter: settings.trackingFilter,
-    profileName: profile?.name ?? 'this profile',
     hasLazer: installKinds.includes('lazer'),
     playsFiltered,
     onSaved: async (saved) => {

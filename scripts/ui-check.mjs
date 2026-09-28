@@ -1539,7 +1539,7 @@ if (stableNote.hidden.every((h) => h)) {
   console.log('  SKIP  the note itself  (no osu!stable on this machine, or it was dismissed)');
 } else {
   check('it says when a stable score arrives', stableNote.text.includes('leave the results'), true);
-  check('and that quit or failed plays are not counted', stableNote.text.includes('not counted'), true);
+  check('and that quit or failed plays are not counted', stableNote.text.includes("can't be tracked"), true);
   check('it can be dismissed two ways, as the counting note is', stableNote.dismissible, 2);
 }
 
@@ -1747,8 +1747,8 @@ check(
   true,
 );
 check(
-  'the dialog names the profile it applies to',
-  await evaluate("document.getElementById('settingsProfileName').textContent.trim().length > 0"),
+  'the dialog says its settings belong to the current profile',
+  await evaluate("!!document.querySelector('#settingsModal [data-i18n=\"settingsModal.perProfile\"]')"),
   true,
 );
 check(
@@ -2338,21 +2338,20 @@ const noteFor = (counting) =>
 
 check('no note for an official profile', await noteFor({ includeUnrankedMods: false }), '');
 const stripped = await noteFor({ includeUnrankedMods: true, preferStrippedPp: true });
-check('it says the profile is not comparable', stripped.includes('not comparable'), true);
+check('it says where to turn them off', stripped.includes('uncheck those boxes'), true);
 check('and names the stripped-mod pricing', stripped.includes('as if the mod had been off'), true);
 check('and points at the asterisk on the rows', stripped.includes('marked with *'), true);
-check('and says which of the two rules is on', stripped.includes('plays on mods osu! does not rank'), true);
+check('and says which of the two rules is on', stripped.includes('Unranked mods scores'), true);
 
 const asPlayed = await noteFor({ includeUnrankedMods: true, preferStrippedPp: false });
-check('the as-played wording differs', asPlayed.includes('as played'), true);
-check('and does not claim mods were removed', asPlayed.includes('as if the mod'), false);
+check('osu!’s own pricing needs no explaining', asPlayed.includes('as if the mod'), false);
 
 // Unranked beatmaps are a separate rule and must be disclosed on their own.
 const mapsOnly = await noteFor({ includeUnrankedMods: false, extraMapStatuses: [4] });
-check('unranked beatmaps alone are disclosed', mapsOnly.includes('beatmaps osu! does not rank'), true);
+check('unranked beatmaps alone are disclosed', mapsOnly.includes('Unranked beatmaps scores'), true);
 check('without mentioning relax', mapsOnly.includes('Relax'), false);
 const both = await noteFor({ includeUnrankedMods: true, preferStrippedPp: true, extraMapStatuses: [4] });
-check('both rules together name both', both.includes('mods and beatmaps'), true);
+check('both rules together name both', both.includes('beatmaps and mods'), true);
 
 console.log('\npp cells say when a value is not osu!s');
 const ppCellFor = (play) =>
