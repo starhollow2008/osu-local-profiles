@@ -837,6 +837,10 @@
         <label class="checkgroup__item"><input type="checkbox" data-import="medals"> Medals</label>
       </div>
       <p class="setting__hint" id="importNote"></p>
+      <!-- Here rather than beside the welcome: this section is the welcome's, moved in while it is open. -->
+      <p class="setting__hint" data-i18n-html="importSection.localScoresHint">
+        To import scores from your osu! client, go to <b>Options → Import past plays</b>.
+      </p>
       <p class="setting__hint" data-i18n-html="importSection.oneRequestToOsuPpy">
         One request to <code>osu.ppy.sh</code> to find the account, one per picture, one per
         hundred favorites, and a few per game mode for scores, no login and no API key needed.
@@ -869,6 +873,9 @@
     <h3 id="backfillTitle" data-i18n="backfillTitle">Import past plays</h3>
     <p data-i18n="backfillModal.playsSetWhileThisApp">
       Import plays from osu! client, including from before this app was installed.
+    </p>
+    <p class="setting__hint" data-i18n-html="backfillModal.onlineScoresHint">
+      To import scores from your online osu! profile, go to <b>Options → Profiles</b>.
     </p>
 
     <div class="presets" id="backfillPresets">
