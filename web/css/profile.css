@@ -2880,6 +2880,14 @@
   margin-top: 4px;
 }
 
+/* The same rule as above Removed scores, for a setting that starts a new group. */
+.setting--divided,
+.setting + .setting--divided {
+  margin-top: 16px;
+  border-top: 1px solid hsl(var(--hsl-b3));
+  padding-top: 12px;
+}
+
 .setting__hint {
   margin-top: 4px;
   font-size: var(--fs-normal);

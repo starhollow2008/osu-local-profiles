@@ -161,6 +161,11 @@ export interface Settings {
    */
   sectionOrder: string[];
   /**
+   * The profile's sections that are not shown, as their ids. The hidden ones rather than the
+   * shown ones, so a section added in a later version appears without anyone ticking it.
+   */
+  hiddenSections: string[];
+  /**
    * Whether the Scores section warns that this profile's pp is not comparable with a real osu!
    * account.
    *
@@ -278,6 +283,21 @@ function nameList(raw: unknown): string[] {
   return out;
 }
 
+/**
+ * Section ids, each once. Only shape is checked here; which ids are real is the page's
+ * business, and it reconciles against its own list anyway.
+ */
+function sectionIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  return raw.filter((value): value is string => {
+    if (typeof value !== 'string' || !/^[a-z_]{1,32}$/.test(value)) return false;
+    if (seen.has(value)) return false;
+    seen.add(value);
+    return true;
+  });
+}
+
 const DEFS: Defs = {
   country: {
     default: '',
@@ -359,18 +379,11 @@ const DEFS: Defs = {
   },
   sectionOrder: {
     default: [],
-    coerce: (raw) => {
-      if (!Array.isArray(raw)) return [];
-      // Only shape is checked here; which ids are real is the page's business, and it
-      // reconciles against its own list anyway.
-      const seen = new Set<string>();
-      return raw.filter((value): value is string => {
-        if (typeof value !== 'string' || !/^[a-z_]{1,32}$/.test(value)) return false;
-        if (seen.has(value)) return false;
-        seen.add(value);
-        return true;
-      });
-    },
+    coerce: sectionIds,
+  },
+  hiddenSections: {
+    default: [],
+    coerce: sectionIds,
   },
   linkedUserId: {
     default: 0,

@@ -686,6 +686,8 @@
   "setting.noStatusSource": "Nie znaleziono instalacji osu!lazer, a osu!stable nie zapisuje stanu beatmapy, więc każda beatmapa już się liczy i te opcje nie mają żadnego wpływu.",
   "setting.priceRelax": "Wyceniaj podejścia z relax",
   "setting.priceRelaxHint": "Tylko Relax i Autopilot.",
+  "setting.sections": "Sekcje profilu",
+  "setting.sectionsHint": "Odznacz sekcję, aby ukryć ją na profilu.",
   "setting.saved": "Zapisano ustawienia",
   "setting.savedRejected": "Zapisano - {fields} było nieprawidłowe i zostało wyczyszczone",
   "setting.showEveryAttempt": "pokaż każdą próbę",

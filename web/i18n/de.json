@@ -675,6 +675,8 @@
   "setting.noStatusSource": "Es wurde keine osu!lazer-Installation gefunden, und osu!stable hält den Status einer Beatmap nicht fest, daher zählt bereits jede Beatmap und diese Optionen haben keine Wirkung.",
   "setting.priceRelax": "Relax-Spiele bewerten",
   "setting.priceRelaxHint": "Nur Relax und Autopilot.",
+  "setting.sections": "Profilbereiche",
+  "setting.sectionsHint": "Entferne das Häkchen bei einem Bereich, um ihn im Profil auszublenden.",
   "setting.saved": "Einstellungen gespeichert",
   "setting.savedRejected": "Gespeichert – {fields} war ungültig und wurde geleert",
   "setting.showEveryAttempt": "jeden Versuch anzeigen",

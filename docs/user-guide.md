@@ -167,6 +167,10 @@ The order is saved with the profile, the way osu! remembers the arrangement of y
 The arrows are the real interface, not a fallback: they work from the keyboard and on a
 touchscreen, and they cannot half-succeed the way a drag can.
 
+To hide a section, untick it under **Options -> Other settings -> Profile sections**. It
+disappears from the page, its tab and a saved web page, and comes back where it was when you
+tick it again.
+
 ## Profiles
 
 **Options -> Profiles** manages several playstyles side by side - "left hand", "mouse only",

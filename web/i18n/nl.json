@@ -675,6 +675,8 @@
   "setting.noStatusSource": "Er is geen installatie van osu!lazer gevonden, en osu!stable legt de status van een beatmap niet vast, dus elke beatmap telt al mee en deze opties hebben geen effect.",
   "setting.priceRelax": "Relax-pogingen waarderen",
   "setting.priceRelaxHint": "Alleen Relax en Autopilot.",
+  "setting.sections": "Profielonderdelen",
+  "setting.sectionsHint": "Vink een onderdeel uit om het op het profiel te verbergen.",
   "setting.saved": "Instellingen opgeslagen",
   "setting.savedRejected": "Opgeslagen – {fields} was niet geldig en is leeggemaakt",
   "setting.showEveryAttempt": "elke poging tonen",

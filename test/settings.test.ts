@@ -337,3 +337,18 @@ test('show more adds a whole number of rows, or the whole list', () => {
     h.cleanup();
   }
 });
+
+test('every section shows until a profile hides it, and only section ids are kept', () => {
+  const h = harness();
+  try {
+    assert.deepEqual(getSettings(h.db, h.profileId).hiddenSections, []);
+    const hidden = updateSettings(h.db, h.profileId, {
+      hiddenSections: ['medals', 'me', 'medals', 'Not An Id', 7, '<b>'],
+    }).hiddenSections;
+    assert.deepEqual(hidden, ['medals', 'me']);
+    assert.deepEqual(getSettings(h.db, h.profileId).hiddenSections, ['medals', 'me']);
+    assert.deepEqual(updateSettings(h.db, h.profileId, { hiddenSections: 'medals' }).hiddenSections, []);
+  } finally {
+    h.cleanup();
+  }
+});

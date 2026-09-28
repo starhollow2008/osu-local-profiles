@@ -675,6 +675,8 @@
   "setting.noStatusSource": "osu!lazer のインストールが見つからず、osu!stable はビートマップの状態を記録しないため、すでにすべてのビートマップがカウントされており、これらの項目は効果がありません。",
   "setting.priceRelax": "relax プレイの評価方法",
   "setting.priceRelaxHint": "Relax と Autopilot のみ。",
+  "setting.sections": "プロフィールのセクション",
+  "setting.sectionsHint": "チェックを外したセクションはプロフィールに表示されません。",
   "setting.saved": "設定を保存しました",
   "setting.savedRejected": "保存しました － {fields}は無効だったため空にしました",
   "setting.showEveryAttempt": "すべての試行を表示",

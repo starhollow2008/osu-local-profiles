@@ -675,6 +675,8 @@
   "setting.noStatusSource": "Nessuna installazione di osu!lazer è stata trovata, e osu!stable non registra lo stato di una beatmap, quindi ogni beatmap conta già e queste opzioni non hanno effetto.",
   "setting.priceRelax": "Valuta le partite con relax",
   "setting.priceRelaxHint": "Solo Relax e Autopilot.",
+  "setting.sections": "Sezioni del profilo",
+  "setting.sectionsHint": "Togli la spunta da una sezione per nasconderla dal profilo.",
   "setting.saved": "Impostazioni salvate",
   "setting.savedRejected": "Salvato – {fields} non era valido ed è stato cancellato",
   "setting.showEveryAttempt": "mostra ogni tentativo",

@@ -675,6 +675,8 @@
   "setting.noStatusSource": "Ingen installation av osu!lazer hittades, och osu!stable registrerar inte en beatmaps status, så varje beatmap räknas redan och de här alternativen har ingen effekt.",
   "setting.priceRelax": "Värdera relax-omgångar",
   "setting.priceRelaxHint": "Bara Relax och Autopilot.",
+  "setting.sections": "Profilavsnitt",
+  "setting.sectionsHint": "Bocka ur ett avsnitt för att dölja det på profilen.",
   "setting.saved": "Inställningarna sparade",
   "setting.savedRejected": "Sparat – {fields} var inte giltigt och rensades",
   "setting.showEveryAttempt": "visa varje försök",

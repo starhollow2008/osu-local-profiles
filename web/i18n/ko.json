@@ -675,6 +675,8 @@
   "setting.noStatusSource": "osu!lazer 설치를 찾지 못했고 osu!stable은 비트맵 상태를 기록하지 않으므로, 이미 모든 비트맵이 집계되고 있어 이 항목들은 효과가 없습니다.",
   "setting.priceRelax": "relax 플레이 평가 방식",
   "setting.priceRelaxHint": "Relax와 Autopilot만 해당합니다.",
+  "setting.sections": "프로필 섹션",
+  "setting.sectionsHint": "체크를 해제한 섹션은 프로필에서 숨겨집니다.",
   "setting.saved": "설정을 저장했습니다",
   "setting.savedRejected": "저장했습니다 - {fields}이(가) 올바르지 않아 비웠습니다",
   "setting.showEveryAttempt": "모든 시도 표시",

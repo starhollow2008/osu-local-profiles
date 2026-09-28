@@ -673,6 +673,8 @@
   "setting.noStatusSource": "No osu!lazer installation was found, and osu!stable does not record a beatmap’s status, so every beatmap already counts and these have no effect.",
   "setting.priceRelax": "Price relax plays",
   "setting.priceRelaxHint": "Relax and Autopilot only.",
+  "setting.sections": "Profile sections",
+  "setting.sectionsHint": "Uncheck a section to hide it from the profile.",
   "setting.saved": "Settings saved",
   "setting.savedRejected": "Saved - {fields} was not valid and was cleared",
   "setting.showEveryAttempt": "show every attempt",

@@ -675,6 +675,8 @@
   "setting.noStatusSource": "osu!lazerin asennusta ei löytynyt, eikä osu!stable kirjaa kartan tilaa, joten jokainen kartta lasketaan jo mukaan eikä näillä valinnoilla ole vaikutusta.",
   "setting.priceRelax": "Relax-suoritusten arvotus",
   "setting.priceRelaxHint": "Vain Relax ja Autopilot.",
+  "setting.sections": "Profiilin osiot",
+  "setting.sectionsHint": "Poista osion valinta piilottaaksesi sen profiilista.",
   "setting.saved": "Asetukset tallennettu",
   "setting.savedRejected": "Tallennettu – {fields} ei kelvannut ja tyhjennettiin",
   "setting.showEveryAttempt": "näytä jokainen yritys",

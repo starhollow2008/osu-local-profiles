@@ -675,6 +675,8 @@
   "setting.noStatusSource": "Установка osu!lazer не найдена, а osu!stable не записывает состояние карты, поэтому каждая карта уже засчитывается и эти настройки ни на что не влияют.",
   "setting.priceRelax": "Оценивать игры с relax",
   "setting.priceRelaxHint": "Только Relax и Autopilot.",
+  "setting.sections": "Разделы профиля",
+  "setting.sectionsHint": "Снимите галочку с раздела, чтобы скрыть его в профиле.",
   "setting.saved": "Настройки сохранены",
   "setting.savedRejected": "Сохранено - {fields} не прошло проверку и было очищено",
   "setting.showEveryAttempt": "показывать каждую попытку",

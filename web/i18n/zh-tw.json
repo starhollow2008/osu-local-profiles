@@ -675,6 +675,8 @@
   "setting.noStatusSource": "沒有找到 osu!lazer 的安裝，而 osu!stable 不記錄譜面的狀態，因此所有譜面已經都被計入，這些選項不會有任何影響。",
   "setting.priceRelax": "relax 遊玩的估值方式",
   "setting.priceRelaxHint": "僅限 Relax 和 Autopilot。",
+  "setting.sections": "檔案區塊",
+  "setting.sectionsHint": "取消勾選即可在檔案中隱藏該區塊。",
   "setting.saved": "設定已儲存",
   "setting.savedRejected": "已儲存 - {fields}無效，已被清空",
   "setting.showEveryAttempt": "顯示每一次嘗試",

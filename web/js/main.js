@@ -180,6 +180,18 @@ const SETTINGS_FIELDS = [
     hint: () =>
       t('setting.unrankedMapsHint'),
   },
+  {
+    // A box is ticked for a section that shows, but what is stored is the ones hidden, so a
+    // section added in a later version appears without anyone ticking it.
+    key: 'hiddenSections',
+    type: 'checkboxes',
+    invert: true,
+    // A rule above it: two lists of checkboxes in a row read as one.
+    divided: true,
+    label: () => t('setting.sections'),
+    options: SECTIONS,
+    hint: () => t('setting.sectionsHint'),
+  },
 ];
 
 /*
@@ -1287,6 +1299,11 @@ function currentOrder() {
   return reconcileOrder(settings.sectionOrder);
 }
 
+/** The sections Other settings has hidden: kept in the order, but not shown or moved past. */
+function isHiddenSection(id) {
+  return (settings.hiddenSections ?? []).includes(id);
+}
+
 function sectionLabel(id) {
   // A function rather than a string: the label is fetched when it is drawn, so switching
   // language redraws it rather than leaving the section nav in the old one.
@@ -1317,22 +1334,27 @@ function sectionControls(id, index, total) {
 /** Put the sections and the tab bar in the saved order, and (re)draw their controls. */
 function applySectionOrder() {
   const order = currentOrder();
+  const shown = order.filter((id) => !isHiddenSection(id));
   const main = document.querySelector('.user-profile-pages');
 
-  order.forEach((id, index) => {
+  order.forEach((id) => {
     const section = $(`section-${id}`);
     if (!section) return;
     // appendChild moves an existing node, so this ends up as exactly the wanted order.
     main.appendChild(section);
+    section.hidden = isHiddenSection(id);
 
     // Placed on the section rather than inside the heading: `.title` is `width: max-content`
     // so that its underline hugs the text, and anything added inside it drags that rule out
     // under the controls.
     section.querySelector(':scope > .section-order')?.remove();
-    section.insertAdjacentHTML('afterbegin', sectionControls(id, index, order.length));
+    // First and last among the sections that show, so no arrow moves past only hidden ones.
+    if (!section.hidden) {
+      section.insertAdjacentHTML('afterbegin', sectionControls(id, shown.indexOf(id), shown.length));
+    }
   });
 
-  $('sectionTabs').innerHTML = order
+  $('sectionTabs').innerHTML = shown
     .map((id) => `<a class="page-mode__item" href="#section-${id}">${escapeHtml(sectionLabel(id))}</a>`)
     .join('');
 }
@@ -1354,8 +1376,11 @@ async function saveSectionOrder(order) {
 function moveSection(id, delta) {
   const order = currentOrder();
   const from = order.indexOf(id);
-  const to = from + delta;
-  if (from < 0 || to < 0 || to >= order.length) return;
+  if (from < 0) return;
+  // Past the next section that shows: stepping over a hidden one would look like nothing moved.
+  let to = from + delta;
+  while (to >= 0 && to < order.length && isHiddenSection(order[to])) to += delta;
+  if (to < 0 || to >= order.length) return;
   order.splice(to, 0, ...order.splice(from, 1));
   void saveSectionOrder(order);
 }
@@ -2146,12 +2171,14 @@ function settingControl(f) {
     return `<input type="checkbox" id="${id}"${settings[f.key] ? ' checked' : ''}>`;
   }
   if (f.type === 'checkboxes') {
-    const chosen = new Set(settings[f.key] ?? []);
+    const stored = new Set(settings[f.key] ?? []);
+    // `invert`: the setting lists the boxes left unticked.
+    const ticked = (value) => stored.has(value) !== Boolean(f.invert);
     return `<div class="checkgroup" id="${id}">${f.options
       .map(
         ([value, label]) =>
           `<label class="checkgroup__item">
-            <input type="checkbox" value="${escapeHtml(value)}"${chosen.has(value) ? ' checked' : ''}>
+            <input type="checkbox" value="${escapeHtml(value)}"${ticked(value) ? ' checked' : ''}>
             <span>${escapeHtml(label())}</span>
           </label>`,
       )
@@ -2188,7 +2215,7 @@ function readSettingControl(f) {
   const el = $(`set-${f.key}`);
   if (f.type === 'toggle') return el.checked;
   if (f.type === 'checkboxes') {
-    return [...el.querySelectorAll('input:checked')].map((i) => i.value);
+    return [...el.querySelectorAll(f.invert ? 'input:not(:checked)' : 'input:checked')].map((i) => i.value);
   }
   if (f.type === 'rows') return el.valueAsNumber;
   return el.value;
@@ -2231,7 +2258,7 @@ function renderSettingsFields() {
   // A `rows` field holds a label of its own (All at once), and labels cannot nest.
   const wrapper = (f) => (f.type === 'rows' ? 'div' : 'label');
   $('settingsFields').innerHTML = SETTINGS_FIELDS.map(
-    (f) => `<div class="setting">
+    (f) => `<div class="setting${f.divided ? ' setting--divided' : ''}">
       <${wrapper(f)} class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
         <span>${escapeHtml(f.label())}</span>
         ${settingControl(f)}
