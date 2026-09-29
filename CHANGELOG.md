@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.29.0
+
+- **The page is set in Nunito, the closest free font to osu!'s own.** It's drawn a little heavier
+  than usual, so small text looks as solid as on osu!'s site. **Options -> Other settings -> Font**
+  switches back to your computer's own font.
+
+- **Beatmap rules replace keywords in the play tracking filter.** Each rule looks at a field you
+  choose (title, artist, difficulty name, mapper, beatmap set owner, source or tags) and can have
+  several conditions that must all hold. A play is tracked if its beatmap matches any rule, and a
+  sentence under the rules says what they track.
+  - **Mapper** uses osu!'s own record of who mapped each difficulty, so guest difficulties count,
+    and so do maps made under an old name.
+  - Your keywords were kept as a rule that tracks exactly the same plays as before.
+
+- **Hide profile sections you don't want.** **Options -> Other settings -> Profile sections**
+  has a box for each one. A hidden section leaves the page and its saved copies, and comes back
+  where it was.
+
+- **A profile with no banner shows osu!'s default banner**, instead of its best play's cover art.
+
+- **Only scores you entered by hand are tagged.** Scores imported from osu! no longer say
+  "No replay file"; "Manually entered by hand" stays.
+
+- **Option descriptions and notes are shorter and plainer**, in Options, the play tracking
+  filter, Share and Import past plays, and on the profile.
+
+- **Import from osu! and Import past plays point to each other**, so it's clear which one brings
+  in scores from your osu! profile and which from this computer.
+
+- **Everything new in this release is translated** into all 15 languages.
+
 ## 1.28.1
 
 <!-- important -->
