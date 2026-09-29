@@ -477,9 +477,15 @@ test('the play tracking filter judges an attempt on what it can know', async () 
     await h.index();
     const byName = ingestUnsubmittedAttempt(
       attempt({ player: '1' }),
-      h.ctx({ filter: { ...defaultTrackingFilter(), enabled: true, keywords: 'something else' } }),
+      h.ctx({
+        filter: {
+          ...defaultTrackingFilter(),
+          enabled: true,
+          rules: [{ conditions: [{ field: 'any', test: 'contains', values: ['something else'] }] }],
+        },
+      }),
     );
-    assert.equal(byName.status === 'filtered' && byName.criterion, 'keywords');
+    assert.equal(byName.status === 'filtered' && byName.criterion, 'beatmap rules');
 
     const byMods = ingestUnsubmittedAttempt(
       attempt({ player: '2' }),

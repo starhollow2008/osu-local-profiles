@@ -137,3 +137,27 @@ test('with no online.db there is nothing to refresh', () => {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
 });
+
+test("a difficulty's mappers come from online.db's own record, guests and collabs included", () => {
+  const h = harness();
+  try {
+    writeOnlineDb(h.onlineDb, [{ md5: MD5, id: 11, set: 22, approved: Status.RANKED }]);
+    const resolver = new BeatmapResolver(h.db, [h.install]);
+    // An online.db from before osu! recorded owners has no table: no record, not an error.
+    assert.equal(resolver.beatmapMappers(11), null);
+
+    const online = new DatabaseSync(h.onlineDb);
+    online.exec(`CREATE TABLE users (user_id INTEGER PRIMARY KEY, username TEXT);
+                 CREATE TABLE beatmap_owners (beatmap_id INTEGER, user_id INTEGER);
+                 INSERT INTO users VALUES (19048, 'Blue Dragon'), (7, 'Woey');
+                 INSERT INTO beatmap_owners VALUES (11, 19048), (11, 7), (12, 999);`);
+    online.close();
+
+    assert.deepEqual(resolver.beatmapMappers(11)?.sort(), ['Blue Dragon', 'Woey']);
+    // An owner osu! has no name for is left out; with nobody left, there is no record.
+    assert.equal(resolver.beatmapMappers(12), null);
+    assert.equal(resolver.beatmapMappers(13), null);
+  } finally {
+    h.cleanup();
+  }
+});

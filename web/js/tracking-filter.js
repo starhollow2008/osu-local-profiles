@@ -65,6 +65,40 @@ const CATEGORY_LABELS = [
   ['unsubmitted', () => t('filter.neverSubmitted')],
 ];
 
+/**
+ * What a beatmap rule's condition can look at, and how, as `src/tracking-filter.ts` defines
+ * them (`RULE_FIELDS`, `RULE_TESTS`). Labels are fetched when drawn, by a literal `t()` each.
+ */
+const RULE_FIELDS = [
+  ['any', () => t('filter.fieldAny')],
+  ['title', () => t('filter.fieldTitle')],
+  ['artist', () => t('filter.fieldArtist')],
+  ['difficulty', () => t('filter.fieldDifficulty')],
+  ['mapper', () => t('filter.fieldMapper')],
+  ['setOwner', () => t('filter.fieldSetOwner')],
+  ['source', () => t('filter.fieldSource')],
+  ['tags', () => t('filter.fieldTags')],
+];
+
+const RULE_TESTS = [
+  ['contains', () => t('filter.testContains')],
+  ['is', () => t('filter.testIs')],
+  ['notContains', () => t('filter.testNotContains')],
+];
+
+/** Matches `MAX_RULES` and `MAX_CONDITIONS` in src/tracking-filter.ts. */
+const MAX_RULES = 20;
+const MAX_CONDITIONS = 10;
+
+/** A condition's box as values: commas separate, as the hint says. */
+const splitValues = (text) =>
+  String(text ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value) => value !== '');
+
+const newCondition = () => ({ field: 'any', test: 'contains', text: '' });
+
 /** The states a mod chip cycles through, in the order a click moves through them. */
 const MOD_CYCLE = ['allowed', 'required', 'excluded'];
 
@@ -92,7 +126,17 @@ const filterHint = (message, isError) => hint('filterHint', message, isError);
 function copyFilter(filter) {
   return {
     enabled: Boolean(filter?.enabled),
-    keywords: typeof filter?.keywords === 'string' ? filter.keywords : '',
+    // Each condition's values are edited as the text in its box, split on commas when saved.
+    rules: Array.isArray(filter?.rules)
+      ? filter.rules.map((rule) => ({
+          conditions: (rule?.conditions ?? []).map((c) => ({
+            field: RULE_FIELDS.some(([f]) => f === c?.field) ? c.field : 'any',
+            test: RULE_TESTS.some(([test]) => test === c?.test) ? c.test : 'contains',
+            text: Array.isArray(c?.values) ? c.values.join(', ') : '',
+          })),
+        }))
+      : [],
+    fromKeywords: Boolean(filter?.fromKeywords),
     modes: Array.isArray(filter?.modes) ? [...filter.modes] : [0, 1, 2, 3],
     stars: { min: filter?.stars?.min ?? 0, max: filter?.stars?.max ?? null },
     length: { min: filter?.length?.min ?? 0, max: filter?.length?.max ?? null },
@@ -202,13 +246,104 @@ function paintRange(id) {
 
 /* ------------------------------------------------------------------- sections */
 
-function keywordsSection() {
+/**
+ * Beatmap rules (roadmap 5.74): a play is tracked if its beatmap matches any rule, and a rule
+ * matches when all its conditions do. The list is drawn by `renderRules`, since adding or
+ * removing a rule redraws it.
+ */
+function rulesSection() {
   return section(
-    t('filter.keywords'),
-    `<input type="text" id="tf-keywords" class="tfilter__text"
-            placeholder="${escapeHtml(t('filter.keywordsPlaceholder'))}">`,
-    t('filter.keywordsHelp'),
+    t('filter.rules'),
+    `<div class="tf-rules__note" id="tf-rules-note" hidden>${escapeHtml(t('filter.rulesFromKeywords'))}</div>
+     <div class="tf-rules" id="tf-rules"></div>
+     <div class="tfilter__readout" id="tf-rules-readout"></div>`,
+    `${escapeHtml(t('filter.rulesHelp'))}<br>${escapeHtml(t('filter.rulesFieldsHelp'))}`,
+    { html: true },
   );
+}
+
+function optionTags(list, selected) {
+  return list
+    .map(([value, label]) => `<option value="${value}"${value === selected ? ' selected' : ''}>${escapeHtml(label())}</option>`)
+    .join('');
+}
+
+
+/** The rules as controls. Called when the dialog opens and whenever a rule or condition comes or goes. */
+function renderRules() {
+  const rules = draft.rules
+    .map(
+      (rule, r) => `${r > 0 ? `<div class="tf-rules__or">${escapeHtml(t('filter.or'))}</div>` : ''}
+      <div class="tf-rule" data-rule="${r}">
+        <div class="tf-rule__head">
+          <span>${escapeHtml(t('filter.ruleN', { n: r + 1 }))}</span>
+          <button type="button" class="tf-rule__remove" data-act="remove-rule"
+                  aria-label="${escapeHtml(t('filter.removeRule'))}" title="${escapeHtml(t('filter.removeRule'))}">&times;</button>
+        </div>
+        ${rule.conditions
+          .map(
+            (c, i) => `<div class="tf-cond" data-cond="${i}">
+              <span class="tf-cond__join">${i > 0 ? escapeHtml(t('filter.and')) : ''}</span>
+              <select data-part="field" aria-label="${escapeHtml(t('filter.fieldLabel'))}">${optionTags(RULE_FIELDS, c.field)}</select>
+              <select data-part="test" aria-label="${escapeHtml(t('filter.testLabel'))}">${optionTags(RULE_TESTS, c.test)}</select>
+              <input type="text" data-part="text" class="tfilter__text" maxlength="400"
+                     value="${escapeHtml(c.text)}" placeholder="${escapeHtml(t('filter.valuesPlaceholder'))}"
+                     aria-label="${escapeHtml(t('filter.valuesLabel'))}">
+              <button type="button" class="tf-cond__remove" data-act="remove-cond"
+                      aria-label="${escapeHtml(t('filter.removeCondition'))}" title="${escapeHtml(t('filter.removeCondition'))}">&times;</button>
+            </div>`,
+          )
+          .join('')}
+        <button type="button" class="tf-rule__add" data-act="add-cond"${
+          rule.conditions.length >= MAX_CONDITIONS ? ' hidden' : ''
+        }>+ ${escapeHtml(t('filter.addCondition'))}</button>
+      </div>`,
+    )
+    .join('');
+  $('tf-rules').innerHTML = `${rules}
+    <button type="button" class="tf-rules__add" data-act="add-rule"${draft.rules.length >= MAX_RULES ? ' hidden' : ''}>+ ${escapeHtml(
+      t('filter.addRule'),
+    )}</button>`;
+  $('tf-rules-note').hidden = !draft.fromKeywords;
+}
+
+/**
+ * What the rules mean, in a sentence: the answer to "which of my plays does this keep?"
+ * without reading the controls. Conditions with nothing typed yet say nothing, as when saved.
+ */
+function rulesReadout() {
+  const phrases = draft.rules
+    .map((rule) =>
+      rule.conditions
+        .filter((c) => splitValues(c.text).length > 0)
+        .map((c) =>
+          t('filter.conditionPhrase', {
+            field: escapeHtml(RULE_FIELDS.find(([f]) => f === c.field)?.[1]() ?? c.field),
+            test: escapeHtml(RULE_TESTS.find(([test]) => test === c.test)?.[1]() ?? c.test),
+            values: joinOr(splitValues(c.text).map((v) => `<b>${escapeHtml(v)}</b>`)),
+          }),
+        )
+        .join(` ${escapeHtml(t('filter.and'))} `),
+    )
+    .filter((phrase) => phrase !== '');
+  if (phrases.length === 0) return escapeHtml(t('filter.rulesNone'));
+  return t('filter.rulesReadout', { rules: phrases.join(`, ${escapeHtml(t('filter.or'))} `) });
+}
+
+const joinOr = (items) =>
+  items.length <= 1
+    ? items.join('')
+    : t('filter.joinLastOr', { list: items.slice(0, -1).join(', '), last: items[items.length - 1] });
+
+/** The draft as the server takes it: each condition's box split into its values. */
+function payload() {
+  const { fromKeywords, ...rest } = draft;
+  return {
+    ...rest,
+    rules: draft.rules.map((rule) => ({
+      conditions: rule.conditions.map((c) => ({ field: c.field, test: c.test, values: splitValues(c.text) })),
+    })),
+  };
 }
 
 function modesSection() {
@@ -385,7 +520,7 @@ function renderBody() {
     : '';
 
   $('filterBody').innerHTML =
-    keywordsSection() +
+    rulesSection() +
     modesSection() +
     starsSection() +
     modsSection() +
@@ -416,7 +551,7 @@ function renderBody() {
 /** Put the draft into the controls. Called on open and after "Clear every criterion". */
 function fillFromDraft() {
   $('filterEnabled').checked = draft.enabled;
-  $('tf-keywords').value = draft.keywords;
+  renderRules();
 
   for (const box of $('filterBody').querySelectorAll('[data-mode]')) {
     box.checked = draft.modes.includes(Number(box.dataset.mode));
@@ -573,6 +708,7 @@ function impossibleReason() {
 }
 
 function renderReadouts() {
+  $('tf-rules-readout').innerHTML = rulesReadout();
   $('tf-mods-readout').innerHTML = modsReadout();
   const impossible = impossibleReason();
   const warning = $('filterImpossible');
@@ -588,7 +724,7 @@ function renderReadouts() {
 function applyEnabled() {
   const on = $('filterEnabled').checked;
   $('filterBody').classList.toggle('tfilter--inactive', !on);
-  for (const control of $('filterBody').querySelectorAll('input, button')) control.disabled = !on;
+  for (const control of $('filterBody').querySelectorAll('input, button, select')) control.disabled = !on;
 
   // With osu!stable alone there is no source for a beatmap's status or either submission date,
   // so those three stay inert even when the filter is on -- there is nothing to compare.
@@ -610,8 +746,10 @@ function bindBody() {
   body.oninput = (e) => {
     const target = e.target;
 
-    if (target.id === 'tf-keywords') {
-      draft.keywords = target.value;
+    if (target.dataset.part === 'text') {
+      const condition = conditionOf(target);
+      if (condition) condition.text = target.value;
+      renderReadouts();
       return;
     }
     if (target.dataset.bound) {
@@ -623,6 +761,13 @@ function bindBody() {
 
   body.onchange = (e) => {
     const target = e.target;
+    if (target.dataset.part === 'field' || target.dataset.part === 'test') {
+      const condition = conditionOf(target);
+      if (!condition) return;
+      condition[target.dataset.part] = target.value;
+      renderReadouts();
+      return;
+    }
     if (target.dataset.mode !== undefined) {
       const mode = Number(target.dataset.mode);
       draft.modes = [0, 1, 2, 3].filter((m) =>
@@ -667,6 +812,11 @@ function bindBody() {
   }, true);
 
   body.onclick = (e) => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act) {
+      ruleAction(act, e.target);
+      return;
+    }
     if (e.target.closest('#tf-mods-all')) {
       draft.mods = {};
       draft.noMod = 'allowed';
@@ -688,6 +838,42 @@ function bindBody() {
     if (!chip) return;
     cycleChip(chip);
   };
+}
+
+/** The draft condition a control inside `.tf-cond` edits. */
+function conditionOf(control) {
+  const rule = draft.rules[Number(control.closest('[data-rule]')?.dataset.rule)];
+  return rule?.conditions[Number(control.closest('[data-cond]')?.dataset.cond)];
+}
+
+/**
+ * Add or remove a rule or a condition, redraw, and put the cursor where the next thing to type
+ * is. A rule left with no conditions goes with its last one: an empty rule says nothing.
+ */
+function ruleAction(act, button) {
+  const r = Number(button.closest('[data-rule]')?.dataset.rule);
+  let focus = null;
+  if (act === 'add-rule') {
+    draft.rules.push({ conditions: [newCondition()] });
+    focus = [draft.rules.length - 1, 0];
+  } else if (act === 'remove-rule') {
+    draft.rules.splice(r, 1);
+  } else if (act === 'add-cond') {
+    draft.rules[r].conditions.push(newCondition());
+    focus = [r, draft.rules[r].conditions.length - 1];
+  } else if (act === 'remove-cond') {
+    const c = Number(button.closest('[data-cond]')?.dataset.cond);
+    draft.rules[r].conditions.splice(c, 1);
+    if (draft.rules[r].conditions.length === 0) draft.rules.splice(r, 1);
+  }
+  renderRules();
+  applyEnabled();
+  renderReadouts();
+  if (focus) {
+    $('tf-rules')
+      .querySelector(`[data-rule="${focus[0]}"] [data-cond="${focus[1]}"] [data-part="field"]`)
+      ?.focus();
+  }
 }
 
 function cycleChip(chip) {
@@ -854,7 +1040,7 @@ export function resetTrackingFilter() {
 export async function saveTrackingFilter() {
   $('filterSave').disabled = true;
   try {
-    const data = await postJson('/api/settings', { trackingFilter: draft }, 'saving failed');
+    const data = await postJson('/api/settings', { trackingFilter: payload() }, 'saving failed');
     draft = copyFilter(data.settings.trackingFilter);
     closeTrackingFilter();
     toast(

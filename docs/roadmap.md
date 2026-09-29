@@ -85,6 +85,7 @@ does not have to make it again.
 | 5.71 | Export to a spreadsheet                                   | done   |
 | 5.72 | The mode switcher's icons                                 | done   |
 | 5.73 | A name osu! changed is still yours                        | done   |
+| 5.74 | Beatmap rules replace the filter's keywords               | done   |
 
 ## Constraints on every item
 
@@ -1420,3 +1421,35 @@ replay since said the new one, and nothing on the computer ties the two together
   ordinary ingest with today's identity and filter. Track anyway stays the only way past the
   filter.
 - osu! unreachable is an error, never a "not you".
+
+## 5.74 - Beatmap rules replace the filter's keywords
+
+**Status:** done (unreleased)
+
+The keywords box matched any comma-separated term anywhere in the artist, title, difficulty name
+and `Creator` joined together. It felt like a black box, and its "mapper" was the set's host, not
+whoever mapped the difficulty. A mapper (Blue Dragon) wanted a profile of only his own maps, and his
+guest difficulties matched only when his name happened to be in the difficulty name.
+
+- **Rules, OR between them, AND within**, as the user proposed: each condition is a field, a test
+  (*contains*, *is*, *doesn't contain*) and values, any of which will do. Other criteria stay
+  separate ANDs. Up to 20 rules of 10 conditions.
+- **Mapper is osu!'s own record** (`online.db` `beatmap_owners`, by user id, so under current
+  names, guest difficulties and collabs included), with a fallback to the set owner and the name in
+  the difficulty name or tags where there is no record. **Beatmap set owner** is `Creator`, the
+  user's name for it. Measured: of 294 guest difficulties on this machine, 114 named the guest
+  nowhere the keywords could see. Real misses the old box made: "[BD's Gangsta]" in Tarrasky's set
+  (Blue Dragon's, missed), Kyshiro's and OnosakiHito's difficulties in Blue Dragon's sets (wrongly
+  counted as his).
+- **Old filters carry over exactly**, so no one's tracking changes and no alarming notice is
+  needed: keywords become one rule, *Any field contains* each term, where Any field is the old
+  joined text. Checked: 11 keyword filters against this machine's 590 beatmaps, 0 answers differ.
+  A friendly note says so once, in the dialog and as a toast, until the filter is saved. The
+  filter never re-judges stored plays anyway, so a profile could not have been wiped.
+- A sentence under the rules says what they track, so the rules can be read without the controls.
+- Tags and Source are read from the `.osu` once and cached on `beatmaps`; owners are read fresh
+  for each play (under a millisecond each).
+
+Still open: two cached beatmaps on this machine (Come[Back]Home's "Nevada") hold names from before
+the `[` fix of 5.45 (`Creator` "Come", no difficulty name), so every field that reads them sees the
+wrong name. Beatmap rows cached before that fix should be read again once.

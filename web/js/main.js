@@ -4737,6 +4737,22 @@ if (welcomeOffered && !isStatic && !document.body.classList.contains('export-mod
   void openWelcome();
 }
 
+/*
+ * A filter whose keywords were carried over into beatmap rules (roadmap 5.74), and not saved
+ * since: said once per browser session, until the filter is saved. Nothing about what it
+ * tracks changed, so a toast is enough; the dialog says it too.
+ */
+if (!isStatic && settings.trackingFilter?.enabled && settings.trackingFilter?.fromKeywords) {
+  let told = false;
+  try {
+    told = sessionStorage.getItem('osu-local-profiles.rules-notice') === '1';
+    sessionStorage.setItem('osu-local-profiles.rules-notice', '1');
+  } catch {
+    /* site data blocked: say it anyway */
+  }
+  if (!told) toast(t('filter.rulesFromKeywords'));
+}
+
 openEvents();
 
 /*

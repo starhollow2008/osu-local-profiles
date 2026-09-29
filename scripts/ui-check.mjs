@@ -622,6 +622,53 @@ check(
   true,
 );
 
+// Beatmap rules (roadmap 5.74), from no rules at all, so the sentences are this test's doing.
+const rules = await evaluate(`(() => {
+  const click = (selector) => document.querySelector(selector).click();
+  const set = (selector, value, event) => {
+    const el = document.querySelector(selector);
+    el.value = value;
+    el.dispatchEvent(new Event(event, { bubbles: true }));
+  };
+  const readout = () => document.getElementById('tf-rules-readout').textContent.trim();
+  while (document.querySelector('#tf-rules [data-act="remove-rule"]')) click('#tf-rules [data-act="remove-rule"]');
+  const out = { none: readout() };
+  click('#tf-rules [data-act="add-rule"]');
+  out.rows = document.querySelectorAll('#tf-rules .tf-cond').length;
+  out.focused = document.activeElement?.dataset?.part ?? null;
+  set('[data-rule="0"] [data-cond="0"] [data-part="field"]', 'mapper', 'change');
+  set('[data-rule="0"] [data-cond="0"] [data-part="test"]', 'is', 'change');
+  out.placeholder = document.querySelector('[data-rule="0"] [data-cond="0"] [data-part="text"]').placeholder;
+  set('[data-rule="0"] [data-cond="0"] [data-part="text"]', 'Blue Dragon, Mismagius', 'input');
+  out.one = readout();
+  click('[data-rule="0"] [data-act="add-cond"]');
+  out.and = document.querySelector('[data-rule="0"] [data-cond="1"] .tf-cond__join').textContent.trim();
+  // A condition with nothing typed says nothing, in the sentence as when saved.
+  out.emptyIgnored = readout() === out.one;
+  click('[data-rule="0"] [data-cond="1"] [data-act="remove-cond"]');
+  click('#tf-rules [data-act="add-rule"]');
+  set('[data-rule="1"] [data-cond="0"] [data-part="field"]', 'title', 'change');
+  set('[data-rule="1"] [data-cond="0"] [data-part="text"]', 'Happy', 'input');
+  out.or = document.querySelector('#tf-rules .tf-rules__or').textContent.trim();
+  out.two = readout();
+  // Removing a rule's last condition removes the rule.
+  click('[data-rule="1"] [data-cond="0"] [data-act="remove-cond"]');
+  out.rulesLeft = document.querySelectorAll('#tf-rules .tf-rule').length;
+  return out;
+})()`);
+check('with no beatmap rules, the sentence says every beatmap counts', rules.none, 'No rules, so every beatmap is tracked.');
+check('Add rule makes one rule of one condition, cursor in it', `${rules.rows}|${rules.focused}`, '1|field');
+check('the values box says how to give several', rules.placeholder, 'Separate several with commas');
+check('the sentence reads the rule', rules.one, 'Tracks a beatmap when Mapper is Blue Dragon or Mismagius.');
+check('conditions join with "and", rules with "or"', `${rules.and}|${rules.or}`, 'and|or');
+check('a condition not yet typed says nothing', rules.emptyIgnored, true);
+check(
+  'and two rules read as either',
+  rules.two,
+  'Tracks a beatmap when Mapper is Blue Dragon or Mismagius, or Title contains Happy.',
+);
+check("removing a rule's last condition removes the rule", rules.rulesLeft, 1);
+
 console.log('\nleaving the filter dialog');
 await evaluate("document.getElementById('filterCancel').click()");
 check('Cancel closes it', await shown('filterModal'), 'none');

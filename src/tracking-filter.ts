@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import type { Db } from './db/index.ts';
 import type { LazerMod, Ruleset } from './osr.ts';
 import {
+  osuTagsAndSource,
   Status,
   UNRESOLVED_STATUS,
   type BeatmapResolver,
@@ -68,11 +69,59 @@ export interface UnknownableDateRange extends DateRange {
   includeUnknown: boolean;
 }
 
+/**
+ * What a beatmap rule's condition looks at (roadmap 5.74).
+ *
+ * - `mapper`: who mapped this difficulty, by osu!'s own record where `online.db` has one
+ *   (guest difficulties and collabs included, under each account's current name); otherwise
+ *   the set owner, or the name written into the difficulty name or tags. See `mapperMatches`.
+ * - `setOwner`: who made the beatmap set, the `.osu` file's `Creator`.
+ * - `any`: the title, artist, difficulty name and set owner as one text, exactly what the
+ *   old keywords box searched, so a filter carried over from it matches the same plays.
+ */
+export const RULE_FIELDS = ['any', 'title', 'artist', 'difficulty', 'mapper', 'setOwner', 'source', 'tags'] as const;
+export type RuleField = (typeof RULE_FIELDS)[number];
+
+/** `notContains` holds when none of the condition's values appears. */
+export const RULE_TESTS = ['contains', 'is', 'notContains'] as const;
+export type RuleTest = (typeof RULE_TESTS)[number];
+
+/** One condition: `values` are alternatives, so "Mapper is Blue Dragon, Mismagius" is one. */
+export interface RuleCondition {
+  field: RuleField;
+  test: RuleTest;
+  values: string[];
+}
+
+/** A rule matches a beatmap when every one of its conditions does. */
+export interface BeatmapRule {
+  conditions: RuleCondition[];
+}
+
+/**
+ * Room enough for any real filter, and a bound on what one settings row can hold. The values
+ * bounds are the old keywords box's own (200 characters in all), so every filter carried over
+ * from it fits whole.
+ */
+export const MAX_RULES = 20;
+export const MAX_CONDITIONS = 10;
+const MAX_VALUES = 100;
+const MAX_VALUE_LENGTH = 200;
+
 export interface TrackingFilter {
   /** Off by default. While it is off nothing below is consulted. */
   enabled: boolean;
-  /** Comma-separated; a play matches when any one of them appears in the beatmap's text. */
-  keywords: string;
+  /**
+   * Beatmap rules: a play is tracked when its beatmap matches any rule. None narrows nothing.
+   * They replaced a comma-separated keywords box (roadmap 5.74), which `coerceTrackingFilter`
+   * still reads, turning it into one rule that matches exactly what it did.
+   */
+  rules: BeatmapRule[];
+  /**
+   * Read only: this filter's rules were carried over from the old keywords box and have not
+   * been saved since, so the dialog can say so once. Never stored; saving clears it.
+   */
+  fromKeywords: boolean;
   modes: Ruleset[];
   /** Star rating as played, mods included. */
   stars: NumberRange;
@@ -135,7 +184,8 @@ export const MAX_LENGTH_SECONDS = 3600;
 export function defaultTrackingFilter(): TrackingFilter {
   return {
     enabled: false,
-    keywords: '',
+    rules: [],
+    fromKeywords: false,
     modes: [...ALL_MODES],
     stars: { min: 0, max: null },
     length: { min: 0, max: null },
@@ -208,6 +258,48 @@ const coerceModState = (raw: unknown): ModState =>
   MOD_STATES.includes(raw as ModState) ? (raw as ModState) : 'allowed';
 
 /**
+ * A condition's values: an array from the page, or one comma-separated string from a script.
+ * Each is one line and trimmed, and kept as typed, since the dialog shows it back; every test
+ * ignores case, so a value differing only in case from an earlier one goes.
+ */
+function coerceValues(raw: unknown): string[] {
+  const items = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+  const out: string[] = [];
+  for (const item of items) {
+    if (typeof item !== 'string') continue;
+    const value = item.replace(/[\r\n\t]+/g, ' ').trim().slice(0, MAX_VALUE_LENGTH);
+    if (value !== '' && !out.some((kept) => kept.toLowerCase() === value.toLowerCase())) out.push(value);
+    if (out.length >= MAX_VALUES) break;
+  }
+  return out;
+}
+
+/**
+ * The rules, cleaned. A condition with no values says nothing, and a rule with no conditions
+ * would match every beatmap, so both are dropped rather than kept: an empty row the dialog
+ * left behind must not quietly switch the rules off.
+ */
+function coerceRules(raw: unknown[]): BeatmapRule[] {
+  const rules: BeatmapRule[] = [];
+  for (const rule of raw) {
+    if (!isRecord(rule) || !Array.isArray(rule['conditions'])) continue;
+    const conditions: RuleCondition[] = [];
+    for (const c of rule['conditions']) {
+      if (!isRecord(c)) continue;
+      const values = coerceValues(c['values']);
+      if (values.length === 0) continue;
+      const field = RULE_FIELDS.includes(c['field'] as RuleField) ? (c['field'] as RuleField) : 'any';
+      const test = RULE_TESTS.includes(c['test'] as RuleTest) ? (c['test'] as RuleTest) : 'contains';
+      conditions.push({ field, test, values });
+      if (conditions.length >= MAX_CONDITIONS) break;
+    }
+    if (conditions.length > 0) rules.push({ conditions });
+    if (rules.length >= MAX_RULES) break;
+  }
+  return rules;
+}
+
+/**
  * Clean whatever arrived from the page, or was read back out of a database written by another
  * version. Like every other setting this is the only validation there is, so it has to accept
  * anything at all and answer with something usable.
@@ -217,9 +309,17 @@ export function coerceTrackingFilter(raw: unknown): TrackingFilter {
   if (!isRecord(raw)) return out;
 
   out.enabled = truthy(raw['enabled']);
-  if (typeof raw['keywords'] === 'string') {
-    // One line, and short enough that the readout can show it whole.
-    out.keywords = raw['keywords'].replace(/[\r\n\t]+/g, ' ').trim().slice(0, 200);
+  if (Array.isArray(raw['rules'])) {
+    out.rules = coerceRules(raw['rules']);
+  } else if (typeof raw['keywords'] === 'string') {
+    // A filter saved before beatmap rules existed. Its keywords become one rule, "Any field
+    // contains" one of them, which is exactly the old test: any term anywhere in those four.
+    // Kept as typed, since the dialog shows them; the rules ignore case as the keywords did.
+    const terms = coerceValues(raw['keywords'].replace(/[\r\n\t]+/g, ' ').slice(0, 200));
+    if (terms.length > 0) {
+      out.rules = [{ conditions: [{ field: 'any', test: 'contains', values: terms }] }];
+      out.fromKeywords = true;
+    }
   }
 
   if (Array.isArray(raw['modes'])) {
@@ -275,17 +375,37 @@ export interface PlayFacts {
   lengthSeconds: number | null;
   /** osu!'s `approved` value, or UNRESOLVED_STATUS. */
   status: number | null;
-  /** Artist, title, difficulty and mapper joined -- what the keywords are matched against. */
-  text: string | null;
+  /** What the beatmap rules read. Null when the beatmap's metadata could not be read at all. */
+  beatmap: BeatmapText | null;
   addedAt: number | null;
   submittedAt: number | null;
   rankedAt: number | null;
 }
 
-/** Which criterion turned a play away, named as the dialog names it. */
+/**
+ * A beatmap's text, field by field, as the beatmap rules read it. A field the file does not
+ * have is `''`. `mappers` is osu!'s record of who mapped this difficulty, or null where
+ * `online.db` has none.
+ */
+export interface BeatmapText {
+  title: string;
+  titleUnicode: string;
+  artist: string;
+  artistUnicode: string;
+  difficulty: string;
+  setOwner: string;
+  source: string;
+  tags: string;
+  mappers: string[] | null;
+}
+
+/**
+ * Which criterion turned a play away, named as the dialog names it. Declines recorded before
+ * beatmap rules existed say `keywords`, and keep saying it.
+ */
 export type FilterCriterion =
   | 'mode'
-  | 'keywords'
+  | 'beatmap rules'
   | 'category'
   | 'date added'
   | 'date submitted'
@@ -294,12 +414,102 @@ export type FilterCriterion =
   | 'mods'
   | 'star rating';
 
-/** The keywords, split as the dialog says they are split: commas separate, spaces do not. */
+/**
+ * The old keywords box's terms, split as it split them: commas separate, spaces do not. Kept
+ * for reading a filter saved before beatmap rules (`coerceTrackingFilter`).
+ */
 export function filterKeywords(keywords: string): string[] {
   return keywords
     .split(',')
     .map((term) => term.trim().toLowerCase())
     .filter((term) => term !== '');
+}
+
+/* -------------------------------------------------------------- beatmap rules */
+
+const lower = (text: string) => text.toLowerCase();
+
+/** Tags written `blue_dragon` read as `blue dragon` too. */
+const spacedTags = (tags: string) => lower(tags).replace(/_/g, ' ');
+
+/**
+ * `value` as a whole word or phrase of `text`: "mismagius" in "mismagius' hard", but not in
+ * "mismagiusfan". Letters and digits of any script count as word characters.
+ */
+function containsWhole(text: string, value: string): boolean {
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(text);
+}
+
+/**
+ * `value` is one of the beatmap's tags: one of the space-separated words, written with `_` for
+ * a space or not. A name with a space may also be written as two tags in a row.
+ */
+function hasTag(tags: string, value: string): boolean {
+  const words = lower(tags).split(/\s+/).filter(Boolean);
+  if (words.includes(value) || words.includes(value.replace(/ /g, '_'))) return true;
+  return value.includes(' ') && containsWhole(spacedTags(tags), value);
+}
+
+/** The texts a field is made of: a title or artist in both scripts, the rest in one. */
+function fieldTexts(b: BeatmapText, field: Exclude<RuleField, 'any' | 'mapper' | 'tags'>): string[] {
+  const texts =
+    field === 'title'
+      ? [b.title, b.titleUnicode]
+      : field === 'artist'
+        ? [b.artist, b.artistUnicode]
+        : field === 'difficulty'
+          ? [b.difficulty]
+          : field === 'setOwner'
+            ? [b.setOwner]
+            : [b.source];
+  return texts.filter((text) => text !== '').map(lower);
+}
+
+/**
+ * Whether the difficulty was mapped by `value` (lowercase).
+ *
+ * With osu!'s own record, that is the answer, guest difficulties and collabs included: "is"
+ * wants one of its mappers' names exactly, "contains" a part of one. Without it (a set osu!
+ * has not ranked or loved, or no osu!lazer) the best the file offers: the set owner, or the
+ * name written into the difficulty name or tags, where "is" wants it as a whole word so
+ * "Mismagius' Hard" counts and "Mismagiusfan's Hard" does not.
+ */
+function mapperMatches(b: BeatmapText, test: 'is' | 'contains', value: string): boolean {
+  if (b.mappers !== null) {
+    return b.mappers.some((name) => (test === 'is' ? lower(name) === value : lower(name).includes(value)));
+  }
+  const owner = lower(b.setOwner);
+  const difficulty = lower(b.difficulty);
+  if (test === 'is') return owner === value || containsWhole(difficulty, value) || hasTag(b.tags, value);
+  return owner.includes(value) || difficulty.includes(value) || spacedTags(b.tags).includes(value) || lower(b.tags).includes(value);
+}
+
+function valueMatches(b: BeatmapText, field: RuleField, test: 'is' | 'contains', value: string): boolean {
+  if (field === 'mapper') return mapperMatches(b, test, value);
+  if (field === 'any') {
+    // The four fields the old keywords box read, joined the way it joined them, so a phrase
+    // can still run from one into the next exactly as it could there.
+    const romanised = [b.artist, b.title, b.difficulty, b.setOwner].filter((text) => text !== '').map(lower);
+    return test === 'is' ? romanised.includes(value) : romanised.join(' ').includes(value);
+  }
+  if (field === 'tags') {
+    if (test === 'contains') return lower(b.tags).includes(value) || spacedTags(b.tags).includes(value);
+    return hasTag(b.tags, value);
+  }
+  const texts = fieldTexts(b, field);
+  return test === 'is' ? texts.includes(value) : texts.some((text) => text.includes(value));
+}
+
+function conditionMatches(b: BeatmapText, c: RuleCondition): boolean {
+  const test = c.test === 'is' ? 'is' : 'contains';
+  const hit = c.values.some((value) => valueMatches(b, c.field, test, lower(value)));
+  return c.test === 'notContains' ? !hit : hit;
+}
+
+/** Whether a beatmap matches the rules: any rule, with every one of its conditions. */
+export function rulesMatch(rules: readonly BeatmapRule[], b: BeatmapText): boolean {
+  return rules.some((rule) => rule.conditions.every((c) => conditionMatches(b, c)));
 }
 
 function outsideRange(value: number, range: NumberRange): boolean {
@@ -355,10 +565,9 @@ export function filterRejects(
 
   if (facts.mode !== undefined && !filter.modes.includes(facts.mode)) return 'mode';
 
-  const terms = filterKeywords(filter.keywords);
-  if (terms.length > 0 && facts.text) {
-    const haystack = facts.text.toLowerCase();
-    if (!terms.some((term) => haystack.includes(term))) return 'keywords';
+  // A beatmap whose metadata could not be read is not judged on it, as the keywords never were.
+  if (filter.rules.length > 0 && facts.beatmap && !rulesMatch(filter.rules, facts.beatmap)) {
+    return 'beatmap rules';
   }
 
   if (facts.status != null && !categoryAllowed(filter, facts.status)) return 'category';
@@ -404,7 +613,7 @@ export function filterRejects(
 export function filterNarrows(filter: TrackingFilter): boolean {
   if (!filter.enabled) return false;
   if (filter.modes.length < ALL_MODES.length) return true;
-  if (filterKeywords(filter.keywords).length > 0) return true;
+  if (filter.rules.length > 0) return true;
   if (filter.stars.min > 0 || filter.stars.max !== null) return true;
   if (filter.length.min > 0 || filter.length.max !== null) return true;
   if (filter.noMod !== 'allowed') return true;
@@ -429,7 +638,7 @@ export function filterNarrows(filter: TrackingFilter): boolean {
  */
 export interface BeatmapFilterFacts {
   status: number;
-  text: string;
+  beatmap: BeatmapText | null;
   lengthMs: number | null;
   addedAt: number | null;
   submittedAt: number | null;
@@ -463,13 +672,15 @@ export function beatmapFilterFacts(
   beatmap: ResolvedBeatmap,
 ): BeatmapFilterFacts {
   const row = db
-    .prepare('SELECT length_ms, added_at, submitted_at, ranked_at FROM beatmaps WHERE md5 = ?')
+    .prepare('SELECT length_ms, added_at, submitted_at, ranked_at, tags, source FROM beatmaps WHERE md5 = ?')
     .get(beatmap.md5) as
     | {
         length_ms: number | null;
         added_at: number | null;
         submitted_at: number | null;
         ranked_at: number | null;
+        tags: string | null;
+        source: string | null;
       }
     | undefined;
 
@@ -477,16 +688,29 @@ export function beatmapFilterFacts(
   let addedAt = row?.added_at ?? null;
   let submittedAt = row?.submitted_at ?? null;
   let rankedAt = row?.ranked_at ?? null;
+  let tags = row?.tags ?? null;
+  let source = row?.source ?? null;
 
-  if (lengthMs === null) {
-    lengthMs = 0;
-    if (beatmap.osuPath) {
+  // The file, read at most once however many of its facts are missing.
+  let text: string | null | undefined;
+  const osuText = () => {
+    if (text === undefined) {
       try {
-        lengthMs = beatmapLengthMs(fs.readFileSync(beatmap.osuPath, 'utf8'));
+        text = beatmap.osuPath ? fs.readFileSync(beatmap.osuPath, 'utf8') : null;
       } catch {
-        /* moved or deleted since it was indexed: unknown, and remembered as such */
+        text = null; // moved or deleted since it was indexed: unknown, and remembered as such
       }
     }
+    return text;
+  };
+
+  if (lengthMs === null) {
+    const file = osuText();
+    lengthMs = file === null ? 0 : beatmapLengthMs(file);
+  }
+  if (tags === null || source === null) {
+    const file = osuText();
+    ({ tags, source } = file === null ? { tags: '', source: '' } : osuTagsAndSource(file));
   }
 
   if (addedAt === null) addedAt = beatmap.osuPath ? fileCreatedAt(beatmap.osuPath) : 0;
@@ -498,19 +722,32 @@ export function beatmapFilterFacts(
     rankedAt = dates?.rankedAt ?? 0;
   }
 
-  // One statement for all four, and only when the row is there -- resolve() writes it, and a
+  // One statement for all of them, and only when the row is there -- resolve() writes it, and a
   // beatmap that has never been resolved has nothing to attach these to.
   if (row) {
     db.prepare(
-      'UPDATE beatmaps SET length_ms = ?, added_at = ?, submitted_at = ?, ranked_at = ? WHERE md5 = ?',
-    ).run(lengthMs, addedAt, submittedAt, rankedAt, beatmap.md5);
+      `UPDATE beatmaps SET length_ms = ?, added_at = ?, submitted_at = ?, ranked_at = ?, tags = ?, source = ?
+        WHERE md5 = ?`,
+    ).run(lengthMs, addedAt, submittedAt, rankedAt, tags, source, beatmap.md5);
   }
 
+  // No name at all is a beatmap whose metadata could not be read, which the rules do not judge.
+  const named = [beatmap.artist, beatmap.title, beatmap.version, beatmap.creator].some(Boolean);
   return {
     status: beatmap.status ?? UNRESOLVED_STATUS,
-    text: [beatmap.artist, beatmap.title, beatmap.version, beatmap.creator]
-      .filter((part): part is string => Boolean(part))
-      .join(' '),
+    beatmap: named
+      ? {
+          title: beatmap.title ?? '',
+          titleUnicode: beatmap.titleUnicode ?? '',
+          artist: beatmap.artist ?? '',
+          artistUnicode: beatmap.artistUnicode ?? '',
+          difficulty: beatmap.version ?? '',
+          setOwner: beatmap.creator ?? '',
+          source: source ?? '',
+          tags: tags ?? '',
+          mappers: beatmap.beatmapId === null ? null : resolver.beatmapMappers(beatmap.beatmapId),
+        }
+      : null,
     lengthMs: orNull(lengthMs),
     addedAt: orNull(addedAt),
     submittedAt: orNull(submittedAt),
@@ -535,7 +772,7 @@ export function playFacts(
     mods,
     lengthSeconds: facts.lengthMs === null ? null : Math.round(facts.lengthMs / rate / 1000),
     status: facts.status,
-    text: facts.text,
+    beatmap: facts.beatmap,
     addedAt: facts.addedAt,
     submittedAt: facts.submittedAt,
     rankedAt: facts.rankedAt,

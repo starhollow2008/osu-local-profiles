@@ -14,6 +14,10 @@ import {
   filterNarrows,
   filterRejects,
   playFacts,
+  rulesMatch,
+  type BeatmapRule,
+  type BeatmapText,
+  type RuleCondition,
   type TrackingFilter,
 } from '../src/tracking-filter.ts';
 import { ingestIncompletePlay } from '../src/tracker/incomplete.ts';
@@ -34,13 +38,39 @@ function filter(overrides: Partial<TrackingFilter> = {}): TrackingFilter {
   return { ...defaultTrackingFilter(), enabled: true, ...overrides };
 }
 
+/** A beatmap as the rules read it, with only the named fields changed. */
+function map(overrides: Partial<BeatmapText> = {}): BeatmapText {
+  return {
+    title: 'Dreamin Attraction!!',
+    titleUnicode: '',
+    artist: 'Yooh',
+    artistUnicode: '',
+    difficulty: 'Extra',
+    setOwner: 'Sotarks',
+    source: '',
+    tags: '',
+    mappers: null,
+    ...overrides,
+  };
+}
+
+/** One condition: `cond('mapper', 'is', 'Blue Dragon', 'Mismagius')`. */
+const cond = (field: RuleCondition['field'], test: RuleCondition['test'], ...values: string[]): RuleCondition => ({
+  field,
+  test,
+  values: values.map((v) => v.toLowerCase()),
+});
+
+/** Rules as the dialog saves them: each argument one rule, a list of its conditions. */
+const rules = (...each: RuleCondition[][]): BeatmapRule[] => each.map((conditions) => ({ conditions }));
+
 const facts = {
   mode: 0 as const,
   mods: [] as { acronym: string }[],
   stars: 5,
   lengthSeconds: 120,
   status: Status.RANKED,
-  text: 'Yooh - Dreamin Attraction!! [Extra] Sotarks',
+  beatmap: map(),
   addedAt: Date.UTC(2024, 0, 1),
   submittedAt: Date.UTC(2020, 0, 1),
   rankedAt: Date.UTC(2020, 5, 1),
@@ -69,7 +99,7 @@ test('switched on and untouched, every play still passes', () => {
 });
 
 test('filterNarrows notices each criterion on its own', () => {
-  assert.equal(filterNarrows(filter({ keywords: 'sotarks' })), true);
+  assert.equal(filterNarrows(filter({ rules: rules([cond('mapper', 'is', 'sotarks')]) })), true);
   assert.equal(filterNarrows(filter({ modes: [0, 1, 2] })), true);
   assert.equal(filterNarrows(filter({ stars: { min: 5, max: null } })), true);
   assert.equal(filterNarrows(filter({ stars: { min: 0, max: 7 } })), true);
@@ -82,35 +112,137 @@ test('filterNarrows notices each criterion on its own', () => {
     filterNarrows(filter({ submitted: { from: null, to: null, includeUnknown: false } })),
     true,
   );
-  // Keywords that are only punctuation are not keywords.
-  assert.equal(filterNarrows(filter({ keywords: ' , , ' })), false);
+  // Rules that say nothing are dropped when cleaned, and narrow nothing.
+  assert.equal(filterNarrows(coerceTrackingFilter({ enabled: true, rules: [{ conditions: [{ values: [' , '] }] }] })), true);
+  assert.equal(filterNarrows(coerceTrackingFilter({ enabled: true, rules: [{ conditions: [] }, {}] })), false);
 });
 
-/* ------------------------------------------------------------------ keywords */
+/* ------------------------------------------------------------- beatmap rules */
 
-test('keywords are separated by commas, not by spaces', () => {
-  assert.deepEqual(filterKeywords('Blue Zenith, Sotarks'), ['blue zenith', 'sotarks']);
-  assert.deepEqual(filterKeywords('  ,  '), []);
+/** The old keywords box's own test, kept here to prove the carried-over rule matches it. */
+function keywordsMatched(keywords: string, b: BeatmapText): boolean {
+  const terms = filterKeywords(keywords);
+  const text = [b.artist, b.title, b.difficulty, b.setOwner].filter(Boolean).join(' ').toLowerCase();
+  return terms.length === 0 || terms.some((term) => text.includes(term));
+}
+
+test('an old keywords filter becomes one rule that tracks exactly the same plays', () => {
+  const beatmaps = [
+    map(),
+    map({ setOwner: 'Monstrata', title: 'Blue Zenith', artist: 'xi', difficulty: "Blue Dragon's Insane" }),
+    map({ setOwner: 'Andrea', difficulty: 'Suspect #5 Terror Expert Target', mappers: ['MrTerror'] }),
+    map({ artist: '', title: 'Sotarks', difficulty: 'Hard', setOwner: 'Someone', tags: 'sotarks' }),
+    map({ title: 'Happy', artist: 'Justin Bieber', difficulty: 'Normal', setOwner: 'x', titleUnicode: 'ハッピー' }),
+  ];
+  const tries = ['sotarks', 'Blue Zenith, Sotarks', 'dreamin attraction', 'attraction dreamin', 'blue dragon', 'terror', 'ハッピー', 'insane, zzz'];
+  for (const keywords of tries) {
+    const carried = coerceTrackingFilter({ enabled: true, keywords });
+    assert.equal(carried.fromKeywords, true, keywords);
+    assert.deepEqual(carried.rules, [{ conditions: [{ field: 'any', test: 'contains', values: keywords.split(',').map((k) => k.trim()).filter(Boolean) }] }]);
+    for (const b of beatmaps) {
+      assert.equal(rulesMatch(carried.rules, b), keywordsMatched(keywords, b), `${keywords} on ${b.title} [${b.difficulty}]`);
+    }
+  }
+  // Nothing to carry over is no rule at all, and nothing to announce.
+  const empty = coerceTrackingFilter({ enabled: true, keywords: ' , ' });
+  assert.deepEqual(empty.rules, []);
+  assert.equal(empty.fromKeywords, false);
+  // Once saved as rules, the keywords are history.
+  const saved = coerceTrackingFilter({ ...coerceTrackingFilter({ keywords: 'sotarks' }) });
+  assert.equal(saved.fromKeywords, false);
+  assert.deepEqual(saved.rules, [{ conditions: [{ field: 'any', test: 'contains', values: ['sotarks'] }] }]);
 });
 
-test('a play matches if any one keyword appears in any of the four fields', () => {
-  const byMapper = filter({ keywords: 'sotarks' });
-  assert.equal(filterRejects(byMapper, facts), null);
-  assert.equal(filterRejects(byMapper, { ...facts, text: 'Yooh - Dreamin [Extra] Monstrata' }), 'keywords');
-
-  // Any one of them, which is what makes "track these two mappers" expressible.
-  const either = filter({ keywords: 'monstrata, sotarks' });
-  assert.equal(filterRejects(either, facts), null);
-
-  // A phrase with a space in it is one keyword, and matches across the joined fields.
-  assert.equal(filterRejects(filter({ keywords: 'dreamin attraction' }), facts), null);
-  assert.equal(filterRejects(filter({ keywords: 'attraction dreamin' }), facts), 'keywords');
+test('conditions in a rule must all hold; any one rule is enough', () => {
+  const happy = map({ title: 'Happy', artist: 'Justin Bieber' });
+  const f = filter({
+    rules: rules(
+      [cond('title', 'is', 'Happy'), cond('artist', 'contains', 'Justin Bieber')],
+      [cond('mapper', 'is', 'Blue Dragon')],
+    ),
+  });
+  assert.equal(filterRejects(f, { ...facts, beatmap: happy }), null);
+  assert.equal(filterRejects(f, { ...facts, beatmap: map({ title: 'Happy', artist: 'Pharrell Williams' }) }), 'beatmap rules');
+  assert.equal(filterRejects(f, { ...facts, beatmap: map({ mappers: ['Blue Dragon'] }) }), null);
 });
 
-test('a beatmap with no readable metadata is not rejected on its keywords', () => {
+test('each field reads its own part of the beatmap, and a title in either script', () => {
+  const b = map({ title: 'Yoru ni Kakeru', titleUnicode: '夜に駆ける', source: 'Touhou', tags: 'anime blue_dragon' });
+  assert.equal(rulesMatch(rules([cond('title', 'contains', 'kakeru')]), b), true);
+  assert.equal(rulesMatch(rules([cond('title', 'is', '夜に駆ける')]), b), true);
+  assert.equal(rulesMatch(rules([cond('artist', 'contains', 'kakeru')]), b), false);
+  assert.equal(rulesMatch(rules([cond('difficulty', 'is', 'extra')]), b), true);
+  assert.equal(rulesMatch(rules([cond('setOwner', 'is', 'SOTARKS')]), b), true);
+  assert.equal(rulesMatch(rules([cond('source', 'contains', 'touhou')]), b), true);
+  assert.equal(rulesMatch(rules([cond('tags', 'is', 'anime')]), b), true);
+  assert.equal(rulesMatch(rules([cond('tags', 'is', 'blue dragon')]), b), true, 'a tag written with _');
+  assert.equal(rulesMatch(rules([cond('tags', 'is', 'blue')]), b), false);
+});
+
+test("doesn't contain holds when none of its values appear", () => {
+  const b = map({ difficulty: "Froslass' Insane" });
+  assert.equal(rulesMatch(rules([cond('difficulty', 'notContains', 'easy', 'normal')]), b), true);
+  assert.equal(rulesMatch(rules([cond('difficulty', 'notContains', 'easy', 'insane')]), b), false);
+});
+
+test("Mapper is osu!'s own record where there is one, guest difficulties and old names included", () => {
+  // The WHODUNIT set: hosted by Andrea, every difficulty a guest's, each named by a nickname.
+  const guest = map({ setOwner: 'Andrea', difficulty: 'Suspect #5 Terror Expert Target', mappers: ['MrTerror'] });
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'MrTerror')]), guest), true);
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'Andrea')]), guest), false, 'the host did not map it');
+  assert.equal(rulesMatch(rules([cond('setOwner', 'is', 'Andrea')]), guest), true);
+  // Owners are by account, under its current name: a map made as Froslass reads as Blue Dragon.
+  const renamed = map({ setOwner: 'Froslass', difficulty: 'Extra', mappers: ['Blue Dragon'] });
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'Blue Dragon', 'Mismagius', 'Froslass')]), renamed), true);
+  // A collab names everyone.
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'Woey')]), map({ mappers: ['Blue Dragon', 'Woey'] })), true);
+});
+
+test('without a record, Mapper falls back to the set owner and the name written into the map', () => {
+  const own = map({ setOwner: 'Froslass', difficulty: 'Extra' });
+  const guest = map({ setOwner: 'Leader', difficulty: "Mismagius' Hard" });
+  const tagged = map({ setOwner: 'Nhawak', difficulty: 'Ultra', tags: 'featured mismagius' });
+  const lookalike = map({ setOwner: 'Leader', difficulty: "Mismagiusfan's Hard" });
+  const theirNames = rules([cond('mapper', 'is', 'Blue Dragon', 'Mismagius', 'Froslass')]);
+  assert.equal(rulesMatch(theirNames, own), true);
+  assert.equal(rulesMatch(theirNames, guest), true);
+  assert.equal(rulesMatch(theirNames, tagged), true);
+  assert.equal(rulesMatch(theirNames, lookalike), false, '"is" wants the whole name');
+  assert.equal(rulesMatch(rules([cond('mapper', 'contains', 'mismagius')]), lookalike), true);
+  // A name in the tags counts as a whole tag, written with _ or as two tags in a row.
+  const taggedDragon = map({ setOwner: 'Nhawak', difficulty: 'Ultra', tags: 'blue_dragon hard' });
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'Blue Dragon')]), taggedDragon), true);
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'Blue')]), taggedDragon), false);
+  assert.equal(rulesMatch(rules([cond('mapper', 'is', 'Blue Dragon')]), map({ tags: 'blue dragon' })), true);
+});
+
+test('a beatmap with no readable metadata is not judged on the rules', () => {
   // Nothing to match against is not the same as "does not match" -- see the module's header.
-  assert.equal(filterRejects(filter({ keywords: 'sotarks' }), { ...facts, text: null }), null);
-  assert.equal(filterRejects(filter({ keywords: 'sotarks' }), { ...facts, text: '' }), null);
+  const f = filter({ rules: rules([cond('mapper', 'is', 'sotarks')]) });
+  assert.equal(filterRejects(f, { ...facts, beatmap: null }), null);
+  assert.equal(filterRejects(f, { ...facts, beatmap: map({ setOwner: 'someone else' }) }), 'beatmap rules');
+});
+
+test('rules are cleaned: unknown fields and tests fall back, values are trimmed and bounded', () => {
+  const cleaned = coerceTrackingFilter({
+    rules: [
+      { conditions: [{ field: 'nonsense', test: 'nonsense', values: ['  Sotarks ', 'sotarks', '', 42] }] },
+      { conditions: [{ field: 'mapper', test: 'is', values: 'Blue Dragon, Mismagius' }] },
+      'not a rule',
+    ],
+  });
+  assert.deepEqual(cleaned.rules, [
+    { conditions: [{ field: 'any', test: 'contains', values: ['Sotarks'] }] },
+    { conditions: [{ field: 'mapper', test: 'is', values: ['Blue Dragon', 'Mismagius'] }] },
+  ]);
+  const many = coerceTrackingFilter({
+    rules: Array.from({ length: 50 }, () => ({ conditions: Array.from({ length: 50 }, () => ({ values: ['x'] })) })),
+  });
+  assert.equal(many.rules.length, 20);
+  assert.equal(many.rules[0]?.conditions.length, 10);
+  // The longest keywords box there could have been still carries over whole.
+  const longest = coerceTrackingFilter({ keywords: Array.from({ length: 100 }, (_, i) => String.fromCharCode(65 + (i % 26)) + i).join(",").slice(0, 200) });
+  assert.equal(longest.rules[0]?.conditions[0]?.values.join(","), Array.from({ length: 100 }, (_, i) => String.fromCharCode(65 + (i % 26)) + i).join(",").slice(0, 200));
 });
 
 /* --------------------------------------------------------------------- mods */
@@ -213,7 +345,7 @@ test('an open upper bound really is open', () => {
 
 test('length is judged at the speed the play ran', () => {
   const upToThreeMinutes = filter({ length: { min: 0, max: 180 } });
-  const beatmap = { status: Status.RANKED, text: '', lengthMs: 240_000, addedAt: null, submittedAt: null, rankedAt: null };
+  const beatmap = { status: Status.RANKED, beatmap: null, lengthMs: 240_000, addedAt: null, submittedAt: null, rankedAt: null };
 
   // Four minutes nomod is too long; the same map under DT is 2:40 and is not.
   assert.equal(
@@ -351,12 +483,15 @@ test('the filter round-trips through the profile settings store', () => {
     trackingFilter: {
       enabled: true,
       keywords: 'sotarks',
+      rules: [{ conditions: [{ field: 'mapper', test: 'is', values: ['Sotarks'] }] }],
       mods: { HD: 'required' },
       stars: { min: 5, max: 7 },
     },
   }).trackingFilter;
   assert.equal(saved.enabled, true);
-  assert.equal(saved.keywords, 'sotarks');
+  // Rules win over keywords a script might still send, and are stored cleaned.
+  assert.deepEqual(saved.rules, [{ conditions: [{ field: 'mapper', test: 'is', values: ['Sotarks'] }] }]);
+  assert.equal(saved.fromKeywords, false);
   assert.deepEqual(saved.mods, { HD: 'required' });
   assert.deepEqual(saved.stars, { min: 5, max: 7 });
   // Everything not mentioned keeps its default rather than disappearing.
@@ -386,6 +521,8 @@ Title:Dreamin Attraction!!
 Artist:Yooh
 Creator:Sotarks
 Version:Extra
+Source:Touhou
+Tags:featured blue_dragon
 BeatmapID:100
 BeatmapSetID:10
 
@@ -419,7 +556,18 @@ test('the beatmap facts are read once and remembered on the row', () => {
 
   const read = beatmapFilterFacts(h.db, h.resolver, beatmap);
   assert.equal(read.lengthMs, 60_000);
-  assert.equal(read.text, 'Yooh Dreamin Attraction!! Extra Sotarks');
+  assert.deepEqual(read.beatmap, {
+    title: 'Dreamin Attraction!!',
+    titleUnicode: '',
+    artist: 'Yooh',
+    artistUnicode: '',
+    difficulty: 'Extra',
+    setOwner: 'Sotarks',
+    source: 'Touhou',
+    tags: 'featured blue_dragon',
+    // No online.db here, so no record of who mapped it.
+    mappers: null,
+  });
   // The file's creation time, not the beatmap's own age -- see the module's header.
   assert.ok(read.addedAt !== null && Math.abs(read.addedAt - Date.now()) < 60_000);
   // Nothing on this machine can date a set that online.db has never heard of.
@@ -504,11 +652,11 @@ test('an unfinished play is judged on the seven criteria that can judge it', () 
       resolver,
       profileId,
       trackingSince: 0,
-      filter: filter({ keywords: 'something else entirely' }),
+      filter: filter({ rules: rules([cond('any', 'contains', 'something else entirely')]) }),
     },
   );
   assert.equal(elsewhere.status, 'filtered');
-  assert.equal(elsewhere.status === 'filtered' && elsewhere.criterion, 'keywords');
+  assert.equal(elsewhere.status === 'filtered' && elsewhere.criterion, 'beatmap rules');
   assert.equal(
     (db.prepare('SELECT COUNT(*) AS n FROM incomplete_plays').get() as { n: number }).n,
     1,

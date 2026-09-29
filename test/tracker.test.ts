@@ -227,9 +227,12 @@ test('a play the filter declines is not recorded at all', { timeout: 120_000 }, 
   const source = await findScorableReplay(db, resolver, null);
   if (!source) return t.skip('no replay available to drop through the watcher');
 
-  // A keyword no beatmap on this machine can contain, so the rejection is unambiguous.
+  // A rule no beatmap on this machine can match, so the rejection is unambiguous.
   updateSettings(db, profileId, {
-    trackingFilter: { enabled: true, keywords: 'zzz-not-a-real-beatmap-zzz' },
+    trackingFilter: {
+      enabled: true,
+      rules: [{ conditions: [{ field: 'any', test: 'contains', values: ['zzz-not-a-real-beatmap-zzz'] }] }],
+    },
   });
 
   const tracker = new Tracker({
@@ -258,7 +261,7 @@ test('a play the filter declines is not recorded at all', { timeout: 120_000 }, 
     fs.copyFileSync(source, path.join(watchDir, 'incoming-replay'));
 
     const play = await declined;
-    assert.equal(play.criterion, 'keywords');
+    assert.equal(play.criterion, 'beatmap rules');
     assert.equal(play.kind, 'score');
     assert.ok(play.title.length > 0, 'a declined play still has to say which map it was');
 

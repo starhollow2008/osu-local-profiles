@@ -362,7 +362,37 @@ Decides whether a play is **written**. A declined play is never a row of `scores
 - **Date added is the file's creation time, never mtime.** lazer imports keep mtimes from 2019-2021
   and were created in 2025; mtime is the beatmap's own age. With no creation time, mtime stands in.
 - Star rating and length are judged as played, mods included. Beatmap dates and length are filled
-  lazily on `beatmaps`: NULL is never looked up, 0 is looked up and unknowable.
+  lazily on `beatmaps`: NULL is never looked up, 0 is looked up and unknowable. Tags and Source
+  are filled the same way (`''` for none).
+
+### Beatmap rules
+
+The filter's first criterion (roadmap 5.74): a play is tracked if its beatmap matches **any**
+rule, and a rule matches when **all** its conditions do. A condition is a field, a test
+(*contains*, *is*, *doesn't contain*) and one or more values, any of which will do. Every test
+ignores case; values are stored as typed. `rulesMatch` in `src/tracking-filter.ts` is the only
+definition.
+
+- **Mapper** is osu!'s own record of who mapped that difficulty: `online.db`'s `beatmap_owners`,
+  read fresh per play through `BeatmapResolver.beatmapMappers` (well under a millisecond). It
+  includes guest difficulties and collabs, and names each account by its current name, since owners
+  are recorded by user id: a difficulty mapped as Froslass reads as Blue Dragon. Only ranked,
+  approved and loved sets have a record, and only with osu!lazer. Without one, Mapper falls back to
+  the set owner (`Creator`), or the name as a whole word in the difficulty name or as a whole tag
+  (`mapperMatches`). Measured on this machine: 294 guest difficulties, 100 naming the guest in the
+  difficulty name, 176 in the tags, 114 in neither.
+- **Beatmap set owner** is the `.osu` file's `Creator`, which is all the old keywords box knew as
+  "the mapper": it names the set's host on every difficulty, guest difficulties included.
+- **Any field** is the artist, title, difficulty name and set owner joined with spaces, exactly what
+  the old keywords box searched, so a phrase can still run from one field into the next.
+- Title and Artist also match the original-language names.
+- **Old keywords carry over exactly.** A saved filter with `keywords` and no `rules` is read as one
+  rule, *Any field contains* each term, which is the old test ("any term anywhere in those four").
+  Checked on this machine: 11 keyword filters against 590 beatmaps, 0 answers differ. Such a filter
+  is marked `fromKeywords` (never stored) until saved, so the dialog and a toast say it once. The
+  filter never re-judges stored plays, so no change here can remove one.
+- Empty conditions and empty rules are dropped when cleaned: an empty rule would match everything.
+- A beatmap whose metadata could not be read at all is not judged on the rules.
 
 ### Plays not tracked, and Track anyway
 

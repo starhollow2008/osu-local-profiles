@@ -521,6 +521,25 @@ export function osuSection(text: string, header: string): string | null {
   return text.slice(body, next < 0 ? undefined : next);
 }
 
+/**
+ * A `.osu` file's Tags and Source lines, for the play tracking filter's beatmap rules. `''`
+ * for a line the file does not have. Tags are space-separated, and a tag with a space in it is
+ * usually written with `_`, which is left as it is here: the rules read it both ways.
+ */
+export function osuTagsAndSource(text: string): { tags: string; source: string } {
+  const out = { tags: '', source: '' };
+  const section = osuSection(text, '[Metadata]');
+  if (section === null) return out;
+  for (const line of section.split(NEWLINE)) {
+    const sep = line.indexOf(':');
+    if (sep < 0) continue;
+    const key = line.slice(0, sep).trim();
+    if (key === 'Tags') out.tags = line.slice(sep + 1).trim();
+    else if (key === 'Source') out.source = line.slice(sep + 1).trim();
+  }
+  return out;
+}
+
 function parseOsuMetadataText(text: string): OsuMetadata {
   const out: OsuMetadata = {
     artist: null,
@@ -808,6 +827,35 @@ export class BeatmapResolver {
           .get(beatmapsetId) as { submit_date: string | null; approved_date: string | null } | undefined;
         if (!row) return undefined;
         return { submittedAt: parseOnlineDate(row.submit_date), rankedAt: parseOnlineDate(row.approved_date) };
+      }) ?? null
+    );
+  }
+
+  /**
+   * Who mapped a difficulty, by osu!'s own record: `online.db`'s `beatmap_owners`, one row per
+   * mapper, so a guest difficulty names its guest and a collab names everyone. Names are the
+   * accounts' current ones, because owners are recorded by user id: a difficulty mapped under
+   * an old name reads as the new one. Null when `online.db` has no record, which is every set
+   * osu! has not ranked, approved or loved, and every machine without osu!lazer.
+   *
+   * Read fresh for each play rather than cached: a lookup is well under a millisecond, and
+   * osu! can change a difficulty's owner.
+   */
+  beatmapMappers(beatmapId: number): string[] | null {
+    return (
+      this.fromOnline((online) => {
+        const names = (
+          online
+            .prepare(
+              `SELECT u.username FROM beatmap_owners o
+                 LEFT JOIN users u ON u.user_id = o.user_id
+                WHERE o.beatmap_id = ?`,
+            )
+            .all(beatmapId) as { username: string | null }[]
+        )
+          .map((r) => r.username)
+          .filter((name): name is string => typeof name === 'string' && name !== '');
+        return names.length > 0 ? names : undefined;
       }) ?? null
     );
   }

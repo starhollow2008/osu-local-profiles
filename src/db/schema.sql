@@ -152,7 +152,11 @@ CREATE TABLE IF NOT EXISTS beatmaps (
   -- loved ones; every other set is legitimately 0 here.
   added_at      INTEGER,
   submitted_at  INTEGER,
-  ranked_at     INTEGER
+  ranked_at     INTEGER,
+  -- The .osu file's Tags and Source lines, for the filter's beatmap rules (roadmap 5.74), read
+  -- once on first need: NULL means never looked up, '' means the file has none (or is gone).
+  tags          TEXT,
+  source        TEXT
 );
 
 -- MD5 -> path index of local .osu files. lazer stores files by SHA-256, so this is the

@@ -30,7 +30,8 @@ The reasons are in `docs/architecture.md`.
   it lacks never rejects a play. Every declined play is announced and recorded in
   `declined_plays`, which no figure reads. The only way back is Track anyway, one play at a time
   (`Tracker.trackAnyway`, roadmap 5.61), never a setting. `scripts/reingest.mjs` must not pass a
-  filter.
+  filter. A filter saved with the old `keywords` must keep reading as the same rule, *Any field
+  contains* each term, matching exactly what it did (`coerceTrackingFilter`, roadmap 5.74).
 - **The server refuses non-loopback requests, with no switch.** Don't bring back
   `shareOnNetwork`, and don't "fix" it by binding to `127.0.0.1` (that drops `::1`).
 - **`/api/quit` refuses any `Origin` but the app's own page** (`isOwnPage`), or any website open

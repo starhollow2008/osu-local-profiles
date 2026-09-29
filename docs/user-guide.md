@@ -326,7 +326,7 @@ wide open. There are nine:
 
 | | |
 |---|---|
-| **Keywords** | Song title, artist, difficulty name and mapper. Separate several with commas; a play counts if any one appears. |
+| **Beatmap rules** | Which beatmaps count, by title, artist, mapper and more. See [Beatmap rules](#beatmap-rules). |
 | **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
 | **Difficulty** | The star rating as played, mods included. |
 | **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
@@ -341,6 +341,40 @@ each time: a line in the log, a message naming the criterion, a count in the Opt
 on the menu entry while a filter is narrowing anything. It's also listed under [Plays not
 tracked](#plays-not-tracked). **Import past plays** applies the filter too, and can be told to
 ignore it for one import.
+
+### Beatmap rules
+
+A play is tracked if its beatmap matches **any** rule. Each rule is one or more conditions, and a
+rule matches when **all** of them do. With no rules, every beatmap counts. A sentence under the rules
+says what they track.
+
+A condition is a field, a test (**contains**, **is** or **doesn't contain**) and what to look for.
+Separate several values with commas; any one of them will do. Capitals don't matter.
+
+| Field | What it looks at |
+|---|---|
+| **Any field** | The title, artist, difficulty name and beatmap set owner together. |
+| **Title**, **Artist** | Including the song's original-language name. |
+| **Difficulty name** | The difficulty's name, like "Insane". |
+| **Mapper** | Whoever mapped that difficulty, guest difficulties included. |
+| **Beatmap set owner** | Who made the beatmap set. |
+| **Source**, **Tags** | The beatmap's Source and Tags. |
+
+**Mapper** uses osu!'s own record of who mapped each difficulty. That record covers ranked, approved
+and loved maps, when osu!lazer is installed, and it knows every account by its current name, so a
+map made under an old name still counts. For other maps, Mapper looks for the name as the set owner,
+in the difficulty name or in the tags, so add your old names too. For example, to track every
+difficulty Blue Dragon mapped, under any of his names:
+
+> **Rule 1:** Mapper is `Blue Dragon, Mismagius, Froslass`
+
+To track only "Happy" by Justin Bieber, plus everything by one mapper:
+
+> **Rule 1:** Title is `Happy` **and** Artist contains `Justin Bieber`
+> **Rule 2:** Mapper is `Blue Dragon`
+
+Filters from before beatmap rules kept working exactly as they did: their keywords became one rule,
+**Any field contains** each keyword.
 
 ### The mods section
 

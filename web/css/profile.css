@@ -5497,6 +5497,120 @@ s.bbcode-editor__glyph {
   color: hsl(var(--hsl-l1));
 }
 
+/*
+ * Beatmap rules (web/js/tracking-filter.js): each rule a box, "or" between them, each condition
+ * a row of field, test and values, "and" between them.
+ */
+.tf-rules {
+  display: grid;
+  gap: 8px;
+}
+
+.tf-rules__note {
+  margin-bottom: 10px;
+  padding: 7px 10px;
+  border-left: 3px solid hsl(var(--hsl-h1));
+  border-radius: 5px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal-2);
+}
+
+.tf-rule {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+}
+
+.tf-rule__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--fs-normal);
+  font-weight: 700;
+  color: hsl(var(--hsl-l1));
+}
+
+.tf-cond {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 11em) minmax(0, 9em) minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.tf-cond__join,
+.tf-rules__or {
+  font-size: var(--fs-normal);
+  color: hsl(var(--hsl-f1));
+}
+
+.tf-rules__or {
+  padding-left: 10px;
+}
+
+.tf-cond select {
+  min-width: 0;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 6px 8px;
+  font: inherit;
+  color-scheme: dark;
+}
+
+.tf-rule__remove,
+.tf-cond__remove {
+  background: none;
+  border: 0;
+  padding: 2px 6px;
+  font-size: 18px;
+  line-height: 1;
+  color: hsl(var(--hsl-f1));
+  cursor: pointer;
+}
+
+.tf-rule__remove:hover,
+.tf-cond__remove:hover {
+  color: hsl(var(--hsl-c1));
+}
+
+.tf-rule__add,
+.tf-rules__add {
+  justify-self: start;
+  background: none;
+  border: 0;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-h1));
+  cursor: pointer;
+}
+
+.tf-rule__add {
+  margin-left: 40px;
+}
+
+.tf-rule__add:hover,
+.tf-rules__add:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  /* Field and test on one line, the values under them. */
+  .tf-cond {
+    grid-template-columns: 34px minmax(0, 1fr) minmax(0, 1fr) auto;
+  }
+
+  .tf-cond [data-part="text"] {
+    grid-column: 2 / 4;
+    grid-row: 2;
+  }
+}
+
 /* What the current selection means, in words. The mod grid cannot be read without it. */
 .tfilter__readout {
   margin-top: 10px;

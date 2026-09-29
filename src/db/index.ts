@@ -54,6 +54,9 @@ const ADDED_COLUMNS: ReadonlyArray<{ table: string; column: string; definition: 
   { table: 'beatmaps', column: 'added_at', definition: 'INTEGER' },
   { table: 'beatmaps', column: 'submitted_at', definition: 'INTEGER' },
   { table: 'beatmaps', column: 'ranked_at', definition: 'INTEGER' },
+  // Added with the filter's beatmap rules (roadmap 5.74), filled lazily the same way.
+  { table: 'beatmaps', column: 'tags', definition: 'TEXT' },
+  { table: 'beatmaps', column: 'source', definition: 'TEXT' },
   // Added with attempts osu! could not submit. NULL marks rows indexed before names were read,
   // which the index backfills once -- in the same pass as beatmap_id above for anyone upgrading
   // from a release that had neither.
