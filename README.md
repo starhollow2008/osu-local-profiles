@@ -11,6 +11,8 @@ App that tracks local / offline profiles in a browser profile page that resemble
 
 Preview sample profile: https://jonathant09.github.io/osu-local-profiles/
 
+Reddit Post: https://www.reddit.com/r/osugame/comments/1wphvn7/osu_local_profiles_app_stable_lazer_4_gamemodes/
+
 Good for:
 - Creating multiple profiles to track pp without multiaccounting
 - Alternative playstyles - e.g. using non-dominant hand, mouse/tablet, touchscreen
