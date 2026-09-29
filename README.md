@@ -34,7 +34,7 @@ Features:
 - Edit or import profile details, such as Name, Avatar, Banner, me! section, scores, etc.
 - pp for unranked maps and mods
 - Import previous plays instead of starting a profile fresh
-- Play tracking filter - only track scores that meet specified criteria, e.g. keywords, mods, difficulty, ranked date
+- Play tracking filter - only track scores that meet specified criteria, e.g. mapper (guest difficulties included), title, artist, mods, difficulty, ranked date
 - Option to remove scores from profile
 - Automatically detects updates and installs with one click
 - Recalculates pp automatically for scores on each pp rework
@@ -171,6 +171,10 @@ App reads from lazer's session log to track incomplete plays:
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
 | `language` | `""` | the page's language, as one of osu!'s own codes (`de`, `pt-br`, `zh-tw`). Empty means never chosen, which is what lets the first launch ask |
 | `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Other settings** |
+| `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Other settings -> Font** |
+| `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Auto-update** |
+| `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
+
 
 ## Development
 
@@ -196,11 +200,13 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
 ## Credits
 
 - [ppy/osu](https://github.com/ppy/osu) - official rulesets and performance calculator
-- [ppy/osu-web](https://github.com/ppy/osu-web) - mod glyphs, grade badges, stable's grade letters, the guest avatar and mod badge styling (AGPL-3.0-or-later, © ppy Pty Ltd), plus mod and medal definitions
+- [ppy/osu-web](https://github.com/ppy/osu-web) - mod glyphs, grade badges, stable's grade letters, the guest avatar, default banner, mode icons, mod badge styling (AGPL-3.0-or-later, © ppy Pty Ltd), plus mod and medal definitions
 - [data.ppy.sh](https://data.ppy.sh) - public ladder dumps behind the pp-to-rank curves
 - [Twemoji](https://github.com/jdecked/twemoji) - country flag artwork
 - [fyne.io/systray](https://github.com/fyne-io/systray), [godbus/dbus](https://github.com/godbus/dbus) and [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) for the tray launcher
 - [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's video](https://youtu.be/5wVU4kYC3So) and McOsu for the idea
+- [Nunito](https://github.com/googlefonts/nunito) - the page's font (SIL Open Font License)
+
 
 Full license details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
@@ -216,9 +222,9 @@ Versions up to and including v1.22.0 were released under the MIT License and rem
 The page uses artwork and styling from [osu-web](https://github.com/ppy/osu-web) (© ppy Pty Ltd), under
 osu-web's own AGPL-3.0 licence. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for that and for
 everything a release bundles. osu!'s Torus and Venera fonts are not included; if they are installed on
-your computer, the page uses them.
+your computer, the page uses them. Otherwise it uses Nunito, which is included under the SIL Open Font License.
 
-This app does **not** contact osu! game servers, log in, use API credentials, or automate/assist gameplay in any way.
+This app does **not** log in to osu!, use API credentials, submit anything to your account, or automate/assist gameplay in any way.
 
 "osu!" and "ppy" are trademarks of ppy Pty Ltd. This is an unofficial community project and is not
 affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
