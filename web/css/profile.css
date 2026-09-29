@@ -527,6 +527,41 @@
 /* --- gamemode switcher -------------------------------------------------- */
 
 /*
+ * osu-web's `.header-nav-mobile` (`header-nav-mobile.less`): a block at the top of the header
+ * that only exists below the desktop breakpoint, where the header's own nav is too wide to fit.
+ * It carries the game modes here, centred, so below 900px they have a row of their own.
+ *
+ * The row they came from is the name's, and that row also holds the cover's chevron. At a narrow
+ * width the two overlapped: mania sat under the chevron, and a click on it landed on the chevron.
+ * Taking the modes out of that row is what makes every one of them clickable again.
+ */
+.header-nav-mobile {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  padding: 8px var(--gutter);
+  font-size: var(--fs-title-small);
+  background-color: hsl(var(--hsl-b3));
+  box-shadow: inset 0 -1px 0 hsl(var(--hsl-b2));
+}
+
+/* Below the breakpoint the modes are the block above, not the end of the name's row. */
+.profile-info__details .game-mode {
+  display: none;
+}
+
+@media (min-width: 900px) {
+  .header-nav-mobile {
+    display: none;
+  }
+
+  .profile-info__details .game-mode {
+    display: flex;
+  }
+}
+
+/*
  * The mode switcher: osu-web's game-mode.less and game-mode-link.less -- each ruleset's icon
  * alone, 20px, in the header's pink until it is the one showing or under the pointer, then
  * white. The name is the tooltip (web/js/tooltip.js), as on osu!'s own profile page.

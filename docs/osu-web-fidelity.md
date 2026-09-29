@@ -89,6 +89,7 @@ Everyone else gets Nunito, which ships with the app (`web/css/fonts.css`).
 | the pencil that opens me! | `#aboutActions`, `.btn-circle--page-toggle` | `profile-page/user-page.tsx` (`page-extra__actions`), `bem/btn-circle.less` |
 | flag and country name | `#pflags`, `.flag-country` | `components/flag-country.tsx`, `bem/flag-country.less` |
 | mode tabs | `#modes`, `.game-mode` | `bem/game-mode.less`, `bem/game-mode-link.less`, `playmode-tabs.tsx` |
+| mode tabs below the desktop breakpoint | `#modesMobile`, `.header-nav-mobile` | `bem/header-nav-mobile.less`, `components/header-v4.tsx` |
 | level bar and hexagon | `.profile-detail-bar__level` | `bem/profile-detail-bar.less`, `bem/user-level.less`, `components/user-level.tsx`, `css/layout.less` (the `--level-tier-*` gradients) |
 | global rank, pp, ranked maps | `#globalRank`, `#totalPp` | `profile-page/detail-stats.tsx`, `bem/profile-detail-stats.less` |
 | rank chart | `#ppChart` | `profile-page/rank-chart.tsx`, `bem/line-chart.less` |

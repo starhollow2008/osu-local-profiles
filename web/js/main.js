@@ -340,28 +340,36 @@ const RULESETS = ['osu', 'taiko', 'fruits', 'mania'];
 /*
  * The mode switcher as osu-web's profile page draws it (`playmode-tabs.tsx`): each mode's icon
  * alone, its name in the tooltip over it -- and read out by a screen reader, which has no icon.
+ *
+ * Written into two places, because the page has two: the name's row, which is where they sit
+ * from osu-web's desktop breakpoint up, and `.header-nav-mobile` above the cover, which is where
+ * they sit below it. One function writes both, so the two cannot fall out of step.
  */
 function renderModes() {
   hideTooltip();
-  $('modes').innerHTML = MODE_NAMES.map((name, i) => {
+  const links = MODE_NAMES.map((name, i) => {
     const classes = ['game-mode__link'];
     if (i === mode) classes.push('game-mode__link--active');
     if (!modesWithPlays.includes(i)) classes.push('game-mode__link--empty');
     return `<a class="${classes.join(' ')}" href="#" data-mode="${i}" data-tooltip="${escapeHtml(name)}" aria-label="${escapeHtml(name)}"${i === mode ? ' aria-current="page"' : ''}><span class="mode-icon mode-icon--${RULESETS[i]}" aria-hidden="true"></span></a>`;
   }).join('');
+
+  for (const id of ['modes', 'modesMobile']) $(id).innerHTML = links;
 }
 
-$('modes').addEventListener('click', (e) => {
-  const link = e.target.closest('[data-mode]');
-  if (!link) return;
-  e.preventDefault();
-  mode = Number(link.dataset.mode);
-  // A different mode is a different set of lists; carrying an expansion across would ask
-  // for 200 rows of a mode that has three.
-  resetPaging();
-  renderModes();
-  loadProfile();
-});
+for (const id of ['modes', 'modesMobile']) {
+  $(id).addEventListener('click', (e) => {
+    const link = e.target.closest('[data-mode]');
+    if (!link) return;
+    e.preventDefault();
+    mode = Number(link.dataset.mode);
+    // A different mode is a different set of lists; carrying an expansion across would ask
+    // for 200 rows of a mode that has three.
+    resetPaging();
+    renderModes();
+    loadProfile();
+  });
+}
 
 /* ----------------------------------------------------------- detail block */
 

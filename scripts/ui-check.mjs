@@ -106,6 +106,18 @@ async function evaluate(expression) {
   return r.result?.result?.value;
 }
 
+/**
+ * Resize the page and wait for it to settle.
+ *
+ * Needed for anything that is only true at one width -- osu-web's own breakpoint is where most
+ * of the page changes shape. The settle is `sleep` rather than a frame: the styles that matter
+ * here are media queries, and Chrome has applied those by the next task.
+ */
+async function setViewport(width, height = 900) {
+  await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+  await sleep(250);
+}
+
 /*
  * Wait for the page's own scripts to have wired everything up.
  *
@@ -1318,6 +1330,64 @@ check('and unfolding puts everything back', folded.restored.avatar, 120);
 /*
  * A blank me!: osu-web's `renderPageNew`, rather than a line of plain text.
  */
+/*
+ * The game modes, which live in two places by width. Below osu-web's breakpoint they are
+ * `.header-nav-mobile` at the top of the header, not the right-hand end of the name's row --
+ * because that row also holds the cover's chevron, and the two overlapped there: mania sat
+ * under the chevron and a click on it landed on the chevron.
+ *
+ * Read at both widths, and by hit-testing rather than by position: an element can be exactly
+ * where it should be and still not be the thing you click.
+ */
+console.log('\nthe game modes are clickable at any width');
+const modesAt = async (width) => {
+  await setViewport(width);
+  return JSON.parse(
+    await evaluate(`(() => {
+      const cw = document.documentElement.clientWidth;
+      const wide = window.matchMedia('(min-width: 900px)').matches;
+      const mobile = document.querySelector('#modesMobile');
+      const row = document.querySelector('#modes');
+      const shown = wide ? row : mobile;
+      const box = shown.getBoundingClientRect();
+      return JSON.stringify({
+        wide,
+        // Primitives throughout: check() compares with ===, and two equal arrays are not
+        // === to each other.
+        mobileShown: getComputedStyle(mobile).display !== 'none' ? 'yes' : 'no',
+        rowShown: getComputedStyle(row).display !== 'none' ? 'yes' : 'no',
+        // The mobile block is centred; the row's own is right-aligned beside the name, which
+        // is where osu-web has it, so only the first of these is a centre.
+        centreOffset: Math.round(box.left + box.width / 2 - cw / 2),
+        modes: shown.querySelectorAll('[data-mode]').length,
+        // Every mode reachable, and the point you press is the link itself. An element can be
+        // exactly where it should be and still not be the thing you click.
+        unreachable: [...shown.querySelectorAll('[data-mode]')].filter((l) => {
+          const r = l.getBoundingClientRect();
+          if (r.left < 0 || r.right > cw) return true;
+          return !l.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+        }).map((l) => l.getAttribute('aria-label')).join('|') || 'none',
+        // The two copies are written by one function, so they must agree.
+        copiesAgree: [...shown.querySelectorAll('[data-mode]')].map((l) => l.classList.contains('game-mode__link--active')).join()
+          === [...document.querySelectorAll('#modes [data-mode]')].map((l) => l.classList.contains('game-mode__link--active')).join(),
+      });
+    })()`),
+  );
+};
+for (const width of [320, 380, 1280]) {
+  const m = await modesAt(width);
+  check(`${width}px: all four modes are drawn`, m.modes, 4);
+  check(`${width}px: and every one is the thing you click`, m.unreachable, 'none');
+  check(
+    `${width}px: the modes live ${m.wide ? "in the name's row" : 'in the mobile block at the top'}`,
+    `${m.mobileShown}/${m.rowShown}`,
+    m.wide ? 'no/yes' : 'yes/no',
+  );
+  if (!m.wide) check(`${width}px: and the mobile block is centred`, m.centreOffset, 0);
+  check(`${width}px: and the two copies agree on which mode is showing`, m.copiesAgree, true);
+}
+await setViewport(1280);
+
 console.log('\nme!');
 const about = JSON.parse(
   await evaluate(`(() => {

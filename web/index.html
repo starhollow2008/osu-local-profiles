@@ -14,6 +14,15 @@
 <body>
 
 <header class="profile-info">
+  <!--
+    osu-web's `.header-nav-mobile` (`header-nav-mobile.less`), which is a mobile-only block at the
+    top of the header. Here it carries the game modes, so below the desktop breakpoint they have a
+    centred row of their own instead of the right-hand end of the name's row. That row also holds
+    the cover's chevron, and on a narrow window the two overlapped: mania sat underneath the
+    chevron and a click landed on the chevron instead. `renderModes()` writes both.
+  -->
+  <div class="header-nav-mobile" id="modesMobile"></div>
+
   <div class="profile-info__bg" id="cover">
     <div class="profile-info__bg-actions">
       <button class="update-pill" id="updateBtn" type="button" hidden data-i18n="updateBtn">Update available</button>
