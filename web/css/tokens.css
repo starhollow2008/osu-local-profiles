@@ -96,10 +96,10 @@
   /*
    * osu! sets everything in Torus, which is commercially licensed and cannot be
    * shipped with this project. Leaving it first means a locally installed copy is
-   * picked up automatically; everything behind it is a geometric-sans fallback that
-   * needs no network.
+   * picked up automatically. Next is Nunito, which ships with the app (web/css/fonts.css)
+   * and is the closest free face to Torus; everything behind it needs no network.
    */
-  --font-default: "Torus", "Torus Pro", "Inter", "Segoe UI Variable Text", "Segoe UI",
+  --font-default: "Torus", "Torus Pro", "Nunito", "Inter", "Segoe UI Variable Text", "Segoe UI",
     system-ui, "Helvetica Neue", Tahoma, Arial, sans-serif;
 
   /*
@@ -110,6 +110,15 @@
    * osu!. See docs/osu-web-fidelity.md.
    */
   --font-grade: "Venera", var(--font-default);
+}
+
+/*
+ * Other settings -> Font -> System font (web/js/font.js): the stack as it was before Nunito,
+ * at osu-web's weights as asked, since only Nunito's faces are drawn heavier.
+ */
+:root[data-font="system"] {
+  --font-default: "Torus", "Torus Pro", "Inter", "Segoe UI Variable Text", "Segoe UI",
+    system-ui, "Helvetica Neue", Tahoma, Arial, sans-serif;
 }
 
 /* osu-web's "desktop" breakpoint. */

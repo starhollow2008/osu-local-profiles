@@ -49,6 +49,13 @@ export interface Config {
    */
   originalMetadata: boolean;
   /**
+   * The page's typeface: `nunito`, which ships with the app and is the closest free face to
+   * osu!'s Torus, or `system`, the system's own font. Other settings -> Font. Beside
+   * `originalMetadata` for the same reason: how this person reads the page, kept here so a
+   * second browser and a screenshot agree (web/js/font.js).
+   */
+  font: 'nunito' | 'system';
+  /**
    * Shown beside the profile name, the way osu! shows a country. Two-letter ISO code;
    * empty means the profile has no country, which is how a new profile starts.
    */
@@ -91,6 +98,7 @@ const DEFAULTS: Config = {
   searchedForInstalls: false,
   language: '',
   originalMetadata: false,
+  font: 'nunito',
   country: '',
   tagline: '',
   checkForUpdates: true,

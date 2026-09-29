@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>osu! local profiles</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="stylesheet" href="/css/fonts.css">
 <link rel="stylesheet" href="/css/tokens.css">
 <link rel="stylesheet" href="/css/base.css">
 <link rel="stylesheet" href="/css/profile.css">
@@ -663,6 +664,15 @@
         <label class="field">
           <span data-i18n="installSettings.originalLanguage">Show beatmap metadata in original language</span>
           <input type="checkbox" id="originalMetadataSetting">
+        </label>
+      </div>
+      <div class="setting">
+        <label class="field">
+          <span data-i18n="installSettings.font">Font</span>
+          <select id="fontSetting">
+            <option value="nunito" data-i18n="installSettings.fontNunito">Nunito</option>
+            <option value="system" data-i18n="installSettings.fontSystem">System font</option>
+          </select>
         </label>
       </div>
     </div>

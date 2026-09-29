@@ -260,6 +260,8 @@ export interface AppConfig {
   language?: string;
   /** Show beatmap artists and titles in the song's own script, as osu!'s own option does. */
   originalMetadata?: boolean;
+  /** Other settings -> Font: Nunito, shipped with the app, or the system's own font. */
+  font?: 'nunito' | 'system';
   /** Options -> Auto-update: download new versions and install them at quit or next start. */
   autoUpdate?: boolean;
 }
@@ -736,6 +738,12 @@ export function startServer(opts: ServerOptions): http.Server {
             return json(res, { error: `${String(body['language'])} is not a language this app has` }, 400);
           }
           patch.language = body['language'];
+        }
+        if ('font' in body) {
+          if (body['font'] !== 'nunito' && body['font'] !== 'system') {
+            return json(res, { error: 'font must be nunito or system' }, 400);
+          }
+          patch.font = body['font'];
         }
         if (Object.keys(patch).length === 0) {
           return json(res, { error: 'openBrowser must be true or false' }, 400);

@@ -112,6 +112,28 @@ test('the open-in-browser option round-trips, and rejects anything but a boolean
   }
 });
 
+test('the font setting takes Nunito or the system font, and nothing else', async () => {
+  const h = harness();
+  try {
+    const send = (body: unknown) =>
+      fetch(`${h.base}/api/app-config`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+    const system = await send({ font: 'system' });
+    assert.equal(system.status, 200);
+    assert.equal(((await system.json()) as { config: { font: string } }).config.font, 'system');
+
+    assert.equal((await send({ font: 'comic sans' })).status, 400);
+    assert.equal((await send({ font: true })).status, 400);
+    assert.equal((h.appConfig as { font?: string }).font, 'system', 'a rejected request changes nothing');
+  } finally {
+    h.cleanup();
+  }
+});
+
 test('reset refuses without an explicit confirmation', async () => {
   const h = harness();
   try {

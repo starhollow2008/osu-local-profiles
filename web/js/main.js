@@ -52,6 +52,7 @@ import {
   refreshLanguageButton,
 } from './language-picker.js';
 import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './metadata.js';
+import { applyConfigFont, pageFont, setPageFont } from './font.js';
 import { bindOsuFolders, closeOsuFolders, installName, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
@@ -684,6 +685,7 @@ async function loadState() {
   // rest of this render is in the language already on screen, and a change re-runs it.
   void applyConfigLanguage();
   applyConfigOriginalMetadata();
+  applyConfigFont(app.config);
   $('footerVersion').textContent = app.version
     ? `osu! local profiles v${app.version}`
     : 'osu! local profiles';
@@ -2604,6 +2606,7 @@ function openSettings() {
   void loadPpSource();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   $('originalMetadataSetting').checked = preferOriginalMetadata();
+  $('fontSetting').value = pageFont();
   settingsHint(' ');
   $('settingsModal').hidden = false;
   $('settingsCancel').focus();
@@ -2671,6 +2674,13 @@ $('settingsSave').onclick = async () => {
     if (setPreferOriginalMetadata(originalMetadata)) {
       refreshLanguageButton();
       const c = await postJson('/api/app-config', { originalMetadata }, 'saving that failed');
+      app = { ...app, config: c.config };
+    }
+
+    // The typeface, install-level too. Switching it restyles the page at once.
+    const font = $('fontSetting').value;
+    if (setPageFont(font)) {
+      const c = await postJson('/api/app-config', { font }, 'saving that failed');
       app = { ...app, config: c.config };
     }
 
@@ -4575,6 +4585,7 @@ on('identity', () => loadState());
 // A second tab should read the install's options as they now are.
 on('app-config', (e) => {
   app = { ...app, config: JSON.parse(e.data) };
+  applyConfigFont(app.config);
   renderUpdate();
 });
 // Pin, unpin and remove all change what the page should be showing.
@@ -4715,7 +4726,9 @@ await startLanguage();
 await loadState();
 applySectionOrder();
 await loadProfile();
-// Tells the screenshot renderer the page has finished drawing itself.
+// Tells the screenshot renderer the page has finished drawing itself, fonts included: until
+// Nunito has loaded, its text is not drawn at all (font-display: block).
+await document.fonts.ready;
 document.body.dataset.rendered = 'true';
 
 // A brand-new install is offered the account import once. Never on a shared copy, and never

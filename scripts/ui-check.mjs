@@ -2822,6 +2822,44 @@ check(
   true,
 );
 
+/*
+ * The typeface (web/js/font.js, web/css/fonts.css). Switched through the page's own module,
+ * which changes only this throwaway browser's storage, never the app's config.
+ */
+const fontBefore = await evaluate(`import('/js/font.js').then((m) => m.pageFont())`);
+await evaluate(`import('/js/font.js').then((m) => m.setPageFont('nunito'))`);
+check(
+  'the page is set in Nunito, shipped with the app',
+  await evaluate(`document.fonts.load('400 14px Nunito').then(() =>
+    document.fonts.check('400 14px Nunito') && getComputedStyle(document.body).fontFamily.includes('Nunito'))`),
+  true,
+);
+check(
+  "and drawn heavier than osu-web's weights ask for",
+  // The same text at 400, once as the page draws it and once pinned to Nunito's own 400. The
+  // property outranks the @font-face descriptor, so only the first is drawn heavier, and wider.
+  await evaluate(`(() => {
+    const span = (extra) => {
+      const s = document.createElement('span');
+      s.textContent = 'Ranked Score Hit Accuracy Play Count';
+      s.style.cssText = 'font: 400 14px Nunito; position: absolute; white-space: nowrap;' + extra;
+      document.body.append(s);
+      const w = s.getBoundingClientRect().width;
+      s.remove();
+      return w;
+    };
+    return span('') > span('font-variation-settings: "wght" 400;');
+  })()`),
+  true,
+);
+await evaluate(`import('/js/font.js').then((m) => m.setPageFont('system'))`);
+check(
+  'System font puts the system font back',
+  await evaluate(`!getComputedStyle(document.body).fontFamily.includes('Nunito')`),
+  true,
+);
+await evaluate(`import('/js/font.js').then((m) => m.setPageFont(${JSON.stringify(fontBefore)}))`);
+
 // Put the language back exactly as it was found.
 if (languageBefore && languageBefore !== 'en') await setLanguage(languageBefore);
 

@@ -531,6 +531,8 @@ async function main(): Promise<void> {
         sharedFavorites: config.sharedFavorites,
         language: config.language,
         originalMetadata: config.originalMetadata,
+        // A hand-edited value that is neither is Nunito, the default.
+        font: config.font === 'system' ? 'system' : 'nunito',
         autoUpdate: config.autoUpdate === true,
       }),
       set: (patch) => {
@@ -540,6 +542,7 @@ async function main(): Promise<void> {
         if (patch.originalMetadata !== undefined) {
           current.originalMetadata = config.originalMetadata = patch.originalMetadata;
         }
+        if (patch.font !== undefined) current.font = config.font = patch.font;
         if (patch.sharedFavorites !== undefined) {
           current.sharedFavorites = config.sharedFavorites = patch.sharedFavorites;
           // Merge or copy the lists now, so the next request already reads the right one.

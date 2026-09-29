@@ -74,6 +74,7 @@ Metrics worth knowing: the desktop breakpoint is 900px, the page container 1000p
 
 Fonts: osu-web's stack is `Torus, Inter, "Helvetica Neue", Tahoma, Arial`, with Venera for grade
 letters. Neither can be shipped, so both are named first and a machine that has them uses them.
+Everyone else gets Nunito, which ships with the app (`web/css/fonts.css`).
 
 ## Region map
 
@@ -119,10 +120,12 @@ letters. Neither can be shipped, so both are named first and a machine that has 
 What's deliberately not identical, and why. Anything else that looks wrong is a bug.
 
 - **The typeface, the largest remaining difference.** osu! uses Torus for the page and Venera for
-  display letters, and neither can be shipped. Venera now shows only in the grade in the middle of
-  a lazer score's dial and on a mod osu-web has no glyph for (none, as of roadmap 5.57). Grade
-  badges, stable's letters and mod glyphs are osu-web's own pictures, so their letters are exact.
-  Keep osu!'s sizes rather than tuning them up to compensate.
+  display letters, and neither can be shipped. The page uses Nunito instead, the closest free
+  face, drawn heavier than the weights asked for so small text has Torus's weight (see
+  `docs/architecture.md`, "The page"); the CSS keeps osu-web's weights. Venera shows only in the
+  grade in the middle of a lazer score's dial and on a mod osu-web has no glyph for (none, as of
+  roadmap 5.57). Grade badges, stable's letters and mod glyphs are osu-web's own pictures, so
+  their letters are exact. Keep osu!'s sizes rather than tuning them up to compensate.
 - **`.mod` takes its size from the row** rather than setting its own from `--mod-height`. The
   badge measures the same.
 - **View Details is a card first and a page second.** It opens as a dialog over the profile, so

@@ -429,8 +429,8 @@ has gets **View osu! score link** in its ⋯ menu.
 ## Other settings
 
 Everything in **Options -> Other settings** belongs to the current profile, except the settings under
-*This install* (**Open in browser on start** and **Show beatmap metadata in original language**),
-which are saved to `data/config.json`.
+*This install* (**Open in browser on start**, **Show beatmap metadata in original language** and
+**Font**), which are saved to `data/config.json`.
 
 ### Include pp for unranked mods
 
@@ -495,6 +495,13 @@ still apply, and it says what it brought in. Per profile.
 Off by default, the same setting osu! has. On, artist and title read as the song writes them
 (夜に駆ける rather than Yoru ni Kakeru) everywhere the page names a beatmap. It's also offered at
 first launch and in the language menu.
+
+### Font
+
+**Nunito** by default, which comes with the app and is the closest free font to the one osu! uses.
+It's drawn a little heavier than normal so small text looks as solid as on osu!'s site. **System
+font** uses your computer's own font (Segoe UI on Windows) instead. If you have osu!'s own font,
+Torus, installed, the page uses that either way.
 
 ### pp calculator
 

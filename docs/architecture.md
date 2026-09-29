@@ -454,6 +454,25 @@ surfaces resolve to their token colours.
 **`var()` doesn't work in SVG presentation attributes.** `stop-color="hsl(var(--x))"` is silently
 dropped; `style="stop-color: hsl(var(--x))"` works, because inline style is parsed as CSS.
 
+**The typeface is Nunito, drawn heavier than asked.** osu! uses Torus, which can't be shipped.
+Nunito is the closest free face, and ships in `web/fonts/nunito/` (`web/css/fonts.css`). Measured
+against osu.ppy.sh in the same browser: at 200px the two have the same stem at weight 400, but at
+12-16px, where most of the page's text is, Torus snaps its stems to whole pixels and Nunito's blur
+to grey, so Nunito at the same weight puts down about a fifth less ink and reads skinny. So each
+`@font-face` band draws Nunito heavier than the weight asked for (`font-variation-settings`):
+400 as 600, 600/700 as 750 (osu! only loads Torus up to SemiBold, so its 600 and 700 are the same
+face), 800+ as 850, and 300, the big light figures, as asked, since it already matches. The CSS
+everywhere else keeps osu-web's own weights. The one trade-off is large 400 text, like the 24px
+name, which comes out a little heavier than osu!'s.
+
+Other settings -> Font can switch to the system's own font instead (`config.font`, `web/js/font.js`),
+kept in `config.json` and `localStorage` like the language: `data-font="system"` on `<html>` brings
+back the old font list at osu-web's weights as asked. The score page asks `/api/app-config` for it,
+so a score screenshot, rendered in a browser with no storage, agrees. Both pages wait for
+`document.fonts.ready` before telling the screenshot renderer they're done, since Nunito's text isn't
+drawn at all until it loads (`font-display: block`). A saved copy carries the font files, once per
+weight band.
+
 **Section headings stay block-level.** As `inline-block` they flowed "Top Ranks" and "Best
 Performance" onto one line. `npm run ui` checks they stack.
 

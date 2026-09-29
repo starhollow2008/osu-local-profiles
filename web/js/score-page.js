@@ -15,6 +15,7 @@ import {
   saveScoreImage,
 } from './score-share.js';
 import { postJson, toast } from './ui.js';
+import { applyConfigFont } from './font.js';
 
 const $ = (id) => document.getElementById(id);
 const id = Number(/^\/scores\/(\d+)/.exec(location.pathname)?.[1]);
@@ -23,6 +24,12 @@ if (exporting) document.body.classList.add('export-mode');
 
 let owner = null;
 let score = null;
+
+// The app's typeface, which a screenshot's browser has never been told in its own storage.
+const fontChosen = fetch('/api/app-config')
+  .then((r) => r.json())
+  .then((d) => applyConfigFont(d.config))
+  .catch(() => {});
 
 async function load() {
   try {
@@ -43,7 +50,9 @@ async function load() {
       String(err.message).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)
     }. It may have been removed from its profile.</div>`;
   }
-  // What the screenshot waits for, as the profile page's export does.
+  // What the screenshot waits for, as the profile page's export does, fonts included.
+  await fontChosen;
+  await document.fonts.ready;
   document.body.dataset.rendered = 'true';
 }
 
