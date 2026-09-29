@@ -1,13 +1,12 @@
 # Third-party notices
 
 osu! local profiles is licensed under the **GNU Affero General Public License v3.0 or later**
-(see `LICENSE`). It includes artwork and styling from
-[ppy/osu-web](https://github.com/ppy/osu-web), under the same licence, and a **packaged
-build** additionally bundles other people's software. All of it is listed here.
+(see `LICENSE`). It includes artwork and styling from [ppy/osu-web](https://github.com/ppy/osu-web)
+under the same licence, and a packaged build also bundles other people's software. All of it is
+listed here.
 
-This is a good-faith notice, not legal advice. If you redistribute a build - especially
-commercially - verify each component's terms yourself against the actual contents of
-`dist/<build>/tools/pp/`.
+This is a good-faith notice, not legal advice. If you redistribute a build, especially
+commercially, check each component's terms against what's actually in `dist/<build>/tools/pp/`.
 
 ## What a release contains
 
@@ -18,7 +17,7 @@ commercially - verify each component's terms yourself against the actual content
 | [fyne.io/systray](https://github.com/fyne-io/systray) | the launcher's tray / menu bar icon | Apache-2.0 |
 | [godbus/dbus](https://github.com/godbus/dbus) | the tray icon on Linux | BSD-2-Clause |
 | [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) | the launcher's Windows system calls | BSD-3-Clause |
-| [ppy/osu](https://github.com/ppy/osu) - `osu.Game*`, `osu.Framework`, `osuTK` | the real difficulty and pp code; the entire reason this project can be accurate | MIT |
+| [ppy/osu](https://github.com/ppy/osu) - `osu.Game*`, `osu.Framework`, `osuTK` | osu!'s real difficulty and pp code | MIT |
 | [.NET 10 runtime](https://github.com/dotnet/runtime) | runs the pp helper self-contained | MIT |
 | [Realm](https://github.com/realm/realm-dotnet) | osu!'s model types are Realm objects, so it cannot be removed | Apache-2.0 |
 | [SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp) | pulled in by osu!'s beatmap handling | Six Labors Split License (Apache-2.0 for open-source use) |
@@ -27,45 +26,41 @@ commercially - verify each component's terms yourself against the actual content
 | various osu! transitive dependencies | AutoMapper, MessagePack, Newtonsoft.Json, SQLitePCLRaw, Remotion.Linq and similar | individually permissive; see each package on NuGet |
 
 The rank curves in `src/calc/rank-tables/` are derived from osu!'s public
-[data.ppy.sh](https://data.ppy.sh) dumps. They contain no personal data - only a
-pp-to-rank curve computed from an anonymous sample.
+[data.ppy.sh](https://data.ppy.sh) dumps. They hold no personal data, only a pp-to-rank curve
+computed from an anonymous sample.
 
 ## Artwork and data in the page itself
 
 | component | where | licence |
 |---|---|---|
-| osu-web's mod glyphs and badge blanks, grade badges, stable's grade letters, guest avatar | `web/osu-web/`, vendored unmodified by `scripts/build-osu-web-art.mjs`; the commit is in `web/osu-web/README.md` | **AGPL-3.0-or-later**, © ppy Pty Ltd |
-| osu-web's default profile banner (`c3.jpg`) | `web/osu-web/covers/`, vendored unmodified by `scripts/build-osu-web-art.mjs` from the last osu-web commit that still had its built-in banners (`770e5d4`, before they moved to a database table in `6b22ecb`) | **AGPL-3.0-or-later**, © ppy Pty Ltd |
-| osu-web's four ruleset icons (the mode switcher) | `web/osu-web/modes/`, each glyph's outline taken out of osu-web's icon font `resources/fonts/extra/extra.svg` by `scripts/build-osu-web-art.mjs` and written as an SVG of its own; the font itself, which also holds the osu! logo, is not taken | **AGPL-3.0-or-later**, © ppy Pty Ltd |
+| osu-web's mod glyphs and badge blanks, grade badges, stable's grade letters, guest avatar | `web/osu-web/`, copied unmodified by `scripts/build-osu-web-art.mjs`; the commit is in `web/osu-web/README.md` | **AGPL-3.0-or-later**, © ppy Pty Ltd |
+| osu-web's default profile banner (`c3.jpg`) | `web/osu-web/covers/`, copied unmodified by `scripts/build-osu-web-art.mjs` from the last osu-web commit that still had its built-in banners (`770e5d4`, before they moved to a database table in `6b22ecb`) | **AGPL-3.0-or-later**, © ppy Pty Ltd |
+| osu-web's four ruleset icons (the mode switcher) | `web/osu-web/modes/`, each glyph's outline taken from osu-web's icon font `resources/fonts/extra/extra.svg` by `scripts/build-osu-web-art.mjs` and written as its own SVG; the font itself, which also holds the osu! logo, is not taken | **AGPL-3.0-or-later**, © ppy Pty Ltd |
 | styling ported from osu-web's LESS, TSX and CoffeeScript (`mod.less`, `score-rank.less`, `legacy-rank.less`, `mod.tsx`, `game-mode.less`, `game-mode-link.less`, `playmode-tabs.tsx`, `tooltip-default.less`, `tooltip-default.coffee`) | `web/css/profile.css`, `web/css/osu-web-art.css`, `web/js/badges.js`; each port names its source file | **AGPL-3.0-or-later**, © ppy Pty Ltd |
 | [Twemoji](https://github.com/jdecked/twemoji) country flags | `web/flags/*.svg`, generated by `scripts/build-flags.mjs` from `@twemoji/svg` | graphics **CC-BY 4.0**, © Twitter / the Twemoji contributors |
 | mod names, types and setting labels | `web/js/mod-definitions.js`, generated by `scripts/build-mod-table.mjs` | facts taken from osu-web's `database/mods.json`, which osu-web generates from ppy/osu (MIT) |
 | medal definitions | `src/calc/medal-definitions.json` | as above, from osu!'s own medal list |
 
-The flags are the same artwork osu! uses: `ppy/osu-resources` generates its flag textures
-from Twemoji with its own `osu_flags.sh`. They are taken from Twemoji directly rather than
-from osu!'s copy, because osu-resources is **CC-BY-NC 4.0** and Twemoji is not.
+The flags are the same artwork osu! uses: `ppy/osu-resources` generates its flag textures from
+Twemoji. They're taken from Twemoji directly because osu-resources is **CC-BY-NC 4.0** and Twemoji
+is not.
 
-**osu-web's files are used under its own licence.** osu-web's README grants its code, design
-and artwork to any project that credits it and is released under the AGPL, which this project
-is. Its images are copied byte for byte into `web/osu-web/` and never edited -- the ruleset
-icons, which osu-web has only as glyphs of an icon font, are each written out unchanged as an
-SVG of their own -- and code taken from
-it is marked with the osu-web file it came from. `docs/osu-web-fidelity.md` sets out what may
-and may not be taken, and lists where this page still differs.
+**osu-web's files are used under its own licence.** osu-web's README grants its code, design and
+artwork to any project that credits it and is released under the AGPL, as this one is. Its images
+are copied byte for byte into `web/osu-web/` and never edited (the ruleset icons, which osu-web has
+only as icon-font glyphs, are each written out unchanged as an SVG), and code taken from it names
+the osu-web file it came from. `docs/osu-web-fidelity.md` sets out what may and may not be taken.
 
-**What osu-web's licence does not cover, and this project does not use:** the "osu!" and "ppy"
-names and logos as branding, which osu-web's README keeps outside its AGPL grant as
-trademarks; the Torus and Venera typefaces, below; and anything from
-[ppy/osu-resources](https://github.com/ppy/osu-resources), which is CC-BY-NC 4.0.
-"osu!" and "ppy" are trademarks of ppy Pty Ltd. This project is not affiliated with or
-endorsed by ppy.
+**Not covered by osu-web's licence, and not used here:** the "osu!" and "ppy" names and logos as
+branding, which osu-web's README keeps outside its grant as trademarks; the Torus and Venera
+typefaces (below); and anything from [ppy/osu-resources](https://github.com/ppy/osu-resources),
+which is CC-BY-NC 4.0. "osu!" and "ppy" are trademarks of ppy Pty Ltd. This project is not
+affiliated with or endorsed by ppy.
 
-The **Torus** and **Venera** typefaces osu! uses are commercial (Paulo Goode / Monotype),
-licensed by MyFonts to osu!'s website alone, and are **not bundled** - osu-web's own
-stylesheet says no one else may use its copies. They are named first in the page's font
-stack, so a machine that already has them installed will use them; every other machine falls
-back to Inter, which is what osu-web's own stack falls back to.
+The **Torus** and **Venera** typefaces osu! uses are commercial (Paulo Goode / Monotype), licensed
+by MyFonts to osu!'s website alone, and are **not bundled**. They're named first in the page's
+font stack, so a machine that already has them uses them; others fall back to Inter, as osu-web's
+own stack does.
 
 ## Code first released under the MIT licence
 
@@ -90,52 +85,36 @@ which the MIT licence permits; its notice is kept, as the MIT licence requires:
 > DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## What is deliberately removed
+## What is left out of a build
 
-`scripts/package.mjs` deletes part of osu!'s dependency tree before packaging, taking the
-helper from 273MB to about 112MB. One exclusion matters for licensing rather than size:
+The packaging script removes part of osu!'s dependency tree. One removal matters for licensing
+rather than size:
 
-- **The native BASS binaries** (`bass.dll`, `bass_fx.dll`, `bassmix.dll`, `basswasapi.dll`).
-  BASS is [un4seen](https://www.un4seen.com/)'s commercial audio library - free for
-  non-commercial use but **not freely redistributable**. This app never plays a sound, and
-  the native libraries are only loaded on demand, so they are removed. The *managed*
-  wrapper `ppy.ManagedBass` (MIT, by ppy) has to stay: osu.Framework references it
-  directly and the helper will not start without it.
+- **The native BASS binaries** (`bass.dll`, `bass_fx.dll`, `bassmix.dll`, `basswasapi.dll`). BASS
+  is [un4seen](https://www.un4seen.com/)'s commercial audio library, free for non-commercial use but
+  not freely redistributable. This app never plays a sound and the native libraries only load on
+  demand, so they're removed. The managed wrapper `ppy.ManagedBass` (MIT, by ppy) stays, because
+  osu.Framework references it and the helper won't start without it.
 
-The rest of what goes is dead weight: `osu.Game.Resources.dll` (125MB of fonts, textures
-and audio samples), the localisation satellite assemblies, and the native ffmpeg, SDL,
-shader-compiler, image-loader and debug-symbol libraries.
+The rest is dead weight: `osu.Game.Resources.dll` (fonts, textures and audio samples), localisation
+assemblies, and native libraries the helper never loads. .NET's own libraries are partially
+trimmed; osu!'s and every third-party library are shipped whole. Each build checks that the smaller
+helper gives exactly the same answers as the full one before shipping it (`docs/roadmap.md` 5.60).
 
-**Trimming the assemblies is not an option, and that was measured rather than assumed.**
-`PublishTrimmed` takes the helper to 36MB, and then breaks it: with the linker's removals in
-place it fails inside osu!'s own graph, unable to construct
-`Newtonsoft.Json.Converters.StringEnumConverter` while reading a lazer replay. .NET's own
-linker warns in advance that `osu.Game`, `osu.Framework`, `Realm`, `Newtonsoft.Json`,
-`AutoMapper` and `MongoDB.Bson` are not trim-safe. See `docs/roadmap.md` 5.44 for the full
-result and how to repeat it.
-
-**Less can be removed than you would expect.** osu.Framework's `Logger` static constructor
-pulls in nearly the whole managed assembly graph - NUnit, Sentry, OpenTabletDriver and
-others are all loaded before any of this project's code runs, however irrelevant they are
-to computing pp. Removing any of them kills the helper at startup, so they ship. Sentry in
-particular is present but **inert**: nothing here calls `SentrySdk.Init`, so no telemetry
-is collected or sent.
-
-Every exclusion was verified against a build with no fallback helper available, and the
-packaged helper is then run through a real pp calculation. That detail matters: an earlier
-attempt at this list passed the pp tests while shipping a helper that could not start at
-all, because the tests had quietly fallen back to the unpruned development build.
+Some libraries ship even though pp doesn't need them, because osu.Framework's startup loads nearly
+the whole assembly graph (NUnit, Sentry, OpenTabletDriver and others) and removing any of them stops
+the helper starting. Sentry is present but inert: nothing calls `SentrySdk.Init`, so no telemetry is
+collected or sent.
 
 ## What this project does not do
 
-Worth stating plainly, since it reads another game's files:
-
-- It never contacts osu!'s game servers, never logs in, and uses **no API credentials**.
-- It never submits, modifies or interferes with anything in your osu! account.
-- It only **reads** replay files and beatmaps already on your disk, and never writes to
-  osu!'s own files or databases (`online.db` is opened read-only).
+- It never logs in to osu! and uses **no API credentials**.
+- It never submits, changes or interferes with anything in your osu! account.
+- It only **reads** replays and beatmaps on your disk, and never writes to osu!'s own files or
+  databases (`online.db` is opened read-only).
 - It does not automate, assist or alter play in any way.
 
-It is a local read-only viewer of your own replays. The two hosts it may contact are
-`assets.ppy.sh` for cover art and `data.ppy.sh` for rank dumps - both public,
-unauthenticated, and optional.
+The hosts it contacts are public and need no login: `assets.ppy.sh` and `b.ppy.sh` for cover art,
+medal icons and song previews; `osu.ppy.sh` only when you press a button that looks something up
+or imports it, or to download a beatmap a score needs; and GitHub, to check for updates, which
+`"checkForUpdates": false` turns off.

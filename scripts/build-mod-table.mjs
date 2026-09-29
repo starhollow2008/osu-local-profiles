@@ -8,8 +8,8 @@
  *
  * The source is osu-web's `database/mods.json`, which osu-web itself generates from the
  * game's mod definitions. Only the acronym, display name, type and setting labels are
- * kept -- facts about osu!, the same class of thing as the colour tables in
- * docs/osu-web-reference.md. Descriptions and per-ruleset duplicates are dropped.
+ * kept -- facts about osu!, the same class of thing as the colour values in
+ * web/css/tokens.css. Descriptions and per-ruleset duplicates are dropped.
  *
  * Run: node scripts/build-mod-table.mjs
  */

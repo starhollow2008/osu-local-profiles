@@ -1,6 +1,6 @@
 /*
- * osu-web's design tokens, reimplemented from the published table in
- * docs/osu-web-reference.md. osu-web is AGPL-3.0-or-later, as this project is, so its LESS
+ * osu-web's design tokens, reimplemented from the values in its colors.less and variables.less
+ * (see docs/osu-web-fidelity.md). osu-web is AGPL-3.0-or-later, as this project is, so its LESS
  * could be ported as it is; these tokens were reimplemented from its values before that.
  *
  * The whole palette hangs off one hue. Each token is an hsl() *fragment*

@@ -1,8 +1,7 @@
 # User guide
 
-What every part of the app does, from a user's side. The README covers installing and the
-short version; `docs/architecture.md` covers how it works inside. Carried over from the
-README as it stood at 1.21.0.
+What each part of the app does. The README covers installing; `docs/architecture.md` covers how it
+works inside.
 
 ## Running it
 
@@ -12,249 +11,193 @@ README as it stood at 1.21.0.
 | macOS | double-click `osu! local profiles` | the menu bar |
 | Linux | run `./osu-local-profiles` (or `./start.sh`) | the system tray |
 
-There is no console window. The icon's menu has **Open profile**, **Open log** and **Quit**. On
-Windows and Linux, clicking the icon opens the page. The page has **Quit** too, at the top right.
-Starting the app again while it runs opens the page, so the launcher is also how to find it.
-What it prints goes to `data/logs/app.log`. The page also has a pause button, to keep it open
-without recording.
+There's no console window. The icon's menu has **Open profile**, **Open log** and **Quit**, and on
+Windows and Linux clicking the icon opens the page. The page has **Quit** at the top right, and a
+pause button to stop recording without closing. Starting the app again while it runs just opens the
+page. Output goes to `data/logs/app.log`.
 
-On Linux, a desktop without a tray (GNOME without the AppIndicator extension) gets no icon, and
-the app runs anyway; start it again for the page. With no desktop at all, `./start.sh` runs it
-in the terminal.
+On Linux, a desktop with no tray (GNOME without the AppIndicator extension) gets no icon, but the
+app still runs; start it again to open the page. With no desktop, `./start.sh` runs it in the
+terminal.
 
-Windows may say it protected your PC from an unrecognised app, because the build is not signed:
+Windows may say it protected your PC from an unrecognised app, because the build isn't signed:
 press **More info**, then **Run anyway**. It asks once.
 
-On macOS the first launch is refused, because the build is not signed by a paid Apple
-developer account and macOS blocks downloaded programs that are not. It takes one approval:
-double-click `osu! local profiles`, close the message, then in **System Settings -> Privacy &
-Security** press **Open Anyway** beside it and confirm. (On macOS 14 and earlier,
-right-clicking it and choosing Open does the same.) The launcher then lifts the quarantine from
-the rest of its own folder, so the pp calculator and its libraries are not refused one at a time
-- there is no need to allow apps from anywhere, and it is better not to. Running
-`xattr -dr com.apple.quarantine .` in the folder from Terminal does the same without any
-approval. The packaged `README.txt` says so too.
+macOS refuses the first launch for the same reason. Double-click `osu! local profiles`, close the
+message, then in **System Settings -> Privacy & Security** press **Open Anyway** and confirm. (On
+macOS 14 and earlier, right-click it and choose Open.) The launcher then lifts the quarantine from
+the rest of its folder, so you don't need to allow apps from anywhere. Running
+`xattr -dr com.apple.quarantine .` in the folder from Terminal does the same.
 
-**The page opens straight away, even on the first run.** The first time, the app reads your
-osu! folder once to match each score to its beatmap - seconds on some machines, longer on a
-big library. A bar at the top of the page shows how far it has got, and anything you play
-meanwhile is held and added, with pp, as soon as it finishes. Later runs only look for new
-beatmaps, which normally takes under a second.
+**The page opens straight away, even the first time.** On a first run the app reads your osu!
+folder to match scores to beatmaps, which takes seconds to a few minutes depending on your library.
+A bar at the top shows progress, and anything you play meanwhile is added, with pp, when it
+finishes.
 
-Scores set before the profile was created are never imported unless you ask - otherwise
-switching the app on would pull in the plays you set with your normal playstyle earlier that
-day. See [Importing plays you set while it was closed](#importing-plays-you-set-while-it-was-closed).
+Plays set before a profile was created are never imported unless you ask, so switching the app on
+doesn't pull in plays from your normal playstyle. See
+[Importing plays you set while it was closed](#importing-plays-you-set-while-it-was-closed).
 
 ## Platform support
 
 | Platform | State |
 | -------- | ----- |
-| **Windows** | Verified, on both clients. osu!stable was installed and played against as of 1.12.0 (detection, the beatmap index, the replay watcher, pp and the Classic mod all checked on a real install). |
-| **Linux** | Green on CI (`ubuntu-latest`): typecheck, the full test suite, and a real start-up. Each release has a `linux-x64` build, packaged and started on Linux. Nobody has yet run it against an actual osu! install. |
-| **macOS** | The same, on `macos-latest`, with an `osx-arm64` (Apple silicon) build and an `osx-x64` (Intel) one built on an Intel runner. Each is built and started by CI on its own architecture; neither has been run against a real osu! install. |
+| **Windows** | Verified on both osu!lazer and osu!stable. |
+| **Linux** | Tested and packaged on CI, but nobody has run it against a real osu! install yet. |
+| **macOS** | The same, with Apple silicon and Intel builds. |
 
-Linux and macOS are *supported but unproven*. What can be checked without one of those
-machines has been: every path the app looks for osu! in is pinned by tests that run on all
-three platforms, and CI builds osu!'s pp calculator and starts the app on each. What cannot is
-everything that needs a real osu! installation - that detection finds it, that the file watcher
-fires, and that a packaged build runs after being unzipped.
+On Linux or macOS, `node src/main.ts --check-only` reports whether osu! was found and whether the
+pp calculator starts. If osu! isn't found, point `installRoots` in `data/config.json` at it, and
+please open an issue with the path.
 
-On one of them, the interesting output is `node src/main.ts --check-only`. It reports whether
-osu! was found and whether the pp calculator starts, as two separate answers. If osu! is not
-found, point `installRoots` in `data/config.json` at it, and please open an issue with the
-path - that is exactly the kind of layout that cannot be guessed.
+**osu!stable on macOS and Linux** runs under Wine, with no single layout. Wineskin bundles, plain
+`~/.wine` prefixes, CrossOver bottles and osu-winello are all checked. Anything else needs
+`installRoots`.
 
-**osu!stable on macOS and Linux** runs under Wine, and there is no single layout for it. The
-Wineskin bundles, plain `~/.wine` prefixes, CrossOver bottles and osu-winello are all looked
-in; osu-winello's own record of where it installed osu! is read rather than guessed at.
-Anything else needs `installRoots`.
+**Options -> osu! folders** shows what was found and lets you add a folder by hand. If no osu!
+install is found, the page still opens so you can point at one.
 
-**Options -> osu! folders** shows what was found and takes a folder by hand. "No osu!
-installation found" does not close the app - the page opens so you can point at one.
-
-**osu!'s development client** - a Debug build of [ppy/osu](https://github.com/ppy/osu) run from
-source - is found too, and tracked **beside** osu!lazer rather than instead of it. It keeps its
-own folder next to lazer's (`osu-development`, or `osu-development-2` and so on when started
-with `--debug-client-id`), which is looked in on every launch; one anywhere else can be added
-in osu! folders or `installRoots` like any other. Its plays count toward the same profile, and
-so do mods you have made yourself, though their pp is osu!'s current formula, since the app's
-calculator is the released one. It signs in to osu!'s development server, so the account its
-replays carry is the one in its own `game.dev.ini`, and that account counts as you.
+**osu!'s development client** (a Debug build of [ppy/osu](https://github.com/ppy/osu) run from
+source) is found too, and tracked beside osu!lazer. It keeps its own folder next to lazer's
+(`osu-development`, or `osu-development-2` and so on with `--debug-client-id`). Its plays count
+toward the same profile, including mods you made yourself. It signs in to osu!'s development
+server, so the account in its `game.dev.ini` counts as you.
 
 ## Plays that were never finished
 
-osu! counts a play you quit, retried or failed. lazer does not *keep* one: it saves a score
-only for a map played to the end, so a fail or a quit leaves no replay behind. On one real
-session that was 26 of 45 counted plays - more than half a play count, invisible. So those are
-read from lazer's own session log instead, which records the moment osu! accepted each
-submission.
+osu! counts a play you quit, retried or failed, but osu!lazer only saves a replay for a map played
+to the end. On one real session that was 26 of 45 counted plays with no replay. So the app reads
+them from lazer's own session log, which records when osu! accepted each play.
 
-This needs osu! to be signed in, which is also exactly when osu! counts the play - so the two
-agree. There is no accuracy, combo, mod list or pp for these: lazer never writes any of it down
-for a play it discards. They count toward your play count, monthly play counts and Most Played,
-and appear in Recent Plays as dimmed rows according to the
-[Unfinished plays in Recent Plays](#unfinished-plays-in-recent-plays) setting. They can be
-removed from Recent Plays and the play count.
+That needs osu! to be signed in, which is also when osu! counts the play, so the two agree. These
+plays have no accuracy, combo, mods or pp, because lazer never records any. They count toward your
+play count, monthly play counts and Most Played, and show in Recent Plays as dimmed rows (see
+[Unfinished plays in Recent Plays](#unfinished-plays-in-recent-plays)). You can remove them like a
+score.
 
 ### Offline or signed out
 
-osu! counts nothing it cannot submit, so a quit, fail or retry while offline is not a play on
-osu!. lazer still writes one line about it - `No token, skipping score submission` - and that
-is what this reads: only a solo play the game said it had no token for, that did not reach a
-results screen (a pass is already tracked from its replay). The beatmap is matched by the name
-the log gives it, against every beatmap installed, so this works without osu!lazer's online
-beatmap database.
+Offline, osu! counts nothing, but lazer still logs `No token, skipping score submission`. The app
+reads that line for solo plays that didn't reach a results screen, and matches the beatmap by the
+name in the log, so this works without lazer's online beatmap database.
 
-They count by default, toward the play count, monthly play counts, Most Played, Recent Plays
-(as **Not submitted**) and Total Play Time together: osu! never received them, so counting them
-takes nothing away from what your osu! profile shows - it only covers play osu! had no chance
-to see. Turn off **Other settings -> Count plays osu! could not submit** to match your osu!
-profile exactly; they are recorded either way, so turning it back on loses nothing. The one
-thing the log cannot say is whether osu! would have counted the attempt had it been online -
-osu! ignores a play with no hits at all - so an attempt quit before hitting anything counts
-here.
+These count by default toward the play count, monthly play counts, Most Played, Recent Plays (as
+**Not submitted**) and Total Play Time. osu! never received them, so counting them doesn't
+contradict your osu! profile. To match your osu! profile exactly, turn off **Other settings ->
+Count plays osu! could not submit**; they're still recorded, so turning it back on loses nothing.
+The log can't say whether osu! would have counted an attempt (it ignores a play with no hits), so
+an attempt quit before hitting anything counts here.
 
-Attempts from before the app was running are still in osu!lazer's logs, and **Import past
-plays** can bring them in.
+**Import past plays** can bring in attempts from before the app was running.
 
 ## osu!stable is different
 
-Measured on a real stable install (`b20260711.1`), and not something this app can work around:
+Measured on a real stable install, and not something the app can work around:
 
-- **A score arrives when you leave the results screen**, not when the play ends. That is the
-  moment stable writes the replay file: on one session the scores were set at 3:39:25, 3:41:04
-  and 3:42:12, and the replays appeared 8 to 23 seconds later, as each results screen was
-  closed. Until then there is nothing on disk to notice.
-- **Plays you quit, failed or retried are not counted at all.** stable writes no replay for
-  them and no log of them. The only trace is a single "last played" time per beatmap in
-  `osu!.db`: a quit, a fail and a retry on one difficulty left *one* timestamp between them,
-  flushed minutes later, and a pass updates the same field. That cannot count retries, cannot
-  tell a fail from a pass, and comes too late - so this app does not guess.
-- **With osu!stable and no osu!lazer, every beatmap counts toward pp.** Only lazer ships the
-  database that records whether a beatmap is ranked, so a stable-only install cannot tell a
-  ranked map from a loved, graveyarded or never-submitted one. pp is still calculated for every
-  play - that needs only the beatmap file, which is in your Songs folder - so rather than
-  counting nothing, the profile counts everything and says so in **Scores**. The *Include pp
-  for unranked beatmaps* settings are dimmed there, because there is no status to filter on.
-  Install osu!lazer alongside and the statuses resolve for stable's plays too.
+- **A score arrives when you leave the results screen**, not when the play ends, because that's when
+  stable writes the replay.
+- **Plays you quit, failed or retried aren't counted.** Stable writes no replay or log for them. Its
+  only trace is one "last played" time per beatmap, which can't count retries or tell a fail from a
+  pass.
+- **With osu!stable and no osu!lazer, every beatmap counts toward pp.** Only lazer ships the database
+  that says whether a beatmap is ranked. pp is still calculated for every play from the beatmap in
+  your Songs folder, so the profile counts everything and says so in **Scores**, and the *Include pp
+  for unranked beatmaps* settings are dimmed. Install osu!lazer alongside and statuses resolve for
+  stable's plays too.
 
-The page says the first two once, wherever a stable install is found - in Recent Plays and in
-Scores, with a **Don't show again**. On osu!lazer neither applies: a play is counted the moment
-osu! accepts it, quits and retries included. The full evidence is in
-[roadmap.md](roadmap.md) under 5.12.
+The page says the first two once, wherever a stable install is found, with **Don't show again**.
+The evidence is in [roadmap.md](roadmap.md) under 5.12.
 
 ## The profile page
 
-Under the rank graph sit osu!'s own three figures: **Medals** (every medal the profile holds,
-across all modes), **pp**, and [**Total Play Time**](#total-play-time).
+Under the rank graph are osu!'s three figures: **Medals** (every medal across all modes), **pp**,
+and [**Total Play Time**](#total-play-time).
 
-The long sections - Recent Plays, Scores, Milestones and Most Played Beatmaps - start at five
-rows with a **show more** button, expanding to 25 and then 25 at a time, as on osu!. Both
-charts are hoverable: the rank graph reads out `Global Ranking #120,000` / `40 days ago` by
-day, and Play History reads `Plays 430` / `March 2020` by month.
+Long sections start at five rows with a **show more** button (see [Show more](#show-more)). Both
+charts show values on hover, by day on the rank graph and by month on Play History.
 
-Global rank is an estimate (see [Known limitations](#known-limitations)). Country rank shows
-`-`, on purpose.
+Global rank is an estimate (see [Known limitations](#known-limitations)). Country rank shows `-` on
+purpose.
 
-The page can be read **in your own language**: the flag in the top right switches language,
-and the first launch asks.
+The flag in the top right switches the page's language, and the first launch asks.
 
 ### Rearranging the page
 
-Hover a section and use the arrows in its top-right corner, or drag it by the grip beside them.
-The order is saved with the profile, the way osu! remembers the arrangement of your own page.
+Hover a section and use the arrows in its top right corner, or drag it by the grip. The order is
+saved with the profile. The arrows also work from the keyboard and on a touchscreen.
 
-The arrows are the real interface, not a fallback: they work from the keyboard and on a
-touchscreen, and they cannot half-succeed the way a drag can.
-
-To hide a section, untick it under **Options -> Other settings -> Profile sections**. It
-disappears from the page, its tab and a saved web page, and comes back where it was when you
-tick it again.
+To hide a section, untick it under **Options -> Other settings -> Profile sections**. It disappears
+from the page, its tab and saved web pages, and comes back where it was when ticked again.
 
 ## Profiles
 
-**Options -> Profiles** manages several playstyles side by side - "left hand", "mouse only",
-"tablet again" - each with its own scores, pp, level and start date. Only the selected one
-records plays. A new profile starts empty and tracks from the moment you create it, never from
-earlier plays. The same dialog edits and resets the profile being tracked, imports from an osu!
-account, and holds **Keep Favorite Beatmaps the same on every profile**.
+**Options -> Profiles** manages several playstyles side by side ("left hand", "mouse only"), each
+with its own scores, pp, level and start date. Only the selected one records plays. A new profile
+starts empty and tracks from the moment you create it. The same dialog edits and resets the current
+profile, imports from an osu! account, and has **Keep Favorite Beatmaps the same on every profile**.
 
-Deleting a profile takes its tracked scores with it and needs an explicit confirmation. The
-last remaining profile cannot be deleted; reset it instead, with **Reset this profile** at the
-end of Edit profile.
+Deleting a profile deletes its scores and asks for confirmation. The last profile can't be deleted;
+use **Reset this profile** at the end of Edit profile instead.
 
 ### Editing the profile
 
-**Options -> Profiles**, under *Edit profile* - or click the avatar or the name, which open
-Profiles there.
+Under *Edit profile*, or click the avatar or the name:
 
-- **Name** - renames the profile. Nothing it has tracked changes.
-- **Country** - a two-letter code, shown beside the name the way osu! shows a flag.
-- **Playstyle** - what this profile is tracking, shown under the name.
-- **Picture** and **Banner** - upload a PNG, JPEG, WebP or GIF, or import them from an osu!
-  account (below). Both are stored per profile, so two playstyles are two identities.
+- **Name** renames the profile.
+- **Country** is a two-letter code, shown as a flag.
+- **Playstyle** shows under the name.
+- **Picture** and **Banner** take a PNG, JPEG, WebP or GIF, or come from an osu! account (below).
+  Both are per profile.
 
-Nothing here is required. With no picture the page draws an avatar from the profile's name, and
-with no banner it shows osu!'s default one.
-
-`country` and `tagline` in `data/config.json` are only the starting point; once edited here
-they are stored per profile, so two playstyles can carry different descriptions and clearing
-one stays cleared. An image dropped at `data/avatar.png` or `data/cover.jpg`
-(`.jpg`/`.jpeg`/`.png`/`.webp` all work) is used too.
+All optional. With no picture the page shows osu!'s guest avatar, and with no banner osu!'s default
+one.
 
 ### Importing from an osu! profile
 
-**Options -> Profiles**, under *Import from osu!*. Type a username, a user id or a link to a
-profile, press **Look up**, tick what to copy, and press **Import**.
+Under *Import from osu!*: type a username, user id or profile link, press **Look up**, tick what to
+copy, and press **Import**.
 
 | What | Ticked to begin with |
 | ---- | -------------------- |
 | Avatar | yes |
 | Banner | yes |
 | Flag | yes |
-| me! | yes - it replaces this profile's me! |
-| Favorite beatmaps | no - they are added to the list |
-| Medals | no - see below |
+| me! | yes (replaces this profile's me!) |
+| Favorite beatmaps | no (added to the list) |
+| Medals | no |
+| Best performances and pinned scores | no |
 
-It can also copy the account's **best performances and pinned scores**, so a profile's pp and
-accuracy match the website even for plays set on another PC.
+**Best performances and pinned scores** bring in up to 200 plays per mode, so a profile's pp and
+accuracy match the website even for plays set on another PC. See
+[Scores without a replay](#scores-without-a-replay).
 
-**Medals** copies the medals the account already holds, with the dates osu! awarded them - only
-the ones this app has (see [Medals](#medals)); osu!'s other groups are left out. Best
-performances alone cannot bring those back: a 1★ pass medal earned years ago is on a map that is
-nowhere near the account's best. They join the medals your plays here earn rather than replacing
-them - a medal shows whichever came first - and their cards say *Imported from osu!*. Importing
-again replaces what the last import copied, and resetting the profile clears them.
+**Medals** copies the medals the account already has, with their dates, but only the ones this app
+has (see [Medals](#medals)). They join the medals your plays here earn, and a medal shows whichever
+came first. Importing again replaces what the last import copied; resetting clears them.
 
-Importing also links the profile to that account. It is never automatic. A brand-new install
-offers this once, as a welcome marked optional; Skip, the close button, Escape or clicking
-outside it dismisses it for good, and an install updated from an earlier version is never
-asked. Either way nothing is sent to `osu.ppy.sh` until you press a button - one request to find
-the account, one per picture, and one per hundred favorites. No login and no API key. If osu! is
-signed in on this machine, its username is offered, read from the client's own config file with
-no network at all.
+Importing links the profile to that account, and is never automatic. A brand-new install offers it
+once as an optional welcome; any way of closing it dismisses it for good. Nothing is sent to
+`osu.ppy.sh` until you press a button, and there's no login or API key. If osu! is signed in on this
+machine, its username is suggested, read from osu!'s own config file.
 
-Importing from someone else's account - an alt, a friend, a player whose banner you like - is
-fine: it never decides which plays are yours. That is whoever osu! says is signed in on this
-machine, and replays other players set (ones you watched) are left out on that basis. Plays with
-no name, lazer's `Guest`, and plays osu! never accepted are always yours, whatever name they
-carry.
+You can import someone else's account (an alt, a friend, a banner you like). It never decides which
+plays are yours: that's whoever osu! says is signed in here, and replays other players set (ones you
+watched) are left out on that basis. Plays with no name, lazer's `Guest`, and plays osu! never
+received are always yours.
 
 ## The me! section
 
-The description box from osu!'s own profile, at the top of the page. Click it to write
-something; it belongs to the profile, so each playstyle gets its own.
+osu!'s description box, at the top of the page. Click it to write something; each profile has its
+own.
 
-It is written the way osu!'s is: in **BBCode**, with osu!'s own toolbar - Bold, Italic, Strike
-Out, Header, Link, Spoiler Box, Numbered List, List, Image, Image Map and Font Size, each
-wrapping whatever is selected - and **Preview** to see it before saving. **Paste or drop an
-image** straight into the box, or press Image with nothing selected, and it is stored with the
-profile. A me! page can be up to 60,000 characters, so one imported from osu! arrives whole.
+It's written in **BBCode** with osu!'s toolbar (Bold, Italic, Strike Out, Header, Link, Spoiler Box,
+lists, Image, Image Map and Font Size) and **Preview**. Paste or drop an image into the box, or press
+Image with nothing selected, and it's stored with the profile. Up to 60,000 characters, so a page
+imported from osu! arrives whole.
 
-The page is drawn by this app's own renderer rather than by trusting the text: everything is
-escaped first, and only the tags it knows become formatting. A tag it does not know, or one
-left open, shows as the characters you typed - so a page imported from anyone's osu! profile is
-exactly as safe as one you wrote.
+The app draws it with its own renderer: everything is escaped first, and only known tags become
+formatting. An unknown or unclosed tag shows as typed, so a page imported from anyone's profile is
+as safe as one you wrote.
 
 ## Scores
 
@@ -262,396 +205,279 @@ exactly as safe as one you wrote.
 
 Every score row has a **⋯** menu.
 
-- **Pin to profile** puts it under **Pinned Scores**, above Best Performance, as on osu!. Pins
-  are per game mode, and a pinned score does not have to be in your top 100 - pinning is how
-  you show a play you are proud of that pp does not reward.
-- Drag pinned scores to reorder them, or use **Move up** / **Move down** in the same menu.
-- **Remove from profile** takes the score out of every section *and* out of the totals: pp,
-  play count, ranked score, level, the charts and Most Played.
+- **Pin to profile** puts it under **Pinned Scores**, above Best Performance. Pins are per mode and
+  don't have to be in your top 100. Reorder by dragging, or with **Move up** / **Move down**.
+- **Remove from profile** takes the score out of every section and every total: pp, play count,
+  ranked score, level, the charts and Most Played.
 
-Removing never deletes anything. The score is marked hidden and can be put back from
-**Options -> Other settings**, under *Removed scores*. That is not only a convenience: the
-replay file is still in osu!'s store, so a genuinely deleted row would be re-imported the next
-time it was noticed - and with nothing left to recognise it by, it would come back looking like
-a brand new play.
+Removing never deletes anything. Removed scores can be put back from **Options -> Other settings ->
+Removed scores**. (If the row were deleted, the replay still in osu!'s folder would be imported again
+next time, as a new play.)
 
-To get rid of one for good, press the **red minus** beside it in *Removed scores* (it asks once
-more), or **Delete all permanently**. The score is deleted; what is kept is only the replay's
-fingerprint, so the replay still in osu!'s store is never imported again. A reset clears those
-along with everything else.
-
-Replays you *watched* are not counted as your own - osu! keeps them in the same folders as the
-ones you set.
+To delete one for good, press the **red minus** beside it in Removed scores, or **Delete all
+permanently**. Only the replay's fingerprint is kept, so it's never imported again. A reset clears
+those too.
 
 ### View Details
 
-**View Details** opens the score as osu!'s score page does, in a card over the profile: the
-beatmap and its difficulty, the cover, the grade tower, osu!'s accuracy dial (or, for a score
-set on osu!stable, the big grade letter osu! shows instead), the mods and total score, who
-played it and when and on which client, and accuracy, max combo, pp and every judgement -
-great / ok / meh / miss, plus slider ticks, slider ends and spinners against what the map had.
+**View Details** opens the score like osu!'s score page, in a card over the profile: the beatmap,
+cover, grade, osu!'s accuracy dial (or the big grade letter for an osu!stable score), mods, total
+score, who played it, when and on which client, and every judgement.
 
-Under those is the **pp breakdown**: how much came from aim, speed, accuracy and flashlight
-(taiko: difficulty and accuracy; mania: difficulty; catch has none), as osu!'s own calculator
-splits it, with the osu! release that priced the score. It is on the card only, not the profile
-page. A score tracked before this existed gets its breakdown the first time it is opened,
-recalculated from its replay so the parts always add up to the pp shown. Close it with the X,
-Escape, or a click beside it; the page underneath is exactly as you left it. Its own **⋯** has
-Pin and the rest, as the one on osu!'s score page does.
+Below that is the **pp breakdown**: how much came from aim, speed, accuracy and flashlight (taiko:
+difficulty and accuracy; mania: difficulty; catch has none), with the osu! release that priced it.
+Close the card with the X, Escape, or a click beside it. Its own **⋯** has Pin and the rest.
 
-Two things from osu!'s page are not there, because they are facts about osu!'s leaderboards and
-a local profile has none: the score's **Global Rank**, and how many times the replay was
-**watched**.
+The score's **Global Rank** and **watch count** aren't shown, since a local profile has no
+leaderboard.
 
-**Every score has its own page**, as on osu!: `http://localhost:7272/scores/<number>`, this
-app's version of `osu.ppy.sh/scores/<number>`. The card's **⋯** menu - in the pop-up and on that
-page - has **Copy link** for the address, and **Save screenshot** / **Copy screenshot** for the
-card as a picture, to your downloads or straight to the clipboard. The picture is made by the
-Chrome or Edge already on your computer, the same way the profile's screenshot is, which is
-what lets it include the beatmap's cover art. A link keeps working after you switch profiles;
-it shows the score as the profile it belongs to.
+**Every score has its own page** at `http://localhost:7272/scores/<number>`. The card's **⋯** menu
+has **Copy link**, and **Save screenshot** / **Copy screenshot** for the card as a picture, made by
+the Chrome or Edge already on your computer. A link keeps working after you switch profiles.
 
 ### Download Replay
 
-Saves the score's replay to your Downloads folder like any download - the exact file osu!
-wrote, so it can be dragged back into osu! to watch. It is named the way osu!lazer names a
-replay it exports, e.g. `Tangy playing Taylor Swift - Cruel Summer (funny) [Seolv's Hard]
-(2026-09-10_20-36).osr`. It is offered for any finished score whose replay osu! recorded; an
-unfinished play never has one. If osu! has since deleted the file, the page says so rather than
-starting a download that fails.
+Saves the score's replay to your Downloads folder, the exact file osu! wrote, named the way
+osu!lazer names an exported replay (for example `Tangy playing Taylor Swift - Cruel Summer (funny)
+[Seolv's Hard] (2026-09-10_20-36).osr`). Offered for any finished score with a replay. If osu! has
+since deleted the file, the page says so.
 
-### Two scoring scales, as osu! has
+### Two scoring scales
 
-osu! keeps every play on two scales, and its own profile page switches between them. So does
-this: **Options -> Lazer scoring**, on by default, exactly as osu! defaults it.
+**Options -> Lazer scoring**, on by default as on osu!:
 
 - **Lazer scoring** (on) is osu!'s standardised scale, where a nomod SS is 1,000,000.
-- **Classic scoring** (off) is the uncapped older scale. A play set on osu!stable shows the
-  number stable itself recorded; a play set on lazer shows osu!'s own classic conversion of it,
-  which runs into the millions.
+- **Classic scoring** (off) is the older uncapped scale: stable's own number for a stable play, and
+  osu!'s classic conversion for a lazer play.
 
-Both numbers come from osu!'s own code - the pp helper returns them beside the pp - and both are
-stored per score, so switching is instant and never needs a recalculation. It moves every
-score-shaped number together: the score on each row and card, Total Score, Ranked Score, and
-the level, which is a function of total score. A score tracked before this existed shows the
-single number its replay carried, until **Other settings** recalculates it.
+Both come from osu!'s own code and are stored per score, so switching is instant. It changes every
+row and card, Total Score, Ranked Score and the level together.
 
-osu!stable plays are also listed **with the Classic mod**, as osu! lists them. osu! adds CL to
-every stable score before scoring it - it is what selects classic slider accuracy and legacy
-miss estimation - so a stable play reads `DTCL` here just as it does on osu!. That is display
-only: medals, play time and pp eligibility all read the mods you actually chose.
+osu!stable plays are listed **with the Classic mod**, as on osu!, which adds CL to every stable score
+before scoring it. That's display only: medals, play time and pp eligibility use the mods you chose.
 
 ## Medals
 
-A Medals section laid out as osu!'s is, restricted to the medals a local profile can actually
-decide for itself. The names, descriptions, icons and thresholds are osu!'s own.
+A Medals section like osu!'s, limited to medals a local profile can decide. Names, descriptions,
+icons and thresholds are osu!'s own. They're grouped as on osu! (**Mod Introduction**, then **Skill
+& Dedication**). Hover a medal for its card. A newly earned one appears in **Milestones**, and the
+page announces it.
 
-They are shown in osu!'s own groups - **Mod Introduction**, then **Skill & Dedication** - with a
-row of icons per family and nothing written beside them. Hover (or tab to) a medal for osu!'s
-card - the group, the medal's name and description, and the date it was achieved, or *Locked*.
-A newly earned medal also appears in **Milestones**, and the page announces it when it happens.
-
-What exists is **not the same in every mode**, and that is osu!'s doing:
+What exists differs by mode, as on osu!:
 
 | family | osu!standard | taiko, catch, mania |
 |---|---|---|
-| Combo | 500 / 750 / 1,000 / 2,000 | none in osu! |
-| Plays | 5,000 / 15,000 / 25,000 / 50,000 | none in osu! |
-| Hits | none in osu! | four tiers, per mode |
+| Combo | 500 / 750 / 1,000 / 2,000 | none |
+| Plays | 5,000 / 15,000 / 25,000 / 50,000 | none |
+| Hits | none | four tiers, per mode |
 | Beatmap pass | 1★ to 10★ | 1★ to 8★ |
 | Beatmap full combo | 1★ to 10★ | 1★ to 8★ |
-| Rank | top 50,000 / 10,000 / 5,000 / 1,000 | the same four |
+| Rank | top 50,000 / 10,000 / 5,000 / 1,000 | the same |
 
-A star medal is for its own star rating and nothing below it, as on osu!: a 5.4★ pass earns the
-5★ pass medal alone. The rating is the one with your mods, and as osu! does, it only counts a
-ranked or approved map (never qualified or loved), with no Easy, No Fail, Half Time, Daycore,
-Spun Out, Relax, Autopilot or other mod that makes a map easier or plays it for you - and on
-osu!mania, no key mod or Dual Stages.
+A star medal is for its own star rating only: a 5.4★ pass earns the 5★ medal alone. The rating
+includes your mods, and as on osu!, only a ranked or approved map counts (not qualified or loved),
+with no mod that makes it easier or plays it for you, and on osu!mania no key mod or Dual Stages.
 
-**Mod Introduction** is one set shared by every mode, as on osu!: your first pass with a mod on
-its own at its default settings - Easy, No Fail, Half Time, Hard Rock, Sudden Death, Perfect,
-Double Time, Nightcore, Hidden, Flashlight, and Spun Out (osu!standard only). Two more go to
-lazer's **Conversion** and **Fun** mods, which osu!stable does not have. Classic does not count
-as a second mod, Nightcore is not Double Time, and a failed play earns nothing.
+**Mod Introduction** is shared by every mode: your first pass with a mod on its own at default
+settings (Easy, No Fail, Half Time, Hard Rock, Sudden Death, Perfect, Double Time, Nightcore,
+Hidden, Flashlight, and Spun Out in osu!standard), plus lazer's **Conversion** and **Fun** mods.
+Classic doesn't count as a second mod, Nightcore isn't Double Time, and a failed play earns nothing.
 
-Medals are **derived from the scores, never stored**: removing a score that earned one takes the
-medal with it. The one exception is medals imported from osu!, which are osu!'s record rather
-than your plays here. Two families are only as good as their inputs, and say so:
-
-- **Rank** medals use the estimated pp-to-rank curve, so they inherit its approximation.
-- **Full combo** needs the beatmap's own maximum combo. A lazer score can drop slider ends
-  without breaking combo, so "no misses" alone is not enough. Scores tracked before that was
-  recorded are reported as unknown rather than guessed either way; the section says how many,
-  and **Other settings** can recalculate them.
+Medals are worked out from your scores, so removing a score removes a medal it earned. Medals
+imported from osu! are the exception. **Rank** medals use the estimated rank. **Full combo** needs
+the beatmap's maximum combo; scores tracked before that was recorded show as unknown, and **Other
+settings** can recalculate them.
 
 ## Total Play Time
 
-Counted the way osu! counts it. osu!'s score processor adds, for every play, **the beatmap's
-length divided by the play's rate, or the time from starting the play to submitting it,
-whichever is less** - so DT counts two-thirds of the map, and quitting after thirty seconds
-counts thirty seconds rather than the whole map.
+Counted as osu! counts it: for each play, the beatmap's length divided by the play's speed, or the
+time from starting to submitting it, whichever is less. So DT counts two-thirds of the map, and
+quitting after thirty seconds counts thirty seconds.
 
-- A **finished score** counts its beatmap's length at the speed it was played. The replay does
-  not record when the play began, but for a map played to the end the length is the smaller of
-  the two anyway.
-- An **unfinished play** (quit, retry, fail) counts the time between osu! starting it and osu!
-  accepting its submission, both read from lazer's log, capped at the map's length. Unfinished
-  plays tracked before 1.5.0 have no start time recorded and count nothing rather than a guess.
-- A beatmap's length runs from its first object to the end of its last, read once from the
-  `.osu` file. A slider's tail at the very end of a map is not included.
+- A **finished score** counts the beatmap's length at the speed played.
+- An **unfinished play** counts the time between osu! starting it and accepting it, from lazer's
+  log, capped at the map's length. Unfinished plays tracked before 1.5.0 count nothing.
 
 ## Favorite Beatmaps
 
-The **Beatmaps** section, as osu! has it. Open the **⋯** menu on any row in **Scores** or
-**Recent Plays** and choose **Favorite this beatmap**; it appears as osu!'s beatmap card, with
-its cover, status, a coloured dot per difficulty, and the Explicit / Featured Artist /
-Spotlight badges, and a video or storyboard icon when the set has one. Hover the dots for every
-difficulty's name and star rating, and the card for the heart (unfavourite) and the download
-link. The play button on the cover plays osu!'s own short preview of the song - streamed from
-osu.ppy.sh only when pressed, about 100KB, and never stored. Press it again to pause, and again
-to carry on from where it stopped.
+The **Beatmaps** section, as on osu!. In the **⋯** menu of any row in **Scores** or **Recent
+Plays**, choose **Favorite this beatmap**. It appears as osu!'s beatmap card. Hover the difficulty
+dots for each difficulty's name and star rating. The play button on the cover plays osu!'s short
+preview of the song, streamed only when pressed.
 
-While a preview plays, osu!'s audio bar comes up in the bottom-right corner: previous / next
-through your favourites, play / pause, the position (drag to seek), a volume slider with mute,
-and a button to play the next favourite automatically when one ends. It goes away a few seconds
-after the music stops. The volume, mute and autoplay choices are remembered by your browser.
+While a preview plays, osu!'s audio bar appears in the bottom right corner: previous and next,
+play/pause, seeking, volume, and autoplay of the next favourite. Your browser remembers the volume,
+mute and autoplay.
 
-**Every profile shares one list** by default, since what you like to play does not change with
-how you play it. Turn that off under **Options -> Profiles -> Every profile** and each profile
-keeps its own copy of the list as it stands; turning it back on merges them. **Import** the
-favorites of any osu! account from **Options -> Profiles** - one request per hundred, which
-carries every card's details. While the list is empty it says how to fill it, with **Don't show
-again** for anyone who would rather not.
+**Every profile shares one list** by default. Turn that off under **Options -> Profiles -> Every
+profile** and each profile keeps its own copy; turning it back on merges them. You can **Import**
+any account's favorites from **Options -> Profiles**.
 
-Favorites are never sent to osu!. Favouriting makes **one request** to `osu.ppy.sh` for that
-beatmap's details, which are then kept, so the card works offline. With no connection the
-favourite is still saved, and the card shows what your machine knows - every difficulty from
-lazer's `online.db`, with a star rating only where one of your own scores gives it - until a
-later favourite, made online, fills it in.
+Favorites are never sent to osu!. Favouriting makes one request to `osu.ppy.sh` for the beatmap's
+details, which are kept so the card works offline. With no connection the favourite is still saved,
+and the card shows what your machine knows until it can be filled in.
 
 ## Play tracking filter
 
-**Options -> Play tracking filter.** Which plays this profile records *at all*.
+**Options -> Play tracking filter** decides which plays this profile records at all.
 
-It is **off by default**, and switching it on changes nothing on its own: every criterion starts
-wide open, so the filter only ever narrows on purpose. There are nine:
+It's **off by default**, and switching it on changes nothing by itself, since every criterion starts
+wide open. There are nine:
 
 | | |
 |---|---|
-| **Keywords** | Matched against the song title, the artist, the difficulty name and the mapper. Separate several with commas - a play counts if any one appears. |
+| **Keywords** | Song title, artist, difficulty name and mapper. Separate several with commas; a play counts if any one appears. |
 | **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
-| **Difficulty** | The star rating **as played**, mods included, so a 5.50&#9733; beatmap under Double Time is judged at its Double Time rating. |
+| **Difficulty** | The star rating as played, mods included. |
 | **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
 | **Categories** | Ranked, Qualified, Loved, Pending, Work in progress, Graveyarded, Never submitted. |
-| **Length** | How long the beatmap runs at the speed it was played. |
+| **Length** | How long the beatmap runs at the speed played. |
 | **Date added** | When the beatmap arrived on this machine. |
 | **Date submitted** | When it was first uploaded to osu!. |
 | **Date ranked** | When it was ranked, approved or loved. |
 
-**A play the filter turns away is not tracked** - no score, no pp, no play count. So the app
-says so every time: a line in the log, a message on the page naming the criterion that declined
-it, a count in the Options menu, and a mark on the menu entry for as long as a filter is
-narrowing anything. It is also listed under **Plays not tracked** (below), where it can be
-tracked anyway. **Import past plays applies the filter too**, and says how many it would leave
-out; it can be told to ignore the filter for that one import.
-
-### Plays not tracked
-
-**Options → Other settings → Plays not tracked** lists every play this profile turned away, and
-why: declined by the filter (naming the criterion), set by another player, or a replay that
-could not be read. Each replay shows the name of the player who set it. Each says whether it was turned away while tracking, by Import
-past plays, or by the import at launch. It is the first place to look when a play you expected
-never appeared. When the list holds more than one kind, a **Show** menu narrows it to one.
-
-**Track anyway** brings that one play in regardless, exactly as if you had just played it. It
-never adds a play twice, and it cannot bring back a replay osu! has since deleted. Tracking
-another player's replay asks you to press twice, because it puts their play in your profile.
-The red minus deletes a play for good, exactly as it does under Removed scores: it is never
-tracked or listed again, and **Delete all permanently** does that for every play in the list.
-The list keeps the newest 1,000 plays, and resetting the profile empties it. Like Removed
-scores, it is always in Other settings, and says so when it is empty.
+**A play the filter turns away isn't tracked**: no score, no pp, no play count. So the app tells you
+each time: a line in the log, a message naming the criterion, a count in the Options menu, and a mark
+on the menu entry while a filter is narrowing anything. It's also listed under [Plays not
+tracked](#plays-not-tracked). **Import past plays** applies the filter too, and can be told to
+ignore it for one import.
 
 ### The mods section
 
-A mod is in one of three states, and a click moves it to the next:
+Click a mod to cycle it through three states:
 
-- **may be used** (the starting state) - the mod has no say in whether the play is tracked.
-- **must be used** - every play tracked has to have it on.
-- **must not be used** - no play with it on is tracked.
+- **may be used** (the starting state): the mod doesn't affect whether a play is tracked.
+- **must be used**: every tracked play needs it.
+- **must not be used**: no play with it is tracked.
 
-So Hidden left alone with everything else marked out tracks nomod and HD plays; Double Time set
-to *must* with Hidden left alone tracks DT and DTHD. The **nomod** badge says what the grid
-cannot: *must* means only plays with no mods at all, *must not* means never a nomod play. Under
-the grid is a sentence saying what the current selection means, because sixty-seven badges
-cannot be read as a rule.
+So Hidden left alone with everything else set to *must not* tracks nomod and HD plays. The **nomod**
+badge covers what the grid can't: *must* means only plays with no mods, *must not* means never a
+nomod play. A sentence under the grid spells out the current selection.
 
-Only *which* mods were on is compared, never how they were configured, and an osu!stable play is
-matched on what you actually chose - osu! adds Classic to stable scores afterwards, which is not
-a choice anyone made. Autoplay and Cinema are not listed at all: nothing in this app can ever
-count them.
+Only which mods were on is compared, not their settings, and an osu!stable play is matched on the
+mods you chose (not the Classic mod osu! adds). Autoplay and Cinema aren't listed, since they never
+count.
 
-### What it cannot judge
+### What it can't judge
 
-- **Plays you quit, failed or retried** are matched on the other seven criteria. osu!lazer
-  records no mods and no star rating for a play it discards, and those two simply do not judge
-  it - the alternative, dropping what cannot be fully judged, would make this profile's play
-  count disagree with osu!'s the moment the filter came on.
-- **With osu!stable and no osu!lazer**, a beatmap's category and both of its submission dates
-  have no source on the machine. Those three sections say so and stay out of the way; the other
-  six work normally.
-- **Beatmaps osu! has never ranked, approved or loved have no submission or ranked date at
-  all** - osu! only records them for those three. Both date criteria therefore carry an
-  *include beatmaps with no date on record* box, on by default, so narrowing a year does not
-  silently stop tracking every graveyarded map.
+- **Plays you quit, failed or retried** have no mods or star rating, so those two criteria don't
+  judge them. Dropping them instead would make your play count disagree with osu!'s.
+- **With osu!stable and no osu!lazer**, category and both submission dates have no source, so those
+  sections say so and stay out of the way.
+- **Beatmaps osu! has never ranked, approved or loved have no submitted or ranked date.** Both date
+  criteria have an *include beatmaps with no date on record* box, on by default, so narrowing a year
+  doesn't quietly stop tracking every graveyarded map.
+
+### Plays not tracked
+
+**Options -> Other settings -> Plays not tracked** lists every play this profile turned away and
+why: declined by the filter (naming the criterion), set by another player, or a replay that couldn't
+be read. Each shows who set it and whether it was turned away while tracking, by Import past plays,
+or by the import at launch. It's the first place to look when a play never appeared.
+
+**Track anyway** brings one play in regardless, as if you had just played it. It never adds a play
+twice, and can't bring back a replay osu! has deleted. Tracking another player's replay asks twice.
+The red minus deletes a play for good, as in Removed scores. The list keeps the newest 1,000, and a
+reset empties it.
+
+**It's me** appears beside Track anyway on a play set by another player. It asks osu! whether that
+name is yours under another name; if it is, every name your account has had counts as yours, and the
+plays turned away under them are tracked (the filter still applies).
 
 ## Importing plays you set while it was closed
 
-Scores are only tracked while the app is running, so a session played with it closed is missed.
-**Options -> Import past plays** covers that: pick when you played, check what would be
-imported, then confirm.
+Plays are only tracked while the app runs. **Options -> Import past plays** covers the rest: pick
+when you played, check what would be imported, then confirm.
 
-- **A preset** - 1 hour up to 1 day - imports from that long ago up to now.
-- **All** imports every play osu! has kept on this computer, however old. Checking reads every
-  replay, so it can take a minute or two, and importing thousands of plays takes longer.
-- **From and To** pick a range of your own - an evening last week, without the week since. Tick
-  **Earliest** to start from the oldest play there is, and **Now** (ticked by default) to run up
-  to the present; a ticked end hides its date.
-- **Look in**, when the app has found more than one osu! install (osu!lazer, osu!stable, McOsu,
-  osu!'s development client), lists them all, ticked. Untick any you do not want this import to
-  read - a profile kept for your McOsu playstyle, say, can leave osu!stable's plays out.
-- **Import replay files...** takes `.osr` files you have yourself - downloaded from osu!'s
-  website, say, or kept from an old install - that osu! no longer has. Choose as many as you like
-  at once, or select them in a folder and drag them onto the dialog. Each is imported straight
-  away, through the same checks as everything else (the filter box above included), and the
-  dialog says what came of them. The app keeps its own copy in `data/replays/`, so deleting the
-  file you chose loses nothing, and **Back up everything** includes it.
-- **Import from a score link...** takes a score's link on osu.ppy.sh, for a play whose replay
-  you no longer have. **Check** shows the score and who set it; **Import** brings it in. Its pp
-  is calculated here from the score's own numbers, exactly as osu! calculates it - and after a
-  pp rework it is recalculated here with everything else, no internet needed. A beatmap you do
-  not have installed is downloaded once and kept. If osu! did keep the replay after all, in any
-  of your osu! installs, it is found and used instead, and the dialog says so.
-- **Enter a score by hand...** is the last resort, for a play with no replay and no link. Pick
-  the beatmap - search your installed ones by name, or paste its link - then type the
-  judgements, max combo, mods, when you played it, and the score if you know it. Everything is
-  checked against the beatmap, and the pp is calculated from what you entered.
+- **A preset** (1 hour up to 1 day) imports from that long ago up to now.
+- **All** imports every play osu! has kept on this computer. Checking reads every replay, so it can
+  take a minute or two.
+- **From** and **To** pick your own range. Tick **Earliest** to start from the oldest play, and
+  **Now** (ticked by default) to run up to the present.
+- **Look in**, when more than one osu! install was found, lets you untick installs this import
+  shouldn't read.
+- It reads osu!lazer's logs as well as replays, so a past session comes back whole: finished plays,
+  counted quits and retries, and offline attempts. Each kind is its own tick box with its count.
+- A play on a beatmap you no longer have is skipped, and the check says how many.
 
-Best performances imported from your osu! account are priced the same way: each is rebuilt from
-what osu! sent and calculated here, so a pp rework recalculates them with everything else. Right
-after the import, every osu! install on this computer is searched for the replays of those plays,
-and each one found takes its score's place - so plays whose replay you still have never show **No
-replay file** at all. Only those plays' own replays are used: nothing else is imported. If the
-real replay of one turns up later - live, from Import past plays, or a file you add - it takes
-that score's place too, keeping its pin, and never adds the play twice.
+Only reach back as far as the session you actually played with this playstyle, or you'll pull in
+plays from your normal one. It never runs by itself unless you turn on [Import plays set while the
+app was closed](#import-plays-set-while-the-app-was-closed).
 
-Scores with no replay say so on every row they appear in, on their details card, and in shared
-copies of the profile: **No replay file** for one imported from osu! (by link, or with an
-account's best performances), and **Manually entered by hand** for one typed in. Neither can be
-downloaded as a replay. Any score osu! has - most submitted plays too - has **View osu! score link** in
-its ··· menu.
+### Scores without a replay
 
-It reads osu!lazer's own logs as well as your replays, so a past session comes back whole: the
-finished plays from their replays, the quits, fails and retries osu! counted, and the ones made
-offline or signed out that osu! could not submit. The check lists each kind with its count, all
-ticked, and you untick what you do not want - bringing in last week's offline attempts does not
-have to bring in last week's replays. A play on a beatmap you no longer have installed is
-skipped, and the check says how many.
+The same dialog has three ways to add plays osu! no longer has a replay for:
 
-It never runs by itself unless you ask it to, and the warning in the dialog is the important
-part - reach back further than the session you actually played with this playstyle and you will
-pull in plays set with your normal one, which is the one thing a separate profile must not
-contain.
+- **Import replay files...** takes `.osr` files you have, for example downloaded from osu!'s website.
+  Choose several, or drag them onto the dialog. The app keeps its own copy, so deleting yours loses
+  nothing.
+- **Import from a score link...** takes a score's link on osu.ppy.sh. **Check** shows the score and
+  who set it, and **Import** brings it in.
+- **Enter a score by hand...** is the last resort: pick the beatmap, then type the judgements, max
+  combo, mods and date. Everything is checked against the beatmap.
 
-Asking it to is **Options -> Other settings -> Import plays set while the app was closed**, off
-by default. That runs this same import at every launch, over the gap the app was closed for and
-no further, so you do not have to remember to. Everything above still applies to it: the play
-tracking filter, the duplicate check, and plays on beatmaps you no longer have.
+For all of these, and for best performances imported from your osu! account, pp is calculated here
+from the score's numbers exactly as osu! calculates it, and recalculated here after a pp rework with
+no internet needed. A beatmap you don't have is downloaded once and kept. If the real replay of one
+of these plays turns up (on your computer, from Import past plays, or a file you add), it takes that
+score's place, keeping its pin.
+
+These scores are marked on every row, card and shared page: **No replay file** for one from osu!, and
+**Manually entered by hand** for one you typed. Neither can be downloaded as a replay. Any score osu!
+has gets **View osu! score link** in its ⋯ menu.
 
 ## Other settings
 
-**Options -> Other settings**, and everything there belongs to the profile you are on - two
-playstyles are two profiles and should not share how their scores count. The exceptions are
-under *This install* - **Open in browser on start** and **Show beatmap metadata in original
-language** - which are about the install rather than any one profile, and are saved to
-`data/config.json`.
+Everything in **Options -> Other settings** belongs to the current profile, except the settings under
+*This install* (**Open in browser on start** and **Show beatmap metadata in original language**),
+which are saved to `data/config.json`.
 
 ### Include pp for unranked mods
 
-On by default for a profile made from 1.24.0; a profile from before then keeps osu!'s own rule
-(off) until you change it. On, it counts plays osu! refuses to rank because of their mods:
+On by default for profiles made from 1.24.0; older profiles keep osu!'s rule (off) until you change
+it. On, it counts plays osu! won't rank because of their mods: **Relax and Autopilot**, and **custom
+rates** such as DT at 1.45x. Autoplay and Cinema never count.
 
-- **Relax and Autopilot.**
-- **Customised rates** - DT at 1.45x, HT at 0.5x, and so on.
-
-Autoplay and Cinema are never counted whatever this is set to: they are not plays.
-
-Relax and Autopilot can be priced two ways, and they are far apart:
+Relax and Autopilot can be priced two ways:
 
 | | one real RX replay | one real AP replay |
 |---|---|---|
 | **As osu! scores them** (default) | 6.26 stars, 111pp | 3.14 stars, 57pp |
 | **As if the mod were off** | 7.83 stars, 239pp | 4.45 stars, 101pp |
 
-Both numbers come from osu!'s own difficulty and performance calculators - osu!'s difficulty
-calculation is relax-aware, which is why the two disagree by more than 2x. The default is the
-first: what osu!'s own calculator says the play is worth. The second makes "relax counts as
-nomod, relax + DT counts as DT" true, but it flatters the score: a relax run reaches accuracy and
-combo the same player could not reach by hand. A profile made before 1.25.0 keeps the second,
-which was the default then, until you change it.
+Both are osu!'s own numbers; they differ because osu!'s difficulty calculation accounts for Relax.
+The second makes "relax counts as nomod" true, but flatters the play, since relax reaches accuracy
+and combo you couldn't by hand. Profiles made before 1.25.0 keep the second until you change it.
+Both are stored, so switching is instant.
 
-Both values are stored for every score, so switching between them is instant.
-
-Whenever a profile is counting something osu! would not, the page says so above Best
-Performance, and every affected row is marked.
+When a profile counts something osu! wouldn't, the page says so above Best Performance and marks the
+affected rows.
 
 ### Include pp for unranked beatmaps
 
-None by default. Six states, each its own choice, because they are not one proposition:
-
-| state | what it is |
-|---|---|
-| Loved | community-voted, played competitively, no pp in osu! |
-| Qualified | ranked-pending, will usually become ranked |
-| Pending | submitted, awaiting nomination |
-| Work in progress | submitted, explicitly unfinished |
-| Graveyarded | submitted, then abandoned |
-| Never submitted | not in lazer's `online.db` at all - it exists only on your machine |
-
-pp still comes from osu!'s own calculator, which will price any beatmap it is handed. The two
-settings are independent: a Loved map played with Relax needs both before it counts.
+Six separate choices: Loved, Qualified, Pending, Work in progress, Graveyarded, and Never submitted
+(a map that exists only on your machine). On for profiles made from 1.24.0, off for older ones. pp
+still comes from osu!'s calculator. This and the mod setting are independent: a Loved map played
+with Relax needs both.
 
 ### Unfinished plays in Recent Plays
 
-Plays that were started and never finished - quit, retried, or failed. They **always** count
-toward your play count, monthly play counts and Most Played, because osu! counts them and a
-profile that disagreed with the website about how much you had played would simply be wrong.
-This setting only decides whether they are listed in Recent Plays.
+Quit, retried and failed plays always count toward your play count, monthly play counts and Most
+Played, as on osu!. This only decides how Recent Plays lists them:
 
 | Setting | What Recent Plays shows |
 | ------- | ----------------------- |
-| Group retries on one map | *(default)* a run of attempts on one beatmap becomes one row, with the count |
+| Group retries on one map | *(default)* consecutive attempts on one beatmap as one row, with the count |
 | Show every attempt | one row per attempt |
 | Hide them | scores only |
 
-The default is grouping because of how much of a session these can be: on the session this was
-built from there were 26 abandoned attempts against 19 finished ones, and listing each one turns
-the feed into a list of retries. A run is only grouped while it is *consecutive*, so a finished
-play in the middle still breaks it up the way it happened.
-
-These rows carry no accuracy, mods or pp, and are shown dimmed with a "Didn't finish" note
-rather than with zeroes standing in for numbers nobody recorded.
+These rows have no accuracy, mods or pp, and show dimmed with a "Didn't finish" note.
 
 ### Show more
 
-How far a list grows each time you press its **show more**: Best Performance, Most Played
-Beatmaps, Recent Plays, Milestones and Favorite Beatmaps. **25 rows** by default, as osu! does;
-type any number from 1 to 10,000 (the box suggests 25, 50 and 100). Favorite Beatmaps counts
-rows of two cards, so 25 rows is 50 beatmaps. Each list still opens with its first few.
-
-**All at once** makes one press show the whole list, and the button reads **show all**. The
-number stays beside it for when you turn All off again. A long Most Played or Favorite
-Beatmaps list then loads a cover image for every row at once. Recent Plays can show fewer rows
-than its play count, because retries on one map share a row (see above).
+How many rows each **show more** adds to Best Performance, Most Played Beatmaps, Recent Plays,
+Milestones and Favorite Beatmaps. 25 by default, as on osu!; type any number from 1 to 10,000.
+Favorite Beatmaps counts rows of two cards. **All at once** shows the whole list in one press.
 
 ### Count plays osu! could not submit
 
@@ -659,217 +485,130 @@ On by default. See [Offline or signed out](#offline-or-signed-out).
 
 ### Import plays set while the app was closed
 
-Off by default, and the default is the point: closing the app is how you stop tracking - a
-different playstyle, a warm-up, someone else on your keyboard - so a launch normally brings in
-nothing from the time it was shut.
-
-Turn it on and every launch does [the import](#importing-plays-you-set-while-it-was-closed) for
-you, over the gap and no more: back to when the app last ran, never further, and never past this
-profile's own start. It is the same import as the manual one - your play tracking filter still
-applies, plays already tracked are not doubled, replays someone else set are not taken - and it
-says what it brought in. Per profile, so a profile tracking one playstyle can stay out of it
-while another catches up on everything.
+Off by default, because closing the app is how you stop tracking. Turn it on and every launch runs
+[the import](#importing-plays-you-set-while-it-was-closed) over the time the app was closed, never
+further back than when it last ran or before this profile started. The filter and duplicate checks
+still apply, and it says what it brought in. Per profile.
 
 ### Show beatmap metadata in original language
 
-Off by default, and the same setting osu! has. On, each beatmap's artist and title read the way
-the song writes them - 夜に駆ける rather than Yoru ni Kakeru - everywhere the page names one:
-Recent Plays, Scores, Most Played, the score page, Favorite Beatmaps, Milestones and the live
-notifications. A beatmap that has no separate original-language name is unaffected.
-
-It belongs to the install rather than a profile, the way the language does, and sits in three
-places: the first launch asks, the flag in the top right has a switch above the language list,
-and it is here under *This install*. Switching it redraws what is already on screen - both names
-are sent with every beatmap, so nothing is re-fetched.
-
-Beatmaps you had already played are read for their original-language names once, in the
-background on the next launch, so this works on a profile that has been running for years and
-not only on what you play next.
+Off by default, the same setting osu! has. On, artist and title read as the song writes them
+(夜に駆ける rather than Yoru ni Kakeru) everywhere the page names a beatmap. It's also offered at
+first launch and in the language menu.
 
 ### pp calculator
 
-Says which osu! release's calculator prices your scores - the footer says so too. After osu!
-reworks pp, a new version of this app ships the new calculator, and **the first launch after
-that update recalculates every score the old one priced**, in every profile, from their
-replays, so no profile ranks scores from two algorithms against each other. It runs in the
-background once the beatmap index is ready, shows its progress on the page, and happens once
-per osu! release: a score whose replay has since been deleted keeps the pp it had, and is not
-retried at every launch. Plays you set while it runs are tracked as usual.
-
-When some of this profile's scores are still priced by another release, this says how many.
-**Recalculate every score** does the whole thing on demand, for every score in every profile,
-whatever priced it.
+Says which osu! release's calculator prices your scores. After osu! reworks pp, a new version of this
+app ships the new calculator, and **the first launch after updating recalculates every score** the old
+one priced, in every profile, in the background. A score whose replay has been deleted keeps its old
+pp. **Recalculate every score** does the whole thing on demand.
 
 #### pp from your own osu! source
 
-If you run osu! from source - a clone of [ppy/osu](https://github.com/ppy/osu), perhaps with your
-own pp changes or mods - the app can price every score with **your** code instead of the release
-it ships. Type the folder you cloned ppy/osu into (the one with `osu.Game` in it - not
-`%APPDATA%osu-development`, which only holds settings and replays) and press **Build and use**,
-twice to confirm. It needs git and the .NET 10 SDK, which anyone building osu! already has.
+If you run osu! from source (a clone of [ppy/osu](https://github.com/ppy/osu), perhaps with your own
+pp changes or mods), the app can price every score with your code instead. Type the folder you cloned
+ppy/osu into (the one with `osu.Game` in it, not osu!'s data folder) and press **Build and use**. It
+needs git and the .NET 10 SDK.
 
-- The app builds its own calculator against your clone, into `data/pp-source/` (about 50MB). The
-  first build compiles osu! and takes a minute or so; the page shows how far it has got. It writes osu!'s
-  usual build output (`bin/`, `obj/`) inside your clone, which git ignores.
-- **Every score in every profile is then recalculated with it.** Your pp changes apply to your
-  whole history, and plays on a mod only your source has - which the release cannot price at all -
-  get their pp.
-- Each score says what priced it: **osu! source 325c8f5** on its details card and in the footer,
-  with `+` and a short code when your clone had uncommitted changes. Change your source and the
-  panel offers **Rebuild**; a rebuild with different code recalculates everything again.
-- The profile says pp comes from your source, and the estimated rank says it is measured against
-  release pp, so it means little.
-- **Use the release calculator again** switches back and recalculates everything with the release.
-- It is all or nothing, by design: there is never a profile adding pp from two formulas. If your
-  source will not build or start, nothing changes and the panel says why. If it will not start
-  at a launch, no pp is stored until it does - the release is never quietly used in its place.
-
-### Recalculating older scores
-
-Scores tracked before a setting existed have no pp for anything osu! would not rank - there was
-no reason to calculate one at the time. Turning the setting on offers to recalculate them from
-their replay files. Nothing is deleted, and a score whose replay is no longer on disk is left
-exactly as it is.
+- The app builds its own calculator from your clone into `data/pp-source/` (about 50MB). The first
+  build takes a minute or so. It writes osu!'s usual `bin/` and `obj/` in your clone, which git
+  ignores.
+- **Every score in every profile is then recalculated with it**, including plays on mods only your
+  source has.
+- Each score says what priced it, for example **osu! source 325c8f5**, with `+` and a short code when
+  your clone had uncommitted changes. After you change your source, **Rebuild** appears.
+- **Use the release calculator again** switches back and recalculates everything.
+- It's all or nothing: a profile never mixes pp from two formulas. If your source won't build or
+  start, nothing changes. If it won't start at a launch, no pp is stored until it does.
 
 ## Sharing and backing up
 
 **Options -> Share & back up.**
 
-- **Save as a web page** - this page as one `.html` file that **works like it**: show more, the
-  mode tabs, View Details, the medal cards, the charts and the song previews all respond. It
-  opens anywhere, with no app and no connection (osu!'s cover art and previews appear when
-  there is one). Nothing in it can change the profile - those controls are gone, and the page
-  answers itself from a snapshot taken when it was saved - and it holds nothing about your
-  computer: no install paths, no other profiles.
-- **Save as an image** - a full-page PNG, rendered by the Chrome or Edge already on your
-  machine. Nothing is bundled: a headless browser would be several times the size of this whole
-  app. Without one installed the button says so and points at the HTML export.
-- **Back up everything** downloads `osu-local-profiles-backup-<date>.zip`: every profile, with
-  its scores, pictures and me! images. Inside it is laid out exactly as the `data` folder is,
-  so it doubles as a copy of that folder. The database in it is a consistent snapshot, taken
-  while the app runs.
-- **Restore from backup** takes that zip (or a `.db` saved by a version before 1.22.0), says
-  which profiles it holds and how many plays each has, and asks before doing anything. The app
-  then restarts to swap it in. Nothing is deleted: the profiles it replaces are moved to
-  `data/before-restore-<date and time>/`, where they can be copied back by hand. Restoring does
-  not import the plays set between the backup and now, even with *Import plays set while the
-  app was closed* on; **Import past plays** can bring them in deliberately. Run from a terminal
-  rather than the tray, the app cannot restart itself, and the page asks you to do it.
-- **The data folder** is where everything lives, shown with its full path and an **Open
-  folder** button. With the app closed, copying the folder somewhere else is a complete backup
-  too, and putting it back restores it. It has to be closed: while it runs, the latest writes
-  can sit in `profiles.db-wal` beside the database, and a copy taken then can miss them.
-  `config.json` in the same folder is this install's own settings (osu! paths, port,
-  language), which is why a backup leaves it out.
-- **Export to a spreadsheet**, under *Export*, with a button for each format:
-  - **.csv** - every score in this profile, all game modes, highest pp first, one row each.
-    Double-click it and it opens in Excel, Google Sheets (File -> Import), LibreOffice or
-    Numbers. The columns: date set, mode, artist and title (and each in the song's own script
-    where it differs), difficulty, mapper, stars, pp, whether it counts toward pp, its place
-    in Best Performance and its weighted pp, accuracy, grade, mods and their settings, score
-    on both of osu!'s scales, combo and the beatmap's maximum, full combo, each judgement,
-    passed, the beatmap's status and length, pp's own parts (Aim, Speed, ...), pp without
-    Relax/Autopilot, the osu! version that priced it, client, where the score came from,
-    player, beatmap and score links, and IDs. Delete whichever you do not want.
-  - **.xlsx** - the same scores as the first sheet, then a sheet for each game mode you have
-    played (when there is more than one), **Summary** (the figures at the top of the profile,
-    per mode), **Most played**, **Favorite beatmaps** and **Medals**. Every sheet has its
-    header row frozen and a filter on every column, so sorting and filtering is a click.
+- **Save as a web page** saves the page as one `.html` file that works like it: show more, the mode
+  tabs, View Details, medals, charts and previews all respond. It opens anywhere with no app. Nothing
+  in it can change the profile, and it holds nothing about your computer.
+- **Save as an image** makes a full-page PNG with the Chrome or Edge already on your machine.
+- **Back up everything** downloads `osu-local-profiles-backup-<date>.zip`: every profile, with its
+  scores, pictures and me! images, laid out like the `data` folder.
+- **Restore from backup** takes that zip (or a `.db` from before 1.22.0), says which profiles it holds,
+  and asks before doing anything. The app restarts to swap it in. The profiles it replaces are moved
+  to `data/before-restore-<date and time>/`. Plays set between the backup and now aren't imported;
+  use **Import past plays** for those.
+- **The data folder** is shown with an **Open folder** button. With the app closed, copying the folder
+  is a complete backup too. (While it runs, recent writes can sit in `profiles.db-wal`.) `config.json`
+  in that folder holds this install's settings, which is why backups leave it out.
+- **Export** has **.csv** and **.xlsx** buttons. The .csv is every score in the profile, all modes,
+  highest pp first, with over 40 columns; delete what you don't want. The .xlsx has the same scores,
+  then a sheet per mode, **Summary**, **Most played**, **Favorite beatmaps** and **Medals**, each with
+  filters ready. Both follow this profile's settings, leave out removed scores, and use the page's
+  language.
+- **Export this profile's scores (JSON)** is for other tools. It isn't a backup and can't be
+  restored from.
 
-  Both follow this profile's settings, so the pp and "counts toward pp" are what the page
-  shows, and a score you removed from the profile is not in either. Headers, sheet names and
-  words like Yes and No are in the language the page is in; names that are osu!'s own - modes,
-  grades, medals - stay as osu! writes them. Dates are your computer's local time. A title that begins with `=`, `+`, `-` or `@` is written with a `'` in
-  front in the .csv, so a spreadsheet does not run it as a formula.
-- **Export this profile's scores (JSON)**, under *Export*: every score with its beatmap, plus
-  the computed totals and rank, for another tool. It is not a backup and cannot be restored
-  from.
+Replays on disk are the real source of truth (`node scripts/reingest.mjs` rebuilds everything from
+them), but these exports outlive the app.
 
-Replays on disk remain the real source of truth - `node scripts/reingest.mjs` rebuilds
-everything from them - but these are portable and outlive the app.
+### Putting it online
 
-### Putting it online, as a sample profile
+A saved page is one file, so any static host can serve it. With **GitHub Pages**:
 
-The saved page is a plain file with everything inside it, so any static web host can serve it
-as it is - there is nothing to install and nothing to configure. The simplest free one is
-**GitHub Pages**:
+1. Add the saved file to a public repository as `index.html`.
+2. In the repository's **Settings -> Pages**, choose **Deploy from a branch**, pick the branch and
+   `/ (root)`, and save.
+3. A minute later it's at `https://<your-name>.github.io/<repository>/`.
 
-1. Create a public repository (or use one you have), and add the saved file to it as
-   `index.html`.
-2. In the repository's **Settings -> Pages**, choose **Deploy from a branch**, pick the branch
-   and `/ (root)`, and save.
-3. A minute later it is at `https://<your-name>.github.io/<repository>/`.
-
-To update it, save a new copy and replace `index.html`. Netlify Drop, Cloudflare Pages and any
-ordinary web space work the same way: upload the one file.
+To update it, save a new copy and replace `index.html`.
 
 ### The live page is never shared
 
-The page can reset a profile, delete one and remove scores, and none of those endpoints asks
-who is calling. So the server refuses anything that is not coming from this machine, and there
-is no setting that changes that. (Versions before 1.5.0 had an opt-in `shareOnNetwork`
-setting; an old `config.json` that still has it is simply ignored.)
+The page can reset and delete profiles without asking who's calling, so the app only answers
+requests from this computer, with no setting to change that.
 
 ## Updating
 
-The app asks GitHub whether there is a newer version when it starts, and once a day while it
-stays open. When there is:
+The app checks GitHub for a newer version when it starts and once a day while it runs. When there is
+one:
 
-- **Update to 1.x.x** appears at the top of the page, and the tray icon gets a dot. The
-  dialog lists what each new version changes, with a link to the full changelog.
-- **Update and restart** installs it now. **When I quit** downloads it now and installs it when
-  you quit the app, so a session is never interrupted. The tray menu has **Update to ... and
-  restart** and **What's new** too.
+- **Update to 1.x.x** appears at the top of the page and the tray icon gets a dot. The dialog lists
+  what each new version changes.
+- **Update and restart** installs it now. **When I quit** downloads it now and installs it when you
+  quit. The tray menu has both too.
 - After an update, the first start shows what it brought, once.
-- An update that has been waiting two weeks, or one marked as an important fix, is also said
-  at the foot of the page. Dismissed, it stays away for a week.
+- An update waiting two weeks, or one marked important, is also mentioned at the foot of the page.
 
-**Options → Auto-update** does it for you: new versions download in the background and install
-when you quit the app, or when it next starts - never in the middle of a session. It is off
-until you turn it on, and it never downloads on a connection Windows or Linux says is metered
-(macOS is not asked). An update you start yourself still downloads there.
+**Options -> Auto-update** downloads new versions in the background and installs them when you quit
+or next start, never mid-session. It's off until you turn it on, and never downloads on a
+connection Windows or Linux reports as metered (macOS isn't asked).
 
-An update downloads the whole app for your system, about 65MB; your `data/` is never touched.
-`"checkForUpdates": false` in `config.json` turns every check off.
+An update downloads the whole app, about 65MB, and never touches `data/`.
+`"checkForUpdates": false` in `config.json` turns off every check.
 
 ## What it contacts
 
-No osu! API credentials are needed, and none are used. There is no OAuth application, no
-client id, no secret and no login anywhere in this project. Nothing polls the API. An offline or
-logged-out play is never submitted, so it never appears in the osu! API - not even after you
-reconnect - which is why the app reads local files instead.
-
-Every host it contacts is public, unauthenticated and optional:
+No osu! API credentials, no login, and nothing polls osu!. An offline play never reaches osu!'s API,
+even after you reconnect, which is why the app reads local files.
 
 | host | what for | if it fails |
 |---|---|---|
-| `assets.ppy.sh` | beatmap cover art, and medal icons | a drawn placeholder shows instead |
-| `b.ppy.sh` | a favourite's audio preview, only when you press play | no preview |
-| `osu.ppy.sh` | **Look up** in Profiles, importing favorites, and one request per new favourite | it says so; type a name and upload an image instead |
-| GitHub | a check for a newer release at startup and once a day while the app runs (`checkForUpdates`), its patch notes, and the download when you update or Auto-update is on | no update notice |
-| `data.ppy.sh` | the rank-curve dumps, only when `npm run rank:refresh` is run by hand | nothing; the checked-in curves keep working |
-
-The profile lookup reads the public profile page - the same user object osu!'s API returns for
-`/users/{user}`, which the page embeds in order to render itself. One request per press of the
-button, never on a timer, and what it finds is copied into `data/` so it is never fetched
-twice.
+| `assets.ppy.sh` | cover art and medal icons | a drawn placeholder |
+| `b.ppy.sh` | a favourite's audio preview, when you press play | no preview |
+| `osu.ppy.sh` | Look up, imports, score links, a new favourite's details, and downloading a beatmap a score needs | it says so |
+| GitHub | the update check, patch notes and the update download | no update notice |
+| `data.ppy.sh` | the rank curves, only when `npm run rank:refresh` is run by hand | the included curves keep working |
 
 ## Known limitations
 
-- **Only osu!standard has been checked against known-correct pp.** taiko, catch and mania go
-  through the same osu! code and should be right, but nothing verifies them yet. The rank
-  curves cover all four modes and inherit that caveat.
-- **Global rank is an estimate, and ages.** It is interpolated from a pp->rank curve built from
-  a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase grows. See
+- **Only osu!standard has been checked against known-correct pp.** taiko, catch and mania use the
+  same osu! code and should be right, but nothing verifies them yet.
+- **Global rank is an estimate, and ages.** It comes from a pp-to-rank curve built from a data.ppy.sh
+  sample, so it drifts as the playerbase grows. See
   [maintaining.md](maintaining.md#refreshing-the-rank-curves).
-- **Country rank is not shown at all.** A 10,000-user sample spread over ~200 countries is far
-  too thin to estimate one, and a fabricated number would be worse than a dash.
-- **Only the `.osu` files you already have can be used for pp**; a map you have never
-  downloaded cannot be calculated offline.
-- **Unfinished plays carry no score, and are lazer-only.** osu!lazer keeps no record of a play
-  it discards, so a quit, a retry or a fail can be counted but never scored. Signed-in ones need
-  osu! signed in, since the play is only visible once osu! has accepted the submission. A
-  converted beatmap files under the beatmap's own ruleset, because the log never names the one
-  it was played in.
-- **osu!stable's unfinished plays are not counted.** stable writes no replay and no log for
-  them; see [osu!stable is different](#osustable-is-different).
+- **Country rank isn't shown.** A 10,000-player sample over about 200 countries is far too thin.
+- **pp needs the beatmap.** A map you've never downloaded can't be priced offline, though a score
+  imported from osu! downloads the one it needs.
+- **Unfinished plays have no score, and are lazer-only.** They need osu! signed in, since the play only
+  shows once osu! accepts it. A converted beatmap files under the beatmap's own mode, because the log
+  never names the one it was played in.
+- **osu!stable's unfinished plays aren't counted.** See [osu!stable is
+  different](#osustable-is-different).

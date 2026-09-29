@@ -1,8 +1,8 @@
 /*
  * The profile page, rebuilt to match osu.ppy.sh/users/{id}.
  *
- * Class names follow osu-web's so this file can be read side by side with
- * docs/osu-web-reference.md, which records the structure and metrics it implements.
+ * Class names follow osu-web's so this file can be read side by side with its LESS;
+ * docs/osu-web-fidelity.md maps each region to the osu-web file that defines it.
  * Mobile-first, with the desktop layout at osu-web's 900px breakpoint.
  */
 

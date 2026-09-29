@@ -1,7 +1,7 @@
 /**
  * Page controller: fetches state, renders, and keeps up with live scores over SSE.
  *
- * There is no framework here on purpose (see docs/phase-2-handoff.md). Every update is a
+ * There is no framework here on purpose (see docs/architecture.md, "The page"). Every update is a
  * refetch followed by a re-render of the affected block, which is plenty for a page that
  * changes once every few minutes when a play lands.
  */
