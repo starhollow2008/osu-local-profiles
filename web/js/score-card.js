@@ -291,7 +291,7 @@ const submitted = (ms) =>
   new Date(ms).toLocaleString(undefined, { dateStyle: 'long', timeStyle: 'short' });
 
 function player(score, who) {
-  // No replay, or entered by hand: said on the card as on the row, and in a shared copy.
+  // Entered by hand: said on the card as on the row, and in a shared copy.
   const source = sourceTag(score);
   return `<div class="score-player">
   <div class="score-player__row score-player__row--score">

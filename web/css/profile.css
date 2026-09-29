@@ -4302,7 +4302,7 @@ a.beatmapset-badge--spotlight:hover {
   font-size: var(--fs-normal);
 }
 
-/* No replay file, or Entered by hand: the row's tag, on the card. */
+/* Manually entered by hand: the row's tag, on the card. */
 .score-player__row--source {
   margin: -8px 0 15px;
 }

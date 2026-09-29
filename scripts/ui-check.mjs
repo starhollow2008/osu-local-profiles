@@ -429,8 +429,9 @@ await evaluate("document.getElementById('backfillCancel').click()");
 check('Cancel closes the import dialog', await shown('backfillModal'), 'none');
 
 /*
- * A score with no replay says so on its row, and any score osu! has links to it from the row's
- * menu. Against whatever this profile holds, so each check skips when there is nothing to see.
+ * A score entered by hand says so on its row (the only tag a score carries), and any score osu!
+ * has links to it from the row's menu. Against whatever this profile holds, so each check skips
+ * when there is nothing to see.
  */
 const sources = JSON.parse(await evaluate(`(() => {
   const tags = [...document.querySelectorAll('.play-source')];
@@ -446,12 +447,12 @@ const sources = JSON.parse(await evaluate(`(() => {
   return JSON.stringify({
     tags: tags.length,
     titled: tags.every((t) => t.title.length > 20),
-    known: tags.every((t) => ['No replay file', 'Manually entered by hand'].includes(t.textContent.trim())),
+    known: tags.every((t) => t.textContent.trim() === 'Manually entered by hand'),
     linked: menuShows(withUrl),
     unlinked: menuShows(without),
   });
 })()`));
-check('a score with no replay says so, and why', sources.tags === 0 ? SKIP : `${sources.titled}|${sources.known}`, 'true|true');
+check('a score entered by hand says so, and why', sources.tags === 0 ? SKIP : `${sources.titled}|${sources.known}`, 'true|true');
 check('a score osu! has offers View osu! score link', sources.linked === null ? SKIP : sources.linked, true);
 check('one osu! never had does not', sources.unlinked === null ? SKIP : sources.unlinked, false);
 

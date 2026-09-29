@@ -422,9 +422,9 @@ no internet needed. A beatmap you don't have is downloaded once and kept. If the
 of these plays turns up (on your computer, from Import past plays, or a file you add), it takes that
 score's place, keeping its pin.
 
-These scores are marked on every row, card and shared page: **No replay file** for one from osu!, and
-**Manually entered by hand** for one you typed. Neither can be downloaded as a replay. Any score osu!
-has gets **View osu! score link** in its ⋯ menu.
+A score you typed in is marked **Manually entered by hand** on every row, card and shared page.
+Scores from osu! (by link, or with an account's best performances) carry no mark. None of these can
+be downloaded as a replay. Any score osu! has gets **View osu! score link** in its ⋯ menu.
 
 ## Other settings
 

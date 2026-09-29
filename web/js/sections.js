@@ -185,20 +185,15 @@ function ppCell(play) {
 }
 
 /**
- * What a score with no replay says about itself, wherever it is shown -- here, on its card, and
- * in a shared copy. Nothing for a score from a replay osu! wrote.
- *
- * Two kinds, because they mean different things. "No replay file": osu!'s own record of a play
- * that really happened -- imported with an account's best performances, or from the score's
- * link -- priced from its numbers exactly as osu! prices them. "Manually entered by hand": typed in,
- * which nothing can verify, and which a reader of a shared profile has to be able to see.
+ * "Manually entered by hand", wherever a typed-in score is shown -- here, on its card, and in a
+ * shared copy: nothing can verify it, and a reader of a shared profile has to be able to see
+ * that. Nothing for any other score. A score from osu!'s own record (an account's best
+ * performances, or its link) is a play that really happened, priced as osu! prices it, and
+ * carries no tag, at the user's request.
  */
 export function sourceTag(play) {
   if (play.source === 'manual') {
     return `<span class="play-source play-source--manual" title="${escapeHtml(t('source.manualTitle'))}">${escapeHtml(t('source.manual'))}</span>`;
-  }
-  if (play.source === 'link' || play.source === 'osu') {
-    return `<span class="play-source" title="${escapeHtml(t('source.noReplayTitle'))}">${escapeHtml(t('source.noReplay'))}</span>`;
   }
   return '';
 }

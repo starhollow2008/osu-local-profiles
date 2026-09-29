@@ -25,7 +25,7 @@ import type { Ruleset } from './osr.ts';
  *   counts osu!stable shows on its results screen -- priced without a total unless one was given.
  *
  * Either way a block of this app's own (`BUILT_BLOCK`) goes last, saying which it was. That is
- * what marks the score "No replay file" or "Manually entered by hand" wherever it is shown, keeps it out
+ * what marks a typed-in score "Manually entered by hand" wherever it is shown, keeps it out
  * of Download Replay -- there is no cursor data to download -- and tells the pricing whether the
  * header's total is osu!stable's own.
  */

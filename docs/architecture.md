@@ -632,7 +632,8 @@ every score repriced here, offline, by one calculator.
   checked against the score's (osu! serves the current version, and a map updated since can't price
   the play), then kept in `data/beatmaps/`, indexed and backed up.
 - **`scores.origin`** (`link`/`manual`, NULL otherwise) is written by ingest from the block. It
-  drives `Play.source`, the row's "No replay file" or "Manually entered by hand" tag, and the refusal
+  drives `Play.source`, the "Manually entered by hand" tag on a typed-in score (the only tag a
+  score carries: osu!'s own record of a play gets none, at the user's request), and the refusal
   of Download Replay. Recompute re-reads the file, so nothing else special-cases them.
 - **A link** is read from the score page's `<script id="json-show">`, the same object `/scores/best`
   returns. **There are two id schemes:** a stable replay's online id is a legacy id, found only at

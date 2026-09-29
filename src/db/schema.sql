@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS scores (
   imported_at     INTEGER,
   -- Set when the replay behind this row is one this app built (src/built-replays.ts): 'link',
   -- a score imported from its osu! link, or 'manual', one entered by hand. Either is priced
-  -- from that replay like any other, and shown with "No replay file" or "Manually entered by hand".
+  -- from that replay like any other; a 'manual' one is shown with "Manually entered by hand".
   -- NULL on a score from a replay osu! wrote -- and on one imported with best performances,
   -- which imported_at marks instead.
   origin          TEXT,
