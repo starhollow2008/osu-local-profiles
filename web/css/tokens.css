@@ -36,6 +36,17 @@
   --hsl-l1: var(--base-hue), 40%, 80%;
   --hsl-l3: var(--base-hue), 40%, 70%;
 
+  /*
+   * The d family, which the header is painted from. osu-web's `colors.less` builds both d and
+   * b off the one hue, and they are not interchangeable: d is 20% saturation, b is 10%, at the
+   * same six lightness steps. osu-web's own header uses d -- `header-v4__row--bar` is
+   * `@osu-colour-d4` and `header-v4__row--title` is `@osu-colour-d5` -- so a header on b reads
+   * washed out next to it, being both greyer and lighter than the bar it is meant to sit in.
+   * Only the two the header needs are declared.
+   */
+  --hsl-d4: var(--base-hue), 20%, 20%;
+  --hsl-d5: var(--base-hue), 20%, 15%;
+
   --hsl-f1: var(--base-hue), 10%, 60%;
   --hsl-b1: var(--base-hue), 10%, 40%;
   --hsl-b2: var(--base-hue), 10%, 30%;

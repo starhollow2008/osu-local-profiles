@@ -1347,6 +1347,7 @@ const modesAt = async (width) => {
       const cw = document.documentElement.clientWidth;
       const wide = window.matchMedia('(min-width: 900px)').matches;
       const mobile = document.querySelector('#modesMobile');
+      const bar = document.querySelector('.header-v4__row--bar');
       const row = document.querySelector('#modes');
       const shown = wide ? row : mobile;
       const box = shown.getBoundingClientRect();
@@ -1354,10 +1355,11 @@ const modesAt = async (width) => {
         wide,
         // Primitives throughout: check() compares with ===, and two equal arrays are not
         // === to each other.
+        barShown: getComputedStyle(bar).display !== 'none' ? 'yes' : 'no',
         mobileShown: getComputedStyle(mobile).display !== 'none' ? 'yes' : 'no',
-        rowShown: getComputedStyle(row).display !== 'none' ? 'yes' : 'no',
-        // The mobile block is centred; the row's own is right-aligned beside the name, which
-        // is where osu-web has it, so only the first of these is a centre.
+        modesInBar: row.closest('.header-v4__row--bar') !== null,
+        // The mobile block is centred; the bar's tabs are right-aligned, which is where
+        // osu-web has them, so only the first of these is a centre.
         centreOffset: Math.round(box.left + box.width / 2 - cw / 2),
         modes: shown.querySelectorAll('[data-mode]').length,
         // Every mode reachable, and the point you press is the link itself. An element can be
@@ -1379,14 +1381,55 @@ for (const width of [320, 380, 1280]) {
   check(`${width}px: all four modes are drawn`, m.modes, 4);
   check(`${width}px: and every one is the thing you click`, m.unreachable, 'none');
   check(
-    `${width}px: the modes live ${m.wide ? "in the name's row" : 'in the mobile block at the top'}`,
-    `${m.mobileShown}/${m.rowShown}`,
-    m.wide ? 'no/yes' : 'yes/no',
+    `${width}px: the modes live ${m.wide ? 'in the bar above the cover' : 'in the mobile block'}`,
+    `${m.barShown}/${m.mobileShown}`,
+    m.wide ? 'yes/no' : 'no/yes',
   );
   if (!m.wide) check(`${width}px: and the mobile block is centred`, m.centreOffset, 0);
   check(`${width}px: and the two copies agree on which mode is showing`, m.copiesAgree, true);
 }
 await setViewport(1280);
+
+/*
+ * The header's two rows, as `header-v4.less` paints them: the bar is `@osu-colour-d4` and the
+ * name's row is `@osu-colour-d5`. Both are the d family, which is 20% saturation where the page
+ * is 10% -- a header on b reads grey and washed out, which is what this pins.
+ */
+console.log('\nthe header is osu-web\'s d family');
+const header = JSON.parse(
+  await evaluate(`(() => {
+    // The name's row has no background of its own, so walk up for what actually paints it.
+    const painted = (sel) => {
+      let e = document.querySelector(sel);
+      while (e) {
+        const c = getComputedStyle(e).backgroundColor;
+        if (c && c !== 'rgba(0, 0, 0, 0)' && c !== 'transparent') return c;
+        e = e.parentElement;
+      }
+      return 'none';
+    };
+    const sat = (rgb) => {
+      const [r, g, b] = rgb.match(/\\d+/g).slice(0, 3).map(Number);
+      const max = Math.max(r, g, b) / 255, min = Math.min(r, g, b) / 255;
+      return max === 0 ? 0 : (max - min) / max;
+    };
+    return JSON.stringify({
+      bar: painted('.header-v4__row--bar'),
+      nameRow: painted('.profile-info__details'),
+      body: getComputedStyle(document.body).backgroundColor,
+      barSat: +sat(painted('.header-v4__row--bar')).toFixed(2),
+      bodySat: +sat(getComputedStyle(document.body).backgroundColor).toFixed(2),
+    });
+  })()`),
+);
+check('the bar is painted', header.bar !== 'none', true);
+check('and it is the d family, not the b one', header.barSat > header.bodySat, true);
+check('the name\'s row is painted too, a step darker', header.nameRow !== header.bar, true);
+check(
+  'modes are in the bar, as osu-web has them on the right of that row',
+  await evaluate("!!document.querySelector('#modes').closest('.header-v4__row--bar')"),
+  true,
+);
 
 console.log('\nme!');
 const about = JSON.parse(
@@ -3054,11 +3097,15 @@ const bg = (sel) =>
 
 console.log('\nosu-web colour tokens resolve');
 check('page background is b6', await bg('body'), await literal('hsl(333, 10%, 10%)'));
-check('header is b3', await bg('.profile-info'), await literal('hsl(333, 10%, 25%)'));
+// The header is the d family, as `header-v4__row--title` is: 20% saturation where the page is
+// 10%, which is the whole of the contrast. A header on b is greyer and lighter than the bar
+// above it and reads washed out.
+check('header is d5', await bg('.profile-info'), await literal('hsl(333, 20%, 15%)'));
+check('the bar above the cover is d4', await bg('.header-v4__row--bar'), await literal('hsl(333, 20%, 20%)'));
 check('section panel is b4', await bg('.page-extra'), await literal('hsl(333, 10%, 20%)'));
 check('stats box is b4', await bg('.profile-stats'), await literal('hsl(333, 10%, 20%)'));
-// The graph and stats band is osu-page's b5: darker than the b3 header and level bar either
-// side of it, so it reads as its own region, with the b4 stats card lighter on top.
+// The graph and stats band is osu-page's b5, one step darker than the header either side of it
+// in the same band, so it reads as its own region with the b4 stats card lighter on top.
 check('stats band is b5', await bg('.profile-detail'), await literal('hsl(333, 10%, 15%)'));
 check('level bar is b3', await bg('.profile-detail-bar'), await literal('hsl(333, 10%, 25%)'));
 
@@ -3075,18 +3122,22 @@ check(
   'osu!:true,osu!taiko:true,osu!catch:true,osu!mania:true',
 );
 check(
-  'hovering a mode names it in a tooltip above it',
+  'hovering a mode names it in a tooltip beside it',
   await evaluate(`(() => {
-    // At the top of the page: scrolled past, the switcher has no room above it, and the tooltip
-    // rightly opens below instead.
-    window.scrollTo(0, 0);
     const link = document.querySelectorAll('#modes a')[1];
     link.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     const tip = document.querySelector('.tooltip-default');
-    const shown = tip && !tip.hidden && tip.textContent === 'osu!taiko' &&
-      tip.getBoundingClientRect().bottom <= link.getBoundingClientRect().top;
+    const box = link.getBoundingClientRect();
+    const tipBox = tip.getBoundingClientRect();
+    // Beside it, and on whichever side has room. The bar is the top of the document, so there
+    // is never room above and the tooltip opens below -- which is the same rule as everywhere
+    // else on the page, not a special case for the bar.
+    const adjacent = tipBox.bottom <= box.top || tipBox.top >= box.bottom;
+    const named = tip && !tip.hidden && tip.textContent === 'osu!taiko';
+    // And it is on the same horizontal run, so it reads as belonging to that icon.
+    const overLink = tipBox.left < box.right && tipBox.right > box.left;
     document.body.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-    return shown && tip.hidden;
+    return Boolean(named && adjacent && overLink && tip.hidden);
   })()`),
   true,
 );

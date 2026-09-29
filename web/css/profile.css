@@ -36,12 +36,16 @@
  * The header is the top of osu-web's page column, so it is the column: same width, same
  * centring as `.band`. It is not one, because the cover spans the column's full width while
  * the row below it keeps the gutter.
+ *
+ * `@osu-colour-d5`, as `header-v4__row--title` is: the row holding the name, in the d family
+ * like the bar above it and a step darker, so the two read as one header rather than as a bar
+ * sitting on the cover.
  */
 .profile-info {
   width: 100%;
   max-width: var(--container);
   margin: 0 auto;
-  background-color: hsl(var(--hsl-b3));
+  background-color: hsl(var(--hsl-d5));
 }
 
 .profile-info__bg {
@@ -527,9 +531,32 @@
 /* --- gamemode switcher -------------------------------------------------- */
 
 /*
+ * osu-web's `header-v4__row--bar` (`header-v4.less`), the nav bar above the cover.
+ *
+ * Painted `@osu-colour-d4`, which is the d family -- 20% saturation. The page below is on the b
+ * family at 10%, and at the same hue the difference is the whole of the contrast: the bar has to
+ * read as a separate piece of chrome from the body, not as a slightly lighter body.
+ */
+.header-v4__row--bar {
+  background-color: hsl(var(--hsl-d4));
+}
+
+.header-v4__container {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+.header-v4__nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/*
  * osu-web's `.header-nav-mobile` (`header-nav-mobile.less`): a block at the top of the header
  * that only exists below the desktop breakpoint, where the header's own nav is too wide to fit.
- * It carries the game modes here, centred, so below 900px they have a row of their own.
+ * It carries the same mode tabs here, centred, so below 900px they have a row of their own.
  *
  * The row they came from is the name's, and that row also holds the cover's chevron. At a narrow
  * width the two overlapped: mania sat under the chevron, and a click on it landed on the chevron.
@@ -542,12 +569,12 @@
   gap: 20px;
   padding: 8px var(--gutter);
   font-size: var(--fs-title-small);
-  background-color: hsl(var(--hsl-b3));
-  box-shadow: inset 0 -1px 0 hsl(var(--hsl-b2));
+  background-color: hsl(var(--hsl-d4));
+  box-shadow: inset 0 -1px 0 hsl(var(--hsl-d5));
 }
 
-/* Below the breakpoint the modes are the block above, not the end of the name's row. */
-.profile-info__details .game-mode {
+/* The bar is the desktop one, so the tabs are in it, not in the name's row. */
+.header-v4__row--bar {
   display: none;
 }
 
@@ -556,8 +583,8 @@
     display: none;
   }
 
-  .profile-info__details .game-mode {
-    display: flex;
+  .header-v4__row--bar {
+    display: block;
   }
 }
 
@@ -570,9 +597,8 @@
   display: flex;
   align-items: center;
   gap: 10px 20px;
-  align-self: flex-end;
-  margin-left: auto;
-  padding-bottom: 6px;
+  /* In the bar rather than at the end of a row, so there is nothing to be pushed away from. */
+  align-self: center;
   line-height: normal;
 }
 

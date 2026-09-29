@@ -15,11 +15,25 @@
 
 <header class="profile-info">
   <!--
+    osu-web's `header-v4__row--bar`, the nav bar above the cover: `@osu-colour-d4` in
+    `header-v4.less`, which is the d family rather than the b one -- 20% saturation, not 10%.
+    osu-web's own bar holds links to the other pages of the user (modding, playlists,
+    multiplayer, ranked play), which this app does not have, so the mode tabs go here instead:
+    osu-web puts those on the right of this same row. Nothing is invented on the left, because a
+    link to the page you are already on is a dead control.
+  -->
+  <div class="header-v4__row header-v4__row--bar">
+    <div class="header-v4__container band">
+      <div class="band__inner header-v4__nav">
+        <nav class="game-mode" id="modes" aria-label="Game mode" data-i18n-attr="aria-label:modes.label"></nav>
+      </div>
+    </div>
+  </div>
+
+  <!--
     osu-web's `.header-nav-mobile` (`header-nav-mobile.less`), which is a mobile-only block at the
-    top of the header. Here it carries the game modes, so below the desktop breakpoint they have a
-    centred row of their own instead of the right-hand end of the name's row. That row also holds
-    the cover's chevron, and on a narrow window the two overlapped: mania sat underneath the
-    chevron and a click landed on the chevron instead. `renderModes()` writes both.
+    top of the header. It carries the same mode tabs below the desktop breakpoint, where the bar
+    above is gone. `renderModes()` writes both.
   -->
   <div class="header-nav-mobile" id="modesMobile"></div>
 
@@ -123,7 +137,6 @@
             role="button" tabindex="0" title="Rename this profile" data-i18n-attr="title:pname.title">Local Profile</h1>
         <div class="profile-info__flags u-text-shadow" id="pflags"></div>
       </div>
-      <nav class="game-mode" id="modes" aria-label="Game mode" data-i18n-attr="aria-label:modes.label"></nav>
     </div>
     <!--
       osu-web's `.profile-info__cover-toggle`, which lives in this row and not on the cover:
