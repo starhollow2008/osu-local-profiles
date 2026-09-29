@@ -1145,6 +1145,219 @@ check(
   '20px',
 );
 
+/*
+ * The header and the level badge, as osu-web draws them.
+ *
+ * `.osu-page` is a fixed-width column centred in the viewport, so every band is cut at the
+ * column's edges with the page background either side -- not painted edge to edge around a
+ * centred inner element. The badge is a `clip-path` over a per-tier gradient, not a flat
+ * hexagon: a flat one is the shape without the tier colour, which is the part osu! actually
+ * reads the level by.
+ */
+console.log('\nthe page is osu!\'s column');
+const column = JSON.parse(
+  await evaluate(`(() => {
+    const rect = (sel) => {
+      const box = document.querySelector(sel)?.getBoundingClientRect();
+      return box && { left: Math.round(box.left), right: Math.round(box.right), width: Math.round(box.width) };
+    };
+    return JSON.stringify({
+      // clientWidth, not innerWidth: innerWidth counts the scrollbar, which the page is not
+      // centred inside, and the difference is exactly the 15px these checks were failing by.
+      viewport: document.documentElement.clientWidth,
+      cover: rect('.profile-info'),
+      detail: rect('.profile-detail'),
+      bar: rect('.profile-detail-bar'),
+      tabs: rect('.page-mode'),
+      section: rect('#section-me'),
+      footer: rect('.site-footer'),
+    });
+  })()`),
+);
+check('the window is wider than the page, or none of this is visible', column.viewport > 1000, true);
+for (const [name, block] of Object.entries({
+  cover: column.cover,
+  stats: column.detail,
+  levelbar: column.bar,
+  tabs: column.tabs,
+  section: column.section,
+  footer: column.footer,
+})) {
+  check(`the ${name} is the page width, not the window`, block?.width, 1000);
+  check(
+    `and the ${name} is centred, with the page background either side`,
+    Math.abs(block.left - (column.viewport - block.right)) <= 1,
+    true,
+  );
+}
+
+console.log('\nthe level hexagon is osu!\'s');
+check(
+  'it is a clip-path, the shape from user-level.less',
+  await evaluate("getComputedStyle(document.querySelector('.user-level__icon')).clipPath.startsWith('path(')"),
+  true,
+);
+check(
+  'and it is 50px square',
+  await evaluate(`(() => {
+    const r = document.querySelector('.user-level').getBoundingClientRect();
+    return Math.round(r.width) + 'x' + Math.round(r.height);
+  })()`),
+  '50x50',
+);
+check(
+  'the badge takes its colour from the tier, as a gradient',
+  await evaluate(`(() => {
+    const bg = getComputedStyle(document.querySelector('.user-level__icon')).backgroundImage;
+    // Two stops, so the tier is a gradient rather than the one flat colour it used to be.
+    return bg.startsWith('linear-gradient') ? (bg.match(/rgb/g) ?? []).length >= 2 : bg;
+  })()`),
+  true,
+);
+check(
+  'and it names the level, as osu!\'s tooltip does',
+  await evaluate("/^Level \\d+$/.test(document.querySelector('.user-level').title)"),
+  true,
+);
+check(
+  'and the tracking dot is a flat colour, not a lamp',
+  await evaluate("getComputedStyle(document.querySelector('.tracking-pill__dot')).boxShadow"),
+  'none',
+);
+
+/*
+ * The cover's own two controls, as `cover.tsx` and `profile-edit-button.tsx` place them: the
+ * chevron in the details row (so it sits on the name's line, not up on the picture) and the
+ * pencil on the cover's bottom right.
+ */
+console.log('\nthe cover folds away');
+const cover = JSON.parse(
+  await evaluate(`(() => {
+    const box = (sel) => {
+      const r = document.querySelector(sel)?.getBoundingClientRect();
+      return r && { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right), w: Math.round(r.width), h: Math.round(r.height) };
+    };
+    const chevron = box('#coverToggle');
+    const row = box('.profile-info__details');
+    const pencil = box('#coverEdit');
+    const bg = box('.profile-info__bg');
+    return JSON.stringify({ chevron, row, pencil, bg, glyph: box('#coverToggle svg') });
+  })()`),
+);
+check(
+  'the chevron is centred on the name\'s row, not up on the picture',
+  Math.abs(cover.chevron.top + cover.chevron.h / 2 - (cover.row.top + cover.row.h / 2)) <= 1,
+  true,
+);
+check(
+  'the glyph is osu!\'s 12px, and wide enough in a 30px circle to read',
+  await evaluate(`(() => {
+    const p = document.querySelector('#coverToggle svg path').getBoundingClientRect();
+    return Math.round(p.width) + 'x' + Math.round(p.height);
+  })()`),
+  // The outline glyph this replaced drew 12x6 here and rendered as a smudge. The filled one is
+  // 9x6, so the height is nearly the same and only the weight is different -- which is the
+  // point: a chevron this size is carried by the stroke, not the size.
+  '9x6',
+);
+// The two states are one path and a mirror, not two glyphs that could drift apart.
+check(
+  'and the two states are that one path, mirrored',
+  await evaluate(`(() => {
+    const path = document.querySelector('#coverToggle svg path');
+    const toggle = document.querySelector('#coverToggle');
+    const d = path.getAttribute('d');
+    // Two clicks from whatever state the page is in reach both, so this does not depend on
+    // which one the check happens to start in.
+    const seen = new Set();
+    for (let i = 0; i < 2; i++) {
+      toggle.click();
+      seen.add(path.getAttribute('transform') || '');
+    }
+    return path.getAttribute('d') === d && seen.has('') && seen.size === 2;
+  })()`),
+  true,
+);
+check('the pencil is on the cover\'s own right edge', cover.pencil.right <= cover.bg.right, true);
+check(
+  'and near its bottom, as profile-page-cover-editor-button.less puts it',
+  cover.bg.bottom - cover.pencil.bottom <= 20,
+  true,
+);
+
+// Fold it, measure, unfold: the avatar drops to the row's own content height so it stops
+// hanging out of an 85px row, which is what the `cover` modifier was holding it at.
+const folded = JSON.parse(
+  await evaluate(`(() => {
+    const measure = () => {
+      const a = document.querySelector('.profile-info__avatar').getBoundingClientRect();
+      const row = document.querySelector('.profile-info__details').getBoundingClientRect();
+      const bg = document.querySelector('.profile-info__bg');
+      return {
+        avatar: Math.round(a.width),
+        row: Math.round(row.height),
+        bottomGap: Math.round(row.bottom - a.bottom),
+        coverGone: getComputedStyle(bg).display === 'none',
+        label: document.querySelector('#coverToggle').title,
+      };
+    };
+    const before = measure();
+    document.querySelector('#coverToggle').click();
+    const after = measure();
+    document.querySelector('#coverToggle').click();
+    return JSON.stringify({ before, after, restored: measure() });
+  })()`),
+);
+check('with the cover up the picture is osu!\'s 120px', folded.before.avatar, 120);
+check('folding it takes the cover away entirely', folded.after.coverGone, true);
+check('and the picture drops to the row\'s own height', folded.after.avatar, 65);
+check('sitting inside the row rather than out of it', folded.after.bottomGap, 10);
+check('the chevron then offers to show the cover again', /^Show/i.test(folded.after.label), true);
+check('and unfolding puts everything back', folded.restored.avatar, 120);
+
+/*
+ * A blank me!: osu-web's `renderPageNew`, rather than a line of plain text.
+ */
+console.log('\nme!');
+const about = JSON.parse(
+  await evaluate(`(() => {
+    const view = document.getElementById('aboutView');
+    const blank = view.classList.contains('about--empty');
+    const pencil = document.querySelector('#aboutActions button');
+    return JSON.stringify({
+      blank,
+      button: document.getElementById('aboutNew')?.textContent.trim() ?? null,
+      iconFontSize: view.querySelector('.profile-extra-user-page__new-content--icon')
+        ? getComputedStyle(view.querySelector('.profile-extra-user-page__new-content--icon')).fontSize
+        : null,
+      centred: view.querySelector('.profile-extra-user-page--new')
+        ? getComputedStyle(view.querySelector('.profile-extra-user-page--new')).alignItems
+        : null,
+      description: view.querySelector('.profile-extra-user-page__new-content:last-of-type')?.textContent.trim() ?? null,
+      // The pencil only appears once there is something to edit; a blank me! has the button
+      // in the middle of it instead, exactly as on osu!.
+      pencil: pencil ? getComputedStyle(pencil).display !== 'none' : null,
+    });
+  })()`),
+);
+if (about.blank) {
+  check('a blank me! offers to be written, as osu! does', about.button, 'Edit me!');
+  check('with the pencil at osu!\'s 125px', about.iconFontSize, '125px');
+  check('and the block centred', about.centred, 'center');
+  check(
+    'and it says what me! is for',
+    /^me! is a personal customisable area in your profile page\.$/.test(about.description ?? ''),
+    true,
+  );
+  check('and no separate pencil, or there would be two ways in', about.pencil, null);
+} else {
+  check(
+    'a written me! can be opened from osu!\'s pencil in the corner',
+    about.pencil,
+    true,
+  );
+}
+
 console.log('\nmedals');
 check(
   "medals are osu!'s groups, in its order: Mod Introduction, then Skill & Dedication",
@@ -2478,7 +2691,7 @@ check('a collapsed run says how many attempts', collapsed.attempts.includes('4')
 console.log('\nthe charts match osu!s profile');
 const chartLine = (id) =>
   evaluate(`(() => {
-    const line = document.querySelector('#${id} .chart__line');
+    const line = document.querySelector('#${id} .chart__line, #${id} .line-chart__line');
     if (!line) return 'no chart';
     const s = getComputedStyle(line);
     return { stroke: s.stroke, width: s.strokeWidth };
@@ -2505,19 +2718,16 @@ check(
   'Play History',
 );
 
-/*
- * The area fill reaches its colour through var(--chart-line) inside an SVG gradient stop.
- * A presentation attribute would silently not resolve it -- the same trap the grade badges
- * hit -- and the fill would simply be absent.
- */
+// osu-web's play history has no area under the line, and draws real axes.
 check(
-  'the area fill resolves its colour',
-  await evaluate(`(() => {
-    const stop = document.querySelector('#playcountChart svg stop');
-    if (stop == null) return 'no gradient';
-    return getComputedStyle(stop).stopColor;
-  })()`),
-  'rgb(255, 204, 34)',
+  'the play history has no area fill',
+  await evaluate("document.querySelectorAll('#playcountChart svg stop').length"),
+  0,
+);
+check(
+  'the play history draws month labels',
+  await evaluate("document.querySelectorAll('#playcountChart .line-chart__axis--x text').length > 0"),
+  true,
 );
 
 console.log('\nthe charts are hoverable');
@@ -2553,7 +2763,25 @@ check('it names the global ranking', /^Global Ranking #[\d,]+$/.test(rankHover.y
 check('and says how long ago, by day', /^(now|[\d,]+ days? ago)$/.test(rankHover.x), true);
 check('and marks the point it read', rankHover.circle.endsWith('%'), true);
 
-const playsHover = await hoverChart('playcountChart');
+const hoverLineChart = () =>
+  evaluate(`(() => {
+    const area = document.querySelector('#playcountChart .line-chart__hover-area');
+    if (area == null) return 'no chart';
+    const r = area.getBoundingClientRect();
+    area.dispatchEvent(new MouseEvent('mousemove', {
+      clientX: r.left + r.width * 0.6, clientY: r.top + r.height / 2, bubbles: true,
+    }));
+    const hover = area.querySelector('.line-chart__hover');
+    const out = {
+      hidden: hover.getAttribute('data-visibility') === 'hidden',
+      y: area.querySelector('.line-chart__hover-info-box-text--y').textContent,
+      x: area.querySelector('.line-chart__hover-info-box-text--x').textContent,
+    };
+    area.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
+    return out;
+  })()`);
+
+const playsHover = await hoverLineChart();
 // `<strong>Plays</strong> 430` over `March 2020`, at monthly granularity.
 check('hovering the play history shows a month', /^Plays [\d,]+$/.test(playsHover.y), true);
 check('named in full, as on osu!', /^[A-Z][a-z]+ \d{4}$/.test(playsHover.x), true);

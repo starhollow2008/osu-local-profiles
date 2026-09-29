@@ -78,6 +78,19 @@
       </button>
     </div>
     <!--
+      osu-web's `.profile-page-cover-editor-button` (`profile-edit-button.tsx`): a pencil on the
+      cover's own bottom right, which opens the banner picker. Here it opens the profile's
+      Banner field, which is where this app keeps the same picture.
+    -->
+    <div class="profile-page-cover-editor-button">
+      <button class="btn-circle btn-circle--page-toggle" id="coverEdit" type="button"
+              title="Change the banner" data-i18n-attr="title:coverEdit.title"
+              aria-label="Change the banner" data-i18n-attr="aria-label:coverEdit.title">
+        <svg viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="M497.9 142.1l-46.1 46.1c-4.7 4.7-12.3 4.7-17 0l-111-111c-4.7-4.7-4.7-12.3 0-17l46.1-46.1c18.7-18.7 49.1-18.7 67.9 0l60.1 60.1c18.8 18.7 18.8 49.1 0 67.9zM284.2 99.8L21.6 362.4.4 483.9c-2.9 16.4 11.4 30.6 27.8 27.8l121.5-21.3 262.6-262.6c4.7-4.7 4.7-12.3 0-17l-111-111c-4.8-4.7-12.4-4.7-17.1 0zM124.1 339.9c-5.5-5.5-5.5-14.3 0-19.8l154-154c5.5-5.5 14.3-5.5 19.8 0s5.5 14.3 0 19.8l-154 154c-5.5 5.5-14.3 5.5-19.8 0zM88 424h48v36.3l-64.5 11.3-31.1-31.1L51.7 376H88v48z"/></svg>
+      </button>
+    </div>
+
+    <!--
       The beatmap index, while it runs. On a first launch the app reads osu!'s whole folder once
       to match scores to beatmaps; the page works meanwhile. A small note in the cover's corner,
       under the buttons and beneath their menus, so it never reads as the app being blocked.
@@ -102,6 +115,24 @@
         <div class="profile-info__flags u-text-shadow" id="pflags"></div>
       </div>
       <nav class="game-mode" id="modes" aria-label="Game mode" data-i18n-attr="aria-label:modes.label"></nav>
+    </div>
+    <!--
+      osu-web's `.profile-info__cover-toggle`, which lives in this row and not on the cover:
+      a chevron on the row's right edge that folds the cover away, so the name and the figures
+      are the whole first screen. On osu-web it is the row's own full height, so the circle sits
+      on the name's line rather than up on the picture.
+    -->
+    <div class="profile-info__cover-toggle">
+      <button class="btn-circle btn-circle--page-toggle" id="coverToggle" type="button"
+              title="Hide the cover" data-i18n-attr="title:coverToggle.hide"
+              aria-label="Hide the cover" data-i18n-attr="aria-label:coverToggle.hide">
+        <!--
+          Font Awesome's `chevron-down`, pointed down. `cover.tsx` flips the class between
+          `fa-chevron-up` and `fa-chevron-down`; renderCoverToggle() mirrors this one instead
+          of carrying a second path, so the two are the same glyph and cannot drift apart.
+        -->
+        <svg viewBox="0 0 448 512" aria-hidden="true"><path fill="currentColor" d="M233.4 406.6L383.5 256.5c12.5-12.5 12.5-32.8 0-45.3l-22.6-22.6c-12.5-12.5-32.8-12.5-45.3 0L208 296.2 100.3 188.5c-12.5-12.5-32.8-12.5-45.3 0l-22.6 22.6c-12.5 12.5-12.5 32.8 0 45.3l150.1 150.1c14.1 14.1 36.8 14.1 50.9 0z"/></svg>
+      </button>
     </div>
   </div>
 </header>
@@ -173,6 +204,12 @@
 <main class="user-profile-pages">
   <section class="page-extra" id="section-me">
     <h2 class="title" data-i18n="section.me">me!</h2>
+    <!--
+      osu-web's `.page-extra__actions`, kept outside `#aboutView` so clicking the pencil opens
+      the editor rather than being swallowed by the box's own "click anywhere to edit" handler.
+      Filled by renderAbout(), and only when there is something to edit.
+    -->
+    <div id="aboutActions"></div>
     <div class="about" id="aboutView"></div>
     <!--
       osu!'s me! editor, as osu-web's bbcode-editor lays it out: the text (or its preview),

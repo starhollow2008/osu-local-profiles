@@ -7,10 +7,17 @@
  */
 
 /*
- * osu-web is a full-width site whose gutters do the centring. This page has a max width,
- * so every full-bleed band paints edge to edge and centres a fixed-width inner element.
+ * osu-web's `.osu-page` (`osu-page.less`): the page is a fixed-width column centred in the
+ * viewport, and `body` shows either side of it. So the column is the band, not something
+ * centred inside a full-bleed one -- a cover or a panel is cut at the column's edges, which
+ * is what a centred inner element inside a full-bleed band used to do here and osu-web does
+ * not. The gutters move inside the column, as osu-web's do: padding on the page, not a
+ * margin outside it.
  */
 .band {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
   padding-left: var(--gutter);
   padding-right: var(--gutter);
 }
@@ -25,7 +32,15 @@
 /* Header: cover, avatar, name                                              */
 /* ======================================================================== */
 
+/*
+ * The header is the top of osu-web's page column, so it is the column: same width, same
+ * centring as `.band`. It is not one, because the cover spans the column's full width while
+ * the row below it keeps the gutter.
+ */
 .profile-info {
+  width: 100%;
+  max-width: var(--container);
+  margin: 0 auto;
   background-color: hsl(var(--hsl-b3));
 }
 
@@ -60,6 +75,74 @@
 
 .profile-info__bg-actions > * {
   pointer-events: auto;
+}
+
+/*
+ * osu-web's `.profile-info__cover-toggle` (`profile-info.less`): a full-height box on the
+ * details row's right edge with the circle centred in it, so the chevron sits on the name's
+ * line. It is in that row and not on the cover -- which is why it is not up on the picture.
+ */
+.profile-info__cover-toggle {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  right: var(--gutter);
+  display: grid;
+  place-items: center;
+}
+
+@media (min-width: 900px) {
+  .profile-info__cover-toggle {
+    width: var(--gutter);
+    right: 0;
+  }
+}
+
+/*
+ * osu-web's `.profile-page-cover-editor-button` (`profile-page-cover-editor-button.less`): the
+ * pencil on the cover's bottom right, in the same gutter column as the chevron below it.
+ */
+.profile-page-cover-editor-button {
+  position: absolute;
+  bottom: 10px;
+  right: var(--gutter);
+  z-index: 2;
+  display: grid;
+  gap: 10px;
+  justify-content: center;
+}
+
+@media (min-width: 900px) {
+  .profile-page-cover-editor-button {
+    right: 0;
+    width: var(--gutter);
+  }
+}
+
+/* Folded, the cover is gone rather than a strip of it: osu-web drops the element outright. */
+.profile-info--cover-collapsed .profile-info__bg {
+  display: none;
+}
+
+/*
+ * osu-web's avatar has two sizes and the cover picks between them (`profile-info.less`):
+ * `--content-height` (65px) normally, and `@profile-avatar-size` on a profile whose cover is
+ * up. Folding the cover removes the `cover` modifier, so the picture drops back to the row's
+ * own content height instead of hanging 35px out of an 85px row.
+ */
+.profile-info--cover-collapsed .profile-info__avatar {
+  width: 65px;
+  height: 65px;
+  border-radius: 20px;
+  align-self: flex-end;
+  margin-bottom: 10px;
+}
+
+/* An icon font's glyphs are 1em. An inline svg has to be told, or it takes the default size. */
+.profile-page-cover-editor-button svg,
+.profile-info__cover-toggle svg {
+  width: 1em;
+  height: 1em;
 }
 
 .profile-info__details {
@@ -262,7 +345,6 @@
 
 .tracking-pill--on .tracking-pill__dot {
   background-color: var(--green-light);
-  box-shadow: 0 0 8px var(--green-light);
 }
 
 /* Quit, at the end of the header's actions. Quiet until it is armed and asks. */
@@ -769,8 +851,13 @@
   color: hsl(var(--hsl-f1));
 }
 
+/*
+ * osu-web's `.user-level` (`user-level.less`): a 50px hexagon drawn as a `clip-path` over a
+ * gradient, not as a path. The shape is one path with a doubled outline -- a light inner edge
+ * over a dark outer one -- which is what gives the hexagon its rim.
+ */
 .user-level {
-  display: inline-flex;
+  display: flex;
   justify-content: center;
   align-items: center;
   width: 50px;
@@ -780,16 +867,18 @@
   flex: none;
 }
 
-.user-level svg {
+.user-level__icon {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  clip-path: path(
+    "m 25,2.7 a 9.3,9.3 0 0 1 4.7,1.2 l 11.3,6.5 a 9.3,9.3 0 0 1 4.6,8.1 v 13.0 a 9.3,9.3 0 0 1 -4.6,8.1 L 29.7,46.1 a 9.3,9.3 0 0 1 -9.3,0 L 9.1,39.6 A 9.3,9.3 0 0 1 4.4,31.5 v -13.0 A 9.3,9.3 0 0 1 9.1,10.4 L 20.4,3.9 A 9.3,9.3 0 0 1 25,2.7 M 25,0.0 A 11.9,11.9 0 0 0 19.0,1.6 L 7.7,8.1 A 12.0,12.0 0 0 0 1.7,18.5 v 13.0 a 12.0,12.0 0 0 0 6.0,10.4 l 11.3,6.5 a 12.0,12.0 0 0 0 12.0,0 l 11.3,-6.5 a 12.0,12.0 0 0 0 6.0,-10.4 v -13.0 A 12.0,12.0 0 0 0 42.3,8.1 L 31.0,1.6 A 11.9,11.9 0 0 0 25.0,0 Z"
+  );
+  background: linear-gradient(var(--bg));
 }
 
 /* osu-web's `.user-level` is @font-size--large, which the number inherits. */
 .user-level__level {
-  position: relative;
+  position: absolute;
   color: hsl(var(--hsl-b6));
   font-weight: 700;
   font-size: var(--fs-large);
@@ -847,7 +936,7 @@
 }
 
 .page-extra__chart {
-  height: 200px;
+  height: 250px;
   width: 100%;
   position: relative;
   display: flex;
@@ -1557,18 +1646,119 @@
   padding-top: 3px;
 }
 
-.chart__months {
+/* ---------------------------------------------------------------- line chart */
+
+/*
+ * The Play History, from osu-web's `bem/line-chart.less` (`--profile-page`). Unlike the
+ * charts above it is laid out in pixels: `bindCharts` measures the box and draws an svg of
+ * exactly that size, with real axes, so nothing here is stretched.
+ */
+.line-chart {
+  --hover-circle-radius: 10px;
+  --line-chart-width: 2px;
   position: relative;
-  height: 14px;
-  margin-top: 4px;
-  font-size: var(--fs-small);
-  color: hsl(var(--hsl-f1));
+  width: 100%;
+  height: 100%;
 }
 
-.chart__months span {
+.line-chart svg {
+  display: block;
+}
+
+.line-chart__axis {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.line-chart__line {
+  fill: none;
+  stroke: #ffcc22;
+  stroke-width: var(--line-chart-width);
+}
+
+.line-chart__tick-line {
+  fill: none;
+  stroke: hsl(var(--hsl-b6));
+  stroke-width: 1px;
+  shape-rendering: crispEdges;
+}
+
+.line-chart__tick-text {
+  fill: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
+.line-chart__tick-text--strong {
+  font-weight: 700;
+}
+
+.line-chart__hover-area {
   position: absolute;
-  transform: translateX(-50%);
+  display: grid;
+  margin: calc(var(--hover-circle-radius) * -1);
+  padding: var(--hover-circle-radius);
+}
+
+.line-chart__hover {
+  position: relative;
+  pointer-events: none;
+  transition: opacity 120ms;
+  will-change: opacity;
+}
+
+.line-chart__hover[data-visibility='hidden'] {
+  opacity: 0;
+}
+
+.line-chart__hover-line {
+  position: absolute;
+  top: 0;
+  left: calc(var(--line-chart-width) / -2);
+  width: var(--line-chart-width);
+  height: 100%;
+  background-color: #ffcc22;
+}
+
+.line-chart__hover-circle {
+  position: relative;
+  top: calc(var(--hover-circle-radius) * -1);
+  left: calc(var(--hover-circle-radius) * -1);
+  width: calc(var(--hover-circle-radius) * 2);
+  height: calc(var(--hover-circle-radius) * 2);
+  border: calc(var(--line-chart-width) * 2) solid #ffcc22;
+  border-radius: 50%;
+  background-color: hsl(var(--hsl-b5));
+}
+
+.line-chart__hover-info-box {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 5px;
+  padding: 10px;
+  border-radius: 10px;
+  background-color: hsl(var(--hsl-b6));
+  font-size: var(--fs-normal);
+  display: flex;
+  flex-direction: column;
+}
+
+.line-chart__hover-info-box[data-float='right'] {
+  left: auto;
+  right: 0;
+}
+
+.line-chart__hover-info-box-text {
   white-space: nowrap;
+}
+
+.line-chart__hover-info-box-text--x {
+  order: 1;
+  color: hsl(var(--hsl-l1));
+}
+
+.line-chart__hover-info-box-text--y {
+  color: #fff;
 }
 
 /* ======================================================================== */
@@ -2165,6 +2355,76 @@
 
 .about__empty {
   color: hsl(var(--hsl-f1));
+}
+
+/*
+ * osu-web's blank me! (`profile-page/user-page.tsx` -> `renderPageNew`, laid out by
+ * `profile-extra-user-page.less`): a pill to start writing, a 125px pencil, and a line saying
+ * what me! is for. Centred and stacked, 40px between each.
+ */
+.profile-extra-user-page--new {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-extra-user-page__new-content {
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+.profile-extra-user-page__new-content--icon {
+  font-size: 125px;
+}
+
+/*
+ * osu-web's icon here is `fa-edit`, a glyph in an icon font, so the font-size is what sizes
+ * it. An inline svg has no such relationship, so the two 1ems are the whole of it.
+ */
+.profile-extra-user-page__new-content--icon svg {
+  width: 1em;
+  height: 1em;
+}
+
+/* `btn-osu-big--user-page-edit`: a 140px pill, so "Edit me!" is the obvious first thing. */
+.btn-osu-big--user-page-edit {
+  width: 140px;
+  padding: 5px 10px;
+  border-radius: 10000px;
+}
+
+/*
+ * osu-web's `.page-extra__actions`: the pencil that opens the editor once there is something
+ * to edit, in the section's top right (`btn-circle--page-toggle`, a 30px circle on --hsl-b2).
+ * This app's reorder controls live in the same corner, so they step aside for it.
+ */
+.page-extra__actions {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+}
+
+.page-extra:has(> .page-extra__actions) > .section-order {
+  right: 12px + 30px + 4px;
+}
+
+.btn-circle--page-toggle {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  background: hsl(var(--hsl-b2));
+  color: hsl(var(--hsl-c1));
+  font-size: 12px;
+  box-shadow: none;
+  transition: background-color 120ms;
+}
+
+.btn-circle--page-toggle:hover {
+  background: hsl(var(--hsl-b1));
 }
 
 .about-edit textarea {
@@ -5398,7 +5658,7 @@ s.bbcode-editor__glyph {
 /* ======================================================================== */
 
 .static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
-  #aboutEdit, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
+  #aboutEdit, #aboutActions, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;
 }

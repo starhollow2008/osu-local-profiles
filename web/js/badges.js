@@ -8,6 +8,7 @@
  * everything is local, so the page is complete with no network.
  */
 import { escapeHtml } from './format.js';
+import { t } from './i18n.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS, mcosuModNames } from './mcosu-mods.js';
 
@@ -177,15 +178,29 @@ export function modList(mods) {
 /* Level hexagon                                                            */
 /* ------------------------------------------------------------------------ */
 
+/**
+ * The hexagon osu! frames the level number in, and the tier's colour.
+ *
+ * `components/user-level.tsx` picks the tier from the level and hands the whole gradient to
+ * `--bg`, which `user-level__icon` reads through `linear-gradient()`. The shape itself is a
+ * `clip-path` in the stylesheet (`user-level.less`), not a path here.
+ */
+function levelTier(level) {
+  if (level >= 110) return 'lustrous';
+  if (level >= 105) return 'radiant';
+  if (level >= 100) return 'rhodium';
+  if (level >= 80) return 'platinum';
+  if (level >= 60) return 'gold';
+  if (level >= 40) return 'silver';
+  if (level >= 20) return 'bronze';
+  return 'iron';
+}
+
 /** The rounded hexagon osu! frames the level number in. */
 export function levelBadge(level) {
-  return `<div class="user-level">
-  <svg viewBox="0 0 50 50" aria-hidden="true">
-    <path style="fill: hsl(var(--hsl-c1))"
-          d="M25 1.5 L43.6 12.25 A6 6 0 0 1 46.6 17.45 V32.55 A6 6 0 0 1 43.6 37.75
-             L25 48.5 A6 6 0 0 1 19 48.5 L6.4 37.75 A6 6 0 0 1 3.4 32.55 V17.45
-             A6 6 0 0 1 6.4 12.25 L25 1.5 Z"/>
-  </svg>
+  return `<div class="user-level" style="--bg: var(--level-tier-${levelTier(level)})"
+     title="${escapeHtml(t('levelBadge.title', { level: String(level) }))}">
+  <div class="user-level__icon"></div>
   <span class="user-level__level">${escapeHtml(String(level))}</span>
 </div>`;
 }

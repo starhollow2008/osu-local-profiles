@@ -81,10 +81,15 @@ Everyone else gets Nunito, which ships with the app (`web/css/fonts.css`).
 | region | this project | osu-web |
 |---|---|---|
 | cover image | `#cover`, `.profile-info__bg` | `profile-page/cover.tsx`, `bem/profile-info.less` |
+| the page column every band sits in | `.band`, `.profile-info` | `bem/osu-page.less` (`.page-width()`) |
+| folding the cover away | `#coverToggle`, `.profile-info--cover-collapsed` | `profile-page/cover.tsx` (`profile_cover_expanded`), `bem/profile-info.less` (`__cover-toggle`) |
+| the pencil on the banner | `#coverEdit`, `.profile-page-cover-editor-button` | `profile-page/profile-edit-button.tsx`, `bem/profile-page-cover-editor-button.less` |
 | avatar, name | `#avatar`, `#pname` | `bem/profile-info.less` |
+| a blank me! | `#aboutNew`, `.profile-extra-user-page--new` | `profile-page/user-page.tsx` (`renderPageNew`), `bem/profile-extra-user-page.less` |
+| the pencil that opens me! | `#aboutActions`, `.btn-circle--page-toggle` | `profile-page/user-page.tsx` (`page-extra__actions`), `bem/btn-circle.less` |
 | flag and country name | `#pflags`, `.flag-country` | `components/flag-country.tsx`, `bem/flag-country.less` |
 | mode tabs | `#modes`, `.game-mode` | `bem/game-mode.less`, `bem/game-mode-link.less`, `playmode-tabs.tsx` |
-| level bar and hexagon | `.profile-detail-bar__level` | `bem/profile-detail-bar.less`, `bem/user-level.less` |
+| level bar and hexagon | `.profile-detail-bar__level` | `bem/profile-detail-bar.less`, `bem/user-level.less`, `components/user-level.tsx`, `css/layout.less` (the `--level-tier-*` gradients) |
 | global rank, pp, ranked maps | `#globalRank`, `#totalPp` | `profile-page/detail-stats.tsx`, `bem/profile-detail-stats.less` |
 | rank chart | `#ppChart` | `profile-page/rank-chart.tsx`, `bem/line-chart.less` |
 | grade counts | `#gradeCounts`, `.profile-rank-count` | `bem/profile-rank-count.less`, `bem/score-rank.less` |
@@ -98,7 +103,7 @@ Everyone else gets Nunito, which ships with the app (`web/css/fonts.css`).
 | avatar with no picture | `guestAvatar()` in `web/js/badges.js` | `bem/avatar.less` (`avatar--guest`), `public/images/layout/avatar-guest.png` |
 | which score a row shows | `scoreColumn()` in `src/calc/eligibility.ts` | `utils/score-helper.ts` (`totalScore`: legacy, then classic, then standardised) |
 | most played | `.beatmap-playcount` | `profile-page/beatmap-playcount.tsx`, `bem/beatmap-playcount.less` |
-| play history chart | `#playHistory` | `profile-page/chart.tsx`, `profile-page/historical.tsx` |
+| play history chart | `#playcountChart`, `.line-chart` | `profile-page/chart.tsx`, `profile-page/historical.tsx`, `charts/line-chart.ts`, `bem/line-chart.less`, `bem/page-extra.less` |
 | medals | `.medals` | `profile-page/medals.tsx`, `bem/profile-badges.less` |
 | favourite beatmap cards | `web/js/beatmapsets.js` | `beatmapset-panel/index.tsx`, `beatmaps-popup.tsx`, `difficulty-badge` |
 | floating audio player | `#audioPlayer`, `.audio-player` | `core/osu-audio/main.ts`, `bem/audio-player.less`, `bem/audio-player-floating.less` |

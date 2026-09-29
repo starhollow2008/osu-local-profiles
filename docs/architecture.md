@@ -508,12 +508,20 @@ Performance" onto one line. `npm run ui` checks they stack.
 
 ### Charts
 
-Both charts draw in a 0..100 space with `preserveAspectRatio="none"`, so they're responsive without
+The rank and pp charts draw in a 0..100 space with `preserveAspectRatio="none"`, so they're responsive without
 measuring the DOM, and everything inside is stretched by the container (a circle becomes an
 ellipse). So axis labels, the hover marker and the tooltip are HTML positioned over the plot in
 percentages, strokes use `vector-effect="non-scaling-stroke"`, and there are no dots. osu-web does
 the same. The line is `@yellow` `#ffcc22` at 2px; tooltips read `Global Ranking #123` over
-`40 days ago` and `Plays 430` over `March 2020`, all from osu-web's source.
+`40 days ago`, all from osu-web's source.
+
+**Play History is the exception: it is laid out in pixels**, like osu-web's `LineChart`, because it
+has real axes. `playHistoryChart` writes an empty `.line-chart` carrying the months, and
+`bindCharts` measures it and draws the svg (gridlines, a y axis of whole numbers, month labels on a
+45 degree slant) and redraws when the box changes size. The x ticks pick d3's way (every month,
+every third, or every so many years), and under ten months every month is labelled on a desktop
+width. The tooltip reads `Plays 430` over `March 2020`. Missing months are filled with zero, and
+a lone month gets a zero month before it, as `profile-page/historical.tsx` does.
 
 Section lists are paged by the server: the page asks for a size per section and gets totals.
 "Show more" needs both "the page came back full" and "total > returned", because Recent Plays counts

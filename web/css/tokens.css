@@ -74,6 +74,21 @@
   --rank-c: #ff8e5d;
   --rank-d: #ff5a5a;
 
+  /*
+   * The level hexagon's gradient per tier, from osu-web's layout.less. Each is a pair of
+   * stops read by `background: linear-gradient(var(--bg))`, so the name is the tier and the
+   * value is the two colours. `--bg` itself is set per badge in web/js/badges.js, the way
+   * `components/user-level.tsx` sets it from the level.
+   */
+  --level-tier-iron: #bab3ab, #bab3ab;
+  --level-tier-bronze: #b88f7a, #855c47;
+  --level-tier-silver: #e0e0eb, #a3a3c2;
+  --level-tier-gold: #f0e4a8, #e0c952;
+  --level-tier-platinum: #a8f0ef, #52e0df;
+  --level-tier-rhodium: #d9f8d3, #a0cf96;
+  --level-tier-radiant: #97dcff, #ed82ff;
+  --level-tier-lustrous: #ffe600, #ed82ff;
+
   /* Metrics. */
   --gutter: 10px;
   --container: 1000px;

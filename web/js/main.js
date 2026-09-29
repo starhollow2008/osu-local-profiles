@@ -294,7 +294,47 @@ function renderCover() {
   else el.style.removeProperty('--cover');
 }
 
-/** osu-web's name for each ruleset, which names its icon (osu-web-art.css). */
+/**
+ * osu-web's cover toggle (`profile-info.less` -> `profile-info__cover-toggle`, and
+ * `cover.tsx`'s `profile_cover_expanded`): fold the cover away so the name and the figures
+ * are the whole first screen, and unfold it again. The chevron says which way it goes.
+ *
+ * Kept in `localStorage` with the rest of the page's own state rather than in `config.json`,
+ * like every other preference about how the page looks rather than about the profile.
+ */
+const COVER_KEY = 'coverExpanded';
+
+/*
+ * The chevron is one path, pointed down, and the up state is that path mirrored about the
+ * viewBox's middle. `cover.tsx` swaps between two glyphs; a transform is the same thing with
+ * half the path data and no chance of the two being different weights.
+ */
+const CHEVRON_FLIP = 'scale(1,-1) translate(0,-512)';
+
+function renderCoverToggle() {
+  const info = document.querySelector('.profile-info');
+  const expanded = localStorage.getItem(COVER_KEY) !== '0';
+  // Two literal calls, not one chosen by a condition: the i18n check can only see a literal.
+  const hide = t('coverToggle.hide');
+  const show = t('coverToggle.show');
+
+  info.classList.toggle('profile-info--cover-collapsed', !expanded);
+  $('coverToggle').dataset.expanded = expanded ? '1' : '0';
+  const label = expanded ? hide : show;
+  $('coverToggle').title = label;
+  $('coverToggle').setAttribute('aria-label', label);
+  $('coverToggle').querySelector('path').setAttribute('transform', expanded ? CHEVRON_FLIP : '');
+}
+
+
+$('coverToggle').onclick = () => {
+  localStorage.setItem(COVER_KEY, $('coverToggle').dataset.expanded === '1' ? '0' : '1');
+  renderCoverToggle();
+};
+
+// osu-web's pencil opens the cover picker; this app's banner is the profile's, so it opens
+// the dialog that already holds it, scrolled to the Banner field.
+$('coverEdit').onclick = () => openProfiles({ banner: true });
 const RULESETS = ['osu', 'taiko', 'fruits', 'mania'];
 
 /*
@@ -585,6 +625,7 @@ async function loadProfile() {
 
   renderStats(data.stats, data.medalTotal, data.imported);
   renderCover();
+  renderCoverToggle();
 
   renderRank(data);
 
@@ -1503,15 +1544,60 @@ const ABOUT_LIMIT = 60000;
 
 let editingAbout = false;
 
+/*
+ * Font Awesome Free 5.15.4's `edit` and `pencil-alt`, verbatim: the same two glyphs osu-web's
+ * own profile page draws for a blank me! and for the pencil that opens its editor. Taken from
+ * the package osu-web depends on rather than redrawn, so they are osu!'s icons. See
+ * THIRD-PARTY-NOTICES.md.
+ */
+const FA_EDIT = `<svg viewBox="0 0 576 512" aria-hidden="true"><path fill="currentColor" d="M402.3 344.9l32-32c5-5 13.7-1.5 13.7 5.7V464c0 26.5-21.5 48-48 48H48c-26.5 0-48-21.5-48-48V112c0-26.5 21.5-48 48-48h273.5c7.1 0 10.7 8.6 5.7 13.7l-32 32c-1.5 1.5-3.5 2.3-5.7 2.3H48v352h352V350.5c0-2.1.8-4.1 2.3-5.6zm156.6-201.8L296.3 405.7l-90.4 10c-26.2 2.9-48.5-19.2-45.6-45.6l10-90.4L432.9 17.1c22.9-22.9 59.9-22.9 82.7 0l43.2 43.2c22.9 22.9 22.9 60 .1 82.8zM460.1 174L402 115.9 216.2 301.8l-7.3 65.3 65.3-7.3L460.1 174zm64.8-79.7l-43.2-43.2c-4.1-4.1-10.8-4.1-14.8 0L436 82l58.1 58.1 30.9-30.9c4-4.2 4-10.8-.1-14.9z"/></svg>`;
+
+const FA_PENCIL = `<svg viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="M497.9 142.1l-46.1 46.1c-4.7 4.7-12.3 4.7-17 0l-111-111c-4.7-4.7-4.7-12.3 0-17l46.1-46.1c18.7-18.7 49.1-18.7 67.9 0l60.1 60.1c18.8 18.7 18.8 49.1 0 67.9zM284.2 99.8L21.6 362.4.4 483.9c-2.9 16.4 11.4 30.6 27.8 27.8l121.5-21.3 262.6-262.6c4.7-4.7 4.7-12.3 0-17l-111-111c-4.8-4.7-12.4-4.7-17.1 0zM124.1 339.9c-5.5-5.5-5.5-14.3 0-19.8l154-154c5.5-5.5 14.3-5.5 19.8 0s5.5 14.3 0 19.8l-154 154c-5.5 5.5-14.3 5.5-19.8 0zM88 424h48v36.3l-64.5 11.3-31.1-31.1L51.7 376H88v48z"/></svg>`;
+
+/**
+ * osu-web's blank me! (`profile-page/user-page.tsx` -> `renderPageNew`): a pill to start
+ * writing, a pencil, and a line saying what me! is for.
+ *
+ * The editor opens from the button, and from anywhere else in the box, as it always did --
+ * osu-web's is the only route because a blank page has nothing else to click.
+ */
+function aboutEmpty() {
+  return `<div class="profile-extra-user-page profile-extra-user-page--new">
+    <p class="profile-extra-user-page__new-content">
+      <button type="button" class="btn-osu-big btn-osu-big--user-page-edit" id="aboutNew"
+              title="${escapeHtml(t('aboutNew.title'))}">${escapeHtml(t('aboutNew.edit'))}</button>
+    </p>
+    <p class="profile-extra-user-page__new-content profile-extra-user-page__new-content--icon">
+      ${FA_EDIT}
+    </p>
+    <p class="profile-extra-user-page__new-content">${t('aboutNew.description')}</p>
+  </div>`;
+}
+
+/** osu-web's pencil, shown once there is something to edit and the box is not already open. */
+function aboutActions() {
+  if (editingAbout || isStatic) return '';
+  return `<div class="page-extra__actions">
+    <button type="button" class="btn-circle btn-circle--page-toggle" id="aboutEditBtn"
+            title="${escapeHtml(t('aboutNew.title'))}" aria-label="${escapeHtml(t('aboutNew.edit'))}">
+      ${FA_PENCIL}
+    </button>
+  </div>`;
+}
+
 function renderAbout() {
   const html = bbcodeHtml(settings.aboutMe ?? '');
-  $('aboutView').innerHTML = html
-    ? `<div class="bbcode">${html}</div>`
-    : '<div class="about__empty">Nothing here yet. Click to write something.</div>';
+  $('aboutView').innerHTML = html ? `<div class="bbcode">${html}</div>` : aboutEmpty();
   $('aboutView').classList.toggle('about--empty', !html);
   // In a shared copy an empty me! is left out, tab and all: "click to write" is for its owner.
   document.documentElement.classList.toggle('static-copy--no-me', isStatic && !html);
-  $('aboutView').title = editingAbout || isStatic ? '' : 'Click to edit';
+  $('aboutView').title = editingAbout || isStatic ? '' : t('aboutView.title');
+
+  // osu-web puts the pencil outside the content wrapper, and only once there is text: a blank
+  // me! has the button in the middle of it instead.
+  $('aboutActions').innerHTML = html ? aboutActions() : '';
+  const edit = $('aboutEditBtn');
+  if (edit) edit.onclick = openAboutEditor;
 }
 
 /** Write and Preview: osu-web's two states for the same box. */
@@ -3278,12 +3364,12 @@ async function profileAction(payload) {
  * avatar and the name open it at the first, the favorites reminder at the second, with only
  * favorites ticked.
  */
-function openProfiles({ section = null, favoritesOnly = false } = {}) {
+function openProfiles({ section = null, favoritesOnly = false, banner = false } = {}) {
   // A shared copy is read-only.
   if (isStatic) return;
   setMenuOpen(false);
   $('newProfileName').value = '';
-  profileHint('\u00a0');
+  profileHint(' ');
   renderProfiles();
   renderProfileEdit();
   resetImport({ favoritesOnly });
@@ -3292,8 +3378,15 @@ function openProfiles({ section = null, favoritesOnly = false } = {}) {
   $('profilesModal').querySelector('.modal').scrollTop = 0;
   $('profilesClose').focus({ preventScroll: true });
   if (section) $(section === 'import' ? 'importSection' : 'profileEdit').scrollIntoView({ block: 'start' });
+  if (banner) {
+    // The cover's pencil: show the Banner field itself, and put the cursor on its Upload, so
+    // the press that opened this dialog is one click from being finished.
+    $('identityCover').closest('.identity-image').scrollIntoView({ block: 'center' });
+    $('identityCover').closest('.identity-image').querySelector('[data-upload="cover"]').focus();
+  }
   void loadSuggestions();
 }
+
 
 const closeProfiles = () => { $('profilesModal').hidden = true; };
 
