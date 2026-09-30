@@ -16,10 +16,6 @@
 - **A blank me! looks like osu!'s.** It offers to be written, shows the pencil, and says what me!
   is for, and a written me! gets a pencil in its corner to open the editor.
 
-- **Mania can be clicked again on a narrow window.** The game modes move into their own centred row
-  at the top of the header below the desktop breakpoint, because on the name's row they ran under
-  the cover's chevron and a click landed on that instead.
-
 - **The header looks like osu!'s, and stands out more.** There is a bar above the cover with the
   game modes centred in it, and both it and the row with your name are painted in osu!'s darker,
   more saturated maroon rather than the greyer one the rest of the page uses.
