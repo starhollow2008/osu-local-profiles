@@ -150,7 +150,22 @@ JSON-lines pipe from `src/calc/official.ts`.
 Option descriptions and hints are short, plain and human: say what it does in one sentence, or
 a couple of words ("Optional", "Installation locations"). No copywriting: no dashes for dramatic
 pauses, no grandiose asides, no explaining the app's reasoning, no "always/never/nothing is
-lost". Every language gets the same (`web/i18n/*.json`).
+lost". Don't restate the label, and mention a default only when it helps ("On by default.").
+Every language gets the same (`web/i18n/*.json`).
+
+Hints the owner rewrote, before and after:
+
+- "Each profile is a separate playstyle with its own scores, pp and level. Only the selected one
+  records the plays you set." → "Plays are only recorded to the current profile."
+- "Relax and Autopilot only. "As osu! scores them" is osu!'s own pp calculator … so switching is
+  instant." → "Relax and Autopilot only."
+- "Every profile, with its scores, pictures and me! images, as one .zip file. Restore it below, on
+  this computer or another." → "Back up all profiles into one .zip file, can be restored below."
+- "Off by default. Closing the app is how you stop tracking, so a launch normally brings in
+  nothing …" → "Off by default. If enabled, each launch imports plays that were set while it was
+  closed."
+
+Some long hints were cut entirely rather than shortened.
 
 ## UI checks
 
