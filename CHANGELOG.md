@@ -11,14 +11,17 @@
   and a month label under each point, and the chart is taller.
 
 - **The level hexagon takes its colour from the level.** The number is framed by a gradient
-  matching your tier, the way osu! does it, rather than one flat white shape.
+  matching your tier, the way osu! does it, rather than one flat white shape. The number and the
+  percentage beside it are bold white, as on osu!.
 
 - **A blank me! looks like osu!'s.** It offers to be written, shows the pencil, and says what me!
   is for, and a written me! gets a pencil in its corner to open the editor.
 
-- **The header looks like osu!'s, and stands out more.** There is a bar above the cover with the
-  game modes centred in it, and both it and the row with your name are painted in osu!'s darker,
-  more saturated maroon rather than the greyer one the rest of the page uses.
+- **The header looks like osu!'s.** There is a bar above the cover with the game modes in it, and
+  tracking, language, Options and Quit sit at its right end instead of on the banner. The row
+  with your name is the same colour as the level bar below it.
+
+- **Everything new in this release is translated** into all 15 languages.
 
 ## 1.29.0
 
