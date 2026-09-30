@@ -93,13 +93,37 @@ function cut(text) {
   return `${text.slice(0, at > 0 ? at : MAX_HEADLINE).replace(/[,:;(-]+$/, '')}...`;
 }
 
+/** A GitHub user, linked (`[@name](https://github.com/name)`) or not (`@name`). */
+const MENTION = String.raw`(?:\[@[\w-]+\]\(https:\/\/github\.com\/[\w-]+\)|@[\w-]+)`;
+
+/**
+ * A credit closing an entry: `Thanks to [@name](https://github.com/name).`, or several joined
+ * with commas and "and". Linked in the CHANGELOG, where GitHub does not link a bare mention.
+ */
+const CREDIT = new RegExp(String.raw`\s*Thanks to (${MENTION}(?:(?:, and |, | and )${MENTION})*)\.?$`);
+
+/** The people a credit names, as a release page mentions them: plain `@name`s. */
+function thanks(names) {
+  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
+  return `Thanks to ${list}.`;
+}
+
 /**
  * One line for a CHANGELOG entry: its bold lead where that says what changed, otherwise its
  * first sentence. A short bold lead is only a name (`**View Details**, from the menu...`), and
- * the sentence around it is what says anything.
+ * the sentence around it is what says anything. A credit at the entry's end is kept on the
+ * line, uncut, so the release page and the app's patch notes carry it too.
  */
 export function headline(entry) {
-  const text = entry.replace(/\s+/g, ' ').trim();
+  const whole = entry.replace(/\s+/g, ' ').trim();
+  const credit = CREDIT.exec(whole);
+  const text = credit ? whole.slice(0, credit.index) : whole;
+  const line = summary(text);
+  if (!credit) return line;
+  return `${line}${/[.!?]$/.test(line) ? '' : '.'} ${thanks(credit[1].match(/@[\w-]+/g))}`;
+}
+
+function summary(text) {
   const lead = /^\*\*(.+?)\*\*/.exec(text);
   if (lead && (lead[1].length >= 25 || /[.!?]$/.test(lead[1]))) return cut(lead[1]);
   const plain = text.replace(/\*\*/g, '');

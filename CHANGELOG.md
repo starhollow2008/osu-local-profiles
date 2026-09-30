@@ -6,20 +6,25 @@
   are all cut at the same width now instead of running edge to edge around a narrower middle, and
   the page background shows down each side. The chevron on the right of your name folds the cover
   away and the picture shrinks to fit, and the pencil on the banner takes you to it.
+  Thanks to [@starhollow2008](https://github.com/starhollow2008).
 
 - **The Play History chart looks like osu!'s.** It has gridlines, a play count scale on the left,
   and a month label under each point, and the chart is taller.
+  Thanks to [@starhollow2008](https://github.com/starhollow2008).
 
 - **The level hexagon takes its colour from the level.** The number is framed by a gradient
   matching your tier, the way osu! does it, rather than one flat white shape. The number and the
   percentage beside it are bold white, as on osu!.
+  Thanks to [@starhollow2008](https://github.com/starhollow2008).
 
 - **A blank me! looks like osu!'s.** It offers to be written, shows the pencil, and says what me!
   is for, and a written me! gets a pencil in its corner to open the editor.
+  Thanks to [@starhollow2008](https://github.com/starhollow2008).
 
 - **The header looks like osu!'s.** There is a bar above the cover with the game modes in it, and
   tracking, language, Options and Quit sit at its right end instead of on the banner. The row
   with your name is the same colour as the level bar below it.
+  Thanks to [@starhollow2008](https://github.com/starhollow2008).
 
 - **Everything new in this release is translated** into all 15 languages.
 

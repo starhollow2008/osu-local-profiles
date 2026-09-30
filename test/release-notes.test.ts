@@ -52,6 +52,21 @@ test('each change is one line: its bold lead, or its first sentence when that le
   assert.ok(headline(`**${'a '.repeat(100)}**`).endsWith('...'));
 });
 
+test('a credit at the end of a change stays on its line, as mentions a release page links', () => {
+  assert.equal(
+    headline('**The chart looks like osu!\'s.** It has gridlines. Thanks to [@someone](https://github.com/someone).'),
+    "The chart looks like osu!'s. Thanks to @someone.",
+  );
+  assert.equal(
+    headline('**Quit from the page**, at the top right. Thanks to @a, [@b-c](https://github.com/b-c) and @d'),
+    'Quit from the page, at the top right. Thanks to @a, @b-c and @d.',
+  );
+  // Cut short or not, the credit is whole.
+  assert.match(headline(`**${'a '.repeat(100)}** Thanks to @someone.`), /\.\.\. Thanks to @someone\.$/);
+  // Thanks that name nobody is part of the change, not a credit.
+  assert.equal(headline('Thanks to everyone who reported it.'), 'Thanks to everyone who reported it.');
+});
+
 test('a long release lists its first changes and counts the rest', () => {
   const many = Array.from({ length: MAX_HIGHLIGHTS + 3 }, (_, i) => `- **Change number ${i} is here.**`);
   const notes = releaseNotes(`## 2.0.0\n\n${many.join('\n')}\n`, '2.0.0');
