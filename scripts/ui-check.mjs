@@ -1328,22 +1328,21 @@ check('the chevron then offers to show the cover again', /^Show/i.test(folded.af
 check('and unfolding puts everything back', folded.restored.avatar, 120);
 
 /*
- * A blank me!: osu-web's `renderPageNew`, rather than a line of plain text.
- */
-/*
  * The game modes, which live in two places by width. Below osu-web's breakpoint they are
  * `.header-nav-mobile` at the top of the header, not the right-hand end of the name's row --
  * because that row also holds the cover's chevron, and the two overlapped there: mania sat
  * under the chevron and a click on it landed on the chevron.
  *
  * Read at both widths, and by hit-testing rather than by position: an element can be exactly
- * where it should be and still not be the thing you click.
+ * where it should be and still not be the thing you click. Hit-testing only sees the viewport,
+ * so the page goes back to the top first; the checks before this one leave it scrolled down.
  */
 console.log('\nthe game modes are clickable at any width');
 const modesAt = async (width) => {
   await setViewport(width);
   return JSON.parse(
     await evaluate(`(() => {
+      window.scrollTo(0, 0);
       const cw = document.documentElement.clientWidth;
       const wide = window.matchMedia('(min-width: 900px)').matches;
       const mobile = document.querySelector('#modesMobile');
