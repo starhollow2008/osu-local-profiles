@@ -605,6 +605,14 @@
   .header-v4__row--bar .game-mode {
     display: flex;
   }
+
+  /*
+   * Out into the gutter, to end where the banner pencil and the cover's chevron end: 30px
+   * circles centred in it.
+   */
+  .header-v4__actions {
+    margin-right: calc((var(--gutter) - 30px) / 2 - var(--gutter));
+  }
 }
 
 /*

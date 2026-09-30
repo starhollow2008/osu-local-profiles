@@ -1434,14 +1434,15 @@ check(
 
 /*
  * The app's own buttons (tracking, language, Options, Quit) are at the right end of the bar,
- * off the cover, and the menus they open still land on top of the cover below.
+ * off the cover and ending where the banner pencil below them ends, and the menus they open
+ * still land on top of the cover.
  */
 console.log('\nthe app\'s buttons are in the bar');
 const actions = JSON.parse(
   await evaluate(`(async () => {
     scrollTo(0, 0);
     const ids = ['toggle', 'langBtn', 'optionsBtn', 'quitBtn'];
-    const bar = document.querySelector('.header-v4__row--bar .band__inner').getBoundingClientRect();
+    const pencil = document.getElementById('coverEdit').getBoundingClientRect();
     const cover = document.getElementById('cover').getBoundingClientRect();
     const boxes = ids.map((id) => document.getElementById(id).getBoundingClientRect());
     document.getElementById('optionsBtn').click();
@@ -1453,14 +1454,14 @@ const actions = JSON.parse(
     return JSON.stringify({
       inBar: ids.every((id) => document.getElementById(id).closest('.header-v4__row--bar') !== null),
       aboveCover: boxes.every((b) => b.bottom <= cover.top),
-      rightEnd: Math.round(bar.right - Math.max(...boxes.map((b) => b.right))),
+      rightEnd: Math.round(pencil.right - Math.max(...boxes.map((b) => b.right))),
       menuOverCover: m.bottom > cover.top && onTop,
     });
   })()`),
 );
 check('tracking, language, Options and Quit are in the bar', actions.inBar, true);
 check('and above the cover, not on it', actions.aboveCover, true);
-check('at the right end of the bar', actions.rightEnd, 0);
+check('at the right end of the bar, level with the banner pencil', actions.rightEnd, 0);
 check('and the Options menu opens over the cover', actions.menuOverCover, true);
 
 /*
