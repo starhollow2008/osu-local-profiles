@@ -1346,7 +1346,6 @@ const modesAt = async (width) => {
       const cw = document.documentElement.clientWidth;
       const wide = window.matchMedia('(min-width: 900px)').matches;
       const mobile = document.querySelector('#modesMobile');
-      const bar = document.querySelector('.header-v4__row--bar');
       const row = document.querySelector('#modes');
       const shown = wide ? row : mobile;
       const box = shown.getBoundingClientRect();
@@ -1354,7 +1353,9 @@ const modesAt = async (width) => {
         wide,
         // Primitives throughout: check() compares with ===, and two equal arrays are not
         // === to each other.
-        barShown: getComputedStyle(bar).display !== 'none' ? 'yes' : 'no',
+        // The bar itself stays at every width for the app's buttons; it is the tabs in it
+        // that come and go.
+        barShown: getComputedStyle(row).display !== 'none' ? 'yes' : 'no',
         mobileShown: getComputedStyle(mobile).display !== 'none' ? 'yes' : 'no',
         modesInBar: row.closest('.header-v4__row--bar') !== null,
         // The mobile block is centred; the bar's tabs are right-aligned, which is where
@@ -1390,11 +1391,11 @@ for (const width of [320, 380, 1280]) {
 await setViewport(1280);
 
 /*
- * The header's two rows, as `header-v4.less` paints them: the bar is `@osu-colour-d4` and the
- * name's row is `@osu-colour-d5`. Both are the d family, which is 20% saturation where the page
- * is 10% -- a header on b reads grey and washed out, which is what this pins.
+ * The header's two rows: the bar is `@osu-colour-d4` (`header-v4.less`), the d family at 20%
+ * saturation where the page is 10%, so it reads as chrome. The name's row is `.profile-info`,
+ * which `profile-info.less` paints b3, the same as the level bar's row below it.
  */
-console.log('\nthe header is osu-web\'s d family');
+console.log('\nthe header bar is osu-web\'s d family');
 const header = JSON.parse(
   await evaluate(`(() => {
     // The name's row has no background of its own, so walk up for what actually paints it.
@@ -1415,6 +1416,7 @@ const header = JSON.parse(
     return JSON.stringify({
       bar: painted('.header-v4__row--bar'),
       nameRow: painted('.profile-info__details'),
+      levelRow: painted('.profile-detail-bar'),
       body: getComputedStyle(document.body).backgroundColor,
       barSat: +sat(painted('.header-v4__row--bar')).toFixed(2),
       bodySat: +sat(getComputedStyle(document.body).backgroundColor).toFixed(2),
@@ -1423,12 +1425,57 @@ const header = JSON.parse(
 );
 check('the bar is painted', header.bar !== 'none', true);
 check('and it is the d family, not the b one', header.barSat > header.bodySat, true);
-check('the name\'s row is painted too, a step darker', header.nameRow !== header.bar, true);
+check('the name\'s row is painted as the level bar\'s row is', header.nameRow, header.levelRow);
 check(
   'modes are in the bar, as osu-web has them on the right of that row',
   await evaluate("!!document.querySelector('#modes').closest('.header-v4__row--bar')"),
   true,
 );
+
+/*
+ * The app's own buttons (tracking, language, Options, Quit) are at the right end of the bar,
+ * off the cover, and the menus they open still land on top of the cover below.
+ */
+console.log('\nthe app\'s buttons are in the bar');
+const actions = JSON.parse(
+  await evaluate(`(async () => {
+    scrollTo(0, 0);
+    const ids = ['toggle', 'langBtn', 'optionsBtn', 'quitBtn'];
+    const bar = document.querySelector('.header-v4__row--bar .band__inner').getBoundingClientRect();
+    const cover = document.getElementById('cover').getBoundingClientRect();
+    const boxes = ids.map((id) => document.getElementById(id).getBoundingClientRect());
+    document.getElementById('optionsBtn').click();
+    await new Promise((r) => setTimeout(r, 50));
+    const menu = document.getElementById('optionsMenu');
+    const m = menu.getBoundingClientRect();
+    const onTop = menu.contains(document.elementFromPoint(m.left + m.width / 2, cover.top + 10));
+    document.getElementById('optionsBtn').click();
+    return JSON.stringify({
+      inBar: ids.every((id) => document.getElementById(id).closest('.header-v4__row--bar') !== null),
+      aboveCover: boxes.every((b) => b.bottom <= cover.top),
+      rightEnd: Math.round(bar.right - Math.max(...boxes.map((b) => b.right))),
+      menuOverCover: m.bottom > cover.top && onTop,
+    });
+  })()`),
+);
+check('tracking, language, Options and Quit are in the bar', actions.inBar, true);
+check('and above the cover, not on it', actions.aboveCover, true);
+check('at the right end of the bar', actions.rightEnd, 0);
+check('and the Options menu opens over the cover', actions.menuOverCover, true);
+
+/*
+ * The level row's text, as `profile-detail-bar.less` sets it: bold white, which the progress
+ * figure (`bar.less`'s `__text`) and the number in the hexagon (`user-level.less`) inherit.
+ */
+console.log('\nthe level is written as osu-web writes it');
+const levelType = JSON.parse(
+  await evaluate(`(() => {
+    const type = (sel) => { const s = getComputedStyle(document.querySelector(sel)); return s.color + ' ' + s.fontWeight; };
+    return JSON.stringify({ text: type('#levelText'), level: type('.user-level__level') });
+  })()`),
+);
+check('the progress figure is bold white', levelType.text, 'rgb(255, 255, 255) 700');
+check('and so is the level in the hexagon', levelType.level, 'rgb(255, 255, 255) 700');
 
 console.log('\nme!');
 const about = JSON.parse(
@@ -1468,6 +1515,25 @@ if (about.blank) {
     about.pencil,
     true,
   );
+  // The reorder controls are only transparent until hovered, so they are measurable without it.
+  const corner = JSON.parse(
+    await evaluate(`(() => {
+      const section = document.getElementById('section-me');
+      section.scrollIntoView({ block: 'center' });
+      const pencil = document.querySelector('#aboutActions .btn-circle');
+      const order = section.querySelector(':scope > .section-order').getBoundingClientRect();
+      const p = pencil.getBoundingClientRect();
+      const size = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().width);
+      return JSON.stringify({
+        icon: size('#aboutActions .btn-circle svg') + '/' + size('#coverEdit svg'),
+        clear: order.right <= p.left,
+        level: Math.round(order.top + order.height / 2 - (p.top + p.height / 2)),
+      });
+    })()`),
+  );
+  check('and its pencil is the banner pencil\'s size', corner.icon, '12/12');
+  check('with the reorder controls beside it, not under it', corner.clear, true);
+  check('and level with it', corner.level, 0);
 }
 
 console.log('\nmedals');
@@ -3096,10 +3162,9 @@ const bg = (sel) =>
 
 console.log('\nosu-web colour tokens resolve');
 check('page background is b6', await bg('body'), await literal('hsl(333, 10%, 10%)'));
-// The header is the d family, as `header-v4__row--title` is: 20% saturation where the page is
-// 10%, which is the whole of the contrast. A header on b is greyer and lighter than the bar
-// above it and reads washed out.
-check('header is d5', await bg('.profile-info'), await literal('hsl(333, 20%, 15%)'));
+// The name's row is b3, as osu-web's `.profile-info` is (`profile-info.less`). The bar above it
+// is the d family, as `header-v4__row--bar` is.
+check('header is b3', await bg('.profile-info'), await literal('hsl(333, 10%, 25%)'));
 check('the bar above the cover is d4', await bg('.header-v4__row--bar'), await literal('hsl(333, 20%, 20%)'));
 check('section panel is b4', await bg('.page-extra'), await literal('hsl(333, 10%, 20%)'));
 check('stats box is b4', await bg('.profile-stats'), await literal('hsl(333, 10%, 20%)'));

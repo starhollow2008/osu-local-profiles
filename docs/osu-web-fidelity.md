@@ -91,7 +91,7 @@ Everyone else gets Nunito, which ships with the app (`web/css/fonts.css`).
 | mode tabs | `#modes`, `.game-mode` | `bem/game-mode.less`, `bem/game-mode-link.less`, `playmode-tabs.tsx` |
 | the bar above the cover | `.header-v4__row--bar` | `components/header-v4.tsx`, `bem/header-v4.less` (`__nav-container--bar`, `@osu-colour-d4`) |
 | mode tabs below the desktop breakpoint | `#modesMobile`, `.header-nav-mobile` | `bem/header-nav-mobile.less`, `components/header-v4.tsx` |
-| the header's colours | `--hsl-d4`, `--hsl-d5` | `bem/header-v4.less` (`--bar`, `--title`), `colors.less` (the d family) |
+| the header's colours | the bar `--hsl-d4`, the name's row `--hsl-b3` | `bem/header-v4.less` (`--bar`), `bem/profile-info.less`, `colors.less` (the d family) |
 | level bar and hexagon | `.profile-detail-bar__level` | `bem/profile-detail-bar.less`, `bem/user-level.less`, `components/user-level.tsx`, `css/layout.less` (the `--level-tier-*` gradients) |
 | global rank, pp, ranked maps | `#globalRank`, `#totalPp` | `profile-page/detail-stats.tsx`, `bem/profile-detail-stats.less` |
 | rank chart | `#ppChart` | `profile-page/rank-chart.tsx`, `bem/line-chart.less` |
@@ -144,6 +144,9 @@ What's deliberately not identical, and why. Anything else that looks wrong is a 
   leaderboards. The user card's online dot says whether the profile is tracking.
 - **Country rank** isn't shown: there's no honest way to estimate one (see
   `docs/architecture.md`).
+- **The app's own buttons** (tracking, language, Options, Quit) are at the right end of the bar
+  above the cover, where osu-web has its user menu. Below the desktop breakpoint the bar stays
+  for them, and the mode tabs are in `.header-nav-mobile` as osu-web's are.
 
 ## Generated from osu!
 

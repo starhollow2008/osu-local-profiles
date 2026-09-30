@@ -20,12 +20,76 @@
     osu-web's own bar holds links to the other pages of the user (modding, playlists,
     multiplayer, ranked play), which this app does not have, so the mode tabs go here instead:
     osu-web puts those on the right of this same row. Nothing is invented on the left, because a
-    link to the page you are already on is a dead control.
+    link to the page you are already on is a dead control. The app's own buttons (tracking,
+    language, Options, Quit) are at the right end, off the cover, and below the desktop
+    breakpoint the bar stays for them alone.
   -->
   <div class="header-v4__row header-v4__row--bar">
     <div class="header-v4__container band">
       <div class="band__inner header-v4__nav">
         <nav class="game-mode" id="modes" aria-label="Game mode" data-i18n-attr="aria-label:modes.label"></nav>
+        <div class="header-v4__actions">
+          <button class="update-pill" id="updateBtn" type="button" hidden data-i18n="updateBtn">Update available</button>
+          <button class="tracking-pill" id="toggle" type="button">
+            <span class="tracking-pill__dot"></span><span id="tracklabel">not tracking</span>
+          </button>
+          <!--
+            The language picker: a flag, and a menu of every language osu! itself offers, each
+            written in its own name. See web/js/i18n.js. It sits before Options because it
+            changes what Options is *written in*.
+          -->
+          <div class="lang-wrap">
+            <button class="lang-pill" id="langBtn" type="button" aria-haspopup="true" aria-expanded="false"
+                    title="Change language" data-i18n-attr="title:langBtn.title">
+              <img class="lang-pill__flag" id="langFlag" src="/flags/gb.svg" alt="English">
+            </button>
+            <!--
+              Above the list, and outside the part that scrolls: forty languages do not fit on a
+              screen, and a switch under them would be reachable only by scrolling past all of
+              them. It is here rather than only in Other settings because which script a beatmap
+              reads in is the same question as which language the page is in.
+            -->
+            <div class="menu lang-menu" id="langMenu" role="menu" aria-label="Language" hidden data-i18n-attr="aria-label:langMenu.label">
+              <button id="langOriginal" class="menu__toggle lang-menu__original" type="button" role="menuitemcheckbox"
+                      aria-checked="false"
+                      title="Show each beatmap's artist and title the way the song writes them, instead of romanised."
+                      data-i18n-attr="title:langOriginal.title">
+                <span data-i18n="langOriginal.label">Show beatmap metadata in original language</span><span class="menu__switch" aria-hidden="true"></span>
+              </button>
+              <div class="sep"></div>
+              <div class="lang-menu__options" id="langOptions"></div>
+            </div>
+          </div>
+          <div class="menu-wrap">
+            <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="optionsBtn">Options &#9662;</button>
+            <div class="menu" id="optionsMenu" hidden>
+              <button id="optProfiles" type="button" data-i18n="optProfiles">Profiles</button>
+              <button id="optFolders" type="button" data-i18n="optFolders">osu! folders</button>
+              <button id="optSettings" type="button" data-i18n="optSettings">Other settings</button>
+              <div class="sep"></div>
+              <div class="menu__heading" data-i18n="optionsMenu.tracking">Tracking</div>
+              <button id="optBackfill" type="button" data-i18n="optBackfill">Import past plays</button>
+              <button id="optFilter" type="button" data-i18n="optFilter">Play tracking filter</button>
+              <div class="sep"></div>
+              <button id="optLazerScoring" class="menu__toggle" type="button" role="menuitemcheckbox"
+                      aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale." data-i18n-attr="title:optLazerScoring.title">
+                <span data-i18n="optLazerScoring.lazerScoring">Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
+              </button>
+              <!-- Install-level, in config.json: see autoUpdate in src/config.ts (roadmap 5.66). -->
+              <button id="optAutoUpdate" class="menu__toggle" type="button" role="menuitemcheckbox"
+                      aria-checked="false" title="Download new versions in the background and install them when you quit the app, or when it next starts. Never on a metered connection." data-i18n-attr="title:optAutoUpdate.title">
+                <span data-i18n="optAutoUpdate.autoUpdate">Auto-update</span><span class="menu__switch" aria-hidden="true"></span>
+              </button>
+              <button id="optShare" type="button" data-i18n="optShare">Share &amp; back up</button>
+              <div class="sep"></div>
+              <div class="note" id="optInfo">&nbsp;</div>
+            </div>
+          </div>
+          <!-- Stops the app. Asks once first: the page cannot bring it back. -->
+          <button class="quit-pill" id="quitBtn" type="button" title="Quit osu! local profiles" data-i18n-attr="title:quitBtn.title">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="quitBtn.quit">Quit</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -38,68 +102,6 @@
   <div class="header-nav-mobile" id="modesMobile"></div>
 
   <div class="profile-info__bg" id="cover">
-    <div class="profile-info__bg-actions">
-      <button class="update-pill" id="updateBtn" type="button" hidden data-i18n="updateBtn">Update available</button>
-      <button class="tracking-pill" id="toggle" type="button">
-        <span class="tracking-pill__dot"></span><span id="tracklabel">not tracking</span>
-      </button>
-      <!--
-        The language picker: a flag, and a menu of every language osu! itself offers, each
-        written in its own name. See web/js/i18n.js. It sits before Options because it
-        changes what Options is *written in*.
-      -->
-      <div class="lang-wrap">
-        <button class="lang-pill" id="langBtn" type="button" aria-haspopup="true" aria-expanded="false"
-                title="Change language" data-i18n-attr="title:langBtn.title">
-          <img class="lang-pill__flag" id="langFlag" src="/flags/gb.svg" alt="English">
-        </button>
-        <!--
-          Above the list, and outside the part that scrolls: forty languages do not fit on a
-          screen, and a switch under them would be reachable only by scrolling past all of
-          them. It is here rather than only in Other settings because which script a beatmap
-          reads in is the same question as which language the page is in.
-        -->
-        <div class="menu lang-menu" id="langMenu" role="menu" aria-label="Language" hidden data-i18n-attr="aria-label:langMenu.label">
-          <button id="langOriginal" class="menu__toggle lang-menu__original" type="button" role="menuitemcheckbox"
-                  aria-checked="false"
-                  title="Show each beatmap's artist and title the way the song writes them, instead of romanised."
-                  data-i18n-attr="title:langOriginal.title">
-            <span data-i18n="langOriginal.label">Show beatmap metadata in original language</span><span class="menu__switch" aria-hidden="true"></span>
-          </button>
-          <div class="sep"></div>
-          <div class="lang-menu__options" id="langOptions"></div>
-        </div>
-      </div>
-      <div class="menu-wrap">
-        <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="optionsBtn">Options &#9662;</button>
-        <div class="menu" id="optionsMenu" hidden>
-          <button id="optProfiles" type="button" data-i18n="optProfiles">Profiles</button>
-          <button id="optFolders" type="button" data-i18n="optFolders">osu! folders</button>
-          <button id="optSettings" type="button" data-i18n="optSettings">Other settings</button>
-          <div class="sep"></div>
-          <div class="menu__heading" data-i18n="optionsMenu.tracking">Tracking</div>
-          <button id="optBackfill" type="button" data-i18n="optBackfill">Import past plays</button>
-          <button id="optFilter" type="button" data-i18n="optFilter">Play tracking filter</button>
-          <div class="sep"></div>
-          <button id="optLazerScoring" class="menu__toggle" type="button" role="menuitemcheckbox"
-                  aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale." data-i18n-attr="title:optLazerScoring.title">
-            <span data-i18n="optLazerScoring.lazerScoring">Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
-          </button>
-          <!-- Install-level, in config.json: see autoUpdate in src/config.ts (roadmap 5.66). -->
-          <button id="optAutoUpdate" class="menu__toggle" type="button" role="menuitemcheckbox"
-                  aria-checked="false" title="Download new versions in the background and install them when you quit the app, or when it next starts. Never on a metered connection." data-i18n-attr="title:optAutoUpdate.title">
-            <span data-i18n="optAutoUpdate.autoUpdate">Auto-update</span><span class="menu__switch" aria-hidden="true"></span>
-          </button>
-          <button id="optShare" type="button" data-i18n="optShare">Share &amp; back up</button>
-          <div class="sep"></div>
-          <div class="note" id="optInfo">&nbsp;</div>
-        </div>
-      </div>
-      <!-- Stops the app. Asks once first: the page cannot bring it back. -->
-      <button class="quit-pill" id="quitBtn" type="button" title="Quit osu! local profiles" data-i18n-attr="title:quitBtn.title">
-        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="quitBtn.quit">Quit</span>
-      </button>
-    </div>
     <!--
       osu-web's `.profile-page-cover-editor-button` (`profile-edit-button.tsx`): a pencil on the
       cover's own bottom right, which opens the banner picker. Here it opens the profile's

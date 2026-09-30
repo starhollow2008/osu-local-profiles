@@ -37,15 +37,15 @@
  * centring as `.band`. It is not one, because the cover spans the column's full width while
  * the row below it keeps the gutter.
  *
- * `@osu-colour-d5`, as `header-v4__row--title` is: the row holding the name, in the d family
- * like the bar above it and a step darker, so the two read as one header rather than as a bar
- * sitting on the cover.
+ * `--hsl-b3`, as osu-web's `.profile-info` is (`profile-info.less`): the row holding the name is
+ * the same colour as the level bar's row below it. `header-v4__row--title`'s d5 is the title
+ * row of osu-web's other pages, not the profile's.
  */
 .profile-info {
   width: 100%;
   max-width: var(--container);
   margin: 0 auto;
-  background-color: hsl(var(--hsl-d5));
+  background-color: hsl(var(--hsl-b3));
 }
 
 .profile-info__bg {
@@ -63,22 +63,6 @@
   position: absolute;
   inset: 0;
   background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.55));
-}
-
-.profile-info__bg-actions {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 10px var(--gutter);
-  pointer-events: none;
-}
-
-.profile-info__bg-actions > * {
-  pointer-events: auto;
 }
 
 /*
@@ -142,9 +126,11 @@
   margin-bottom: 10px;
 }
 
-/* An icon font's glyphs are 1em. An inline svg has to be told, or it takes the default size. */
-.profile-page-cover-editor-button svg,
-.profile-info__cover-toggle svg {
+/*
+ * An icon font's glyphs are 1em. An inline svg has to be told, or it takes the default size.
+ * Every `btn-circle--page-toggle` (the banner and me! pencils, the cover's chevron) is one size.
+ */
+.btn-circle--page-toggle svg {
   width: 1em;
   height: 1em;
 }
@@ -547,10 +533,29 @@
   min-height: 40px;
 }
 
+/*
+ * Three columns so the mode tabs stay centred whatever the buttons' width: an empty one, the
+ * tabs, and the app's buttons at the right end.
+ */
 .header-v4__nav {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: center;
+}
+
+.header-v4__nav > .game-mode {
+  grid-column: 2;
+}
+
+/* The app's own buttons: tracking, language, Options and Quit. Ours, not osu-web's. */
+.header-v4__actions {
+  grid-column: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 7px 0;
 }
 
 /*
@@ -573,9 +578,23 @@
   box-shadow: inset 0 -1px 0 hsl(var(--hsl-d5));
 }
 
-/* The bar is the desktop one, so the tabs are in it, not in the name's row. */
-.header-v4__row--bar {
+/*
+ * Below the breakpoint the bar keeps only the app's buttons, and the tabs are in the mobile
+ * block. A shared copy or an export has no buttons, so there the bar goes too.
+ */
+.header-v4__row--bar .game-mode {
   display: none;
+}
+
+@media (max-width: 899px) {
+  .static-copy .header-v4__row--bar,
+  .export-mode .header-v4__row--bar {
+    display: none;
+  }
+
+  .header-v4__actions {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (min-width: 900px) {
@@ -583,8 +602,8 @@
     display: none;
   }
 
-  .header-v4__row--bar {
-    display: block;
+  .header-v4__row--bar .game-mode {
+    display: flex;
   }
 }
 
@@ -902,14 +921,12 @@
   transition: width 0.25s cubic-bezier(0.645, 0.045, 0.355, 1);
 }
 
+/* osu-web's `.bar__text` sets no type of its own: it is the level row's bold white 12px. */
 .bar__text {
   position: absolute;
   top: 100%;
   right: 0;
   margin-top: 2px;
-  font-size: var(--fs-small);
-  font-weight: 400;
-  color: hsl(var(--hsl-f1));
 }
 
 /*
@@ -937,12 +954,12 @@
   background: linear-gradient(var(--bg));
 }
 
-/* osu-web's `.user-level` is @font-size--large, which the number inherits. */
+/*
+ * osu-web's `.user-level` is @font-size--large, which the number inherits, and so are its
+ * colour and weight: the level row's bold white, over every tier's hexagon.
+ */
 .user-level__level {
   position: absolute;
-  color: hsl(var(--hsl-b6));
-  font-weight: 700;
-  font-size: var(--fs-large);
   line-height: 1;
 }
 
@@ -2457,7 +2474,8 @@
 /*
  * osu-web's `.page-extra__actions`: the pencil that opens the editor once there is something
  * to edit, in the section's top right (`btn-circle--page-toggle`, a 30px circle on --hsl-b2).
- * This app's reorder controls live in the same corner, so they step aside for it.
+ * This app's reorder controls live in the same corner, so they step aside for it: to its
+ * left and level with its middle, where osu-web keeps its own drag handle beside the pencil.
  */
 .page-extra__actions {
   position: absolute;
@@ -2466,8 +2484,9 @@
   z-index: 2;
 }
 
-.page-extra:has(> .page-extra__actions) > .section-order {
-  right: 12px + 30px + 4px;
+.page-extra:has(.page-extra__actions) > .section-order {
+  right: calc(12px + 30px + 4px);
+  height: 30px;
 }
 
 .btn-circle--page-toggle {
@@ -5247,15 +5266,15 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
 /*
  * Shown while the beatmap index runs on a first launch, or when a routine re-check turns out
  * slow. Deliberately small: the page works the whole time, and a banner across it read as
- * the app being unusable. It sits in the cover's top-right corner, just under the row of
- * buttons (10px padding + 26px pills), and scrolls away with the header.
+ * the app being unusable. It sits in the cover's top-right corner, under the bar that holds
+ * the buttons, and scrolls away with the header.
  *
- * z-index 1 keeps it above the cover's shading but below `.profile-info__bg-actions` (2),
- * so the Options and language menus open over it rather than behind it.
+ * z-index 1 keeps it above the cover's shading and below the Options and language menus (40),
+ * which open over it rather than behind it.
  */
 .index-notice {
   position: absolute;
-  top: 44px;
+  top: 10px;
   right: var(--gutter);
   z-index: 1;
   display: grid;
