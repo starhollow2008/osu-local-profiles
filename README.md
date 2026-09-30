@@ -79,6 +79,7 @@ npm run check:app    # verify the install without starting to track
 ```
 
 Open <http://localhost:7272>. 
+Go is only needed to build the tray launcher.
 
 ## Warnings for stable
 
@@ -175,16 +176,6 @@ App reads from lazer's session log to track incomplete plays:
 | `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Auto-update** |
 | `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
 
-
-## Development
-
-```
-npm run typecheck
-npm test
-npm run check        # both
-npm run ui           # drives the real page in headless Chrome (app must be running)
-```
-
 ## Known limitations
 
 - The official osu! pp calculator adds ~25MB to the download (~58MB unzipped), because it bundles its own .NET 10 runtime
@@ -196,6 +187,9 @@ npm run ui           # drives the real page in headless Chrome (app must be runn
 - No support for tracking incomplete plays for playcount in stable
 - A map's ranked status comes from osu!lazer's list of beatmaps, which osu!lazer updates about once a month, so a map ranked since then counts as unranked until the next update
 
+## Contributing
+
+Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and what a pull request needs.
 
 ## Credits
 
