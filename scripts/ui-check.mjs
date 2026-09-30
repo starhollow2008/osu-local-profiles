@@ -1083,6 +1083,7 @@ const sharedCopy = JSON.parse(await evaluate(`(async () => {
       doc.querySelectorAll('#medalGroups [data-medal]').length ===
       document.querySelectorAll('#medalGroups [data-medal]').length,
     options: display('#optionsBtn'),
+    coverEdit: display('#coverEdit'),
     installs: snap.state.installs.length,
     me: display('#section-me'),
     meEmpty: document.getElementById('aboutView').classList.contains('about--empty'),
@@ -1096,6 +1097,7 @@ check('the copy renders on its own', sharedCopy.rendered, true);
 check('as the same profile', sharedCopy.sameName, true);
 check('with the same medals', sharedCopy.sameMedals, true);
 check('and none of the controls that change it', sharedCopy.options, 'none');
+check('not even the banner pencil', sharedCopy.coverEdit, 'none');
 check('it says nothing about where osu! is installed', sharedCopy.installs, 0);
 if (sharedCopy.meEmpty) {
   check('an empty me! is left out, rather than asking a visitor to write it', sharedCopy.me, 'none');
@@ -1117,7 +1119,7 @@ check(
   'export mode hides every control',
   await evaluate(`(() => {
     document.body.classList.add('export-mode');
-    const hidden = ['.menu-wrap', '.tracking-pill', '.section-order', '.play-detail__menu']
+    const hidden = ['.menu-wrap', '.tracking-pill', '.section-order', '.play-detail__menu', '#coverEdit', '#coverToggle', '#aboutActions']
       .map((sel) => document.querySelector(sel))
       .filter(Boolean)
       .every((el) => getComputedStyle(el).display === 'none');

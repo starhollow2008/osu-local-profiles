@@ -2070,6 +2070,9 @@
 .export-mode .stopped-notice,
 .export-mode .update-nudge,
 .export-mode .section-order,
+.export-mode #coverEdit,
+.export-mode #coverToggle,
+.export-mode #aboutActions,
 .export-mode .play-detail__menu,
 .export-mode .play-detail__grip,
 .export-mode [data-unfavorite],
@@ -5746,7 +5749,7 @@ s.bbcode-editor__glyph {
 /* ======================================================================== */
 
 .static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
-  #aboutEdit, #aboutActions, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
+  #aboutEdit, #aboutActions, #coverEdit, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;
 }
