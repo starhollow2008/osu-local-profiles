@@ -7,15 +7,18 @@
   count as yours whatever name was on it. Now it counts only if osu! wrote the file when the play
   was set. Replays from before July 2014 are also read properly now. Plays already imported this
   way stay until you remove them.
+  Reported in [#4](https://github.com/jonathant09/osu-local-profiles/issues/4).
   Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
 
 - **Your other names, in Other settings and Import past plays.** Plays under these names are
   tracked and imported as yours, such as a name on a private server. Plays already turned away
   under one are checked again.
+  Reported in [#4](https://github.com/jonathant09/osu-local-profiles/issues/4).
   Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
 
 - **The play tracking filter can keep one client's plays.** The new **Client** criterion picks
   osu!stable, osu!lazer or McOsu. A stable play imported into osu!lazer counts as osu!stable.
+  Reported in [#5](https://github.com/jonathant09/osu-local-profiles/issues/5).
   Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
 
 - **Launch on startup, a new switch in Options.** The app starts in the tray when you sign in to
