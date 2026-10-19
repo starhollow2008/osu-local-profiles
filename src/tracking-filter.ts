@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import type { Db } from './db/index.ts';
-import type { LazerMod, Ruleset } from './osr.ts';
+import type { Client, LazerMod, Ruleset } from './osr.ts';
 import {
   osuTagsAndSource,
   Status,
@@ -25,7 +25,7 @@ import { beatmapLengthMs, playRate } from './calc/play-time.ts';
  *
  * - **An unknowable criterion never rejects a play.** Over half of what osu! counts as a
  *   play leaves no replay -- a quit, an HP fail, a retry -- and those have no mod list and no
- *   star rating recorded anywhere (see src/tracker/incomplete.ts). The other seven criteria
+ *   star rating recorded anywhere (see src/tracker/incomplete.ts). The other eight criteria
  *   still judge them. Dropping what cannot be fully judged would make the profile's play
  *   count disagree with osu!'s the moment the filter came on, which is a worse answer than a
  *   filter that admits what it cannot see.
@@ -123,6 +123,11 @@ export interface TrackingFilter {
    */
   fromKeywords: boolean;
   modes: Ruleset[];
+  /**
+   * Which game set the play, read from its replay (roadmap 5.76). A stable play imported into
+   * lazer is still stable's: lazer keeps the replay stable wrote.
+   */
+  clients: Client[];
   /** Star rating as played, mods included. */
   stars: NumberRange;
   /** Length as played, in seconds -- the beatmap's own length divided by the play's rate. */
@@ -168,6 +173,9 @@ export const FILTER_CATEGORY_NAMES = Object.keys(FILTER_CATEGORIES) as FilterCat
 /** Every mode, which is the default: the filter narrows nothing until it is told to. */
 const ALL_MODES: Ruleset[] = [0, 1, 2, 3];
 
+/** Every client, which is the default for the same reason. */
+export const ALL_CLIENTS: Client[] = ['stable', 'lazer', 'mcosu'];
+
 /**
  * The earliest date the sliders offer, measured rather than chosen: the oldest `submit_date`
  * in this machine's `online.db` is `2007-10-06 17:46:31+00:00`, the day osu!'s beatmap
@@ -187,6 +195,7 @@ export function defaultTrackingFilter(): TrackingFilter {
     rules: [],
     fromKeywords: false,
     modes: [...ALL_MODES],
+    clients: [...ALL_CLIENTS],
     stars: { min: 0, max: null },
     length: { min: 0, max: null },
     mods: {},
@@ -332,6 +341,11 @@ export function coerceTrackingFilter(raw: unknown): TrackingFilter {
     // nothing. The dialog says so loudly; widening it silently would misreport what was saved.
     out.modes = ALL_MODES.filter((m) => modes.has(m));
   }
+  // Kept empty for the same reason. A filter saved before this criterion has none, and tracks all.
+  if (Array.isArray(raw['clients'])) {
+    const clients = new Set(raw['clients']);
+    out.clients = ALL_CLIENTS.filter((c) => clients.has(c));
+  }
 
   out.stars = coerceRange(raw['stars'], MAX_STARS, roundStars);
   out.length = coerceRange(raw['length'], MAX_LENGTH_SECONDS, roundSeconds);
@@ -367,6 +381,8 @@ export function coerceTrackingFilter(raw: unknown): TrackingFilter {
 /** The facts a play is judged on. Anything null is not knowable, and never rejects. */
 export interface PlayFacts {
   mode: Ruleset;
+  /** Which game set it. */
+  client: Client;
   /** What the player chose -- null for a play that left no replay. */
   mods: LazerMod[] | null;
   /** As played, mods included. Null until osu!'s calculator has been asked. */
@@ -405,6 +421,7 @@ export interface BeatmapText {
  */
 export type FilterCriterion =
   | 'mode'
+  | 'client'
   | 'beatmap rules'
   | 'category'
   | 'date added'
@@ -564,6 +581,7 @@ export function filterRejects(
   if (!filter.enabled) return null;
 
   if (facts.mode !== undefined && !filter.modes.includes(facts.mode)) return 'mode';
+  if (facts.client !== undefined && !filter.clients.includes(facts.client)) return 'client';
 
   // A beatmap whose metadata could not be read is not judged on it, as the keywords never were.
   if (filter.rules.length > 0 && facts.beatmap && !rulesMatch(filter.rules, facts.beatmap)) {
@@ -613,6 +631,7 @@ export function filterRejects(
 export function filterNarrows(filter: TrackingFilter): boolean {
   if (!filter.enabled) return false;
   if (filter.modes.length < ALL_MODES.length) return true;
+  if (filter.clients.length < ALL_CLIENTS.length) return true;
   if (filter.rules.length > 0) return true;
   if (filter.stars.min > 0 || filter.stars.max !== null) return true;
   if (filter.length.min > 0 || filter.length.max !== null) return true;
@@ -765,10 +784,12 @@ export function playFacts(
   facts: BeatmapFilterFacts,
   mode: Ruleset,
   mods: LazerMod[] | null,
+  client: Client,
 ): Omit<PlayFacts, 'stars'> {
   const rate = mods === null ? 1 : playRate(mods);
   return {
     mode,
+    client,
     mods,
     lengthSeconds: facts.lengthMs === null ? null : Math.round(facts.lengthMs / rate / 1000),
     status: facts.status,

@@ -261,7 +261,7 @@ export async function ingestScore(
   let facts = null;
   if (filter.enabled) {
     facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
-    const rejected = filterRejects(filter, playFacts(facts, mode, mods));
+    const rejected = filterRejects(filter, playFacts(facts, mode, mods, score.client));
     if (rejected) {
       declined(ctx, { ...play, ...named, reason: 'filtered', criterion: rejected });
       return { status: 'filtered', criterion: rejected, ...named };

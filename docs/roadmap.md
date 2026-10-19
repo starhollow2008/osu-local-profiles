@@ -86,6 +86,7 @@ does not have to make it again.
 | 5.72 | The mode switcher's icons                                 | done   |
 | 5.73 | A name osu! changed is still yours                        | done   |
 | 5.74 | Beatmap rules replace the filter's keywords               | done   |
+| 5.76 | The filter's client                                       | done   |
 
 ## Constraints on every item
 
@@ -1453,3 +1454,17 @@ guest difficulties matched only when his name happened to be in the difficulty n
 Still open: two cached beatmaps on this machine (Come[Back]Home's "Nevada") hold names from before
 the `[` fix of 5.45 (`Creator` "Come", no difficulty name), so every field that reads them sees the
 wrong name. Beatmap rows cached before that fix should be read again once.
+
+## 5.76 - The filter's client
+
+**Status:** done (unreleased)
+
+Issue #5: a profile of lazer plays only. Look in can't do it, because lazer's store holds the stable
+plays it imported, and excluding CL didn't either: the filter reads the mods the player chose, and
+a stable play's CL is only shown (`withClassicMod`).
+
+- **Client** in the play tracking filter: osu!stable, osu!lazer, McOsu, all ticked by default and
+  read from the replay (`ReplayScore.client`), so a stable play imported into lazer is stable's. A
+  filter saved before it tracks every client; an empty list is kept and the dialog warns.
+- Unfinished plays and unsubmitted attempts come only from lazer's log, so they're lazer's.
+- CL's meaning in the filter is unchanged, so no saved filter changes what it tracks.

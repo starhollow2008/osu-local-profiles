@@ -322,12 +322,13 @@ and the card shows what your machine knows until it can be filled in.
 **Options -> Play tracking filter** decides which plays this profile records at all.
 
 It's **off by default**, and switching it on changes nothing by itself, since every criterion starts
-wide open. There are nine:
+wide open. There are ten:
 
 | | |
 |---|---|
 | **Beatmap rules** | Which beatmaps count, by title, artist, mapper and more. See [Beatmap rules](#beatmap-rules). |
 | **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
+| **Client** | osu!stable, osu!lazer, McOsu. A stable play imported into lazer counts as stable. |
 | **Difficulty** | The star rating as played, mods included. |
 | **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
 | **Categories** | Ranked, Qualified, Loved, Pending, Work in progress, Graveyarded, Never submitted. |
@@ -429,7 +430,8 @@ when you played, check what would be imported, then confirm.
 - **From** and **To** pick your own range. Tick **Earliest** to start from the oldest play, and
   **Now** (ticked by default) to run up to the present.
 - **Look in**, when more than one osu! install was found, lets you untick installs this import
-  shouldn't read.
+  shouldn't read. osu!lazer keeps the stable plays it imported, so to leave those out use the
+  filter's **Client** instead.
 - It reads osu!lazer's logs as well as replays, so a past session comes back whole: finished plays,
   counted quits and retries, and offline attempts. Each kind is its own tick box with its count.
 - A play on a beatmap you no longer have is skipped, and the check says how many.

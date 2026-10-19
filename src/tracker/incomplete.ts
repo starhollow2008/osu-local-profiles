@@ -147,7 +147,8 @@ function assess(entry: Recording, ctx: IncompleteContext): IncompleteCheck {
   const filter = ctx.filter ?? defaultTrackingFilter();
   if (filter.enabled) {
     const facts = beatmapFilterFacts(ctx.db, ctx.resolver, beatmap);
-    const rejected = filterRejects(filter, playFacts(facts, mode, null));
+    // Only lazer's log records these.
+    const rejected = filterRejects(filter, playFacts(facts, mode, null, 'lazer'));
     if (rejected) return { status: 'filtered', criterion: rejected, ...named, recording: entry, mode };
   }
 

@@ -213,7 +213,7 @@ export async function scanForReplays(
         const beatmap = filtering.resolver.resolve(score.beatmapMD5);
         const facts = beatmapFilterFacts(db, filtering.resolver, beatmap);
         filtered =
-          filterRejects(filter, playFacts(facts, score.mode, scoreMods(score, beatmap.osuPath))) !== null;
+          filterRejects(filter, playFacts(facts, score.mode, scoreMods(score, beatmap.osuPath), score.client)) !== null;
       }
 
       candidates.push({

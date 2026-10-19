@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.31.0
+
+- **The play tracking filter can keep one client's plays.** The new **Client** criterion picks
+  osu!stable, osu!lazer or McOsu. A stable play imported into osu!lazer counts as osu!stable.
+
+- **Everything new in this release is translated** into all 15 languages.
+
 ## 1.30.0
 
 - **The page is a column again, as on osu!.** The cover, the figures, the level bar and the tabs

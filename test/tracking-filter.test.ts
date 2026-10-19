@@ -66,6 +66,7 @@ const rules = (...each: RuleCondition[][]): BeatmapRule[] => each.map((condition
 
 const facts = {
   mode: 0 as const,
+  client: 'stable' as const,
   mods: [] as { acronym: string }[],
   stars: 5,
   lengthSeconds: 120,
@@ -101,6 +102,7 @@ test('switched on and untouched, every play still passes', () => {
 test('filterNarrows notices each criterion on its own', () => {
   assert.equal(filterNarrows(filter({ rules: rules([cond('mapper', 'is', 'sotarks')]) })), true);
   assert.equal(filterNarrows(filter({ modes: [0, 1, 2] })), true);
+  assert.equal(filterNarrows(filter({ clients: ['lazer'] })), true);
   assert.equal(filterNarrows(filter({ stars: { min: 5, max: null } })), true);
   assert.equal(filterNarrows(filter({ stars: { min: 0, max: 7 } })), true);
   assert.equal(filterNarrows(filter({ length: { min: 0, max: 300 } })), true);
@@ -349,15 +351,15 @@ test('length is judged at the speed the play ran', () => {
 
   // Four minutes nomod is too long; the same map under DT is 2:40 and is not.
   assert.equal(
-    filterRejects(upToThreeMinutes, playFacts(beatmap, 0, [])),
+    filterRejects(upToThreeMinutes, playFacts(beatmap, 0, [], 'stable')),
     'length',
   );
   assert.equal(
-    filterRejects(upToThreeMinutes, playFacts(beatmap, 0, [{ acronym: 'DT' }])),
+    filterRejects(upToThreeMinutes, playFacts(beatmap, 0, [{ acronym: 'DT' }], 'stable')),
     null,
   );
   // A play with no mods recorded is measured at the beatmap's own speed, the only answer there is.
-  assert.equal(filterRejects(upToThreeMinutes, playFacts(beatmap, 0, null)), 'length');
+  assert.equal(filterRejects(upToThreeMinutes, playFacts(beatmap, 0, null, 'lazer')), 'length');
 });
 
 /* ------------------------------------------------------- categories and dates */
@@ -416,6 +418,19 @@ test('the mode criterion is the played mode', () => {
   assert.equal(filterRejects(maniaOnly, { ...facts, mode: 0 }), 'mode');
 });
 
+/*
+ * Issue #5: a profile of lazer plays only. lazer's store holds the stable plays it imported, as the
+ * replays stable wrote, so where a play was found cannot say which game set it; the replay does.
+ */
+test('the client criterion is the game that set the play', () => {
+  const lazerOnly = filter({ clients: ['lazer'] });
+  assert.equal(filterRejects(lazerOnly, { ...facts, client: 'lazer' }), null);
+  assert.equal(filterRejects(lazerOnly, { ...facts, client: 'stable' }), 'client');
+  assert.equal(filterRejects(lazerOnly, { ...facts, client: 'mcosu' }), 'client');
+  // An unfinished play from lazer's log is lazer's.
+  assert.equal(filterRejects(lazerOnly, playFacts({ status: Status.RANKED, beatmap: null, lengthMs: null, addedAt: null, submittedAt: null, rankedAt: null }, 0, null, 'lazer')), null);
+});
+
 /* ------------------------------------------------------------------ coercion */
 
 test('anything at all coerces to a usable filter', () => {
@@ -457,6 +472,12 @@ test('an empty mode list is kept, because it is a real answer', () => {
   // was actually saved.
   assert.deepEqual(coerceTrackingFilter({ modes: [] }).modes, []);
   assert.deepEqual(coerceTrackingFilter({ modes: [9, 'x', 1, 1] }).modes, [1]);
+});
+
+test('a filter saved before the client criterion tracks every client, and an empty list is kept', () => {
+  assert.deepEqual(coerceTrackingFilter({ enabled: true, modes: [0] }).clients, ['stable', 'lazer', 'mcosu']);
+  assert.deepEqual(coerceTrackingFilter({ clients: [] }).clients, []);
+  assert.deepEqual(coerceTrackingFilter({ clients: ['mcosu', 'web', 'lazer', 'lazer'] }).clients, ['lazer', 'mcosu']);
 });
 
 test('a date before osu! existed is held to the day osu!’s listing begins', () => {
@@ -602,7 +623,7 @@ test('a beatmap with no local file has no facts, and no facts rejects nothing', 
     added: { from: Date.UTC(2024, 0, 1), to: Date.UTC(2024, 0, 2) },
     categories: ['unsubmitted'],
   });
-  assert.equal(filterRejects(strict, playFacts(read, 0, [])), null);
+  assert.equal(filterRejects(strict, playFacts(read, 0, [], 'stable')), null);
   h.cleanup();
 });
 

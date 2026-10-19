@@ -55,6 +55,16 @@ const MOD_GROUPS = [
   ['System', () => t('mods.system')],
 ];
 
+/**
+ * Which game set the play (roadmap 5.76). Product names, so not translated. A stable play
+ * imported into lazer is stable's, which is what the hint is for.
+ */
+const CLIENT_NAMES = [
+  ['stable', 'osu!stable'],
+  ['lazer', 'osu!lazer'],
+  ['mcosu', 'McOsu'],
+];
+
 const CATEGORY_LABELS = [
   ['ranked', () => t('status.ranked')],
   ['qualified', () => t('status.qualified')],
@@ -138,6 +148,7 @@ function copyFilter(filter) {
       : [],
     fromKeywords: Boolean(filter?.fromKeywords),
     modes: Array.isArray(filter?.modes) ? [...filter.modes] : [0, 1, 2, 3],
+    clients: Array.isArray(filter?.clients) ? [...filter.clients] : CLIENT_NAMES.map(([client]) => client),
     stars: { min: filter?.stars?.min ?? 0, max: filter?.stars?.max ?? null },
     length: { min: filter?.length?.min ?? 0, max: filter?.length?.max ?? null },
     mods: { ...(filter?.mods ?? {}) },
@@ -360,6 +371,14 @@ function modesSection() {
   );
 }
 
+function clientsSection() {
+  const boxes = CLIENT_NAMES.map(
+    ([client, name]) =>
+      `<label class="checkgroup__item"><input type="checkbox" data-client="${client}"> ${escapeHtml(name)}</label>`,
+  ).join('');
+  return section(t('filter.client'), `<div class="checkgroup">${boxes}</div>`, t('filter.clientHelp'));
+}
+
 function starsSection() {
   return section(
     t('filter.difficulty'),
@@ -522,6 +541,7 @@ function renderBody() {
   $('filterBody').innerHTML =
     rulesSection() +
     modesSection() +
+    clientsSection() +
     starsSection() +
     modsSection() +
     categoriesSection(needsLazer) +
@@ -555,6 +575,9 @@ function fillFromDraft() {
 
   for (const box of $('filterBody').querySelectorAll('[data-mode]')) {
     box.checked = draft.modes.includes(Number(box.dataset.mode));
+  }
+  for (const box of $('filterBody').querySelectorAll('[data-client]')) {
+    box.checked = draft.clients.includes(box.dataset.client);
   }
   for (const box of $('filterBody').querySelectorAll('[data-category]')) {
     box.checked = draft.categories.includes(box.dataset.category);
@@ -698,6 +721,9 @@ function impossibleReason() {
   if (draft.modes.length === 0) {
     return t('filter.noModeTicked');
   }
+  if (draft.clients.length === 0) {
+    return t('filter.noClientTicked');
+  }
   if (draft.categories.length === 0) {
     return t('filter.noCategoryTicked');
   }
@@ -772,6 +798,13 @@ function bindBody() {
       const mode = Number(target.dataset.mode);
       draft.modes = [0, 1, 2, 3].filter((m) =>
         m === mode ? target.checked : draft.modes.includes(m),
+      );
+      renderReadouts();
+      return;
+    }
+    if (target.dataset.client !== undefined) {
+      draft.clients = CLIENT_NAMES.map(([client]) => client).filter((client) =>
+        client === target.dataset.client ? target.checked : draft.clients.includes(client),
       );
       renderReadouts();
       return;
