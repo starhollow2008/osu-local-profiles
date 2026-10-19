@@ -24,6 +24,8 @@ type launcher struct {
 	lock      *instanceLock
 	// No dialogs. Set by OSU_LOCAL_PROFILES_NO_TRAY, which is also how the tests run it.
 	quiet bool
+	// Started by the computer (atStartup), until the app's first start has been told so.
+	startup bool
 
 	mu       sync.Mutex
 	state    appState
@@ -99,7 +101,11 @@ func (l *launcher) start() error {
 
 	cmd := exec.Command(filepath.Join(l.root, runtimeName(runtime.GOOS)), filepath.Join("src", "main.ts"))
 	cmd.Dir = l.root
-	cmd.Env = append(os.Environ(), launcherEnv+"="+launcherValue)
+	l.mu.Lock()
+	startup := l.startup
+	l.startup = false
+	l.mu.Unlock()
+	cmd.Env = runtimeEnv(os.Environ(), startup)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

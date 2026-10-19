@@ -80,6 +80,14 @@
                       aria-checked="false" title="Download new versions in the background and install them when you quit the app, or when it next starts. Never on a metered connection." data-i18n-attr="title:optAutoUpdate.title">
                 <span data-i18n="optAutoUpdate.autoUpdate">Auto-update</span><span class="menu__switch" aria-hidden="true"></span>
               </button>
+              <!--
+                Kept by the system, not config.json: see src/startup.ts (roadmap 5.77). Hidden in a
+                copy with no tray launcher to start, a source checkout.
+              -->
+              <button id="optStartup" class="menu__toggle" type="button" role="menuitemcheckbox" hidden
+                      aria-checked="false" title="Start in the tray when you sign in to your computer, without opening this page." data-i18n-attr="title:optStartup.title">
+                <span data-i18n="optStartup.label">Launch on startup</span><span class="menu__switch" aria-hidden="true"></span>
+              </button>
               <button id="optShare" type="button" data-i18n="optShare">Share &amp; back up</button>
               <div class="sep"></div>
               <div class="note" id="optInfo">&nbsp;</div>

@@ -210,3 +210,35 @@ func TestTranslocated(t *testing.T) {
 		t.Error("an ordinary path was taken for a translocated one")
 	}
 }
+
+// Started by the computer's startup entry: no page is opened, and only the first start says so.
+func TestStartup(t *testing.T) {
+	if !atStartup([]string{"osu-local-profiles", "--startup"}) {
+		t.Error("--startup is a startup")
+	}
+	for _, args := range [][]string{nil, {"osu-local-profiles"}, {"--startup"}, {"osu-local-profiles", "--version"}} {
+		if atStartup(args) {
+			t.Errorf("%q is not a startup", args)
+		}
+	}
+
+	has := func(env []string, want string) bool {
+		for _, v := range env {
+			if v == want {
+				return true
+			}
+		}
+		return false
+	}
+	base := []string{"PATH=x"}
+	first := runtimeEnv(base, true)
+	if !has(first, launcherEnv+"="+launcherValue) || !has(first, startupEnv+"=1") {
+		t.Errorf("a startup's first start: %q", first)
+	}
+	if again := runtimeEnv(base, false); has(again, startupEnv+"=1") || !has(again, launcherEnv+"="+launcherValue) {
+		t.Errorf("a restart: %q", again)
+	}
+	if len(base) != 1 {
+		t.Error("the environment it was given is left alone")
+	}
+}

@@ -898,7 +898,9 @@ function setMenuOpen(open) {
 
 $('optionsBtn').onclick = (e) => {
   e.stopPropagation();
-  setMenuOpen($('optionsMenu').hidden);
+  const open = $('optionsMenu').hidden;
+  setMenuOpen(open);
+  if (open) void loadStartup();
 };
 
 // Clicking anywhere else, or Escape, closes the menu.
@@ -1121,6 +1123,41 @@ $('optAutoUpdate').onclick = async () => {
     toast(err.message);
   }
 };
+
+/* -------------------------------------------------------- launch on startup */
+
+/*
+ * Options -> Launch on startup, beside Auto-update: install-level, off by default (roadmap 5.77).
+ * The system's own entry is the answer (src/startup.ts), so it is asked each time the menu opens:
+ * Task Manager can turn it off too. Hidden where there is no tray launcher to start.
+ */
+async function loadStartup() {
+  try {
+    const r = await fetch('/api/startup');
+    if (!r.ok) return;
+    const d = await r.json();
+    $('optStartup').hidden = d.available !== true;
+    $('optStartup').setAttribute('aria-checked', String(d.enabled === true));
+  } catch {
+    /* the row keeps what it last showed */
+  }
+}
+
+$('optStartup').onclick = async () => {
+  const next = $('optStartup').getAttribute('aria-checked') !== 'true';
+  $('optStartup').setAttribute('aria-checked', String(next));
+  try {
+    const d = await postJson('/api/startup', { enabled: next }, 'saving that failed');
+    $('optStartup').setAttribute('aria-checked', String(d.enabled === true));
+    toast(d.enabled ? t('startup.on') : t('startup.off'));
+  } catch (err) {
+    $('optStartup').setAttribute('aria-checked', String(!next));
+    toast(err.message);
+  }
+};
+
+// Once on load as well, so the row is already there the first time the menu opens.
+void loadStartup();
 
 /*
  * `?update=1` is where the tray icon's "Update to ..." item lands: straight into the dialog,

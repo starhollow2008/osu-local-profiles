@@ -88,6 +88,7 @@ does not have to make it again.
 | 5.74 | Beatmap rules replace the filter's keywords               | done   |
 | 5.75 | Shared replays with no score id aren't yours              | done   |
 | 5.76 | The filter's client                                       | done   |
+| 5.77 | Launch on startup                                         | done   |
 
 ## Constraints on every item
 
@@ -1494,3 +1495,26 @@ a stable play's CL is only shown (`withClassicMod`).
   filter saved before it tracks every client; an empty list is kept and the dialog warns.
 - Unfinished plays and unsubmitted attempts come only from lazer's log, so they're lazer's.
 - CL's meaning in the filter is unchanged, so no saved filter changes what it tracks.
+
+## 5.77 - Launch on startup
+
+**Status:** done (unreleased)
+
+Asked for by the owner: an option, off by default, to start the app with the computer, without
+opening the page when it starts that way. A switch in Options beside Auto-update, as the owner
+chose, named so it fits there and reads right on macOS and Linux too.
+
+- **The launcher, never the runtime**, so the app is still stopped from its icon. The computer runs
+  it with `--startup` (`src/startup.ts`): `HKCU\...\Run` on Windows, a LaunchAgent opening the bundle
+  on macOS, `~/.config/autostart` on Linux.
+- **The system's entry is the setting.** Nothing in `config.json`: it is on only when the entry
+  starts this copy's launcher, read each time the Options menu opens, so Task Manager turning it off
+  reads off here. Turning it on in a moved folder, or another copy, points the entry there; turning
+  it off removes only this copy's.
+- **No page**: a `--startup` launcher opens none, even a running copy's, and tells the app on its
+  first start only (`OSU_LOCAL_PROFILES_STARTUP`), which skips its own. Restarts for updates open
+  nothing anyway.
+- Only a packaged build has a launcher, so a source checkout doesn't show the switch.
+
+Checked on Windows: on, the Run value holds the quoted path, non-ASCII name intact, and reads back
+on; off removes it. macOS and Linux are covered by tests against a temporary home, not real logins.

@@ -85,6 +85,7 @@ import { eligibilityOf, visibleSql, type Eligibility } from '../calc/eligibility
 import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
 import { APP_ID, isOwnPage } from '../instance.ts';
+import { setStartup, startupState } from '../startup.ts';
 import {
   downloadImage,
   fetchBeatmapset,
@@ -722,6 +723,32 @@ export function startServer(opts: ServerOptions): http.Server {
           );
         }
         return json(res, { ok: true, settings });
+      });
+    }
+
+    /*
+     * Start with the computer (src/startup.ts): asked of the system each time, since the entry it
+     * keeps is the answer, and a page elsewhere could not see a change made in Task Manager.
+     * Changed only from the app's own page: another website must not be able to make the app
+     * start with the computer.
+     */
+    if (url.pathname === '/api/startup') {
+      if (req.method !== 'POST') {
+        startupState().then(
+          (state) => json(res, state),
+          (e: unknown) => json(res, { error: (e as Error).message }, 500),
+        );
+        return;
+      }
+      if (!isOwnPage(req.headers.origin, req.socket.localPort)) {
+        return json(res, { error: "only this app's own page can change this" }, 403);
+      }
+      return readBody(req, res, (body) => {
+        if (typeof body['enabled'] !== 'boolean') return json(res, { error: 'enabled must be true or false' }, 400);
+        setStartup(body['enabled']).then(
+          (state) => json(res, { ok: true, ...state }),
+          (e: unknown) => json(res, { error: (e as Error).message }, 400),
+        );
       });
     }
 

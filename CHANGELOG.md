@@ -15,6 +15,9 @@
 - **The play tracking filter can keep one client's plays.** The new **Client** criterion picks
   osu!stable, osu!lazer or McOsu. A stable play imported into osu!lazer counts as osu!stable.
 
+- **Launch on startup, a new switch in Options.** The app starts in the tray when you sign in to
+  your computer, without opening the page. Off by default.
+
 - **Everything new in this release is translated** into all 15 languages.
 
 ## 1.30.0

@@ -887,6 +887,16 @@ port (another folder, or `npm run dev`) opens that page. `node src/main.ts` make
   without the AppIndicator extension) it runs without an icon and says so with `notify-send`.
   `start.sh` with no desktop runs the app in its terminal.
 
+**Starting with the computer** (`src/startup.ts`, roadmap 5.77) registers the launcher, never the
+runtime, with `--startup`: a Run value in `HKCU` on Windows, a LaunchAgent running `open -a` on macOS,
+an XDG autostart entry on Linux. The entry is the only record of the setting, so it can't disagree
+with what happens at sign-in, and it counts as on only when it starts this copy's launcher. Windows'
+is read with `reg export` (UTF-16), since `reg query` prints in the console code page and mangles a
+non-ASCII path; Task Manager turning it off (`StartupApprovedRun`, an odd first byte) reads as off.
+A `--startup` launcher opens no page, not even a running copy's, and sets `OSU_LOCAL_PROFILES_STARTUP`
+on the app's first start only (`runtimeEnv`), so the app opens no page either; a restart for an
+update is not a startup.
+
 **`OSU_LOCAL_PROFILES_NO_TRAY`** runs it with no icon and no dialogs, with messages on stderr. That's
 how tests drive it.
 

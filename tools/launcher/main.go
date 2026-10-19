@@ -41,6 +41,9 @@ func run() int {
 		alert(title, message)
 	}
 
+	// Started by the computer as the user signed in: nothing is opened, not even a running copy's page.
+	startup := atStartup(os.Args)
+
 	exe, err := os.Executable()
 	if err != nil {
 		say("osu! local profiles cannot start", err.Error())
@@ -80,16 +83,20 @@ func run() int {
 	// Started twice, from one folder or from two: the second start opens the first's page.
 	lock, only := acquireLock(root)
 	if !only {
-		openWhenRunning(port, 30*time.Second)
+		if !startup {
+			openWhenRunning(port, 30*time.Second)
+		}
 		return 0
 	}
 	if _, ok := probe(port); ok {
 		lock.release()
-		_ = openPath(pageURL(port))
+		if !startup {
+			_ = openPath(pageURL(port))
+		}
 		return 0
 	}
 
-	l := &launcher{exe: exe, root: root, port: port, lock: lock, quiet: quiet}
+	l := &launcher{exe: exe, root: root, port: port, lock: lock, quiet: quiet, startup: startup}
 	if quiet {
 		return l.runWithoutTray()
 	}

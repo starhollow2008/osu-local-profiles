@@ -20,6 +20,12 @@ On Linux, a desktop with no tray (GNOME without the AppIndicator extension) gets
 app still runs; start it again to open the page. With no desktop, `./start.sh` runs it in the
 terminal.
 
+**Options -> Launch on startup** starts the app in the tray when you sign in to your computer,
+without opening the page; open it from the icon when you want it. It's off by default, and kept by
+your system (Windows' startup apps, a macOS login agent, a Linux autostart entry), so turning it off
+in Task Manager shows in the menu too. If you move the app's folder, turn it on again from the new
+place. It's only in the downloaded app, not when run from source.
+
 Windows may say it protected your PC from an unrecognised app, because the build isn't signed:
 press **More info**, then **Run anyway**. It asks once.
 

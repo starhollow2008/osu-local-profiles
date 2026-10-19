@@ -40,6 +40,7 @@ import { eligibilityOf } from './calc/eligibility.ts';
 import { getSettings } from './settings.ts';
 import { replayPlayer, sweepForeignScores, type ReplayPlayer } from './player-identity.ts';
 import { parseReplay } from './osr.ts';
+import { startedWithComputer } from './startup.ts';
 
 const MODE_NAMES = ['osu!', 'osu!taiko', 'osu!catch', 'osu!mania'];
 
@@ -98,6 +99,8 @@ function rememberDiscovery(config: Config, discovery: DiscoveryResult): void {
 
 /** Started by the tray launcher: no console, and it stops when the launcher does. */
 const fromTray = launchedFromTray();
+/** Started by the computer as the user signed in (src/startup.ts): nobody is there to see a page. */
+const withComputer = startedWithComputer();
 
 async function main(): Promise<void> {
   console.log('\n  osu! local profiles');
@@ -116,6 +119,7 @@ async function main(): Promise<void> {
     if (running) {
       const url = `http://localhost:${config.port}`;
       banner(`Already running${running.version ? ` (${running.version})` : ''} -> ${url}`);
+      if (withComputer) return;
       console.log('  Opened its page instead of starting a second copy.\n');
       openBrowser(url);
       return;
@@ -681,7 +685,8 @@ async function main(): Promise<void> {
   );
 
   // Restarted from the page to restore a backup, that page reloads itself: no second tab.
-  if (config.openBrowser && !(restored.applied && fromTray)) openBrowser(url);
+  // Started with the computer: in the tray, with no page until someone asks for it.
+  if (config.openBrowser && !(restored.applied && fromTray) && !withComputer) openBrowser(url);
 
   /*
    * Tidy away what a previous update left, then ask once whether there is a newer release.

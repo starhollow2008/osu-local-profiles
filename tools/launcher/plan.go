@@ -25,7 +25,32 @@ const (
 	// Run with no tray icon: a desktop with no tray, or the tests.
 	noTrayEnv   = "OSU_LOCAL_PROFILES_NO_TRAY"
 	defaultPort = 7272
+	// What the computer's startup entry passes (STARTUP_ARG in src/startup.ts), and what the app
+	// is told when it started that way (STARTUP_ENV), so it opens no page.
+	startupArg = "--startup"
+	startupEnv = "OSU_LOCAL_PROFILES_STARTUP"
 )
+
+// atStartup reports whether the computer started the launcher as the user signed in, rather
+// than a person opening it: then nothing is opened, the page included.
+func atStartup(args []string) bool {
+	for _, arg := range args[min(1, len(args)):] {
+		if arg == startupArg {
+			return true
+		}
+	}
+	return false
+}
+
+// runtimeEnv is what the app is started with: told the tray started it, and, on the first start
+// of a launcher the computer started, that too. A restart for an update is not a startup.
+func runtimeEnv(base []string, startup bool) []string {
+	env := append(append([]string{}, base...), launcherEnv+"="+launcherValue)
+	if startup {
+		env = append(env, startupEnv+"=1")
+	}
+	return env
+}
 
 // dirOf is filepath.Dir for the named platform rather than this one, so a macOS path can be
 // taken apart in a test on Windows and the other way round.
