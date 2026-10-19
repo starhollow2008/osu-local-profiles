@@ -18,13 +18,16 @@ import {
   setJustNow,
   sweepForeignScores,
   UNKNOWN_IDENTITY,
+  wasWrittenLater,
+  WRITTEN_AS_PLAYED_MS,
   type OsuAccount,
   type PlayerIdentity,
   type ReplayPlayer,
 } from '../src/player-identity.ts';
 import { NoSuchUser } from '../src/clients/osu-web.ts';
 import type { OsuInstall } from '../src/clients/detect.ts';
-import type { ReplayScore } from '../src/osr.ts';
+import { parseReplay, type ReplayScore } from '../src/osr.ts';
+import { encodeReplay } from '../src/replay-writer.ts';
 
 /*
  * Whose play a replay is.
@@ -518,19 +521,19 @@ test('a link made before previous names were fetched removes nothing', () => {
   assert.equal(certainlySomeoneElse({ ...stale, namesComplete: true }, player('x', 3654106)), true);
 });
 
-test('a play osu! never accepted is yours, whatever name it carries', () => {
+test('a play osu! never accepted, written as it was played, is yours whatever name it carries', () => {
   /*
    * osu!stable's username is a line in a config file. Anyone can set `Username = Cat` and
    * play offline, and the replay then says `Cat` -- a name that may well belong to a real
    * player. Refusing it would throw away exactly the offline plays this app exists to catch.
    *
-   * What separates the two is not the name but the score id. A replay you downloaded is by
-   * definition one osu! accepted and put on a leaderboard, so it carries one; a play osu!
-   * never accepted was never on a leaderboard, so it cannot have been downloaded, so it was
-   * set on this machine.
+   * What separates the two is not the name but the score id. A replay you downloaded from a
+   * leaderboard is by definition one osu! accepted, so it carries one; a play osu! never
+   * accepted, written as it was played, was set on this machine.
    */
   assert.equal(ownsPlay(OWNER, offlinePlay('Cat')), true);
   assert.equal(ownsPlay(OWNER, offlinePlay('mrekk')), true, 'even a real player\u2019s name');
+  assert.equal(ownsPlay(OWNER, offlinePlay('Cat'), { writtenLater: false }), true);
   assert.equal(certainlySomeoneElse(OWNER, offlinePlay('mrekk')), false);
 
   // A lazer user id that is not yours does not override it either: an unsubmitted play
@@ -704,9 +707,9 @@ test('a confirmed old name lets a link to the new one match again', () => {
  * Only the time inside it tells them apart: a downloaded one carries the time it was set on osu!.
  */
 test('a replay set moments before it turned up is yours whatever its name', async () => {
-  assert.equal(ownsPlay(OLD_NAME_SIGNED_IN, player('chushberry'), true), true);
+  assert.equal(ownsPlay(OLD_NAME_SIGNED_IN, player('chushberry'), { justSet: true }), true);
   // A lazer id that differs still outweighs it.
-  assert.equal(ownsPlay(OWNER, player('mrekk', 7562902), true), false);
+  assert.equal(ownsPlay(OWNER, player('mrekk', 7562902), { justSet: true }), false);
 
   const now = Date.parse('2026-09-27T12:00:00Z');
   assert.equal(setJustNow(now - 5_000, now), true, 'written as it ended');
@@ -747,6 +750,111 @@ test('a replay set moments before it turned up is yours whatever its name', asyn
     );
     assert.ok(imported.status === 'skipped' && imported.reason === 'another-player');
   } finally {
+    h.cleanup();
+  }
+});
+
+/*
+ * Issue #4: other players' top plays, imported into lazer, tracked as the owner's. Stable writes a
+ * play to `Data/r` the moment it ends, before osu! gives it an id, and players share those files --
+ * so a replay with no id is not proof it was set here. Its file's time is: a play is written as it
+ * ends, and one copied in is written years after its play (roadmap 5.75).
+ */
+test('a replay with no score id, written years after its play, is judged by its name', () => {
+  const playedAt = Date.parse('2020-06-01T12:00:00Z');
+  const shared = replay({ username: 'aetrna', onlineScoreId: 0n, playedAt: new Date(playedAt) });
+
+  assert.equal(wasWrittenLater(shared, playedAt + 20_000), false, 'written as it ended');
+  assert.equal(wasWrittenLater(shared, playedAt + WRITTEN_AS_PLAYED_MS - 1), false, 'a clock in another time zone');
+  assert.equal(wasWrittenLater(shared, Date.parse('2026-10-01T00:00:00Z')), true, 'imported years later');
+  assert.equal(wasWrittenLater(shared, null), false, 'not knowing is never later');
+  // McOsu's replays and the built ones are written by this app whenever it builds them.
+  const later = Date.parse('2026-10-01T00:00:00Z');
+  assert.equal(wasWrittenLater(replay({ playedAt: new Date(playedAt), mcosu: {} as never }), later), false);
+  assert.equal(wasWrittenLater(replay({ playedAt: new Date(playedAt), built: {} as never }), later), false);
+
+  assert.equal(ownsPlay(OWNER, offlinePlay('aetrna'), { writtenLater: true }), false, 'a stranger’s, copied in');
+  assert.equal(ownsPlay(OWNER, offlinePlay('Tangy'), { writtenLater: true }), true, 'your own, copied in');
+  assert.equal(ownsPlay(OWNER, offlinePlay(''), { writtenLater: true }), true, 'signed out');
+  assert.equal(ownsPlay(OWNER, offlinePlay('Guest'), { writtenLater: true }), true, 'lazer signed out');
+  assert.equal(ownsPlay(UNKNOWN_IDENTITY, offlinePlay('aetrna'), { writtenLater: true }), null, 'nobody known');
+});
+
+test('an import judges a replay with no score id by when its file was written', async () => {
+  const h = harness();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-written-'));
+  try {
+    const ctx = { db: h.db, resolver: h.resolver, profileId: h.profileId, trackingSince: 0, official: null, identity: OWNER };
+    const playedAt = new Date('2020-06-01T12:00:00Z');
+    const file = (name: string, writtenAt: Date): string => {
+      const at = path.join(dir, name);
+      fs.writeFileSync(at, 'a replay');
+      fs.utimesSync(at, writtenAt, writtenAt);
+      return at;
+    };
+
+    const shared = await ingestScore(
+      replay({ username: 'aetrna', onlineScoreId: 0n, playedAt }),
+      file('shared.osr', new Date('2026-10-01T00:00:00Z')),
+      ctx,
+    );
+    assert.ok(shared.status === 'skipped' && shared.reason === 'another-player', 'copied in years later');
+
+    const offline = await ingestScore(
+      replay({ username: 'Cat', onlineScoreId: 0n, playedAt, totalScore: 2 }),
+      file('offline.osr', new Date(playedAt.getTime() + 15_000)),
+      ctx,
+    );
+    assert.equal(offline.status, 'added', 'an offline name, written as it was played');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    h.cleanup();
+  }
+});
+
+/* osu!stable wrote the id in 32 bits until 2014-07-21, and a downloaded replay from then has one. */
+test('the score id of a replay from before July 2014 is read', async () => {
+  const header = {
+    mode: 0,
+    version: 20140314,
+    beatmapMD5: 'a'.repeat(32),
+    player: 'chocomint',
+    replayMD5: 'b'.repeat(32),
+    counts: { c300: 1, c100: 0, c50: 0, geki: 0, katu: 0, miss: 0 },
+    totalScore: 1,
+    maxCombo: 1,
+    perfect: true,
+    legacyMods: 0,
+    playedAt: Date.parse('2014-03-14T00:00:00Z'),
+    onlineId: 0n,
+  };
+  const id = Buffer.alloc(4);
+  id.writeInt32LE(1_640_000_000);
+  const old = Buffer.concat([encodeReplay(header).subarray(0, -8), id]);
+  assert.equal(replayPlayer(await parseReplay(old)).onlineId, 1_640_000_000);
+
+  // osu! still writes 64 bits when it serves one today, whatever version it says.
+  assert.equal(replayPlayer(await parseReplay(encodeReplay({ ...header, onlineId: 1_640_000_001n }))).onlineId, 1_640_000_001);
+  // And older than 2012-10-08 there is no id at all.
+  const ancient = encodeReplay({ ...header, version: 20120101 }).subarray(0, -8);
+  assert.equal(replayPlayer(await parseReplay(ancient)).onlineId, null);
+});
+
+/* Issue #4's other half: names osu! cannot confirm, such as a private server's. */
+test('names listed as yours join a known owner, and never make one', () => {
+  const h = harness();
+  const stable = signedIn('stable', 'NoelleTGS');
+  try {
+    updateSettings(h.db, h.profileId, { ownNames: 'Noelle, noelle , PrivateNoelle' });
+    const identity = resolveIdentity(h.db, h.profileId, [stable.install]);
+    assert.deepEqual([...identity.names].sort(), ['noelle', 'noelletgs', 'privatenoelle']);
+    assert.equal(ownsPlay(identity, player('PrivateNoelle')), true);
+    assert.equal(ownsPlay(identity, player('mrekk')), false);
+
+    // With nobody known, a listed name alone would turn away the signed-in account's plays.
+    assert.equal(resolveIdentity(h.db, h.profileId, []).source, 'unknown');
+  } finally {
+    stable.cleanup();
     h.cleanup();
   }
 });

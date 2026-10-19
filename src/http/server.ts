@@ -707,8 +707,20 @@ export function startServer(opts: ServerOptions): http.Server {
       return readBody(req, res, (body) => {
         // The whole body is the patch. Keys that are not settings are ignored, so the page
         // can post a form's worth of fields without filtering them first.
+        const before = settingsFor(current()).ownNames.join('\n').toLowerCase();
         const settings = updateSettings(opts.db, current(), body, configFallbacks);
         broadcast('settings', settings);
+        // Plays turned away under a name just listed as yours are judged again, as after "It's
+        // me", and the page is told again once the list of plays not tracked has moved. Other
+        // settings posts the list with every save, so only a change counts.
+        if (settings.ownNames.join('\n').toLowerCase() !== before) {
+          opts.tracker.retrackOwnNames().then(
+            (tracked) => {
+              if (tracked > 0) broadcast('settings', settingsFor(current()));
+            },
+            (e: unknown) => console.error(`  Could not check plays under your names again: ${(e as Error).message}`),
+          );
+        }
         return json(res, { ok: true, settings });
       });
     }

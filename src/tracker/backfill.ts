@@ -1,6 +1,6 @@
 import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replaces, replayIdentity } from './online-import.ts';
-import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
+import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, wasWrittenLater, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
@@ -184,7 +184,7 @@ export async function scanForReplays(
        * Counted by player rather than silently dropped -- see `otherPlayers`.
        */
       const player = replayPlayer(score);
-      if (ownsPlay(owner, player) === false) {
+      if (ownsPlay(owner, player, { writtenLater: wasWrittenLater(score, entry.mtimeMs) }) === false) {
         const name = player.name.trim() || '(no name)';
         others.set(name, (others.get(name) ?? 0) + 1);
         onOtherPlayer?.(entry.path, score, player.name.trim());

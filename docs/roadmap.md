@@ -86,6 +86,7 @@ does not have to make it again.
 | 5.72 | The mode switcher's icons                                 | done   |
 | 5.73 | A name osu! changed is still yours                        | done   |
 | 5.74 | Beatmap rules replace the filter's keywords               | done   |
+| 5.75 | Shared replays with no score id aren't yours              | done   |
 | 5.76 | The filter's client                                       | done   |
 
 ## Constraints on every item
@@ -1454,6 +1455,31 @@ guest difficulties matched only when his name happened to be in the difficulty n
 Still open: two cached beatmaps on this machine (Come[Back]Home's "Nevada") hold names from before
 the `[` fix of 5.45 (`Creator` "Come", no difficulty name), so every field that reads them sees the
 wrong name. Beatmap rows cached before that fix should be read again once.
+
+## 5.75 - Shared replays with no score id aren't yours
+
+**Status:** done (unreleased)
+
+Issue #4: an import from lazer brought in aetrna's 2020 Mou Ii kai? and chocomint's 2014
+masterpiece as the reporter's own top plays, while the dialog said other players' replays are never
+imported. Both were stable replays imported into lazer, and both read as never submitted, which
+counted as yours whatever the name.
+
+- **Stable before 2014-07-21 wrote the score id in 32 bits** (versions from 20121008), as lazer's
+  `LegacyScoreDecoder` reads it. `parseReplay` read only 64, so a replay from then had no id.
+  osu-web still serves 64 whatever version it writes.
+- **No id is not proof a play was set here.** Stable writes a play to `Data/r` as it ends, before
+  osu! gives it an id, and players share those files. A never-submitted replay under a stranger's
+  name is yours only if its file was written within a day of its play (`wasWrittenLater`,
+  `WRITTEN_AS_PLAYED_MS`): live, by its arrival; otherwise by its file's mtime. One imported years
+  later is judged by its name. Unknown times, McOsu's and built replays never count as later. The
+  offline custom-name case stays covered: those are written as they end.
+- **Your other names** (`Settings.ownNames`), as the reporter asked, for private servers: in
+  Other settings, since it decides live tracking too, and in Import past plays, one list in both. They join an owner already known, never make one, and saving them judges again
+  the plays turned away under them (`retrackOwnNames`).
+
+Plays already imported this way stay until removed: the one-off sweep has run, and it only acts on
+a linked identity.
 
 ## 5.76 - The filter's client
 

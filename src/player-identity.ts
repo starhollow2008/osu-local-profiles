@@ -2,7 +2,7 @@ import type { Db } from './db/index.ts';
 import type { ReplayScore } from './osr.ts';
 import type { OsuInstall } from './clients/detect.ts';
 import { detectLocalSessions } from './clients/session.ts';
-import { getSettings } from './settings.ts';
+import { getSettings, type Settings } from './settings.ts';
 
 /**
  * Whose play a replay actually is.
@@ -30,6 +30,11 @@ import { getSettings } from './settings.ts';
  * - **A play set just now is yours.** A replay that turns up while tracking, set moments
  *   before, was set on this computer whatever name it carries (`setJustNow`) -- a downloaded
  *   one carries the time it was set on osu!. Only a lazer user id that differs outweighs it.
+ * - **A play osu! never accepted is yours if osu! wrote it as it was played**, whatever its
+ *   name (`wasWrittenLater`). One written long after its play was copied in: a top play its
+ *   player shared, written before osu! gave it an id (roadmap 5.75).
+ * - **A name listed as yours is yours** (`Settings.ownNames`): a private server's, say, which
+ *   osu! cannot confirm.
  * - **Not knowing means not filtering.** A profile that cannot say who it belongs to tracks
  *   everything, exactly as it always has.
  * - **Who you are is who osu! says is signed in here**, not an account linked for its
@@ -150,6 +155,19 @@ export function resolveIdentity(
   installs: readonly OsuInstall[],
 ): PlayerIdentity {
   const settings = getSettings(db, profileId);
+  const known = knownIdentity(db, profileId, installs, settings);
+  // Names listed as yours join an owner already known, and never make one: listed alone, they
+  // would turn away the plays of the account signed in here.
+  if (known.source === 'unknown' || settings.ownNames.length === 0) return known;
+  return { ...known, names: new Set([...known.names, ...settings.ownNames.map((name) => name.toLowerCase())]) };
+}
+
+function knownIdentity(
+  db: Db,
+  profileId: number,
+  installs: readonly OsuInstall[],
+  settings: Settings,
+): PlayerIdentity {
   const signedIn = detectLocalSessions(installs).map((s) => s.username);
   if (signedIn.length > 0) {
     // Before the link is compared, so a link to the account's new name matches an old one
@@ -332,6 +350,35 @@ export function setJustNow(playedAt: number, arrivedAt: number): boolean {
 }
 
 /**
+ * How long after its play a replay's file may have been written and still count as written as
+ * it was played. Generous: a play is written the moment it ends, and a day covers a marathon, a
+ * clock set to the wrong time zone, and a folder copied the same evening. A replay copied in from
+ * elsewhere is usually months or years older than its file.
+ */
+export const WRITTEN_AS_PLAYED_MS = 24 * 3_600_000;
+
+/**
+ * Whether osu! wrote this replay's file long after its play, so it was copied in rather than
+ * set here: imported into lazer, opened in stable, saved from a download. `writtenAt` is when
+ * it arrived while tracking, or else its file's time; null, not knowing, is never later.
+ *
+ * McOsu's replays and the ones built from osu!'s figures are written by this app whenever it
+ * builds them, so their file's time says nothing about who played.
+ */
+export function wasWrittenLater(score: ReplayScore, writtenAt: number | null): boolean {
+  if (writtenAt === null || score.mcosu || score.built) return false;
+  return writtenAt - score.playedAt.getTime() > WRITTEN_AS_PLAYED_MS;
+}
+
+/** What the replay's arrival says, beyond what is written inside it. */
+export interface PlayTiming {
+  /** Arrived while tracking moments after it was set (`setJustNow`). */
+  justSet?: boolean;
+  /** Written long after it was played (`wasWrittenLater`). */
+  writtenLater?: boolean;
+}
+
+/**
  * Is this play the profile's own?
  *
  * `null` means there is not enough to say, which every caller treats as yours -- see the
@@ -342,7 +389,11 @@ export function setJustNow(playedAt: number, arrivedAt: number): boolean {
  * set on this computer, whatever name osu! wrote in it -- which after a rename may be one the
  * profile has never seen. Only a lazer user id that differs outweighs it.
  */
-export function ownsPlay(identity: PlayerIdentity, player: ReplayPlayer, justSet = false): boolean | null {
+export function ownsPlay(
+  identity: PlayerIdentity,
+  player: ReplayPlayer,
+  { justSet = false, writtenLater = false }: PlayTiming = {},
+): boolean | null {
   if (!identityKnown(identity)) return null;
 
   const name = player.name.trim();
@@ -351,16 +402,16 @@ export function ownsPlay(identity: PlayerIdentity, player: ReplayPlayer, justSet
   if (name === '' || name.toLowerCase() === GUEST_NAME) return true;
 
   /*
-   * A play osu! never accepted cannot have been downloaded from osu!, because there was no
-   * leaderboard entry to download -- so whatever name it carries, it was set here.
+   * A play osu! never accepted, written as it was played, was set here whatever name it
+   * carries. osu!stable's name is a line in its config: set `Username = Cat`, play offline, and
+   * the replay says `Cat`, which may even be a real player's name.
    *
-   * This is what lets osu!stable's configurable name be anything at all. Set `Username = Cat`
-   * and play offline and the replay says `Cat`, which may even be a real player's name; it is
-   * still yours, and refusing it would throw away exactly the offline plays this app exists
-   * to catch. A downloaded replay of the real Cat carries an id and is refused as it should
-   * be.
+   * Never accepted is not enough by itself. Stable writes a play to `Data/r` the moment it ends,
+   * before osu! has given it an id, and players share those files: a 2020 top play kept and
+   * imported into lazer carries no id, and its file is years younger than its play. That one is
+   * judged by its name like any other.
    */
-  if (!wasSubmitted(player)) return true;
+  if (!wasSubmitted(player) && !writtenLater) return true;
 
   // Ids settle it outright, and survive a rename where a name cannot.
   if (identity.userId !== null && player.userId !== null) {

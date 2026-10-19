@@ -183,7 +183,9 @@ machine, its username is suggested, read from osu!'s own config file.
 You can import someone else's account (an alt, a friend, a banner you like). It never decides which
 plays are yours: that's whoever osu! says is signed in here, and replays other players set (ones you
 watched) are left out on that basis. Plays with no name, lazer's `Guest`, and plays osu! never
-received are always yours.
+received are always yours, unless the replay was copied in long after it was played, such as a
+top play someone shared. Names osu! can't confirm, like a private server's, go in [Your other
+names](#your-other-names).
 
 ## The me! section
 
@@ -432,6 +434,8 @@ when you played, check what would be imported, then confirm.
 - **Look in**, when more than one osu! install was found, lets you untick installs this import
   shouldn't read. osu!lazer keeps the stable plays it imported, so to leave those out use the
   filter's **Client** instead.
+- **Your other names** are names whose plays are yours too, the same list as in [Other
+  settings](#your-other-names).
 - It reads osu!lazer's logs as well as replays, so a past session comes back whole: finished plays,
   counted quits and retries, and offline attempts. Each kind is its own tick box with its count.
 - A play on a beatmap you no longer have is skipped, and the check says how many.
@@ -525,6 +529,12 @@ Off by default, because closing the app is how you stop tracking. Turn it on and
 [the import](#importing-plays-you-set-while-it-was-closed) over the time the app was closed, never
 further back than when it last ran or before this profile started. The filter and duplicate checks
 still apply, and it says what it brought in. Per profile.
+
+### Your other names
+
+Names whose plays are yours too, such as a name on a private server, separated by commas. Plays
+under them are tracked live and imported, and plays already turned away under one are checked
+again when you save. The same list is in Import past plays. Per profile.
 
 ### Show beatmap metadata in original language
 

@@ -100,6 +100,12 @@ export interface Settings {
    */
   accountNames: string[];
   /**
+   * Names the player says are theirs, from Other settings or Import past plays: a private
+   * server's, or an old offline name. A replay under one is never turned away as someone else's.
+   * They join an owner the app already knows and never make one (`resolveIdentity`, roadmap 5.75).
+   */
+  ownNames: string[];
+  /**
    * The profile's own description -- osu!'s "me!" box.
    *
    * osu!'s BBCode, stored exactly as it was typed or imported. It is never trusted: the page
@@ -407,6 +413,11 @@ const DEFS: Defs = {
   accountNames: {
     default: [] as string[],
     coerce: nameList,
+  },
+  ownNames: {
+    default: [] as string[],
+    // A list from the page, or the box's text as typed.
+    coerce: (raw) => nameList(typeof raw === 'string' ? raw.split(',') : raw),
   },
   includeUnrankedMaps: {
     // Every status there is, so no play is left out of pp for its beatmap until asked.

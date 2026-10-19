@@ -215,10 +215,19 @@ refused one is gone. So `ownsPlay` refuses only on positive evidence, and these 
 - **A name you used to have.** Stable replays carry no user id, only the name current when the
   play was set, so without osu!'s `previous_usernames` every pre-rename play looks like a
   stranger's.
-- **A play osu! never accepted.** Stable's username is a line in a config file, so an offline play
-  can carry any name, even a real player's. But a downloaded replay is a score osu! put on a
-  leaderboard, so it always has a score id. Measured: all 91 replays by other players had an id,
-  and 258 of the owner's did not.
+- **A play osu! never accepted, written as it was played.** Stable's username is a line in a
+  config file, so an offline play can carry any name, even a real player's. A replay downloaded from
+  a leaderboard always has a score id (osu-web writes `legacy_best_id`; stable before 2014-07-21
+  wrote it in 32 bits, which `parseReplay` reads). Measured: all 91 replays by other players had an
+  id, and 258 of the owner's did not. But no id is not proof on its own: stable writes a play to
+  `Data/r` as it ends, before osu! gives it one, and players share those files. So a replay with no
+  id under a stranger's name counts as yours only if its file was written within
+  `WRITTEN_AS_PLAYED_MS` (a day) of its play (`wasWrittenLater`: the arrival time live, the file's
+  mtime otherwise). One imported into lazer years after its play is judged by its name (roadmap
+  5.75, issue #4). McOsu's and built replays are exempt: this app writes them whenever it builds them.
+- **A name listed as yours** (`Settings.ownNames`, in Other settings and Import past plays): a private server's, which
+  osu! can't confirm. Listed names join an owner already known and never make one alone, or they'd
+  turn away the signed-in account's plays.
 - **A play set just now** (`setJustNow`). A replay arriving while tracking, set within
   `JUST_SET_MS` (5 minutes) before it arrived, was set here, whatever name it carries; a
   downloaded one carries the time it was set on osu!. After a rename osu! can remember the old

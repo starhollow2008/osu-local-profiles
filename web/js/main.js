@@ -166,6 +166,14 @@ const SETTINGS_FIELDS = [
     hint: () => t('setting.importWhileClosedHint'),
   },
   {
+    // The same list as Import past plays' box (roadmap 5.75): it decides live tracking as much
+    // as an import, so it is not only there.
+    key: 'ownNames',
+    type: 'names',
+    label: () => t('backfillModal.ownNames'),
+    hint: () => t('backfillModal.ownNamesHint'),
+  },
+  {
     key: 'includeUnrankedMaps',
     type: 'checkboxes',
     label: () => t('setting.unrankedMaps'),
@@ -2303,6 +2311,10 @@ function settingControl(f) {
       )
       .join('')}</select>`;
   }
+  if (f.type === 'names') {
+    return `<input type="text" id="${id}" value="${escapeHtml((settings[f.key] ?? []).join(', '))}"
+      maxlength="400" autocomplete="off" spellcheck="false">`;
+  }
   return `<input type="text" id="${id}" value="${escapeHtml(String(settings[f.key] ?? ''))}"
       maxlength="${f.maxlength}" placeholder="${escapeHtml(f.placeholder ?? '')}">`;
 }
@@ -3692,6 +3704,23 @@ $('backfillInstalls').onchange = () => {
 };
 
 /**
+ * Your other names (`Settings.ownNames`), saved as soon as the box changes: live tracking reads
+ * them too, and the server judges again the plays already turned away under one.
+ */
+$('backfillOwnNames').onchange = async () => {
+  const box = $('backfillOwnNames');
+  try {
+    const d = await postJson('/api/settings', { ownNames: box.value }, 'saving failed');
+    settings = d.settings;
+    box.value = (settings.ownNames ?? []).join(', ');
+    // Whose replays these are decides what an import brings in, so the counts are stale.
+    resetBackfillPreview(t('backfill.namesChanged'));
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
+/**
  * What ticking the box would actually do, said under it.
  *
  * Three states, because the box means something different in each: a filter that is set and
@@ -3742,6 +3771,7 @@ function openBackfill() {
   $('backfillFiltered').checked = true;
   renderBackfillFilterHint();
   renderBackfillInstalls();
+  $('backfillOwnNames').value = (settings.ownNames ?? []).join(', ');
   $('backfillCheck').disabled = false;
   resetBackfillPreview(t('backfill.pickATime'));
   $('backfillModal').hidden = false;

@@ -1,7 +1,14 @@
 import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replaces, replayIdentity } from './online-import.ts';
 import { releaseUploadedReplay } from '../uploaded-replays.ts';
-import { ownsPlay, replayPlayer, setJustNow, UNKNOWN_IDENTITY, type PlayerIdentity } from '../player-identity.ts';
+import {
+  ownsPlay,
+  replayPlayer,
+  setJustNow,
+  UNKNOWN_IDENTITY,
+  wasWrittenLater,
+  type PlayerIdentity,
+} from '../player-identity.ts';
 import fs from 'node:fs';
 import type { SQLInputValue } from 'node:sqlite';
 import type { Db } from '../db/index.ts';
@@ -52,7 +59,8 @@ export interface IngestContext {
   /**
    * When a live replay turned up, so one set moments before is known to be set here whatever
    * name it carries (`setJustNow`). Only live tracking has one: an import or a catch-up finds
-   * files long after they were written, so the time says nothing about who wrote them.
+   * files long after they were written, so the time says nothing about who wrote them. Without
+   * it, the file's own time says whether it was copied in long after its play (`wasWrittenLater`).
    */
   arrivedAt?: number;
 }
@@ -162,6 +170,15 @@ export async function ingestReplayFile(file: string, ctx: IngestContext): Promis
   return await ingestScore(score, file, ctx);
 }
 
+/** When a replay's file was last written, or null when it cannot be read. */
+function fileWrittenAt(file: string): number | null {
+  try {
+    return fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
 /** Record a replay turned away, when the caller asked for declines to be kept. */
 function declined(
   ctx: IngestContext,
@@ -204,7 +221,9 @@ export async function ingestScore(
   // Named whatever the reason, so the list can say whose replay each one is.
   const play = { dedupeKey: key, mode: score.mode, playedAt, replayPath, player: player.name.trim() || null };
   const justSet = ctx.arrivedAt !== undefined && setJustNow(playedAt, ctx.arrivedAt);
-  if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player, justSet) === false) {
+  // Live, when it arrived; otherwise when its file was written. See `wasWrittenLater`.
+  const writtenLater = wasWrittenLater(score, ctx.arrivedAt ?? fileWrittenAt(replayPath));
+  if (ownsPlay(ctx.identity ?? UNKNOWN_IDENTITY, player, { justSet, writtenLater }) === false) {
     const named = describe(ctx.resolver.resolve(score.beatmapMD5), score.beatmapMD5);
     declined(ctx, { ...play, ...named, reason: 'another-player' });
     return {

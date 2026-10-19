@@ -21,6 +21,9 @@ const LZMA = require('lzma-js-simple-v2') as {
 /** Version marker at which lazer began appending the extended score block. */
 const LAZER_EXT_MIN_VERSION = 30000001;
 
+/** From this version until 20140721, osu!stable wrote a replay's online id as 32 bits. */
+const INT32_ONLINE_ID_MIN_VERSION = 20121008;
+
 /** .NET ticks (100ns since 0001-01-01) -> unix ms. */
 const TICKS_EPOCH_OFFSET_MS = 62135596800000;
 
@@ -200,6 +203,10 @@ export async function parseReplay(buf: Buffer): Promise<ReplayScore> {
       mcosu = readMcosuBlock(c.rest());
       built = readBuiltBlock(c.rest());
     }
+  } else if (version >= INT32_ONLINE_ID_MIN_VERSION && c.remaining >= 4) {
+    // osu!stable wrote the id in 32 bits until 2014-07-21, as lazer's decoder reads it. Without
+    // it a downloaded replay from then looks like a play osu! never accepted (roadmap 5.75).
+    onlineScoreId = BigInt(c.int());
   }
 
   return {

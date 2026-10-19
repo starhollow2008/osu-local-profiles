@@ -1005,6 +1005,17 @@
     </div>
 
     <!--
+      Names that are yours besides the one osu! is signed in under: a private server's, or an old
+      offline one, which osu! cannot confirm. Saved to the profile as it changes, and the same list
+      as Other settings' (Settings.ownNames, roadmap 5.75).
+    -->
+    <label class="field">
+      <span data-i18n="backfillModal.ownNames">Your other names</span>
+      <input type="text" id="backfillOwnNames" maxlength="400" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="setting__hint" data-i18n="backfillModal.ownNamesHint">Plays under these names are tracked and imported as yours, such as a private server name. Separate with commas.</div>
+
+    <!--
       Replay files: ones downloaded from osu!'s website, or kept from an old install, that osu!
       itself no longer has. Chosen several at once, or dropped anywhere on this dialog; each is
       imported as soon as it arrives, through the same checks as a range, and the filter box

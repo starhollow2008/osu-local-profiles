@@ -2,6 +2,16 @@
 
 ## 1.31.0
 
+- **Other players' replays you collected are no longer imported as your plays.** A top play its
+  player shared, imported into osu!lazer or opened in osu!stable, has no score id, and it used to
+  count as yours whatever name was on it. Now it counts only if osu! wrote the file when the play
+  was set. Replays from before July 2014 are also read properly now. Plays already imported this
+  way stay until you remove them.
+
+- **Your other names, in Other settings and Import past plays.** Plays under these names are
+  tracked and imported as yours, such as a name on a private server. Plays already turned away
+  under one are checked again.
+
 - **The play tracking filter can keep one client's plays.** The new **Client** criterion picks
   osu!stable, osu!lazer or McOsu. A stable play imported into osu!lazer counts as osu!stable.
 
