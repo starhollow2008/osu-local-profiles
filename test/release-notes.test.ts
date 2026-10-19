@@ -104,3 +104,20 @@ test('an old release names only the downloads it actually has', () => {
   assert.doesNotMatch(notes, /macOS|Linux/);
   assert.match(releaseNotes(CHANGELOG, '1.10.0'), /macOS Intel `osx-x64` · Linux `linux-x64`/);
 });
+
+test('the issues a change came from stay on its line, as #n a release page links', () => {
+  const issue = (n: number) => `[#${n}](https://github.com/jonathant09/osu-local-profiles/issues/${n})`;
+  assert.equal(
+    headline(`**Your other names.** Plays under them are yours. Reported in ${issue(4)}. Thanks to [@NoelleTGS](https://github.com/NoelleTGS).`),
+    'Your other names (#4). Thanks to @NoelleTGS.',
+  );
+  assert.equal(
+    headline(`**A filter that keeps one client's plays**, picked by name. Reported in ${issue(4)} and ${issue(5)}.`),
+    "A filter that keeps one client's plays (#4, #5)",
+  );
+  // Only as the closing words: an issue linked mid-entry is part of what it says.
+  assert.equal(
+    headline(`**Fixed the importer.** See ${issue(4)} for how. It works now.`),
+    'Fixed the importer.',
+  );
+});

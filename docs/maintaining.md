@@ -41,6 +41,8 @@ The release notes come from `CHANGELOG.md` through `scripts/release-notes.mjs`: 
 lead (at most eight), a link to the full entry, and which download is which. The app shows the same
 lines as its patch notes. So write each bold lead to say what changed on its own. Put
 `<!-- important -->` on its own line in a version's section to mark a release everyone should have.
+An entry that ends `Reported in [#4](<issue link>).` and `Thanks to [@name](https://github.com/name).`
+keeps both on its line, as `(#4)` and `@name`. The release page links both, and the app links the issue.
 
 Most of the packaging script is removal: osu!'s NuGet packages carry the whole game (fonts,
 textures, audio, ffmpeg, SDL), and the native BASS audio libraries are commercially licensed, so

@@ -108,17 +108,34 @@ function thanks(names) {
   return `Thanks to ${list}.`;
 }
 
+/** An issue, linked as the CHANGELOG writes it: `[#4](https://github.com/<repo>/issues/4)`. */
+const ISSUE = String.raw`\[#\d+\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+\)`;
+
+/**
+ * The issues an entry came from, just before its credit: `Reported in [#4](...).`, or several
+ * joined with commas and "and".
+ */
+const REPORTED = new RegExp(String.raw`\s*Reported in (${ISSUE}(?:(?:, and |, | and )${ISSUE})*)\.?$`);
+
 /**
  * One line for a CHANGELOG entry: its bold lead where that says what changed, otherwise its
  * first sentence. A short bold lead is only a name (`**View Details**, from the menu...`), and
  * the sentence around it is what says anything. A credit at the entry's end is kept on the
- * line, uncut, so the release page and the app's patch notes carry it too.
+ * line, uncut, so the release page and the app's patch notes carry it too, and so are the
+ * issues it names, as `(#4)`: GitHub links that on a release page by itself, and the app links
+ * it in its patch notes.
  */
 export function headline(entry) {
   const whole = entry.replace(/\s+/g, ' ').trim();
   const credit = CREDIT.exec(whole);
-  const text = credit ? whole.slice(0, credit.index) : whole;
-  const line = summary(text);
+  let text = credit ? whole.slice(0, credit.index) : whole;
+  const reported = REPORTED.exec(text);
+  if (reported) text = text.slice(0, reported.index);
+  let line = summary(text);
+  if (reported) {
+    const issues = reported[1].match(/#\d+/g).join(', ');
+    line = /[.!?]$/.test(line) ? `${line.slice(0, -1)} (${issues})${line.at(-1)}` : `${line} (${issues})`;
+  }
   if (!credit) return line;
   return `${line}${/[.!?]$/.test(line) ? '' : '.'} ${thanks(credit[1].match(/@[\w-]+/g))}`;
 }

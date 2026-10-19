@@ -988,9 +988,13 @@ function renderUpdate() {
 /** Past this many lines, the rest of what changed is left to the changelog. */
 const MAX_NOTE_LINES = 12;
 
+/** Where an issue named in the patch notes, `(#4)`, lives (scripts/release-notes.mjs). */
+const ISSUES_URL = 'https://github.com/jonathant09/osu-local-profiles/issues/';
+
 /**
  * A version's changes, a line each, newest version first (src/update/notes.ts). The lines are
- * the CHANGELOG's own, escaped; only its `code` spans become markup.
+ * the CHANGELOG's own, escaped; only its `code` spans, and the issues it names as `(#4)`, become
+ * markup.
  */
 function notesHtml(notes) {
   let left = MAX_NOTE_LINES;
@@ -1005,7 +1009,14 @@ function notesHtml(notes) {
       ? `<span class="update-notes__important">${escapeHtml(t('update.important'))}</span>`
       : '';
     const items = lines
-      .map((l) => `<li>${escapeHtml(l).replace(/`([^`]+)`/g, '<code>$1</code>')}</li>`)
+      .map((l) => {
+        const html = escapeHtml(l)
+          .replace(/`([^`]+)`/g, '<code>$1</code>')
+          .replace(/\((#\d+(?:, #\d+)*)\)/g, (_, list) =>
+            `(${list.replace(/#(\d+)/g, `<a href="${ISSUES_URL}$1" target="_blank" rel="noreferrer noopener">#$1</a>`)})`,
+          );
+        return `<li>${html}</li>`;
+      })
       .join('');
     out.push(`<h4>${escapeHtml(n.version)}${important}</h4>${items ? `<ul>${items}</ul>` : ''}`);
   }
