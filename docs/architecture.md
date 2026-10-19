@@ -597,7 +597,7 @@ profile-page payload. Don't hand-edit it.
 
 The page shows icons only, grouped Mod Introduction then Skill & Dedication. The hover card is one
 shared `#medalTooltip` positioned in window coordinates. The header's medal figure is account-wide
-(`earnedMedalCount`). An earned medal is a Milestones event (`medalEvents`), except rank medals
+(`earnedMedalCount`). An earned medal is a Recent event (`medalEvents`), except rank medals
 (`dated: false`).
 
 Medals are derived from scores on every request and never stored, except what an Import from osu!
@@ -857,6 +857,13 @@ calling it unreachable. The 10 s timeout starts with the request, not the wait. 
 they have got over SSE (`osu-progress`): favourites read, the mode being read, beatmaps downloaded.
 The browser's own loads (covers, previews, me! images) don't pass through it.
 
+**Rank events** (`src/rank-events.ts`, roadmap 5.79) are the one network read that isn't a button
+press: `/users/<id>/recent_activity?limit=100` (public JSON; osu! serves at most the newest 100) once
+at start, once after linking, and `ASK_AFTER_PLAY_MS` after the last of a run of plays osu! could rank
+(not McOsu, not a fail). Never on a timer. Only for the linked account when it's the player's own
+(`rankAccount`), and an event is kept only against a play of this profile: same beatmap and mode,
+within `MATCH_WINDOW_MS`, joined by `dedupe_key` so a reingest keeps it.
+
 ## Launcher: a tray icon
 
 `tools/launcher/` (Go, `fyne.io/systray`) is what a package opens: `osu! local profiles.exe`,
@@ -996,7 +1003,7 @@ with no transaction of its own because the connection is shared.
 
 `src/calc/metadata.ts` is the only definition: `NAME_COLUMNS` for what a naming query selects,
 `names()` for a row, and `beatmapName`/`beatmapNameOriginal` for the joined `artist - title` that
-Milestones, medals and Removed scores carry. Don't build `artist - title` by hand in a new query.
+Recent, medals and Removed scores carry. Don't build `artist - title` by hand in a new query.
 
 **Both names go to the page, and the page chooses** (`web/js/metadata.js`), as osu-web does.
 Choosing on the server would put a display preference in `/api/profile`'s cache key and make a

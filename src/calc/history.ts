@@ -39,6 +39,21 @@ export type ActivityEvent =
       version: string | null;
     }
   | { type: 'level'; at: number; level: number }
+  | {
+      /** Where one of the profile's plays placed on osu!'s leaderboard (src/rank-events.ts). */
+      type: 'rank';
+      at: number;
+      /** The osu! account that set it, as osu!'s own entry names and links it. */
+      userId: number | null;
+      username: string;
+      rank: number;
+      grade: string;
+      mode: Ruleset;
+      beatmapId: number | null;
+      title: string;
+      titleOriginal: string | null;
+      version: string | null;
+    }
   | { type: 'first'; at: number }
   | {
       type: 'medal';

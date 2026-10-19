@@ -12,7 +12,7 @@ import {
 import fs from 'node:fs';
 import type { SQLInputValue } from 'node:sqlite';
 import type { Db } from '../db/index.ts';
-import { parseReplay, type ReplayScore, type Ruleset } from '../osr.ts';
+import { parseReplay, type Client, type ReplayScore, type Ruleset } from '../osr.ts';
 import { awardsPp, type BeatmapResolver } from '../clients/beatmaps.ts';
 import { scoreMods, scorePricing } from '../calc/pp.ts';
 import { priceAsPlayed, pricedColumns, priceTheRest } from './pricing.ts';
@@ -85,6 +85,8 @@ export interface IngestedScore {
   /** Whether the *beatmap* allows pp, which no mod setting can override. */
   mapRanked: boolean;
   playedAt: number;
+  /** Which game set it: a McOsu play never reaches osu!, so has no rank there to look up. */
+  client: Client;
 }
 
 export type IngestOutcome =
@@ -408,6 +410,7 @@ export async function ingestScore(
       ranked: priced.ranked === 1,
       mapRanked: awardsPp(beatmap.status),
       playedAt,
+      client: score.client,
     },
   };
 }

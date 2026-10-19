@@ -122,6 +122,15 @@ and [**Total Play Time**](#total-play-time).
 Long sections start at five rows with a **show more** button (see [Show more](#show-more)). Both
 charts show values on hover, by day on the rank graph and by month on Play History.
 
+**Recent** lists the profile's milestones: when it started, levels, new best performances and
+medals. With your own osu! account linked (Profiles -> Import from osu!), it also shows where your
+plays placed on osu!'s leaderboards, *Tangy achieved rank #488 on ...*, as osu!'s profile does, with
+your name and the beatmap linking to their osu! pages. Only
+plays this profile tracked count, so another playstyle's ranks stay out, and osu! posts these only
+for high placings. They're asked for when the app starts and shortly after a play, and kept once
+fetched. osu! lists only the newest 100 events, so ranks set while you were offline for a long
+stretch may have gone.
+
 Global rank is an estimate (see [Known limitations](#known-limitations)). Country rank shows `-` on
 purpose.
 
@@ -130,7 +139,8 @@ The flag in the top right switches the page's language, and the first launch ask
 ### Rearranging the page
 
 Hover a section and use the arrows in its top right corner, or drag it by the grip. The order is
-saved with the profile. The arrows also work from the keyboard and on a touchscreen.
+saved with the profile. A new profile starts as osu!'s does: me!, Recent, Scores, Historical, then
+Recent Plays, Beatmaps and Medals. A profile from before 1.31.0 keeps the order it had. The arrows also work from the keyboard and on a touchscreen.
 
 To hide a section, untick it under **Options -> Other settings -> Profile sections**. It disappears
 from the page, its tab and saved web pages, and comes back where it was when ticked again.
@@ -268,7 +278,7 @@ before scoring it. That's display only: medals, play time and pp eligibility use
 
 A Medals section like osu!'s, limited to medals a local profile can decide. Names, descriptions,
 icons and thresholds are osu!'s own. They're grouped as on osu! (**Mod Introduction**, then **Skill
-& Dedication**). Hover a medal for its card. A newly earned one appears in **Milestones**, and the
+& Dedication**). Hover a medal for its card. A newly earned one appears in **Recent**, and the
 page announces it.
 
 What exists differs by mode, as on osu!:
@@ -522,7 +532,7 @@ These rows have no accuracy, mods or pp, and show dimmed with a "Didn't finish" 
 ### Show more
 
 How many rows each **show more** adds to Best Performance, Most Played Beatmaps, Recent Plays,
-Milestones and Favorite Beatmaps. 25 by default, as on osu!; type any number from 1 to 10,000.
+Recent and Favorite Beatmaps. 25 by default, as on osu!; type any number from 1 to 10,000.
 Favorite Beatmaps counts rows of two cards. **All at once** shows the whole list in one press.
 
 ### Count plays osu! could not submit
@@ -653,7 +663,7 @@ even after you reconnect, which is why the app reads local files.
 | `assets.ppy.sh` | cover art and medal icons, and a linked account's banner | a drawn placeholder |
 | `a.ppy.sh` | a linked account's avatar, when you import it | it says so |
 | `b.ppy.sh` | a favourite's audio preview, when you press play | no preview |
-| `osu.ppy.sh` | Look up, imports, score links, a new favourite's details, and downloading a beatmap a score needs | it says so |
+| `osu.ppy.sh` | Look up, imports, score links, a new favourite's details, downloading a beatmap a score needs, and, with your own account linked, where your plays placed (at launch and after a play) | it says so, or Recent waits for the next try |
 | GitHub | the update check, patch notes and the update download | no update notice |
 | `data.ppy.sh` | the rank curves, only when `npm run rank:refresh` is run by hand | the included curves keep working |
 

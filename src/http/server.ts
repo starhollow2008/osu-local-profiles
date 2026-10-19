@@ -86,6 +86,7 @@ import { capture, findBrowser } from './screenshot.ts';
 import { detectLocalSessions } from '../clients/session.ts';
 import { APP_ID, isOwnPage } from '../instance.ts';
 import { setStartup, startupState } from '../startup.ts';
+import { clearRankEvents, rankActivityEvents, RankEventWatcher } from '../rank-events.ts';
 import {
   downloadImage,
   fetchBeatmapset,
@@ -300,6 +301,19 @@ export function startServer(opts: ServerOptions): http.Server {
   };
 
   opts.tracker.on('score', (score) => broadcast('score', score));
+  /*
+   * Where the profile's plays placed on osu!'s leaderboards (src/rank-events.ts): asked once now,
+   * and a while after each play osu! could rank. Nothing at all without a linked account of the
+   * player's own, and every request waits its turn at the gate.
+   */
+  const rankEvents = new RankEventWatcher({
+    db: opts.db,
+    profileId: () => current(),
+    identity: () => opts.tracker.playerIdentity,
+    onNew: () => broadcast('scores', { action: 'rank-events' }),
+  });
+  opts.tracker.on('score', (score) => rankEvents.played(score));
+  void rankEvents.catchUp();
   // A play with no score still moves the play count and the charts, so the page has to be
   // told about it -- it just has nothing to put in a toast beyond which map it was.
   opts.tracker.on('incomplete', (play) => broadcast('incomplete', play));
@@ -391,7 +405,10 @@ export function startServer(opts: ServerOptions): http.Server {
         medals,
         medalTotal: earnedMedalCount(opts.db, profileId, e, { mode, summary: medals }),
         // Every event, newest first; the request slices off the page it asked for.
-        history: buildHistory(opts.db, profileId, mode, Number.POSITIVE_INFINITY, e, medalEvents(medals.medals)),
+        history: buildHistory(opts.db, profileId, mode, Number.POSITIVE_INFINITY, e, [
+          ...medalEvents(medals.medals),
+          ...rankActivityEvents(opts.db, profileId, mode),
+        ]),
         recentTotal: recentPlayTotal(opts.db, profileId, mode, e),
         mostPlayedCount: mostPlayedTotal(opts.db, profileId, mode, e),
       };
@@ -1178,6 +1195,8 @@ export function startServer(opts: ServerOptions): http.Server {
               }
 
               broadcast('identity', { linked: user.id });
+              // Just linked: where this profile's plays placed, if the account is the player's own.
+              void rankEvents.catchUp();
               return json(res, {
                 ok: true,
                 user,
@@ -1337,6 +1356,8 @@ export function startServer(opts: ServerOptions): http.Server {
               // point before anything below makes it render them as newly unlocked.
               if (wantMedals) broadcast('medals', { action: 'import' });
               broadcast('identity', { linked: user.id });
+              // Just linked: where this profile's plays placed, if the account is the player's own.
+              void rankEvents.catchUp();
               broadcast('settings', settingsFor(id));
               if (favouritesAdded > 0) broadcast('favorites', { action: 'import' });
               if (scores.length > 0) broadcast('scores', { action: 'import' });
@@ -1738,6 +1759,7 @@ export function startServer(opts: ServerOptions): http.Server {
           // priced against an account none of them came from any more.
           clearStanding(opts.db, current());
           clearImportedMedals(opts.db, current());
+          clearRankEvents(opts.db, current());
           opts.db
             .prepare('UPDATE profiles SET tracking_since = ? WHERE id = ?')
             .run(now, current());

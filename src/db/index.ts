@@ -112,6 +112,7 @@ function migrate(db: Db): void {
   rebuildNotBeatmaps(db);
   pinCountingDefaults(db);
   pinRelaxPricing(db);
+  pinSectionOrder(db);
 }
 
 /** Past this much free space inside the file, a rebuild gives it back to the disk. */
@@ -209,6 +210,69 @@ function pinRelaxPricing(db: Db): void {
       'INSERT OR IGNORE INTO profile_settings (profile_id, key, value) SELECT id, ?, ? FROM profiles',
     ).run('unrankedModPp', JSON.stringify('without-the-mod'));
     db.prepare('INSERT INTO kv (key, value) VALUES (?, ?)').run(RELAX_PRICING_PINNED, String(Date.now()));
+    db.exec('COMMIT');
+  } catch (e) {
+    db.exec('ROLLBACK');
+    throw e;
+  }
+}
+
+const SECTION_ORDER_PINNED = 'sectionOrderPinned';
+
+/** The profile page's default order from 1.10.0 until 1.31.0 moved Recent up (roadmap 5.80). */
+const ORDER_UNTIL_1_31 = ['me', 'recent_plays', 'top_ranks', 'historical', 'recent', 'beatmaps', 'medals'];
+
+/** Earlier defaults, which the page read as never arranged (`RETIRED_DEFAULT_ORDERS`). */
+const DEFAULTS_BEFORE_1_10 = [
+  ['me', 'recent', 'top_ranks', 'medals', 'historical'],
+  ['me', 'recent', 'top_ranks', 'historical', 'beatmaps', 'medals'],
+];
+
+/**
+ * A saved order as the page showed it before 1.31.0: `reconcileSectionOrder` in
+ * web/js/sections.js against `ORDER_UNTIL_1_31`, repeated here so the database does not import
+ * the page. Unknown ids go, and a missing section joins after the one it followed by default.
+ */
+function orderAsShownUntil131(saved: unknown): string[] {
+  const list = Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [];
+  const same = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((id, i) => id === b[i]);
+  if (DEFAULTS_BEFORE_1_10.some((old) => same(list, old))) return [...ORDER_UNTIL_1_31];
+  const out: string[] = [];
+  for (const id of list) if (ORDER_UNTIL_1_31.includes(id) && !out.includes(id)) out.push(id);
+  ORDER_UNTIL_1_31.forEach((id, index) => {
+    if (out.includes(id)) return;
+    const before = ORDER_UNTIL_1_31.slice(0, index).reverse().find((prev) => out.includes(prev));
+    out.splice(before === undefined ? 0 : out.indexOf(before) + 1, 0, id);
+  });
+  return out;
+}
+
+/**
+ * Recent under me! and Recent Plays under Historical is the default for a profile made from
+ * 1.31.0 on. One that already existed keeps its page exactly as it was: its order as the page
+ * showed it is written down whole, once, so neither the new default nor where it would slot a
+ * section an older saved order lacks can move anything. The pattern of `pinCountingDefaults`.
+ */
+function pinSectionOrder(db: Db): void {
+  if (db.prepare('SELECT 1 AS hit FROM kv WHERE key = ?').get(SECTION_ORDER_PINNED)) return;
+  db.exec('BEGIN');
+  try {
+    const stored = db.prepare("SELECT value FROM profile_settings WHERE profile_id = ? AND key = 'sectionOrder'");
+    const write = db.prepare(
+      `INSERT INTO profile_settings (profile_id, key, value) VALUES (?, 'sectionOrder', ?)
+         ON CONFLICT(profile_id, key) DO UPDATE SET value = excluded.value`,
+    );
+    for (const { id } of db.prepare('SELECT id FROM profiles').all() as { id: number }[]) {
+      const row = stored.get(id) as { value: string } | undefined;
+      let saved: unknown = [];
+      try {
+        saved = row ? JSON.parse(row.value) : [];
+      } catch {
+        // Unreadable reads as nothing saved, as the settings themselves read it.
+      }
+      write.run(id, JSON.stringify(orderAsShownUntil131(saved)));
+    }
+    db.prepare('INSERT INTO kv (key, value) VALUES (?, ?)').run(SECTION_ORDER_PINNED, String(Date.now()));
     db.exec('COMMIT');
   } catch (e) {
     db.exec('ROLLBACK');

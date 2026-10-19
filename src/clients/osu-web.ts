@@ -906,3 +906,61 @@ export function extractStanding(html: string): OsuWebStanding {
   };
 }
 
+/**
+ * "achieved rank #488 on Yorushika - Tomin [Collab Extra] (osu!)": one of an account's rank
+ * events, as its profile's Recent lists them (roadmap 5.79).
+ */
+export interface RankEvent {
+  /** osu!'s id for the event, so the same one read twice is kept once. */
+  id: number;
+  at: number;
+  rank: number;
+  /** The grade osu! shows beside it: XH, X, SH, S, A, B, C or D. */
+  grade: string;
+  mode: Ruleset;
+  beatmapId: number;
+}
+
+const RULESET_FOR_MODE: Record<string, Ruleset> = { osu: 0, taiko: 1, fruits: 2, mania: 3 };
+
+/** The rank events in a recent-activity page; anything else it lists (medals, renames) is left. */
+export function rankEventsFromJson(list: unknown): RankEvent[] {
+  if (!Array.isArray(list)) return [];
+  const out: RankEvent[] = [];
+  for (const raw of list as Record<string, unknown>[]) {
+    if (raw === null || typeof raw !== 'object' || raw['type'] !== 'rank') continue;
+    const beatmap = raw['beatmap'] as Record<string, unknown> | undefined;
+    const beatmapId = Number(/\/beatmaps\/(\d+)/.exec(String(beatmap?.['url'] ?? ''))?.[1]);
+    const at = Date.parse(String(raw['createdAt'] ?? raw['created_at'] ?? ''));
+    const mode = RULESET_FOR_MODE[String(raw['mode'])];
+    const { id, rank, scoreRank } = raw as { id?: unknown; rank?: unknown; scoreRank?: unknown };
+    if (typeof id !== 'number' || typeof rank !== 'number' || typeof scoreRank !== 'string') continue;
+    if (mode === undefined || !Number.isInteger(beatmapId) || beatmapId <= 0 || !Number.isFinite(at)) continue;
+    out.push({ id, at, rank, grade: scoreRank, mode, beatmapId });
+  }
+  return out;
+}
+
+/**
+ * An account's latest rank events: one request, for the 100 newest events of every kind, which
+ * is as far back as osu! lists them. The same public JSON its profile's Recent reads, no
+ * credentials. Asked only after a play and once a launch (src/rank-events.ts), never on a timer.
+ */
+export async function fetchRankEvents(userId: number): Promise<RankEvent[]> {
+  if (!Number.isInteger(userId) || userId <= 0) throw new Error('not a user id');
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(
+      `https://osu.ppy.sh/users/${userId}/recent_activity?limit=100&offset=0`,
+      'application/json',
+    );
+  } catch (e) {
+    throw unreachable(e, 'could not reach osu.ppy.sh');
+  }
+  if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
+  try {
+    return rankEventsFromJson(await response.json());
+  } catch {
+    throw new Error('the recent activity was not in the shape expected; osu! may have changed it');
+  }
+}

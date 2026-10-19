@@ -90,6 +90,8 @@ does not have to make it again.
 | 5.76 | The filter's client                                       | done   |
 | 5.77 | Launch on startup                                         | done   |
 | 5.78 | One request a second to osu!, and no favourites cap       | done   |
+| 5.79 | Ranks achieved on beatmaps, in Recent                     | done   |
+| 5.80 | Recent, named and placed as on osu!                       | done   |
 
 ## Constraints on every item
 
@@ -1536,3 +1538,39 @@ stopped at 50 pages of 100.
 - **Favourites have no cap**: pages until an empty one, or one that adds nothing new.
 - **Progress** (`osu-progress` over SSE): the import's hint says what it's reading, or how many
   beatmaps of how many it has downloaded; Recalculate every score's downloads toast it.
+
+## 5.79 - Ranks achieved on beatmaps, in Recent
+
+**Status:** done (unreleased)
+
+Left out at the start because offline came first. The owner asked whether it's cheap and fair to
+osu! for players who are online, or online now and then. It is: one small request per run of
+plays, through the gate.
+
+- `osu.ppy.sh/users/<id>/recent_activity` answers JSON with no login, and its `rank` events carry
+  the rank, grade, mode, beatmap id and time. osu! lists the newest 100 at most (`MAX_RESULTS`).
+- **Whose**: the linked account, only when it's the player's own (signed in here as it, or the
+  profile has plays under its names). **Which**: only events matching a play of this profile, so a
+  playstyle never shows another's ranks. **When**: at start, after linking, and 90 seconds after the
+  last of a run of plays osu! could rank. Never on a timer.
+- Kept in `rank_events` by `dedupe_key`; a removed play hides its rank; a reset clears them.
+- Checked against the owner's account: 16 events listed back to 17 September, and each of the two
+  plays the dev profiles had tracked matched into its own profile.
+
+## 5.80 - Recent, named and placed as on osu!
+
+**Status:** done (unreleased)
+
+With osu!'s rank events in it (5.79), the feed called Milestones since 1.10.0 is osu!'s Recent again,
+as the contributor who renamed it suggested it would be.
+
+- **Named Recent**, in every language as osu-web names it (`users.extra.recent_activity.title`).
+  The section id was always `recent`, so saved orders and hidden sections carry over untouched.
+- **A rank event reads as osu-web's**: its `events.rank` in every language, the account's name first
+  and bold, linking to its osu! profile, and the beatmap linking to its page, both in osu-web's link
+  colour (`--hsl-l2`, l1 on hover). A top-50 rank is bold, as there.
+- **The default order is osu!'s**: me!, Recent, Scores, Historical, then Recent Plays, Beatmaps and
+  Medals. A profile from before 1.31.0 keeps the page it had: `pinSectionOrder` writes its order down
+  whole, once, as the page showed it, so neither the new default nor where a missing section would
+  slot in can move anything. Checked against the page's own `reconcileSectionOrder` for each kind of
+  saved order.

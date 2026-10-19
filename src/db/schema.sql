@@ -336,4 +336,19 @@ CREATE TABLE IF NOT EXISTS imported_medals (
   PRIMARY KEY (profile_id, slug)
 );
 
+-- "achieved rank #488 on ...": the rank events of the profile's osu! account that match one of
+-- the profile's own plays, the same beatmap and mode set within minutes of it. Read from osu!
+-- after a play and once a launch, and kept, since osu! lists only its newest 100 events. Joined
+-- to the play by dedupe_key, which survives a reingest where a score's id does not. Cleared by a
+-- reset. See src/rank-events.ts (roadmap 5.79).
+CREATE TABLE IF NOT EXISTS rank_events (
+  profile_id    INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  event_id      INTEGER NOT NULL,
+  dedupe_key    TEXT    NOT NULL,
+  rank          INTEGER NOT NULL,
+  grade         TEXT    NOT NULL,
+  achieved_at   INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, event_id)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

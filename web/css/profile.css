@@ -1598,9 +1598,24 @@
   margin-right: -5px;
 }
 
+/* A rank event's grade: osu-web's icon column is `font-size: 14px`, a 28x14 badge. */
+.activity__icon .score-rank {
+  font-size: 14px;
+  align-self: center;
+}
+
 .activity__text {
   flex: 1;
   min-width: 0;
+}
+
+/* The account and beatmap in a rank event: osu-web's `.link-default()`, l2 turning l1 on hover. */
+.activity__link {
+  color: hsl(var(--hsl-l2));
+}
+
+.activity__link:hover {
+  color: hsl(var(--hsl-l1));
 }
 
 .activity__highlight {

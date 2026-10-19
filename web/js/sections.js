@@ -1,5 +1,5 @@
 /** Markup builders for the repeated rows on the profile page. */
-import { escapeHtml, fmt, pct, timeAgo, fullDate } from './format.js';
+import { escapeHtml, fmt, pct, timeAgo, fullDate, MODE_NAMES } from './format.js';
 import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './badges.js';
 import { t } from './i18n.js';
 import { beatmapArtist, beatmapName, beatmapTitle, original } from './metadata.js';
@@ -408,9 +408,17 @@ export function beatmapPlaycountList(items) {
   return items.map(beatmapPlaycountRow).join('');
 }
 
+/** osu-web's ruleset names, as its beatmap links take them. */
+const RULESET_SLUGS = ['osu', 'taiko', 'fruits', 'mania'];
+
+/** `html` as a link to the page at `osu.ppy.sh/<path>`, or as it is with no path to link to. */
+const osuLink = (path, html) =>
+  path === null ? html : `<a class="activity__link" href="https://osu.ppy.sh/${path}" target="_blank" rel="noreferrer noopener">${html}</a>`;
+
 /**
  * The Recent section. osu! fills this with account events (medals, rank milestones); a
- * local profile has its own equivalents, derived in src/calc/history.ts.
+ * local profile has its own equivalents, derived in src/calc/history.ts, plus the ranks osu!
+ * itself reports (src/rank-events.ts).
  */
 export function activityRow(event) {
   let text;
@@ -434,6 +442,23 @@ export function activityRow(event) {
     case 'level':
       text = t('activity.level', { level: fmt(event.level) });
       break;
+    case 'rank': {
+      // osu!'s `events.rank`, read from the linked account (src/rank-events.ts), drawn as
+      // osu-web's `parse-event.tsx` does: the account and the beatmap link to their osu! pages, a
+      // top-50 rank is bold, and the grade sits in the icon column.
+      const map =
+        escapeHtml(original(event.title, event.titleOriginal)) +
+        (event.version ? ` [${escapeHtml(event.version)}]` : '');
+      const rank = fmt(event.rank);
+      text = t('activity.rank', {
+        user: `<strong>${osuLink(event.userId ? `users/${event.userId}` : null, escapeHtml(event.username ?? ''))}</strong>`,
+        rank: event.rank <= 50 ? `<strong>${rank}</strong>` : rank,
+        map: osuLink(event.beatmapId ? `beatmaps/${event.beatmapId}?mode=${RULESET_SLUGS[event.mode] ?? 'osu'}` : null, map),
+        mode: escapeHtml(MODE_NAMES[event.mode] ?? ''),
+      });
+      icon = gradeBadge(event.grade);
+      break;
+    }
     case 'first':
       text = t('activity.first');
       break;

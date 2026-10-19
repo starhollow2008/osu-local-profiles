@@ -78,18 +78,18 @@ import {
 const $ = (id) => document.getElementById(id);
 
 /*
- * The sections, in their default order. Recent Plays sits near the top, since following the
- * plays is what this profile is for; Milestones -- osu!'s "Recent" feed of medals, bests and
- * levels -- sits under Historical. Both orders at the user's request.
+ * The sections, in their default order: Recent -- osu!'s feed of medals, bests, levels and the
+ * ranks osu! reports -- under me!, as on osu!, and Recent Plays under Historical (roadmap 5.80).
+ * A profile from before 1.31.0 keeps the order it had (`pinSectionOrder` in src/db/index.ts).
  */
 const SECTIONS = [
   ['me', () => t('section.me')],
-  ['recent_plays', () => t('section.recentPlays')],
+  // Called Milestones from 1.10.0 until it gained osu!'s rank events and its name back.
+  ['recent', () => t('section.recent')],
   // The id is kept from when osu! called this Top Ranks: saved section orders refer to it.
   ['top_ranks', () => t('section.scores')],
   ['historical', () => t('section.historical')],
-  // The id is kept from when this was called Recent: saved section orders refer to it.
-  ['recent', () => t('section.milestones')],
+  ['recent_plays', () => t('section.recentPlays')],
   ['beatmaps', () => t('section.beatmaps')],
   // Last by default, at the user's request.
   ['medals', () => t('section.medals')],

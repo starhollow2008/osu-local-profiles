@@ -34,6 +34,8 @@
   --hsl-c2: var(--base-hue), 40%, 90%;
 
   --hsl-l1: var(--base-hue), 40%, 80%;
+  /* osu-web's link colour (`.link-default()`, `colors.less`). */
+  --hsl-l2: var(--base-hue), 40%, 75%;
   --hsl-l3: var(--base-hue), 40%, 70%;
 
   /*

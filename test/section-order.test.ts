@@ -83,3 +83,65 @@ test('the note on a profile counting unranked plays says where to turn them off'
   // Priced as if the mod were off, so the * on those scores is explained.
   assert.match(text, /marked with \*\.$/);
 });
+
+/*
+ * 1.31.0: Recent (Milestones until now) moves under me! and Recent Plays under Historical, by
+ * default -- for a profile made from then on. One that already existed keeps its page exactly:
+ * `pinSectionOrder` writes down whole the order the page showed it (roadmap 5.80).
+ */
+const DEFAULT_131 = ['me', 'recent', 'top_ranks', 'historical', 'recent_plays', 'beatmaps', 'medals'];
+
+test('Recent sits under me! and Recent Plays under Historical, by default', () => {
+  assert.deepEqual(reconcileSectionOrder([], DEFAULT_131, RETIRED), DEFAULT_131);
+});
+
+test('a profile from before 1.31.0 keeps the order it showed, however it was saved', async () => {
+  const fs = await import('node:fs');
+  const os = await import('node:os');
+  const path = await import('node:path');
+  const { openDb, getOrCreateProfile } = await import('../src/db/index.ts');
+  const { getSettings, updateSettings } = await import('../src/settings.ts');
+
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-order-'));
+  const file = path.join(tmp, 'test.db');
+  try {
+    // Profiles as 1.30.0 left them: nothing saved, an old default, rearranged before Recent
+    // Plays existed, rearranged since, and an order with ids that are gone.
+    const saved: (string[] | null)[] = [
+      null,
+      RETIRED[1]!,
+      ['medals', 'me', 'recent', 'top_ranks', 'historical'],
+      ['me', 'medals', 'recent', 'top_ranks', 'historical', 'beatmaps', 'recent_plays'],
+      ['gone', 'historical', 'me'],
+    ];
+    let db = openDb(file);
+    const ids = saved.map((order, i) => {
+      const id = getOrCreateProfile(db, `p${i}`);
+      if (order !== null) updateSettings(db, id, { sectionOrder: order });
+      return id;
+    });
+    // As if this database were last opened by 1.30.0, before the pin existed.
+    db.prepare("DELETE FROM kv WHERE key = 'sectionOrderPinned'").run();
+    db.close();
+
+    db = openDb(file);
+    saved.forEach((order, i) => {
+      const shown = reconcileSectionOrder(order ?? [], DEFAULT_110, RETIRED);
+      const pinned = getSettings(db, ids[i]!).sectionOrder;
+      assert.deepEqual(pinned, shown, `profile ${i}: written down whole`);
+      // And the page, with today's default, shows exactly that.
+      assert.deepEqual(reconcileSectionOrder(pinned, DEFAULT_131, RETIRED), shown);
+    });
+
+    // A profile made afterwards has nothing saved, so it gets today's default.
+    const fresh = getOrCreateProfile(db, 'new');
+    assert.deepEqual(getSettings(db, fresh).sectionOrder, []);
+    db.close();
+    // And the pin happens once: reopening leaves the new profile alone.
+    db = openDb(file);
+    assert.deepEqual(getSettings(db, fresh).sectionOrder, []);
+    db.close();
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});

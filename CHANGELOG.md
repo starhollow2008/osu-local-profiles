@@ -18,6 +18,13 @@
 - **Launch on startup, a new switch in Options.** The app starts in the tray when you sign in to
   your computer, without opening the page. Off by default.
 
+- **Recent shows where your plays placed on osu!.** With your own osu! account linked, it lists
+  *Tangy achieved rank #488 on ...* as osu!'s profile does, with your name and the beatmap linking to
+  osu!, for plays this profile tracked. It asks osu! when the app starts and shortly after a play.
+
+- **Milestones is called Recent again, as on osu!.** A new profile shows it under me!, with Recent
+  Plays under Historical, as osu! orders them. A profile you already have keeps its order.
+
 - **Import from osu! brings in every favourite beatmap.** The 5,000 limit is gone.
 
 - **The app asks osu! for at most one thing a second**, as osu! asks of anything reading it, and
