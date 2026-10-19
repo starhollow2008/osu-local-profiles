@@ -4768,6 +4768,29 @@ on('scores', () => {
   loadProfile();
   loadState();
 });
+/*
+ * How far a long exchange with osu! has got: an import from it, or the beatmaps Recalculate
+ * every score downloads. osu! is asked once a second at most (src/clients/request-gate.ts), so
+ * a big one takes minutes. Said in the import's own hint while that runs, otherwise as a toast
+ * every few seconds.
+ */
+let osuProgressToastAt = 0;
+on('osu-progress', (e) => {
+  const p = JSON.parse(e.data);
+  let text;
+  if (p.step === 'favourites') text = t('progress.favourites', { n: fmt(p.done) });
+  else if (p.step === 'scores') text = t('progress.scores', { mode: MODE_NAMES[p.mode] ?? '' });
+  else if (p.step === 'beatmaps') text = t('progress.beatmaps', { done: fmt(p.done), total: fmt(p.total) });
+  else return;
+  if ($('importGo').disabled) {
+    importHint(text);
+    return;
+  }
+  const now = Date.now();
+  if (now - osuProgressToastAt < 5000 && p.done !== p.total) return;
+  osuProgressToastAt = now;
+  toast(text);
+});
 // A recompute can run for a while on a large profile; report progress rather than looking
 // frozen. The final `recompute` event is handled by whoever started it.
 on('recompute-progress', (e) => {

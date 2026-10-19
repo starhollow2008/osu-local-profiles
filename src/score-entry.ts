@@ -238,11 +238,17 @@ export interface Conversion {
  * A beatmap that is not installed is downloaded only when `download` is set -- after an import
  * from osu!, or on Recalculate every score, both of which the user pressed. Otherwise that play
  * is left on osu!'s figures, and converted the next time it can be.
+ *
+ * Downloads queue behind the request gate, one a second (src/clients/request-gate.ts), so a few
+ * hundred take minutes: `onDownload` hears each one, against how many there are to fetch.
  */
 export async function convertImportedScores(
   deps: EntryDeps,
   profileId: number,
-  { download }: { download: boolean },
+  {
+    download,
+    onDownload = () => {},
+  }: { download: boolean; onDownload?: (done: number, total: number) => void },
 ): Promise<Conversion> {
   const rows = deps.db
     .prepare(
@@ -255,6 +261,16 @@ export async function convertImportedScores(
   if (rows.length === 0) return result;
   if (!deps.canPrice) return { converted: 0, left: rows.length };
 
+  // How many beatmaps there are to download, each once however many plays it has.
+  const toDownload = new Set(
+    download
+      ? rows
+          .filter((row) => row.beatmap_id !== null && !installed(deps, row.beatmap_md5))
+          .map((row) => row.beatmap_md5)
+      : [],
+  );
+  const downloaded = new Set<string>();
+
   // Written under the account the scores came from, which is whose they are.
   const player = { id: null, name: getSettings(deps.db, profileId).linkedUsername || '' };
   for (const row of rows) {
@@ -265,7 +281,14 @@ export async function convertImportedScores(
       if (bytes === null || score === null) throw new Error('not buildable');
       if (local === null || !fs.existsSync(local)) {
         if (!download || row.beatmap_id === null) throw new Error('no beatmap');
-        await ensureBeatmapFile(deps.db, deps.resolver, deps.dataDir, { id: row.beatmap_id, md5: row.beatmap_md5 });
+        try {
+          await ensureBeatmapFile(deps.db, deps.resolver, deps.dataDir, { id: row.beatmap_id, md5: row.beatmap_md5 });
+        } finally {
+          if (toDownload.has(row.beatmap_md5) && !downloaded.has(row.beatmap_md5)) {
+            downloaded.add(row.beatmap_md5);
+            onDownload(downloaded.size, toDownload.size);
+          }
+        }
       }
       const file = storeUploadedReplay(deps.dataDir, bytes);
       if (file === null) throw new Error('not buildable');
@@ -278,6 +301,12 @@ export async function convertImportedScores(
     }
   }
   return result;
+}
+
+/** Whether a beatmap's file is on this computer, installed or downloaded before. */
+function installed(deps: EntryDeps, md5: string): boolean {
+  const local = deps.resolver.resolve(md5).osuPath;
+  return local !== null && fs.existsSync(local);
 }
 
 /* ------------------------------------------------------------------ beatmaps */

@@ -18,6 +18,11 @@
 - **Launch on startup, a new switch in Options.** The app starts in the tray when you sign in to
   your computer, without opening the page. Off by default.
 
+- **Import from osu! brings in every favourite beatmap.** The 5,000 limit is gone.
+
+- **The app asks osu! for at most one thing a second**, as osu! asks of anything reading it, and
+  waits if osu! asks it to slow down. A big import takes longer, and says how far it has got.
+
 - **Everything new in this release is translated** into all 15 languages.
 
 ## 1.30.0

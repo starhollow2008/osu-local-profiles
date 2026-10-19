@@ -89,6 +89,7 @@ does not have to make it again.
 | 5.75 | Shared replays with no score id aren't yours              | done   |
 | 5.76 | The filter's client                                       | done   |
 | 5.77 | Launch on startup                                         | done   |
+| 5.78 | One request a second to osu!, and no favourites cap       | done   |
 
 ## Constraints on every item
 
@@ -1518,3 +1519,20 @@ chose, named so it fits there and reads right on macOS and Linux too.
 
 Checked on Windows: on, the Run value holds the quoted path, non-ASCII name intact, and reads back
 on; off removes it. macOS and Linux are covered by tests against a temporary home, not real logins.
+
+## 5.78 - One request a second to osu!, and no favourites cap
+
+**Status:** done (unreleased)
+
+From a contributor (starhollow2008), who was once IP-banned elsewhere for request volume: is there
+a rate limit, and can an import take 1,000+ favourites? There was none, and the favourites import
+stopped at 50 pages of 100.
+
+- **One gate for every osu! domain** the app asks (osu.ppy.sh, a.ppy.sh, assets.ppy.sh):
+  `RequestGate`, one turn a second, in order, shared by everything, as osu.ppy.sh/docs asks ("no
+  more than 60 requests per minute"). The app reads the website, not the API, but it's the same
+  servers. The owner set this scope; GitHub and the browser's own image loads are out.
+- **A 429 holds everything** for its `Retry-After`, retried twice, then a `SlowDown` that says so.
+- **Favourites have no cap**: pages until an empty one, or one that adds nothing new.
+- **Progress** (`osu-progress` over SSE): the import's hint says what it's reading, or how many
+  beatmaps of how many it has downloaded; Recalculate every score's downloads toast it.

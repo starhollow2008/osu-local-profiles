@@ -846,6 +846,17 @@ failed check shows nothing.
   notice at the foot of the page for an important version, or once the oldest missing one is 14 days
   old; dismissed, it stays away 7 days unless something important comes out.
 
+## Asking osu!
+
+Everything the app itself asks of an osu! domain goes through `fetchWithTimeout` in
+`src/clients/osu-web.ts`, and so through one `RequestGate` (`src/clients/request-gate.ts`, roadmap
+5.78): turns start a second apart, in order, which is osu!'s own ask ("no more than 60 requests per
+minute", osu.ppy.sh/docs). A 429 holds the whole gate for its `Retry-After` (1 s to 5 min, a minute
+without one), is retried twice, then fails as `SlowDown`, which every caller lets through rather than
+calling it unreachable. The 10 s timeout starts with the request, not the wait. Long runs say how far
+they have got over SSE (`osu-progress`): favourites read, the mode being read, beatmaps downloaded.
+The browser's own loads (covers, previews, me! images) don't pass through it.
+
 ## Launcher: a tray icon
 
 `tools/launcher/` (Go, `fyne.io/systray`) is what a package opens: `osu! local profiles.exe`,

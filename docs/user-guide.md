@@ -650,11 +650,18 @@ even after you reconnect, which is why the app reads local files.
 
 | host | what for | if it fails |
 |---|---|---|
-| `assets.ppy.sh` | cover art and medal icons | a drawn placeholder |
+| `assets.ppy.sh` | cover art and medal icons, and a linked account's banner | a drawn placeholder |
+| `a.ppy.sh` | a linked account's avatar, when you import it | it says so |
 | `b.ppy.sh` | a favourite's audio preview, when you press play | no preview |
 | `osu.ppy.sh` | Look up, imports, score links, a new favourite's details, and downloading a beatmap a score needs | it says so |
 | GitHub | the update check, patch notes and the update download | no update notice |
 | `data.ppy.sh` | the rank curves, only when `npm run rank:refresh` is run by hand | the included curves keep working |
+
+**Every request the app makes to osu! waits its turn, one a second at most**, which is what osu!
+asks of anything reading it. A big import, such as thousands of favourites or hundreds of beatmaps
+to download, takes minutes and shows how far it has got. If osu! asks the app to slow down, it
+waits as long as osu! says. Cover art and previews are loaded by your browser for what's on screen,
+as on osu!'s own site.
 
 ## Known limitations
 

@@ -1,5 +1,6 @@
 import { UNRESOLVED_STATUS } from './beatmaps.ts';
 import type { LazerMod, Ruleset } from '../osr.ts';
+import { RequestGate, retryAfterMs } from './request-gate.ts';
 
 /**
  * Looking up an osu! account, so a profile can borrow its name, avatar and banner.
@@ -98,17 +99,44 @@ export function parseUserQuery(input: unknown): string | null {
   return candidate;
 }
 
+/**
+ * Every request this app makes to osu!, one a second at most (src/clients/request-gate.ts). The
+ * timeout starts when the request does, not while it waits its turn.
+ */
+const osuGate = new RequestGate(1000);
+
+/** How many times a request told to slow down (429) is asked again, after the wait osu! asks. */
+const SLOW_DOWN_RETRIES = 2;
+
 async function fetchWithTimeout(url: string, accept: string): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-  try {
-    return await fetch(url, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: { accept, 'user-agent': USER_AGENT },
+  for (let attempt = 0; ; attempt++) {
+    const response = await osuGate.run(async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      try {
+        return await fetch(url, {
+          signal: controller.signal,
+          redirect: 'follow',
+          headers: { accept, 'user-agent': USER_AGENT },
+        });
+      } finally {
+        clearTimeout(timer);
+      }
     });
-  } finally {
-    clearTimeout(timer);
+    if (response.status !== 429) return response;
+    // Everything waits, not just this request: see `RequestGate.pauseFor`.
+    osuGate.pauseFor(retryAfterMs(response.headers.get('retry-after'), Date.now()));
+    if (attempt >= SLOW_DOWN_RETRIES) throw new SlowDown();
+  }
+}
+
+/** Why a request failed: osu! asking to slow down says so, anything else is `message`. */
+const unreachable = (e: unknown, message: string): Error => (e instanceof SlowDown ? e : new Error(message));
+
+/** osu! still asked the app to slow down after it waited as long as osu! said. */
+export class SlowDown extends Error {
+  constructor() {
+    super('osu! asked this app to slow down; try again in a few minutes');
   }
 }
 
@@ -191,8 +219,8 @@ export async function lookupUser(query: string): Promise<OsuWebUser> {
       `https://osu.ppy.sh/users/${encodeURIComponent(clean)}`,
       'text/html',
     );
-  } catch {
-    throw new Error('could not reach osu.ppy.sh -- check your connection, or type a name instead');
+  } catch (e) {
+    throw unreachable(e, 'could not reach osu.ppy.sh -- check your connection, or type a name instead');
   }
 
   if (response.status === 404) throw new NoSuchUser(`osu! has no user called "${clean}"`);
@@ -231,8 +259,8 @@ export async function downloadImage(url: string): Promise<DownloadedImage> {
   let response: Response;
   try {
     response = await fetchWithTimeout(url, 'image/*');
-  } catch {
-    throw new Error('could not download that image');
+  } catch (e) {
+    throw unreachable(e, 'could not download that image');
   }
   if (!response.ok) throw new Error(`downloading the image failed (${response.status})`);
 
@@ -372,9 +400,8 @@ export function beatmapsetFromJson(raw: Record<string, unknown>): BeatmapsetDeta
   };
 }
 
-/** Favourites are read a hundred at a time, and at most fifty pages of them. */
+/** Favourites are read a hundred at a time, as many pages as the account has (roadmap 5.78). */
 const FAVOURITES_PAGE = 100;
-const MAX_FAVOURITE_PAGES = 50;
 
 /**
  * Every beatmapset an osu! account has favourited, as osu! lists them (newest first), with
@@ -386,23 +413,31 @@ const MAX_FAVOURITE_PAGES = 50;
  * Pages are read until one comes back empty, not until one comes back short, so a smaller
  * page size on osu!'s side cannot end the import early. Runs only because a button was
  * pressed.
+ *
+ * No cap on how many: osu! pages favourites without limit, and an account with 9,000 is real.
+ * The request gate spaces the pages out (90 of them, a minute and a half), and a page that adds
+ * nothing new ends it, so a list osu! repeated could not run on forever. `onPage` hears how many
+ * have been read so far.
  */
-export async function fetchFavouriteBeatmapsets(userId: number): Promise<BeatmapsetDetails[]> {
+export async function fetchFavouriteBeatmapsets(
+  userId: number,
+  onPage: (read: number) => void = () => {},
+): Promise<BeatmapsetDetails[]> {
   if (!Number.isInteger(userId) || userId <= 0) throw new Error('not a user id');
   const shapeError = 'the favourites were not in the shape expected; osu! may have changed them';
 
   const sets: BeatmapsetDetails[] = [];
   const seen = new Set<number>();
   let offset = 0;
-  for (let page = 0; page < MAX_FAVOURITE_PAGES; page++) {
+  for (;;) {
     let response: Response;
     try {
       response = await fetchWithTimeout(
         `https://osu.ppy.sh/users/${userId}/beatmapsets/favourite?limit=${FAVOURITES_PAGE}&offset=${offset}`,
         'application/json',
       );
-    } catch {
-      throw new Error('could not reach osu.ppy.sh');
+    } catch (e) {
+      throw unreachable(e, 'could not reach osu.ppy.sh');
     }
     if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
 
@@ -415,6 +450,7 @@ export async function fetchFavouriteBeatmapsets(userId: number): Promise<Beatmap
     if (!Array.isArray(list)) throw new Error(shapeError);
     if (list.length === 0) break;
 
+    const before = seen.size;
     for (const raw of list) {
       const set = raw !== null && typeof raw === 'object' ? beatmapsetFromJson(raw as Record<string, unknown>) : null;
       if (set !== null && !seen.has(set.id)) {
@@ -422,6 +458,8 @@ export async function fetchFavouriteBeatmapsets(userId: number): Promise<Beatmap
         sets.push(set);
       }
     }
+    onPage(sets.length);
+    if (seen.size === before) break;
     offset += list.length;
   }
   return sets;
@@ -439,8 +477,8 @@ export async function fetchBeatmapset(beatmapsetId: number): Promise<BeatmapsetD
   let response: Response;
   try {
     response = await fetchWithTimeout(`https://osu.ppy.sh/beatmapsets/${beatmapsetId}`, 'text/html');
-  } catch {
-    throw new Error('could not reach osu.ppy.sh');
+  } catch (e) {
+    throw unreachable(e, 'could not reach osu.ppy.sh');
   }
   if (response.status === 404) throw new Error('osu! has no beatmapset with that id');
   if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
@@ -528,8 +566,8 @@ export async function fetchLinkedScore(input: string): Promise<LinkedScore> {
   let response: Response;
   try {
     response = await fetchWithTimeout(`https://osu.ppy.sh/${where}`, 'text/html');
-  } catch {
-    throw new Error('could not reach osu.ppy.sh');
+  } catch (e) {
+    throw unreachable(e, 'could not reach osu.ppy.sh');
   }
   if (response.status === 404) throw new Error('osu! has no score at that link -- it may have been replaced by a better one');
   if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
@@ -548,8 +586,8 @@ export async function fetchBeatmapFile(beatmapId: number): Promise<Buffer> {
   let response: Response;
   try {
     response = await fetchWithTimeout(`https://osu.ppy.sh/osu/${beatmapId}`, 'text/plain');
-  } catch {
-    throw new Error('could not reach osu.ppy.sh');
+  } catch (e) {
+    throw unreachable(e, 'could not reach osu.ppy.sh');
   }
   if (response.status === 404) throw new Error('osu! has no beatmap with that id');
   if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
@@ -761,8 +799,8 @@ async function fetchScoreList(
           `?mode=${osuWebMode(mode)}&limit=${SCORES_PAGE}&offset=${offset}`,
         'application/json',
       );
-    } catch {
-      throw new Error('could not reach osu.ppy.sh');
+    } catch (e) {
+      throw unreachable(e, 'could not reach osu.ppy.sh');
     }
     if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
 
@@ -832,8 +870,8 @@ export async function fetchStanding(userId: number, mode: Ruleset): Promise<OsuW
       `https://osu.ppy.sh/users/${userId}/${osuWebMode(mode)}`,
       'text/html',
     );
-  } catch {
-    throw new Error('could not reach osu.ppy.sh');
+  } catch (e) {
+    throw unreachable(e, 'could not reach osu.ppy.sh');
   }
   if (!response.ok) throw new Error(`osu.ppy.sh answered ${response.status}`);
 
@@ -867,3 +905,4 @@ export function extractStanding(html: string): OsuWebStanding {
     countryRank: num(stats['country_rank']),
   };
 }
+

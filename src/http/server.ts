@@ -92,6 +92,7 @@ import {
   fetchBestPerformances,
   fetchFavouriteBeatmapsets,
   fetchPinnedScores,
+  SlowDown,
   fetchStanding,
   lookupUser,
   NoSuchUser,
@@ -874,7 +875,12 @@ export function startServer(opts: ServerOptions): http.Server {
             let converted = 0;
             for (const profile of listProfiles(opts.db)) {
               const deps = trackerEntryDeps(opts.tracker, opts.db, opts.dataDir, profile.id);
-              converted += (await convertImportedScores(deps, profile.id, { download: true })).converted;
+              converted += (
+                await convertImportedScores(deps, profile.id, {
+                  download: true,
+                  onDownload: (done, total) => broadcast('osu-progress', { step: 'beatmaps', done, total }),
+                })
+              ).converted;
             }
             const result = await opts.tracker.recalculate(false);
             console.log(
@@ -1246,7 +1252,10 @@ export function startServer(opts: ServerOptions): http.Server {
               let favouritesAdded = 0;
               if (want('favorites', false)) {
                 try {
-                  const sets = await fetchFavouriteBeatmapsets(user.id);
+                  // Read a hundred a second at most, so a big list says how far it has got.
+                  const sets = await fetchFavouriteBeatmapsets(user.id, (read) =>
+                    broadcast('osu-progress', { step: 'favourites', done: read }),
+                  );
                   favouritesFound = sets.length;
                   favouritesAdded = importFavorites(opts.db, favorites(), sets);
                   done.push(`${favouritesFound} favourite beatmap${favouritesFound === 1 ? '' : 's'}`);
@@ -1281,6 +1290,7 @@ export function startServer(opts: ServerOptions): http.Server {
               const wantPinned = want('pinnedScores', false);
               if (wantBest || wantPinned) {
                 for (const mode of [0, 1, 2, 3] as const) {
+                  broadcast('osu-progress', { step: 'scores', mode });
                   try {
                     const best = wantBest ? await fetchBestPerformances(user.id, mode) : [];
                     const pinned = wantPinned ? await fetchPinnedScores(user.id, mode) : [];
@@ -1315,7 +1325,10 @@ export function startServer(opts: ServerOptions): http.Server {
                  * downloaded now, while the import is online anyway.
                  */
                 if (scores.length > 0) {
-                  const conversion = await convertImportedScores(entryDeps(id), id, { download: true });
+                  const conversion = await convertImportedScores(entryDeps(id), id, {
+                    download: true,
+                    onDownload: (done, total) => broadcast('osu-progress', { step: 'beatmaps', done, total }),
+                  });
                   if (conversion.converted > 0) done.push(`${conversion.converted} priced here`);
                 }
               }
@@ -1647,8 +1660,9 @@ export function startServer(opts: ServerOptions): http.Server {
             saveDetails(opts.db, await fetchBeatmapset(setId));
           } catch (e) {
             if (setId === id) detailsError = (e as Error).message;
-            // Offline is offline for every set; asking again for the rest only waits longer.
-            if ((e as Error).message === 'could not reach osu.ppy.sh') break;
+            // Offline is offline for every set; asking again for the rest only waits longer. So
+            // is osu! asking to slow down.
+            if (e instanceof SlowDown || (e as Error).message === 'could not reach osu.ppy.sh') break;
           }
         }
 
