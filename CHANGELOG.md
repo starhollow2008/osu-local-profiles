@@ -7,13 +7,16 @@
   count as yours whatever name was on it. Now it counts only if osu! wrote the file when the play
   was set. Replays from before July 2014 are also read properly now. Plays already imported this
   way stay until you remove them.
+  Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
 
 - **Your other names, in Other settings and Import past plays.** Plays under these names are
   tracked and imported as yours, such as a name on a private server. Plays already turned away
   under one are checked again.
+  Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
 
 - **The play tracking filter can keep one client's plays.** The new **Client** criterion picks
   osu!stable, osu!lazer or McOsu. A stable play imported into osu!lazer counts as osu!stable.
+  Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
 
 - **Launch on startup, a new switch in Options.** The app starts in the tray when you sign in to
   your computer, without opening the page. Off by default.
@@ -27,8 +30,9 @@
 
 - **Import from osu! brings in every favourite beatmap.** The 5,000 limit is gone.
 
-- **The app asks osu! for at most one thing a second**, as osu! asks of anything reading it, and
-  waits if osu! asks it to slow down. A big import takes longer, and says how far it has got.
+- **The app asks osu! for at most one thing a second.** That is what osu! asks of anything reading
+  it, and the app waits if osu! asks it to slow down. A big import takes longer, and says how far it
+  has got.
 
 - **Everything new in this release is translated** into all 15 languages.
 
