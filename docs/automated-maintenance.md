@@ -162,7 +162,8 @@ gh pr create --base main --title "Maintenance: <what changed>, v<version>" --bod
 gh pr checks <number> --watch --interval 60
 ```
 
-Every check must pass: CI on three systems, and `pp helper` when a rework changed the csproj (the
+If it says no checks are reported yet, wait a minute and run it again; it exits 8 while any is
+still pending. Every check must pass: CI on three systems, and `pp helper` when a rework changed the csproj (the
 slim helper's parity, which a release would otherwise quietly fall back from). A failure: leave
 the pull request open, comment on it with what failed, and report a failure.
 
