@@ -29,6 +29,11 @@ with no sudo, holding a GitHub token for this repository only and a Claude Code 
    is also emailed, through the VM's own alerts (`vm-alert`, from the owner's `oracle-vm` setup)
    when it has them.
 
+The agent runs on the newest Opus at high effort (`--model opus --effort high`), and the token
+checks on the newest Sonnet at medium. Both names are aliases that move to each new release, and
+Claude Code's background calls are pointed at Sonnet (`ANTHROPIC_DEFAULT_HAIKU_MODEL=sonnet`), so
+nothing runs on Haiku.
+
 On the VM:
 
 ```

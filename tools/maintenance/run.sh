@@ -34,6 +34,12 @@ set -a
 set +a
 [ "${OSU_MAINT_TEST_BAD_CLAUDE_TOKEN:-0}" = 1 ] && CLAUDE_CODE_OAUTH_TOKEN=invalid-test-token
 export DOTNET_ROOT=$HOME/.dotnet DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
+# The owner's model rule: work on the app is the newest Opus at high effort, anything else the
+# newest Sonnet at medium, and never Haiku. `opus` and `sonnet` are aliases that move to each new
+# release; Claude Code's own background calls use whatever the `haiku` alias names.
+AGENT_MODEL=(--model opus --effort high)
+CHECK_MODEL=(--model sonnet --effort medium)
+export ANTHROPIC_DEFAULT_HAIKU_MODEL=sonnet
 export PATH=$HOME/.local/bin:$HOME/.dotnet:$HOME/.dotnet/tools:$PATH
 
 exec 9>"$STATE_DIR/lock"
@@ -105,7 +111,7 @@ if [ "$(gh api "repos/$REPO" --jq .permissions.push 2>/dev/null)" != true ]; the
   exit 1
 fi
 probe=$BASE/logs/$stamp.probe.jsonl
-(cd "$BASE" && timeout 180 claude -p "Reply with exactly: OK" --model haiku --output-format stream-json --verbose \
+(cd "$BASE" && timeout 180 claude -p "Reply with exactly: OK" "${CHECK_MODEL[@]}" --output-format stream-json --verbose \
   > "$probe" 2>&1) || true
 probe_error=$(agent_error "$probe")
 if is_auth_error "$probe_error"; then
@@ -159,7 +165,7 @@ $check"
 trap - ERR
 status=0
 # Its own process group, so everything it started can be stopped with it.
-setsid timeout 5h claude -p "$prompt" --dangerously-skip-permissions --output-format stream-json --verbose \
+setsid timeout 5h claude -p "$prompt" "${AGENT_MODEL[@]}" --dangerously-skip-permissions --output-format stream-json --verbose \
   > "$transcript" &
 agent=$!
 # The agent can finish and still not exit, waiting on a background command of its own that never

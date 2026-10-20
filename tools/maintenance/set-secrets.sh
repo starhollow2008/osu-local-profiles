@@ -41,4 +41,4 @@ sudo -u "$BOT" -H bash -c "set -a; . $dir/env; set +a
   gh run list -R $REPO --limit 1 >/dev/null && echo '  actions: readable'"
 
 echo "checking the Claude token..."
-sudo -u "$BOT" -H bash -c "set -a; . $dir/env; set +a; cd ~ && ~/.local/bin/claude -p 'Reply with exactly: token OK'" | sed 's/^/  /'
+sudo -u "$BOT" -H bash -c "set -a; . $dir/env; set +a; cd ~ && ANTHROPIC_DEFAULT_HAIKU_MODEL=sonnet ~/.local/bin/claude -p 'Reply with exactly: token OK' --model sonnet --effort medium" | sed 's/^/  /'
