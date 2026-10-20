@@ -58,6 +58,9 @@ JSON: `rank.due` with `rank.latest` (a dump date such as `2026_10_01`), and `pp.
   commit dumps, `.sql` files, replays or beatmaps. Never print the tokens in `GH_TOKEN` and
   `CLAUDE_CODE_OAUTH_TOKEN`.
 - Don't open issues: `run.sh` does, from your result.
+- Wait for a command you ran in the background through its own output or notification, never by
+  looping on `pgrep -f` (the loop's own command line matches, so it never ends). Leave nothing
+  running when you write the result: `run.sh` stops you 10 minutes after it appears.
 - In `dry-run` mode, do everything up to and including the local commits and `npm run check`,
   then skip [Publish](#6-publish) and [Tag](#7-tag) and write the result with status `dry-run`.
 

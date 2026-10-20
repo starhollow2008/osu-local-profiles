@@ -99,8 +99,21 @@ $check"
 
 trap - ERR
 status=0
-timeout 5h claude -p "$prompt" --dangerously-skip-permissions --output-format stream-json --verbose \
-  > "$transcript" || status=$?
+# Its own process group, so everything it started can be stopped with it.
+setsid timeout 5h claude -p "$prompt" --dangerously-skip-permissions --output-format stream-json --verbose \
+  > "$transcript" &
+agent=$!
+# The agent can finish and still not exit, waiting on a background command of its own that never
+# ends. Ten minutes after it writes its result, it and whatever it left running are stopped.
+while kill -0 "$agent" 2>/dev/null; do
+  if [ -s "$result" ] && [ $(($(date +%s) - $(stat -c %Y "$result"))) -gt 600 ]; then
+    echo "the agent wrote its result 10 minutes ago and is still running; stopping it"
+    kill -TERM -- "-$agent" 2>/dev/null || true
+    break
+  fi
+  sleep 15
+done
+wait "$agent" || status=$?
 echo "agent exited with $status; transcript in $transcript"
 
 if [ ! -s "$result" ]; then
