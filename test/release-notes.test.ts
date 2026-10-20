@@ -32,8 +32,11 @@ test('the current version has release notes, short, with the CHANGELOG a link aw
   const changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
   const notes = releaseNotes(changelog, pkg.version);
   // GitHub lists the downloads under the notes: a whole CHANGELOG section there meant scrolling
-  // past it to reach them.
-  assert.ok(notes.length < changelogSection(changelog, pkg.version)!.length);
+  // past it to reach them. Only the list of changes is measured, since the link and download
+  // lines come with every release and outweigh a section of one or two changes.
+  const changes = notes.split('\n').filter((line) => line.startsWith('- '));
+  assert.ok(changes.length <= MAX_HIGHLIGHTS + 1);
+  assert.ok(changes.join('\n').length <= changelogSection(changelog, pkg.version)!.length);
   assert.ok(notes.includes(`CHANGELOG.md#${pkg.version.replace(/\./g, '')})`));
   assert.doesNotMatch(notes, /## Updating/);
 });
