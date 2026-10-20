@@ -11,14 +11,20 @@ job's agent follows. Doing either by hand is still in `docs/maintaining.md`.
 next boot when the VM was off then). That runs `tools/maintenance/run.sh` as `osubot`, a user
 with no sudo, holding a GitHub token for this repository only and a Claude Code token.
 
-1. `run.sh` clones `main` and runs `tools/maintenance/check.mjs`, which compares the newest
+1. `run.sh` checks both tokens every week, so one that stops working is reported within a week
+   rather than the month an update is next due. A refused Claude Code token opens the issue
+   *Maintenance: Claude Code can't sign in* with the steps to renew it, and the first check that
+   signs in again closes it. An expired GitHub token can't open an issue; GitHub emails the owner
+   a week before a token expires.
+2. It clones `main` and runs `tools/maintenance/check.mjs`, which compares the newest
    data.ppy.sh dump and the newest osu! NuGet packages with the checkout. Nothing new means it
    stops there, with no agent started.
-2. Otherwise it starts Claude Code in the clone with what the check found, and the agent follows
+3. Otherwise it starts Claude Code in the clone with what the check found, and the agent follows
    the procedure below: a branch, a pull request, every CI check passed, a rebase merge, a tag.
    The tag's `release.yml` run builds and publishes the release as for any other.
-3. The agent writes a result file. A failure, or no result at all, opens an issue titled
+4. The agent writes a result file. A failure, or no result at all, opens an issue titled
    *Automated maintenance failed* (or comments on the open one), which GitHub emails the owner.
+   An agent that stopped because it couldn't sign in opens the sign-in issue instead.
 
 On the VM:
 
