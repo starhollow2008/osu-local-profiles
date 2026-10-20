@@ -95,6 +95,9 @@ For roadmap work, search [`docs/roadmap.md`](docs/roadmap.md) for the entry; don
 whole. Update it only when the task changes its status. Read only the relevant sections of
 [`docs/architecture.md`](docs/architecture.md).
 
+Rank-curve refreshes and pp reworks are released by a weekly job on the owner's VM
+([`docs/automated-maintenance.md`](docs/automated-maintenance.md)). Its agent follows that page.
+
 ## TS: strip-only, no runtime emit
 
 `node src/main.ts` runs TypeScript through Node's type stripping, so types are erased, never

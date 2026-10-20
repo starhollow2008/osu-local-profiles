@@ -1,0 +1,14 @@
+[Unit]
+Description=osu! local profiles weekly maintenance (docs/automated-maintenance.md)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=osubot
+Group=osubot
+WorkingDirectory=/home/osubot
+ExecStart=/home/osubot/osu-maintenance/run.sh
+# A pp rework with a rank refresh and three rounds of CI fits well inside this.
+TimeoutStartSec=6h
+Nice=5

@@ -57,7 +57,9 @@ wherever Explorer decides.
 ## Keeping pp current
 
 Reimplementations of osu!'s algorithm lag its reworks, which is why pp comes from osu!'s own
-packages. When osu! reworks pp:
+packages. The weekly maintenance job (`docs/automated-maintenance.md`) prices every new osu!
+version against the current one on generated plays and ships it only when pp changed. By hand,
+when osu! reworks pp:
 
 1. Bump the package versions in `tools/PpCalculator/PpCalculator.csproj`. Check which .NET the new
    release targets (`NU1202 ... supports: net10.0` means it moved). If it moved, the helper's
@@ -88,11 +90,12 @@ The script streams each ~1GB archive through `bzip2` and `tar`, keeps only the u
 and deletes it once the curve is written. The result is about 3KB per mode. All four modes
 currently use the 2026_09_01 dump.
 
-Never run it automatically: it's a multi-gigabyte download and the owner's call. Run it when osu!
-reworks pp (the curve maps pp to rank, so a rework breaks it at once), and every few months
-otherwise, since the same pp slowly buys a worse rank. data.ppy.sh publishes monthly, re-running
-against a dump you already used just rewrites the same curve, and it takes roughly 15-30 minutes
-per mode, mostly download.
+It's a multi-gigabyte download, so nothing in the app runs it. The owner's weekly maintenance job
+(`docs/automated-maintenance.md`) runs it when data.ppy.sh publishes a newer dump, and releases
+the result. By hand, run it when osu! reworks pp (the curve maps pp to rank, so a rework breaks it
+at once) and when a new dump is out, since the same pp slowly buys a worse rank. data.ppy.sh
+publishes monthly, re-running against a dump you already used just rewrites the same curve, and it
+takes roughly 15-30 minutes per mode, mostly download.
 
 ## Recalculating
 

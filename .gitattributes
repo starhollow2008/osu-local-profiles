@@ -1,3 +1,6 @@
 # osu-web's artwork, vendored byte for byte by scripts/build-osu-web-art.mjs. Never let a
 # line-ending conversion make these differ from the commit web/osu-web/README.md names.
 web/osu-web/** -text
+
+# Run on the maintenance VM (docs/automated-maintenance.md), where bash and systemd reject CRLF.
+tools/maintenance/** text eol=lf

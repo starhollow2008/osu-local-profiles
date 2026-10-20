@@ -18,8 +18,9 @@
  * as it takes to reduce it to a few KB of curve, after which it is deleted. Needs curl,
  * bzip2 and tar on PATH (all three ship with Git for Windows).
  *
- * This is deliberately manual and nothing in the app ever triggers it. Refreshing means a
- * multi-gigabyte download, which should happen when the owner decides, not on a timer.
+ * Nothing in the app ever triggers it: refreshing means a multi-gigabyte download. The
+ * owner's weekly maintenance job runs it when data.ppy.sh publishes a newer dump
+ * (docs/automated-maintenance.md).
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
