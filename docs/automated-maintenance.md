@@ -17,14 +17,17 @@ with no sudo, holding a GitHub token for this repository only and a Claude Code 
    signs in again closes it. An expired GitHub token can't open an issue; GitHub emails the owner
    a week before a token expires.
 2. It clones `main` and runs `tools/maintenance/check.mjs`, which compares the newest
-   data.ppy.sh dump and the newest osu! NuGet packages with the checkout. Nothing new means it
-   stops there, with no agent started.
+   data.ppy.sh dump and the newest osu! NuGet packages with the checkout, and looks for a release
+   an earlier run merged but never tagged. Nothing to do means it stops there, with no agent
+   started.
 3. Otherwise it starts Claude Code in the clone with what the check found, and the agent follows
    the procedure below: a branch, a pull request, every CI check passed, a rebase merge, a tag.
    The tag's `release.yml` run builds and publishes the release as for any other.
 4. The agent writes a result file. A failure, or no result at all, opens an issue titled
    *Automated maintenance failed* (or comments on the open one), which GitHub emails the owner.
-   An agent that stopped because it couldn't sign in opens the sign-in issue instead.
+   An agent that stopped because it couldn't sign in opens the sign-in issue instead. A release
+   is also emailed, through the VM's own alerts (`vm-alert`, from the owner's `oracle-vm` setup)
+   when it has them.
 
 On the VM:
 
@@ -51,8 +54,9 @@ isn't covered here, or doesn't look the way this page says it should, stop and r
 with what you found. A late release is fine. A wrong one goes to every user's updater.
 
 The prompt gives you the mode (`publish` or `dry-run`), the result file's path and the check's
-JSON: `rank.due` with `rank.latest` (a dump date such as `2026_10_01`), and `pp.due` with
-`pp.current` and `pp.latest` (osu! versions such as `2026.1020.0`).
+JSON: `release.due` with `release.version`, `rank.due` with `rank.latest` (a dump date such as
+`2026_10_01`), and `pp.due` with `pp.current` and `pp.latest` (osu! versions such as
+`2026.1020.0`).
 
 ### Rules
 
@@ -69,6 +73,13 @@ JSON: `rank.due` with `rank.latest` (a dump date such as `2026_10_01`), and `pp.
   running when you write the result: `run.sh` stops you 10 minutes after it appears.
 - In `dry-run` mode, do everything up to and including the local commits and `npm run check`,
   then skip [Publish](#6-publish) and [Tag](#7-tag) and write the result with status `dry-run`.
+
+### 0. An unfinished release, when `release.due`
+
+An earlier run merged `v<release.version>` and stopped before tagging it. Do [Tag](#7-tag) for
+that version now (in `dry-run` mode, only say you would). If nothing else is due, write the
+result as `released` with that version. Otherwise carry on from step 1 for a new release, and
+name both versions in the summary.
 
 ### 1. Branch and build
 

@@ -199,6 +199,10 @@ fi
 case "$outcome" in
   released | nothing | dry-run)
     echo "done: $outcome. $summary"
+    # An email too, through the VM's own alerts (github.com/jonathant09/oracle-vm) when it has them.
+    if [ "$outcome" = released ] && command -v vm-alert >/dev/null; then
+      vm-alert --subject "osu! local profiles v$(jq -r '.version // "?"' "$result") released" --body "$summary" || true
+    fi
     [ "$DRY_RUN" = 1 ] || { cd "$BASE" && rm -rf "$clone"; }
     ;;
   *)

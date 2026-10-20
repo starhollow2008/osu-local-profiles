@@ -13,9 +13,15 @@
  *   priced and found to change no pp is listed in the state file's `ppNotRework` and isn't due
  *   again; the next one that does change pp is.
  *
+ * - **release**: `package.json`'s version on main with no `v<version>` tag, when its release
+ *   commit came through one of this job's `bot/maintenance-*` pull requests. An earlier run
+ *   merged it and stopped before tagging (a reboot, say), and the tag is all that's left. A
+ *   release commit of the owner's own is theirs to tag, and never due here.
+ *
  * Prints one JSON object and exits 0 whether or not anything is due, 1 when a source can't be
  * read or this checkout isn't what the check expects.
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -93,6 +99,23 @@ async function latestPpVersion() {
   return common.sort(compareVersions).at(-1) ?? null;
 }
 
+const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+
+/** The version on main, and whether this job merged it without tagging it. */
+async function unfinishedRelease() {
+  const version = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+  const tagged = git('tag', '--list', `v${version}`) !== '';
+  if (tagged) return { version, due: false };
+  const commit = git('log', '-1', '--format=%H', '--fixed-strings', `--grep=chore: release v${version}`);
+  if (!commit) return { version, due: false };
+  const headers = { accept: 'application/vnd.github+json', 'user-agent': 'osu-local-profiles maintenance check' };
+  if (process.env.GH_TOKEN) headers.authorization = `Bearer ${process.env.GH_TOKEN}`;
+  const r = await fetch(`https://api.github.com/repos/jonathant09/osu-local-profiles/commits/${commit}/pulls`, { headers });
+  if (!r.ok) throw new Error(`GitHub returned ${r.status} for the pull requests of ${commit}`);
+  const byJob = (await r.json()).some((pr) => pr.merged_at && pr.head.ref.startsWith('bot/maintenance-'));
+  return { version, commit, due: byJob };
+}
+
 function readState(file) {
   if (!file || !fs.existsSync(file)) return { ppNotRework: [] };
   const state = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -115,7 +138,8 @@ async function main() {
 
   const rank = { current: dumps, latest: latestDump, due: latestDump !== null && latestDump > oldestDump };
   const pp = { current: ppCurrent, latest: ppLatest, due: ppNewer && !ppSkipped, knownNotRework: ppSkipped };
-  console.log(JSON.stringify({ rank, pp, due: rank.due || pp.due }, null, 2));
+  const release = await unfinishedRelease();
+  console.log(JSON.stringify({ release, rank, pp, due: release.due || rank.due || pp.due }, null, 2));
 }
 
 main().catch((error) => {
