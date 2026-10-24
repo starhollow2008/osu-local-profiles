@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} partida sin terminar",
   "backfill.othersExplained": "- repeticiones que viste, no partidas tuyas. Nunca se importan.",
   "backfill.othersFound": "{replays} en estas carpetas las jugó otra persona",
-  "backfill.pickATime": "Elige una fecha y luego comprueba qué se importaría.",
+  "backfill.pickATime": "Elige una fecha e importa, o comprueba primero qué se importaría.",
   "backfill.scanning": "Analizando tus carpetas de osu!...",
   "backfill.span": "Las partidas terminadas van de {from} a {to}.",
   "backfill.starsUnchecked": "La dificultad del filtro se comprueba al importar cada partida, así que puede que unas pocas más queden fuera.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Te damos la bienvenida a osu! local profiles",
   "whatsNew.noNotes": "El registro de cambios recoge todo lo que cambió esta versión.",
   "whatsNew.title": "Actualizado a {version}",
-  "whatsNewClose": "Entendido"
+  "whatsNewClose": "Entendido",
+  "importing.title": "Importando partidas anteriores",
+  "backfillModal.keepsRunning": "Puedes cerrar esto, la importación sigue.",
+  "importing.scanning": "Buscando partidas...",
+  "importing.progress": "{done} de {total} partidas",
+  "backfill.importing": "Importando...",
+  "backfill.close": "Cerrar"
 }

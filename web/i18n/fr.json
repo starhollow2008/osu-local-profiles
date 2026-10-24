@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} partie inachevée",
   "backfill.othersExplained": "– des replays que tu as regardés, pas tes parties. Ils ne sont jamais importés.",
   "backfill.othersFound": "{replays} dans ces dossiers ont été réalisés par quelqu'un d'autre",
-  "backfill.pickATime": "Choisis une date, puis vérifie ce qui serait importé.",
+  "backfill.pickATime": "Choisis une date et importe, ou vérifie d’abord ce qui serait importé.",
   "backfill.scanning": "Analyse de tes dossiers osu!…",
   "backfill.span": "Les parties terminées vont de {from} à {to}.",
   "backfill.starsUnchecked": "La difficulté du filtre est vérifiée au moment de l'import de chaque partie, quelques-unes de plus peuvent donc être écartées.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Bienvenue dans osu! local profiles",
   "whatsNew.noNotes": "Le journal des modifications liste tout ce que cette version a changé.",
   "whatsNew.title": "Mis à jour vers {version}",
-  "whatsNewClose": "Compris"
+  "whatsNewClose": "Compris",
+  "importing.title": "Importation des parties passées",
+  "backfillModal.keepsRunning": "Tu peux fermer ceci, l’importation continue.",
+  "importing.scanning": "Recherche de parties…",
+  "importing.progress": "{done} sur {total} parties",
+  "backfill.importing": "Importation…",
+  "backfill.close": "Fermer"
 }

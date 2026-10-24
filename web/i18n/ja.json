@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n}件の未完走プレイ",
   "backfill.othersExplained": "－ あなたが観たリプレイであり、あなたのプレイではありません。インポートされることはありません。",
   "backfill.othersFound": "これらのフォルダー内の{replays}は他の人がプレイしたものです",
-  "backfill.pickATime": "時刻を選んでから、何がインポートされるか確認してください。",
+  "backfill.pickATime": "時刻を選んでインポートするか、先に何がインポートされるか確認してください。",
   "backfill.scanning": "osu! のフォルダーを調べています…",
   "backfill.span": "完走したプレイは {from} から {to} までです。",
   "backfill.starsUnchecked": "フィルターの難易度（スター）は各プレイをインポートするときに確認されるため、さらに数件除外される場合があります。",
@@ -856,5 +856,11 @@
   "welcomeTitle": "osu! local profiles へようこそ",
   "whatsNew.noNotes": "このバージョンの変更点はすべて変更履歴に載っています。",
   "whatsNew.title": "{version} に更新しました",
-  "whatsNewClose": "OK"
+  "whatsNewClose": "OK",
+  "importing.title": "過去のプレイをインポート中",
+  "backfillModal.keepsRunning": "閉じてもインポートは続きます。",
+  "importing.scanning": "プレイを探しています…",
+  "importing.progress": "{total} 件中 {done} 件",
+  "backfill.importing": "インポート中…",
+  "backfill.close": "閉じる"
 }

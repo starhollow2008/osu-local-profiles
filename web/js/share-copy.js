@@ -178,6 +178,7 @@ export async function buildInteractiveHtml(progress = () => {}) {
       hiddenScores: 0,
       staleScores: 0,
       indexing: { ...(state.indexing ?? {}), active: false },
+      importing: { ...(state.importing ?? {}), active: false },
       sharing: { canScreenshot: false },
       app: { version: state.app?.version ?? null, update: null, config: {} },
     },

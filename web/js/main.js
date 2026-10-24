@@ -786,6 +786,7 @@ async function loadState() {
 
   setTracking(s.tracking);
   renderIndexing(s.indexing);
+  renderImporting(s.importing);
   renderIdentity();
   // Never clobber what is being typed: a 15-second poll must not swallow a draft.
   if (!editingAbout) renderAbout();
@@ -888,6 +889,57 @@ function renderIndexing(state) {
     void loadProfile();
   }
 }
+
+/* ------------------------------------------------------- import progress */
+
+/*
+ * An import of past plays while it runs: in its dialog, and in the cover's corner once the
+ * dialog is closed. Closing the dialog only hides it; the import keeps going on the server,
+ * which sends how far it has got as `importing`.
+ */
+let importState = null;
+
+const importRunning = () => importState?.active === true;
+
+function renderImporting(state) {
+  if (!state) return;
+  const wasRunning = importRunning();
+  importState = state;
+  const running = state.active;
+  const scanning = state.phase === 'scanning';
+  // Each phase has its own bar: the files looked through, then the plays added.
+  const [n, of] = scanning ? [state.scanned, state.files ?? 0] : [state.done, state.total];
+  // Until the files are counted there is no percentage yet, and the bar sweeps.
+  const sweeping = scanning && of === 0;
+  const done = of > 0 ? Math.min(1, n / of) : 0;
+  const percent = sweeping ? '' : `${Math.floor(done * 100)}%`;
+  const text = scanning
+    ? t('importing.scanning')
+    : t('importing.progress', { done: fmt(state.done), total: fmt(state.total) });
+
+  $('backfillProgress').hidden = !running;
+  // In place of the summary and the kinds to tick, which say nothing while it runs.
+  $('backfillModal').classList.toggle('backfill-running', running);
+  $('backfillProgress').classList.toggle('backfill-progress--scanning', running && sweeping);
+  $('backfillProgressText').textContent = text;
+  $('backfillProgressPercent').textContent = percent;
+  $('backfillProgressFill').style.setProperty('--fill', `${done * 100}%`);
+
+  $('importNotice').hidden = !running || !$('backfillModal').hidden;
+  $('importNotice').classList.toggle('index-notice--counting', running && sweeping);
+  $('importTitle').textContent = scanning ? t('importing.scanning') : t('importing.title');
+  $('importDetail').textContent = percent;
+  $('importFill').style.setProperty('--fill', `${done * 100}%`);
+  $('importNotice').title = text;
+
+  if (running !== wasRunning) {
+    renderBackfillButtons();
+    // A tall dialog scrolls: keep the bar and the buttons under it in view.
+    if (running && !$('backfillModal').hidden) $('backfillConfirm').scrollIntoView({ block: 'nearest' });
+  }
+}
+
+$('importNotice').onclick = () => openBackfill();
 
 /* ---------------------------------------------------------- options menu */
 
@@ -3678,13 +3730,47 @@ function renderRange() {
   else if (earliest || !now) markPreset(null);
 }
 
-/** Any change to the cutoff invalidates the preview, so Import has to be earned again. */
+/** Any change to the cutoff invalidates the preview, so its counts and choices go. */
 function resetBackfillPreview(message) {
   $('backfillSummary').innerHTML = message;
   $('backfillSources').hidden = true;
   $('backfillSources').innerHTML = '';
-  $('backfillConfirm').disabled = true;
-  $('backfillConfirm').textContent = 'Import';
+  renderBackfillButtons();
+}
+
+/** Every kind of past play: what Import brings in when no preview has offered a choice. */
+const ALL_SOURCES = ['replays', 'unfinished', 'attempts'];
+
+/** The kinds a preview offered that are still ticked, or null with no preview on screen. */
+function tickedSources() {
+  if ($('backfillSources').hidden) return null;
+  return [...$('backfillSources').querySelectorAll('input[data-source]:checked')];
+}
+
+/** A preview or a batch of replay files in progress, which hold the buttons meanwhile. */
+let backfillChecking = false;
+let backfillFilesImporting = false;
+
+/**
+ * The dialog's buttons. Import needs no preview: it is held only while something is running,
+ * or when nothing could be imported (no install to look in, every kind unticked).
+ */
+function renderBackfillButtons() {
+  const running = importRunning();
+  const busy = running || backfillChecking || backfillFilesImporting;
+  const nowhere = backfillInstallRoots()?.length === 0;
+  const ticked = tickedSources();
+  const total = ticked === null ? null : ticked.reduce((sum, box) => sum + Number(box.dataset.count), 0);
+  $('backfillCheck').disabled = busy || nowhere;
+  $('backfillConfirm').disabled = busy || nowhere || total === 0;
+  $('backfillChooseFiles').disabled = backfillFilesImporting;
+  $('backfillConfirm').textContent = running
+    ? t('backfill.importing')
+    : total > 0
+      ? t('backfill.importN', { n: fmt(total) })
+      : t('backfill.import');
+  // While it runs, closing the dialog cancels nothing, so the button does not say Cancel.
+  $('backfillCancel').textContent = running ? t('backfill.close') : t('backfillCancel');
 }
 
 /**
@@ -3705,21 +3791,10 @@ function renderBackfillSources(counts) {
     )
     .join('');
   $('backfillSources').hidden = kinds.length === 0;
-  updateBackfillConfirm();
+  renderBackfillButtons();
 }
 
-/** Import names how much it will bring in, and is only on while that is something. */
-function updateBackfillConfirm() {
-  const ticked = [...$('backfillSources').querySelectorAll('input[data-source]:checked')];
-  const total = ticked.reduce((sum, box) => sum + Number(box.dataset.count), 0);
-  $('backfillConfirm').disabled = total === 0;
-  $('backfillConfirm').textContent =
-    total > 0
-      ? t('backfill.importN', { n: fmt(total) })
-      : t('backfill.import');
-}
-
-$('backfillSources').onchange = updateBackfillConfirm;
+$('backfillSources').onchange = renderBackfillButtons;
 
 /** Whether this import should be judged by the play tracking filter. */
 const backfillApplyFilter = () => $('backfillFiltered').checked;
@@ -3746,7 +3821,6 @@ function backfillInstallRoots() {
 
 $('backfillInstalls').onchange = () => {
   const none = backfillInstallRoots()?.length === 0;
-  $('backfillCheck').disabled = none;
   // Other folders hold other plays, so the counts are no longer the ones this would import.
   resetBackfillPreview(none ? t('backfill.noInstalls') : t('backfill.installsChanged'));
 };
@@ -3812,6 +3886,14 @@ function applyPreset(hours) {
 
 function openBackfill() {
   setMenuOpen(false);
+  // Opened again while an import runs: as it was left, with the progress showing.
+  if (importRunning()) {
+    $('backfillModal').hidden = false;
+    renderImporting(importState);
+    $('backfillConfirm').scrollIntoView({ block: 'nearest' });
+    $('backfillCancel').focus();
+    return;
+  }
   applyPreset(3);
   $('backfillUntil').value = '';
   // Ticked every time it opens: an import agreeing with live tracking is the default, and a
@@ -3820,14 +3902,15 @@ function openBackfill() {
   renderBackfillFilterHint();
   renderBackfillInstalls();
   $('backfillOwnNames').value = (settings.ownNames ?? []).join(', ');
-  $('backfillCheck').disabled = false;
   resetBackfillPreview(t('backfill.pickATime'));
   $('backfillModal').hidden = false;
   $('backfillCancel').focus();
 }
 
+/** Closing only hides it. An import that is running carries on, shown in the cover's corner. */
 function closeBackfill() {
   $('backfillModal').hidden = true;
+  if (importState) renderImporting(importState);
 }
 
 /** Light the preset the range came from: a number of hours, 'all', or null for none. */
@@ -3883,7 +3966,8 @@ $('backfillCheck').onclick = async () => {
   const since = sinceValue();
   const until = untilValue();
 
-  $('backfillCheck').disabled = true;
+  backfillChecking = true;
+  renderBackfillButtons();
   $('backfillSummary').textContent = t('backfill.scanning');
   try {
     const d = await postJson(
@@ -4007,47 +4091,42 @@ $('backfillCheck').onclick = async () => {
       error: escapeHtml(err.message),
     }));
   } finally {
-    $('backfillCheck').disabled = false;
+    backfillChecking = false;
+    renderBackfillButtons();
   }
 };
 
+/*
+ * Import, with or without a preview first. Without one, every kind of past play comes in, as a
+ * preview would have offered them all ticked. What it brought in is said by the `backfill`
+ * event, so a page reloaded meanwhile hears it too.
+ */
 $('backfillConfirm').onclick = async () => {
+  const problem = rangeProblem();
+  if (problem) {
+    resetBackfillPreview(problem);
+    return;
+  }
   const since = sinceValue();
   const until = untilValue();
-  $('backfillConfirm').disabled = true;
-  $('backfillCheck').disabled = true;
-  $('backfillConfirm').textContent = 'Importing...';
+  const sources = tickedSources()?.map((box) => box.dataset.source) ?? ALL_SOURCES;
+  // Shown as running at once; the server's own progress follows.
+  renderImporting({ active: true, phase: 'scanning', scanned: 0, files: 0, done: 0, total: 0, origin: 'import' });
   try {
-    const sources = [...$('backfillSources').querySelectorAll('input[data-source]:checked')].map(
-      (box) => box.dataset.source,
-    );
-    const d = await postJson(
+    await postJson(
       '/api/backfill',
       { since, until, confirm: true, sources, applyFilter: backfillApplyFilter(), installs: backfillInstallRoots() },
       'import failed',
     );
-    const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
-    toast(
-      plural(
-        total,
-        () => t('backfill.importedOne', { n: fmt(total) }),
-        () => tOwn('backfill.importedFew', { n: fmt(total) }),
-        () => t('backfill.importedMany', { n: fmt(total) }),
-      ) +
-        (d.filtered > 0
-          ? t('backfill.importedFiltered', {
-              n: fmt(d.filtered),
-            })
-          : ''),
-    );
     closeBackfill();
-    await Promise.all([loadProfile(), loadState()]);
   } catch (err) {
     resetBackfillPreview(t('backfill.importFailed', {
       error: escapeHtml(err.message),
     }));
-  } finally {
-    $('backfillCheck').disabled = false;
+    // Closed meanwhile, so the dialog's summary would go unseen.
+    if ($('backfillModal').hidden) toast(t('backfill.importFailed', { error: err.message }));
+    // Refused, or failed part-way: whether anything is still running is the server's to say.
+    await loadState();
   }
 };
 
@@ -4069,8 +4148,8 @@ async function importReplayFiles(files) {
     return;
   }
 
-  const buttons = ['backfillChooseFiles', 'backfillCheck', 'backfillConfirm'].map($);
-  for (const b of buttons) b.disabled = true;
+  backfillFilesImporting = true;
+  renderBackfillButtons();
   try {
     for (const [i, file] of replays.entries()) {
       $('backfillSummary').textContent = t('files.importing', { n: fmt(i + 1), total: fmt(replays.length) });
@@ -4087,7 +4166,8 @@ async function importReplayFiles(files) {
     resetBackfillPreview(t('backfill.importFailed', { error: escapeHtml(err.message) }));
     return;
   } finally {
-    for (const b of buttons) b.disabled = false;
+    backfillFilesImporting = false;
+    renderBackfillButtons();
   }
 
   /*
@@ -4725,12 +4805,32 @@ on('reset', () => {
   loadProfile();
   loadState();
 });
-// An import can add dozens of scores at once, so it refreshes the page rather than
-// announcing each one the way a live play does.
-on('backfill', () => {
+/*
+ * An import can add dozens of scores at once, so it refreshes the page rather than announcing
+ * each one the way a live play does, and says once what it brought in. Said here rather than
+ * by the Import button, so a page reloaded or a dialog closed while it ran still hears it.
+ */
+on('backfill', (e) => {
+  const d = JSON.parse(e.data);
+  const total = d.imported + (d.unfinished ?? 0) + (d.attempts ?? 0);
+  toast(
+    plural(
+      total,
+      () => t('backfill.importedOne', { n: fmt(total) }),
+      () => tOwn('backfill.importedFew', { n: fmt(total) }),
+      () => t('backfill.importedMany', { n: fmt(total) }),
+    ) +
+      (d.filtered > 0
+        ? t('backfill.importedFiltered', {
+            n: fmt(d.filtered),
+          })
+        : ''),
+  );
   loadProfile();
   loadState();
 });
+// How far an import of past plays has got, from this page or any other.
+on('importing', (e) => renderImporting(JSON.parse(e.data)));
 /*
  * The same, for the import a launch runs by itself when the profile asks it to. Announced,
  * unlike the one above: nobody pressed a button for this one, so scores appearing without a

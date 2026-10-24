@@ -241,9 +241,20 @@ await evaluate("document.getElementById('optBackfill').click()");
 check('import dialog opens', await shown('backfillModal'), 'grid');
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
 check(
-  'Import is disabled until a preview has run',
+  'Import works without a preview',
   await evaluate("document.getElementById('backfillConfirm').disabled"),
-  true,
+  false,
+);
+// An import keeps going when its dialog closes; its progress shows only while one runs.
+check(
+  'no import progress shows with no import running',
+  await evaluate(`(async () => {
+    const s = (await (await fetch('/api/state')).json()).importing;
+    if (s.active) return 'skipped';
+    return [getComputedStyle(document.getElementById('backfillProgress')).display,
+      getComputedStyle(document.getElementById('importNotice')).display].join();
+  })()`),
+  'none,none',
 );
 // The kinds to import are offered by a preview, each with its count; before one, nothing is.
 check('the kinds of play to import are hidden until a preview has run', await shown('backfillSources'), 'none');
@@ -491,6 +502,7 @@ if (installCount >= 2) {
   })()`);
 }
 check('Check is refused with nowhere to look', withChoice(await evaluate("document.getElementById('backfillCheck').disabled")), true);
+check('and so is Import', withChoice(await evaluate("document.getElementById('backfillConfirm').disabled")), true);
 if (installCount >= 2) {
   await evaluate(`(() => {
     document.querySelector('#backfillInstalls input').checked = true;
@@ -498,6 +510,7 @@ if (installCount >= 2) {
   })()`);
 }
 check('and allowed again once one is ticked', await evaluate("document.getElementById('backfillCheck').disabled"), false);
+check('Import too', await evaluate("document.getElementById('backfillConfirm').disabled"), false);
 
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",

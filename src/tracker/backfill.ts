@@ -90,6 +90,11 @@ export interface ScanOptions {
   /** Who the profile's plays belong to. Omitted, every replay found counts as the owner's. */
   owner?: PlayerIdentity;
   onOtherPlayer?: OtherPlayerFound;
+  /**
+   * Told how many files have been looked at so far, of how many there are, for an import's
+   * progress. Given one, the scan counts the files first, which costs a directory listing.
+   */
+  onScanned?: (scanned: number, files: number) => void;
 }
 
 export function readHead(file: string, n: number): Buffer | null {
@@ -110,6 +115,19 @@ export function readHead(file: string, n: number): Buffer | null {
       }
     }
   }
+}
+
+/** How many files `walk` would visit, from directory listings alone. */
+export function countFiles(dir: string): number {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return 0;
+  }
+  let n = 0;
+  for (const e of entries) n += e.isDirectory() ? countFiles(path.join(dir, e.name)) : 1;
+  return n;
 }
 
 export function* walk(dir: string): Generator<{ path: string; mtimeMs: number }> {
@@ -148,7 +166,7 @@ export async function scanForReplays(
   profileId: number,
   dirs: string[],
   since: number,
-  { until = null, filtering, owner = UNKNOWN_IDENTITY, onOtherPlayer }: ScanOptions = {},
+  { until = null, filtering, owner = UNKNOWN_IDENTITY, onOtherPlayer, onScanned }: ScanOptions = {},
 ): Promise<BackfillScan> {
   const candidates: BackfillCandidate[] = [];
   const others = new Map<string, number>();
@@ -158,11 +176,15 @@ export async function scanForReplays(
 
   const seenKeys = new Set<string>();
   const isStored = db.prepare('SELECT 1 AS hit FROM scores WHERE profile_id = ? AND dedupe_key = ?');
+  // A file that appears or vanishes meanwhile can leave this off by one; the page caps it.
+  const files = onScanned ? dirs.reduce((n, dir) => n + countFiles(dir), 0) : 0;
+  onScanned?.(0, files);
 
   for (const dir of dirs) {
     if (!fs.existsSync(dir)) continue;
     for (const entry of walk(dir)) {
       scanned++;
+      onScanned?.(scanned, files);
       if (entry.mtimeMs < since) continue;
 
       const head = readHead(entry.path, 8);

@@ -92,6 +92,7 @@ does not have to make it again.
 | 5.78 | One request a second to osu!, and no favourites cap       | done   |
 | 5.79 | Ranks achieved on beatmaps, in Recent                     | done   |
 | 5.80 | Recent, named and placed as on osu!                       | done   |
+| 5.81 | An import's progress, and Import without Check           | done   |
 
 ## Constraints on every item
 
@@ -1575,3 +1576,24 @@ as the contributor who renamed it suggested it would be.
   whole, once, as the page showed it, so neither the new default nor where a missing section would
   slot in can move anything. Checked against the page's own `reconcileSectionOrder` for each kind of
   saved order.
+
+## 5.81 - An import's progress, and Import without Check
+
+**Status:** done (unreleased)
+
+From issue #12: an import gave no sign of how far it had got, and the dialog could be closed with no
+way to tell whether it was still running.
+
+- **Progress from the server** (`Tracker.importState`, the `importing` event, `/api/state`'s
+  `importing`): `scanning` while osu!'s folders are walked, counting files, then `importing`,
+  `done` of `total` plays. Active from the moment it is asked for until the last queued import
+  finishes, the launch's catch-up included.
+- **Shown in the dialog**, under the summary, and **in the cover's corner** beside the beatmap
+  index's notice once the dialog is closed. Clicking it opens the dialog again, as it was left.
+- **Closing the dialog cancels nothing**: the import runs on the server. While it runs, Cancel
+  reads Close, and what it brought in is said by the `backfill` event, so a reloaded page hears it.
+  A second import is refused while one runs (409).
+- **Check is optional.** Import is never held for want of a preview, which read as invalid
+  settings. Without one it brings in every kind of past play, as a preview offers them all ticked.
+  It is held only while something runs, or when nothing could be imported (no install ticked,
+  every kind unticked).

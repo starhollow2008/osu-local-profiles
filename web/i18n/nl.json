@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} onvoltooide poging",
   "backfill.othersExplained": "– replays die je hebt bekeken, geen eigen pogingen. Ze worden nooit geïmporteerd.",
   "backfill.othersFound": "{replays} in deze mappen zijn door iemand anders gespeeld",
-  "backfill.pickATime": "Kies een tijdstip en controleer dan wat er geïmporteerd zou worden.",
+  "backfill.pickATime": "Kies een tijdstip en importeer, of controleer eerst wat er geïmporteerd zou worden.",
   "backfill.scanning": "Je osu!-mappen worden doorzocht…",
   "backfill.span": "Voltooide pogingen lopen van {from} tot {to}.",
   "backfill.starsUnchecked": "De sterrenmoeilijkheid van het filter wordt gecontroleerd terwijl elke poging wordt geïmporteerd, dus er kunnen er nog een paar afvallen.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Welkom bij osu! local profiles",
   "whatsNew.noNotes": "Het wijzigingslogboek noemt alles wat deze versie veranderde.",
   "whatsNew.title": "Bijgewerkt naar {version}",
-  "whatsNewClose": "Begrepen"
+  "whatsNewClose": "Begrepen",
+  "importing.title": "Eerdere plays worden geïmporteerd",
+  "backfillModal.keepsRunning": "Je kunt dit sluiten, het importeren gaat door.",
+  "importing.scanning": "Plays zoeken…",
+  "importing.progress": "{done} van {total} plays",
+  "backfill.importing": "Importeren…",
+  "backfill.close": "Sluiten"
 }

@@ -64,7 +64,7 @@
   "backfill.oneUnfinished": "{n} unfinished play",
   "backfill.othersExplained": "-- replays you watched, not plays. They are never imported.",
   "backfill.othersFound": "{replays} in these folders were set by someone else",
-  "backfill.pickATime": "Pick a time, then check what would be imported.",
+  "backfill.pickATime": "Pick a time and import, or check first to see what would be imported.",
   "backfill.scanning": "Scanning your osu! folders...",
   "backfill.span": "Finished plays run from {from} to {to}.",
   "backfill.starsUnchecked": "The filter’s star rating is checked as each play is imported, so a few more may be left out.",
@@ -872,5 +872,11 @@
   "welcomeTitle": "Welcome to osu! local profiles",
   "whatsNew.noNotes": "The changelog lists everything this version changed.",
   "whatsNew.title": "Updated to {version}",
-  "whatsNewClose": "Got it"
+  "whatsNewClose": "Got it",
+  "importing.title": "Importing past plays",
+  "backfillModal.keepsRunning": "You can close this, the import keeps going.",
+  "importing.scanning": "Looking for plays...",
+  "importing.progress": "{done} of {total} plays",
+  "backfill.importing": "Importing...",
+  "backfill.close": "Close"
 }

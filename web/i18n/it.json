@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} partita non completata",
   "backfill.othersExplained": "– replay che hai guardato, non tue partite. Non vengono mai importati.",
   "backfill.othersFound": "{replays} in queste cartelle sono stati giocati da qualcun altro",
-  "backfill.pickATime": "Scegli un momento, poi controlla cosa verrebbe importato.",
+  "backfill.pickATime": "Scegli un momento e importa, oppure controlla prima cosa verrebbe importato.",
   "backfill.scanning": "Scansione delle tue cartelle osu!…",
   "backfill.span": "Le partite completate vanno da {from} a {to}.",
   "backfill.starsUnchecked": "La difficoltà in stelle del filtro viene controllata mentre ogni partita viene importata, quindi qualcuna in più potrebbe essere esclusa.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Benvenuto in osu! local profiles",
   "whatsNew.noNotes": "Il registro delle modifiche elenca tutto ciò che questa versione ha cambiato.",
   "whatsNew.title": "Aggiornato a {version}",
-  "whatsNewClose": "Ho capito"
+  "whatsNewClose": "Ho capito",
+  "importing.title": "Importazione delle partite passate",
+  "backfillModal.keepsRunning": "Puoi chiudere questa finestra, l’importazione continua.",
+  "importing.scanning": "Ricerca delle partite…",
+  "importing.progress": "{done} di {total} partite",
+  "backfill.importing": "Importazione…",
+  "backfill.close": "Chiudi"
 }

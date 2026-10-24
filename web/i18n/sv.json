@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} oavslutad omgång",
   "backfill.othersExplained": "– replays du har tittat på, inte dina egna omgångar. De importeras aldrig.",
   "backfill.othersFound": "{replays} i de här mapparna spelades av någon annan",
-  "backfill.pickATime": "Välj en tidpunkt och kontrollera sedan vad som skulle importeras.",
+  "backfill.pickATime": "Välj en tidpunkt och importera, eller kontrollera först vad som skulle importeras.",
   "backfill.scanning": "Söker igenom dina osu!-mappar…",
   "backfill.span": "Slutförda omgångar sträcker sig från {from} till {to}.",
   "backfill.starsUnchecked": "Filtrets stjärnsvårighet kontrolleras när varje omgång importeras, så några fler kan komma att falla bort.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Välkommen till osu! local profiles",
   "whatsNew.noNotes": "Ändringsloggen listar allt som den här versionen ändrade.",
   "whatsNew.title": "Uppdaterad till {version}",
-  "whatsNewClose": "Uppfattat"
+  "whatsNewClose": "Uppfattat",
+  "importing.title": "Importerar tidigare spel",
+  "backfillModal.keepsRunning": "Du kan stänga det här, importen fortsätter.",
+  "importing.scanning": "Letar efter spel…",
+  "importing.progress": "{done} av {total} spel",
+  "backfill.importing": "Importerar…",
+  "backfill.close": "Stäng"
 }

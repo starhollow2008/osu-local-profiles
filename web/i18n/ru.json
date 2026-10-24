@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} незавершённая игра",
   "backfill.othersExplained": "- это реплеи, которые вы смотрели, а не ваши игры. Они никогда не импортируются.",
   "backfill.othersFound": "{replays} в этих папках сыграны кем-то другим",
-  "backfill.pickATime": "Выберите время, затем проверьте, что будет импортировано.",
+  "backfill.pickATime": "Выберите время и импортируйте или сначала проверьте, что будет импортировано.",
   "backfill.scanning": "Сканирование ваших папок osu!…",
   "backfill.span": "Завершённые игры - с {from} по {to}.",
   "backfill.starsUnchecked": "Сложность в звёздах проверяется фильтром при импорте каждой игры, так что ещё несколько могут не попасть.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Добро пожаловать в osu! local profiles",
   "whatsNew.noNotes": "В списке изменений есть всё, что изменилось в этой версии.",
   "whatsNew.title": "Обновлено до {version}",
-  "whatsNewClose": "Понятно"
+  "whatsNewClose": "Понятно",
+  "importing.title": "Импорт прошлых игр",
+  "backfillModal.keepsRunning": "Это окно можно закрыть, импорт продолжится.",
+  "importing.scanning": "Поиск игр…",
+  "importing.progress": "{done} из {total}",
+  "backfill.importing": "Импорт…",
+  "backfill.close": "Закрыть"
 }

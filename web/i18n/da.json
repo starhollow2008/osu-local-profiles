@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} ufuldendt forsøg",
   "backfill.othersExplained": "– replays, du har set, ikke dine egne forsøg. De bliver aldrig importeret.",
   "backfill.othersFound": "{replays} i disse mapper er spillet af en anden",
-  "backfill.pickATime": "Vælg et tidspunkt, og kontroller derefter, hvad der ville blive importeret.",
+  "backfill.pickATime": "Vælg et tidspunkt og importer, eller kontroller først, hvad der ville blive importeret.",
   "backfill.scanning": "Gennemsøger dine osu!-mapper…",
   "backfill.span": "Gennemførte forsøg går fra {from} til {to}.",
   "backfill.starsUnchecked": "Filterets stjernesværhedsgrad kontrolleres, efterhånden som hvert forsøg importeres, så et par stykker mere kan falde fra.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Velkommen til osu! local profiles",
   "whatsNew.noNotes": "Ændringsloggen viser alt, hvad denne version ændrede.",
   "whatsNew.title": "Opdateret til {version}",
-  "whatsNewClose": "Forstået"
+  "whatsNewClose": "Forstået",
+  "importing.title": "Importerer tidligere spil",
+  "backfillModal.keepsRunning": "Du kan lukke dette, importen fortsætter.",
+  "importing.scanning": "Leder efter spil…",
+  "importing.progress": "{done} af {total} spil",
+  "backfill.importing": "Importerer…",
+  "backfill.close": "Luk"
 }

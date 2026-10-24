@@ -3555,6 +3555,48 @@
   margin-top: 10px;
 }
 
+/* An import while it runs, in place of the summary and the kinds to tick. */
+.backfill-running :is(#backfillSummary, #backfillSources) {
+  display: none;
+}
+
+.backfill-progress {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: var(--fs-normal-2);
+}
+
+.backfill-progress__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.backfill-progress__percent {
+  flex: none;
+  color: hsl(var(--hsl-l1));
+  font-variant-numeric: tabular-nums;
+}
+
+/* Still looking through osu!'s folders, so no percentage yet: the bar sweeps. */
+.backfill-progress--scanning .bar__fill {
+  width: 30%;
+  animation: index-sweep 1.4s ease-in-out infinite;
+}
+
+.backfill-progress--scanning .bar {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backfill-progress--scanning .bar__fill {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+  }
+}
+
 /* Import replay files: the button, and the sentence that says dropping works too. */
 .backfill-files {
   display: flex;
@@ -5303,22 +5345,49 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
  * the buttons, and scrolls away with the header.
  *
  * z-index 1 keeps it above the cover's shading and below the Options and language menus (40),
- * which open over it rather than behind it.
+ * which open over it rather than behind it. An import of past plays, once its dialog is closed,
+ * shows the same way beneath it.
  */
-.index-notice {
+.cover-notices {
   position: absolute;
   top: 10px;
   right: var(--gutter);
   z-index: 1;
   display: grid;
-  gap: 4px;
+  gap: 6px;
   width: min(220px, calc(100% - 2 * var(--gutter)));
+}
+
+.index-notice {
+  display: grid;
+  gap: 4px;
   padding: 6px 10px 7px;
   border-radius: var(--radius-large);
   background-color: hsla(var(--hsl-b6), 0.75);
   color: hsl(var(--hsl-c1));
   font-size: var(--fs-small-2);
   line-height: 1.2;
+}
+
+/* The import's notice opens its dialog again. */
+.index-notice--button {
+  width: 100%;
+  border: 0;
+  margin: 0;
+  font: inherit;
+  font-size: var(--fs-small-2);
+  text-align: start;
+  cursor: pointer;
+}
+
+/* A button holds only spans, so its bar's fill is made a block here. */
+.index-notice--button .bar__fill {
+  display: block;
+}
+
+.index-notice--button:hover,
+.index-notice--button:focus-visible {
+  background-color: hsla(var(--hsl-b6), 0.9);
 }
 
 .index-notice__head {
@@ -5770,7 +5839,7 @@ s.bbcode-editor__glyph {
 /* language picker: a copy carries the one language it was saved in.         */
 /* ======================================================================== */
 
-.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #favoritesNote,
+.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #importNotice, #favoritesNote,
   #aboutEdit, #aboutActions, #coverEdit, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;

@@ -114,6 +114,8 @@ export interface TrackerEvents {
    * for, so it has to say what it added and be visible on a page that is already open.
    */
   caughtUp: [BackfillResult];
+  /** How far an import of past plays has got; sent while it runs and once when it finishes. */
+  importing: [ImportState];
   /**
    * How far a recalculation of every profile's scores has got: after an update brings a new
    * pp calculator, or from Other settings. Sent as it starts and after each step.
@@ -166,6 +168,22 @@ export interface IndexState extends IndexProgress {
  * flashes up and vanishes on every launch would only teach people to ignore it.
  */
 const QUIET_INDEX_MS = 1500;
+
+/**
+ * An import of past plays, as the page shows it: in the dialog, and in the cover's corner once
+ * the dialog is closed. `scanning` looks through osu!'s folders, `scanned` of `files`, to find
+ * the plays; `importing` adds them, `done` of `total`.
+ */
+export interface ImportState {
+  active: boolean;
+  phase: 'scanning' | 'importing';
+  scanned: number;
+  files: number;
+  done: number;
+  total: number;
+  /** Who started it: the dialog, or a launch catching up on its own. */
+  origin: DeclineSource;
+}
 
 export interface BackfillResult {
   /** Finished plays imported from their replays. */
@@ -272,6 +290,10 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     waiting: 0,
     error: null,
   };
+  private importing: ImportState = { active: false, phase: 'scanning', scanned: 0, files: 0, done: 0, total: 0, origin: 'import' };
+  /** Imports asked for and not yet finished, queued ones included. */
+  private importsPending = 0;
+  private importEmittedAt = 0;
 
   constructor(opts: TrackerOptions) {
     super();
@@ -306,8 +328,8 @@ export class Tracker extends EventEmitter<TrackerEvents> {
    * sidestepped.
    *
    * Import past plays is unaffected. It supplies its own cutoff and is the way to bring in
-   * an evening played with the app closed -- chosen, previewed and confirmed, which is
-   * exactly the difference.
+   * an evening played with the app closed -- chosen and confirmed by hand, which is exactly
+   * the difference.
    */
   get liveCutoff(): number {
     return Math.max(this.opts.trackingSince, this.liveSince);
@@ -366,6 +388,18 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
   get indexState(): IndexState {
     return { ...this.index };
+  }
+
+  get importState(): ImportState {
+    return { ...this.importing };
+  }
+
+  /** Tell the page how the import is going: at most four times a second, and always at a change of phase. */
+  private reportImport(now = false): void {
+    const at = performance.now();
+    if (!now && at - this.importEmittedAt < 250) return;
+    this.importEmittedAt = at;
+    this.emit('importing', this.importState);
   }
 
   /**
@@ -659,7 +693,15 @@ export class Tracker extends EventEmitter<TrackerEvents> {
     until: number | null = null,
     installs: InstallChoice = null,
   ): Promise<BackfillResult> {
-    return this.enqueue(async () => {
+    // Active from the moment it is asked for, so a page sees it even while it waits its turn.
+    this.importsPending++;
+    if (!this.importing.active) {
+      this.importing = { active: true, phase: 'scanning', scanned: 0, files: 0, done: 0, total: 0, origin };
+      this.reportImport(true);
+    }
+    const run = this.enqueue(async () => {
+      this.importing = { active: true, phase: 'scanning', scanned: 0, files: 0, done: 0, total: 0, origin };
+      this.reportImport(true);
       let imported = 0;
       let unfinished = 0;
       let attempts = 0;
@@ -680,14 +722,24 @@ export class Tracker extends EventEmitter<TrackerEvents> {
           until,
           owner,
           onOtherPlayer: this.recordOtherPlayer(origin),
+          onScanned: (n, files) => {
+            this.importing.scanned = n;
+            this.importing.files = files;
+            this.reportImport();
+          },
         });
         scanned = scan.scanned;
         otherPlayers = scan.otherPlayers.reduce((n, p) => n + p.count, 0);
+        this.importing.phase = 'importing';
+        this.importing.total = scan.candidates.filter((c) => !c.duplicate).length;
+        this.reportImport(true);
         for (const candidate of scan.candidates) {
           if (candidate.duplicate) {
             skipped++;
             continue;
           }
+          this.importing.done++;
+          this.reportImport();
           const result = await ingestReplayFile(candidate.file, {
             db: this.opts.db,
             resolver: this.opts.resolver,
@@ -738,6 +790,14 @@ export class Tracker extends EventEmitter<TrackerEvents> {
 
       return { imported, unfinished, attempts, skipped, filtered, otherPlayers, scanned, since, until };
     });
+    const finish = () => {
+      this.importsPending--;
+      if (this.importsPending > 0) return;
+      this.importing = { ...this.importing, active: false };
+      this.reportImport(true);
+    };
+    run.then(finish, finish);
+    return run;
   }
 
   /**

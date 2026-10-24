@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "완주하지 못한 플레이 {n}개",
   "backfill.othersExplained": "- 당신이 본 리플레이이지 당신의 플레이가 아닙니다. 절대 가져오지 않습니다.",
   "backfill.othersFound": "이 폴더들에 있는 {replays}은(는) 다른 사람이 플레이한 것입니다",
-  "backfill.pickATime": "시각을 고른 다음, 무엇이 가져와질지 확인하세요.",
+  "backfill.pickATime": "시각을 고르고 가져오거나, 먼저 무엇이 가져와질지 확인하세요.",
   "backfill.scanning": "osu! 폴더를 살펴보는 중…",
   "backfill.span": "완주한 플레이는 {from}부터 {to}까지입니다.",
   "backfill.starsUnchecked": "필터의 별 난이도는 각 플레이를 가져올 때 확인하므로, 몇 개가 더 제외될 수 있습니다.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "osu! local profiles에 오신 것을 환영합니다",
   "whatsNew.noNotes": "이 버전에서 바뀐 모든 내용은 변경 내역에 있습니다.",
   "whatsNew.title": "{version}(으)로 업데이트됨",
-  "whatsNewClose": "확인"
+  "whatsNewClose": "확인",
+  "importing.title": "지난 플레이를 가져오는 중",
+  "backfillModal.keepsRunning": "닫아도 가져오기는 계속됩니다.",
+  "importing.scanning": "플레이를 찾는 중…",
+  "importing.progress": "{total}개 중 {done}개",
+  "backfill.importing": "가져오는 중…",
+  "backfill.close": "닫기"
 }

@@ -352,6 +352,8 @@ export function startServer(opts: ServerOptions): http.Server {
   opts.tracker.on('error', (err) => broadcast('tracker-error', { message: err.message }));
   // The beatmap index runs beside the page; it shows the progress while plays wait on it.
   opts.tracker.on('indexing', (state) => broadcast('indexing', state));
+  // An import of past plays, so every open page can show how far it has got.
+  opts.tracker.on('importing', (state) => broadcast('importing', state));
   // A build of the player's osu! source can take minutes; every open page follows it.
   opts.ppSource?.onChange((state) => broadcast('pp-source', state));
   /*
@@ -545,6 +547,8 @@ export function startServer(opts: ServerOptions): http.Server {
         filterNarrowing: filterNarrows(settings.trackingFilter),
         // A page opened mid-index shows where it has got to, not only what arrives next.
         indexing: opts.tracker.indexState,
+        // The same for an import of past plays, which keeps going when its dialog is closed.
+        importing: opts.tracker.importState,
         /*
          * Which osu! release prices scores, and how many of this profile's were priced by a
          * different one -- after an update that brings a pp rework, the ones still on the old
@@ -1778,9 +1782,9 @@ export function startServer(opts: ServerOptions): http.Server {
     }
 
     /*
-     * Importing plays made while the app was closed. Split into a preview and a commit on
-     * purpose: the user picks a cutoff, sees exactly how many scores it would bring in,
-     * and only then confirms. Nothing here ever runs by itself.
+     * Importing plays made while the app was closed. The user picks a range and presses Import;
+     * the preview, which counts what it would bring in, is optional. Nothing here ever runs by
+     * itself. Its progress goes out as `importing`, so closing the dialog changes nothing.
      */
     const backfill = /^\/api\/backfill(\/preview)?$/.exec(url.pathname);
     if (backfill && req.method === 'POST') {
@@ -1848,6 +1852,10 @@ export function startServer(opts: ServerOptions): http.Server {
           }
           if (!preview && !confirmed) {
             return json(res, { error: 'importing requires an explicit confirmation' }, 400);
+          }
+          // One at a time: a second tab, or a press while a launch is catching up.
+          if (!preview && opts.tracker.importState.active) {
+            return json(res, { error: 'an import is already running' }, 409);
           }
           if (installs !== null && !opts.installs.some((i) => installs.includes(i.root))) {
             return json(res, { error: 'choose at least one osu! install to look in' }, 400);

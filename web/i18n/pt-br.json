@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} jogada inacabada",
   "backfill.othersExplained": "– replays que você assistiu, não jogadas suas. Eles nunca são importados.",
   "backfill.othersFound": "{replays} nestas pastas foram feitos por outra pessoa",
-  "backfill.pickATime": "Escolha um momento e depois verifique o que seria importado.",
+  "backfill.pickATime": "Escolha um momento e importe, ou verifique antes o que seria importado.",
   "backfill.scanning": "Examinando suas pastas do osu!…",
   "backfill.span": "As jogadas concluídas vão de {from} a {to}.",
   "backfill.starsUnchecked": "A dificuldade em estrelas do filtro é verificada conforme cada jogada é importada, então algumas a mais podem ficar de fora.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Boas-vindas ao osu! local profiles",
   "whatsNew.noNotes": "O registro de alterações lista tudo o que esta versão mudou.",
   "whatsNew.title": "Atualizado para {version}",
-  "whatsNewClose": "Entendi"
+  "whatsNewClose": "Entendi",
+  "importing.title": "Importando jogadas anteriores",
+  "backfillModal.keepsRunning": "Você pode fechar isto, a importação continua.",
+  "importing.scanning": "Procurando jogadas…",
+  "importing.progress": "{done} de {total} jogadas",
+  "backfill.importing": "Importando…",
+  "backfill.close": "Fechar"
 }

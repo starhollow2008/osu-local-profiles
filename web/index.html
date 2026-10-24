@@ -129,12 +129,25 @@
       under the buttons and beneath their menus, so it never reads as the app being blocked.
       The longer explanation is its tooltip.
     -->
-    <div class="index-notice" id="indexNotice" role="status" aria-live="polite" hidden>
-      <div class="index-notice__head">
-        <span class="index-notice__title u-ellipsis" id="indexTitle">Finding your beatmaps</span>
-        <span class="index-notice__detail" id="indexDetail"></span>
+    <div class="cover-notices">
+      <div class="index-notice" id="indexNotice" role="status" aria-live="polite" hidden>
+        <div class="index-notice__head">
+          <span class="index-notice__title u-ellipsis" id="indexTitle">Finding your beatmaps</span>
+          <span class="index-notice__detail" id="indexDetail"></span>
+        </div>
+        <div class="bar index-notice__bar"><div class="bar__fill" id="indexFill"></div></div>
       </div>
-      <div class="bar index-notice__bar"><div class="bar__fill" id="indexFill"></div></div>
+      <!--
+        An import of past plays, once its dialog is closed: it keeps going, and this says how far
+        it has got. Clicking it opens the dialog again.
+      -->
+      <button type="button" class="index-notice index-notice--button" id="importNotice" hidden>
+        <span class="index-notice__head">
+          <span class="index-notice__title u-ellipsis" id="importTitle"></span>
+          <span class="index-notice__detail" id="importDetail"></span>
+        </span>
+        <span class="bar index-notice__bar"><span class="bar__fill" id="importFill"></span></span>
+      </button>
     </div>
   </div>
 
@@ -1044,16 +1057,26 @@
     </div>
 
     <div class="backfill-summary" id="backfillSummary">
-      Pick a time, then check what would be imported.
+      Pick a time and import, or check first to see what would be imported.
     </div>
 
     <!-- Filled in by a preview: each kind of past play it found, as its own choice. -->
     <div class="checkgroup backfill-sources" id="backfillSources" hidden></div>
 
+    <!-- While an import runs. Closing the dialog leaves it running, and the cover shows it. -->
+    <div class="backfill-progress" id="backfillProgress" role="status" aria-live="polite" hidden>
+      <div class="backfill-progress__head">
+        <span id="backfillProgressText"></span>
+        <span class="backfill-progress__percent" id="backfillProgressPercent"></span>
+      </div>
+      <div class="bar backfill-progress__bar"><div class="bar__fill" id="backfillProgressFill"></div></div>
+      <div class="setting__hint" data-i18n="backfillModal.keepsRunning">You can close this, the import keeps going.</div>
+    </div>
+
     <div class="actions">
       <button id="backfillCancel" type="button" data-i18n="backfillCancel">Cancel</button>
       <button id="backfillCheck" type="button" data-i18n="backfillCheck">Check</button>
-      <button id="backfillConfirm" class="primary" type="button" disabled>Import</button>
+      <button id="backfillConfirm" class="primary" type="button">Import</button>
     </div>
   </div>
 </div>

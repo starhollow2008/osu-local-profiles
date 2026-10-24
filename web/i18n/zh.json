@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} 次未完成的游玩",
   "backfill.othersExplained": "- 这些是你看过的回放，不是你的游玩。它们永远不会被导入。",
   "backfill.othersFound": "这些文件夹里的 {replays} 是别人打的",
-  "backfill.pickATime": "先选一个时间，再检查会导入哪些内容。",
+  "backfill.pickATime": "选一个时间后直接导入，或先检查会导入哪些内容。",
   "backfill.scanning": "正在扫描你的 osu! 文件夹……",
   "backfill.span": "完成的游玩从 {from} 到 {to}。",
   "backfill.starsUnchecked": "筛选器的星级难度是在导入每次游玩时才检查的，所以可能还会再排除几项。",
@@ -856,5 +856,11 @@
   "welcomeTitle": "欢迎使用 osu! local profiles",
   "whatsNew.noNotes": "更新日志列出了此版本的所有改动。",
   "whatsNew.title": "已更新到 {version}",
-  "whatsNewClose": "知道了"
+  "whatsNewClose": "知道了",
+  "importing.title": "正在导入过去的游玩",
+  "backfillModal.keepsRunning": "可以关闭这个窗口，导入会继续进行。",
+  "importing.scanning": "正在查找游玩记录…",
+  "importing.progress": "{done} / {total} 次游玩",
+  "backfill.importing": "导入中…",
+  "backfill.close": "关闭"
 }

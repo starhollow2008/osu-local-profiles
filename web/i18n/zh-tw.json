@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} 次未完成的遊玩",
   "backfill.othersExplained": "- 這些是你看過的重播，不是你的遊玩。它們永遠不會被匯入。",
   "backfill.othersFound": "這些資料夾裡的 {replays} 是別人打的",
-  "backfill.pickATime": "先選一個時間，再檢查會匯入哪些內容。",
+  "backfill.pickATime": "選一個時間後直接匯入，或先檢查會匯入哪些內容。",
   "backfill.scanning": "正在掃描你的 osu! 資料夾……",
   "backfill.span": "完成的遊玩從 {from} 到 {to}。",
   "backfill.starsUnchecked": "篩選器的星級難度是在匯入每次遊玩時才檢查的，所以可能還會再排除幾項。",
@@ -856,5 +856,11 @@
   "welcomeTitle": "歡迎使用 osu! local profiles",
   "whatsNew.noNotes": "變更紀錄列出了此版本的所有變更。",
   "whatsNew.title": "已更新至 {version}",
-  "whatsNewClose": "知道了"
+  "whatsNewClose": "知道了",
+  "importing.title": "正在匯入過去的遊玩",
+  "backfillModal.keepsRunning": "可以關閉這個視窗，匯入會繼續進行。",
+  "importing.scanning": "正在尋找遊玩紀錄…",
+  "importing.progress": "{done} / {total} 筆遊玩",
+  "backfill.importing": "匯入中…",
+  "backfill.close": "關閉"
 }

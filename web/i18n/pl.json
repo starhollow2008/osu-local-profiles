@@ -64,7 +64,7 @@
   "backfill.oneUnfinished": "{n} nieukończone podejście",
   "backfill.othersExplained": "- to powtórki, które oglądałeś, a nie twoje podejścia. Nigdy nie są importowane.",
   "backfill.othersFound": "{replays} w tych folderach zagrał ktoś inny",
-  "backfill.pickATime": "Wybierz czas, a potem sprawdź, co zostałoby zaimportowane.",
+  "backfill.pickATime": "Wybierz czas i zaimportuj albo najpierw sprawdź, co zostałoby zaimportowane.",
   "backfill.scanning": "Przeszukiwanie twoich folderów osu!…",
   "backfill.span": "Ukończone podejścia obejmują okres od {from} do {to}.",
   "backfill.starsUnchecked": "Poziom trudności w gwiazdkach jest sprawdzany przez filtr w trakcie importu każdego podejścia, więc kilka kolejnych może zostać pominiętych.",
@@ -867,5 +867,11 @@
   "welcomeTitle": "Witaj w osu! local profiles",
   "whatsNew.noNotes": "Dziennik zmian wymienia wszystko, co zmieniła ta wersja.",
   "whatsNew.title": "Zaktualizowano do {version}",
-  "whatsNewClose": "Rozumiem"
+  "whatsNewClose": "Rozumiem",
+  "importing.title": "Importowanie dawnych zagrań",
+  "backfillModal.keepsRunning": "Możesz to zamknąć, import będzie trwał dalej.",
+  "importing.scanning": "Szukanie zagrań…",
+  "importing.progress": "{done} z {total} zagrań",
+  "backfill.importing": "Importowanie…",
+  "backfill.close": "Zamknij"
 }

@@ -63,7 +63,7 @@
   "backfill.oneUnfinished": "{n} keskeneräinen suoritus",
   "backfill.othersExplained": "– ne ovat katsomiasi uusintoja, eivät omia suorituksiasi. Niitä ei koskaan tuoda.",
   "backfill.othersFound": "Näissä kansioissa olevat {replays} ovat jonkun muun pelaamia",
-  "backfill.pickATime": "Valitse ajankohta ja tarkista sitten, mitä tuotaisiin.",
+  "backfill.pickATime": "Valitse ajankohta ja tuo, tai tarkista ensin, mitä tuotaisiin.",
   "backfill.scanning": "Käydään läpi osu!-kansioitasi…",
   "backfill.span": "Loppuun pelatut suoritukset ovat väliltä {from} – {to}.",
   "backfill.starsUnchecked": "Suodattimen tähtivaikeus tarkistetaan vasta kunkin suorituksen tuonnin yhteydessä, joten muutama lisää voi jäädä pois.",
@@ -856,5 +856,11 @@
   "welcomeTitle": "Tervetuloa – osu! local profiles",
   "whatsNew.noNotes": "Muutosloki kertoo kaiken, mitä tämä versio muutti.",
   "whatsNew.title": "Päivitetty versioon {version}",
-  "whatsNewClose": "Selvä"
+  "whatsNewClose": "Selvä",
+  "importing.title": "Tuodaan aiempia pelejä",
+  "backfillModal.keepsRunning": "Voit sulkea tämän, tuonti jatkuu.",
+  "importing.scanning": "Etsitään pelejä…",
+  "importing.progress": "{done}/{total} peliä",
+  "backfill.importing": "Tuodaan…",
+  "backfill.close": "Sulje"
 }

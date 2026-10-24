@@ -144,7 +144,7 @@ JSON-lines pipe from `src/calc/official.ts`.
 - `/api/profile` is cached until the database changes (`total_changes()` stamp).
 - No API polling. Local detection only. Works with no credentials and no network.
 - No scan-and-import at startup unless the profile asked for it. Importing past plays is
-  explicit: pick a range, preview, confirm. A launch imports the gap it was closed for only with
+  explicit: pick a range and press Import (Check, the preview, is optional). A launch imports the gap it was closed for only with
   `importPlaysWhileClosed` on (off by default), never further back than the app last ran, and
   through `Tracker.backfill` like any other import (roadmap 5.56).
 - Ingestion is serialized through a promise queue (`src/tracker/index.ts`).
