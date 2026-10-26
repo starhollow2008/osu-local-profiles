@@ -109,7 +109,9 @@ Runs never overlap, so the two helpers go in fixed folders beside the clone:
    install it with `~/dotnet-install.sh --channel <N>.0 --install-dir ~/.dotnet` and make every
    change step 1 of *Keeping pp current* in `docs/maintaining.md` lists.
 3. `node scripts/build-pp-helper.mjs ~/osu-maintenance/work/pp-new --full` builds the new one.
-4. `node scripts/pp-parity.mjs ~/osu-maintenance/work/pp-old ~/osu-maintenance/work/pp-new`:
+4. `node scripts/pp-parity.mjs ~/osu-maintenance/work/pp-old ~/osu-maintenance/work/pp-new`.
+   It prints that the two versions differ and leaves out the `version` field every answer
+   carries; everything else must match exactly.
    - **Exit 0, every answer identical:** not a rework. Undo every change from this section
      (`git checkout -- .` before anything else is changed) and record `ppEvaluated` as
      `pp.latest` with `ppRework: false`.

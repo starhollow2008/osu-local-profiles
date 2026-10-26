@@ -1185,7 +1185,8 @@ was rejected for the reasons in 5.44. Instead it's made smaller two ways, each a
 because a check proves no answer changed.
 
 - **`scripts/pp-parity.mjs`** (`npm run pp:parity <old> <new>`) sends two helpers the same
-  requests and compares every answer as text: values, errors and the ready line. The requests
+  requests and compares every answer as text: values, errors and the ready line (all but the
+  `version` field when the two are different osu! versions). The requests
   are the app's own, built by the app's code. Unseeded Random and Target Practice are never
   sent, since osu! prices them differently on every run.
 - **Partial trimming** (`SLIM_PUBLISH_ARGS`): only .NET's own libraries are trimmed; osu!'s,

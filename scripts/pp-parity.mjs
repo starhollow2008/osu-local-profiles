@@ -33,6 +33,11 @@
  * both helpers failed, which should be only the ones labelled `error:` -- any other is a
  * generated play osu! could not read, and so a path the check is not reaching.
  *
+ * Two helpers of different osu! versions can be compared too, which is how a new version is
+ * shown to change no pp (docs/automated-maintenance.md). Every answer names the version it
+ * came from, so when the two ready lines name different versions, that field alone is left
+ * out of the comparison.
+ *
  * Exits 0 when every answer is identical, 1 when any differs or a helper dies, 2 on misuse.
  */
 import { spawn, execFileSync } from 'node:child_process';
@@ -339,8 +344,26 @@ async function compare(referenceDir, candidateDir, requests) {
   const reference = helper(referenceDir);
   const candidate = helper(candidateDir);
   const [refReady, candReady] = await Promise.all([reference.ready, candidate.ready]);
+  // Two osu! versions (the maintenance job's question): every line names its helper's version,
+  // so that one field is blanked on each side, as the exact text the helper writes. The rest of
+  // each line is still compared byte for byte.
+  const versionOf = (line) => {
+    try {
+      return JSON.parse(line).version ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const refVersion = versionOf(refReady);
+  const candVersion = versionOf(candReady);
+  const acrossVersions = refVersion !== null && candVersion !== null && refVersion !== candVersion;
+  const blank = (line, version) =>
+    acrossVersions ? line.replaceAll(`"version":${JSON.stringify(version)}`, '"version":"*"') : line;
+  const same = (a, b) => blank(a, refVersion) === blank(b, candVersion);
+  if (acrossVersions) console.log(`  osu! ${refVersion} against ${candVersion}: the version each answer names is not compared`);
+
   let failures = 0;
-  if (refReady !== candReady) {
+  if (!same(refReady, candReady)) {
     failures++;
     console.log(`  READY DIFFERS\n    reference: ${refReady}\n    candidate: ${candReady}`);
   }
@@ -354,7 +377,7 @@ async function compare(referenceDir, candidateDir, requests) {
       // Which requests failed on both sides: only the `error:` ones are meant to.
       if (flag('--errors')) console.log(`  error in both: ${label}: ${answer.error}`);
     }
-    if (a !== b) {
+    if (!same(a, b)) {
       failures++;
       if (failures <= 25) {
         console.log(`  DIFFERS: ${label}\n    request:   ${JSON.stringify(request)}\n    reference: ${a}\n    candidate: ${b}`);
