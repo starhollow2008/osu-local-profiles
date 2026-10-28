@@ -176,6 +176,26 @@ matching half, `src/player-identity.ts`, `src/built-replays.ts`, `src/replay-wri
 `src/score-entry.ts`. Ingestion stays serialised through one queue. File watching keeps the
 `watchablePath` rule: a non-canonical path never reaches `FileSystemWatcher`.
 
+Each part below is checked against the Node app's own code on the owner's files by
+`scripts/port-checks.mjs`, which asks the C# app through `--dev` commands that nothing else uses.
+
+- [x] The replay parser (`Replays/Osr.cs`): every replay the owner's profiles know of, and every
+      file in osu!stable's `Data/r`, read to the same fields (607 of 607). `src/osr.ts` stays the
+      model rather than osu!'s `LegacyScoreDecoder`, which reads a replay into osu!'s own score
+      objects rather than the fields the tracker stores.
+- [x] Finding osu! (`Clients/Detect.cs`, `Clients/Discover.cs`): the installs and candidates
+      startup finds, and the Rescan button's full search (registry, shortcuts, every drive),
+      identical. Paths are joined as Node's `path` joins them (`NodePath.cs`).
+- [x] The beatmap index and resolver (`Clients/Beatmaps.cs`): the index built from nothing, every
+      row identical (14,820 beatmaps, 59,024 lazer files remembered as not beatmaps), and every
+      beatmap the profiles have played resolved to the same answer and cached row (681 of 681).
+      SQLite is shared by threads here, so every database call holds one lock, and the indexer
+      holds it for each slice of work as Node's single thread did.
+- [ ] Ingestion: pricing, grades, McOsu, built replays, player identity, the filter's matching,
+      declined plays, lazer's log and incomplete plays.
+- [ ] Watching and the queue, wired into startup; import, catch-up and recompute; a reingest of
+      every replay by both apps into fresh profiles, compared table by table.
+
 ### 5. Everything that writes
 
 The calculator built from the player's osu! source (5.70, `src/pp-source.ts`,
@@ -306,8 +326,6 @@ the helpers.
 
 ## Open questions
 
-- Whether osu!'s `LegacyScoreDecoder` can replace `src/osr.ts` (phase 4): only if it reads
-  every replay in the corpus to the same fields.
 - How trimming affects reflection-based JSON (phase 7): source-generated serialisation, or
   partial trimming that leaves the app's own assembly alone.
 - The firewall prompt (above).

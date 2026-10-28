@@ -129,45 +129,103 @@ internal sealed partial class Database : IDisposable
         return command;
     }
 
+    /*
+     * One user of the connection at a time. The Node app had one thread, so its database never saw
+     * two statements at once; here requests, the tracker and the beatmap index run on different
+     * threads, and a SQLite connection must not be used by two of them together. Every method takes
+     * this lock, a transaction holds it for its whole body, and `Serialized` holds it across several
+     * statements that must not have another's between them -- what one synchronous TypeScript
+     * function got for free. It is re-entrant, so a method may call another.
+     */
+    private readonly object gate = new();
+
+    /// <summary>Several statements with nobody else's between them.</summary>
+    public T Serialized<T>(Func<T> body)
+    {
+        lock (gate) return body();
+    }
+
+    public void Serialized(Action body)
+    {
+        lock (gate) body();
+    }
+
+    /// <summary>
+    /// The connection held until disposed, for work done in slices: everything between one pause
+    /// and the next, an open transaction included, with nobody else's statements in it.
+    /// </summary>
+    public IDisposable Hold()
+    {
+        Monitor.Enter(gate);
+        return new Held(gate);
+    }
+
+    private sealed class Held(object gate) : IDisposable
+    {
+        private bool released;
+
+        public void Dispose()
+        {
+            if (released) return;
+            released = true;
+            Monitor.Exit(gate);
+        }
+    }
+
     /// <summary><c>db.exec</c>: one or more statements, no parameters.</summary>
     public void Exec(string sql)
     {
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.ExecuteNonQuery();
+        lock (gate)
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.ExecuteNonQuery();
+        }
     }
 
     /// <summary><c>prepare(sql).run(...)</c>: the number of rows changed.</summary>
     public int Run(string sql, params object?[] args)
     {
-        using var command = Command(sql, args);
-        return command.ExecuteNonQuery();
+        lock (gate)
+        {
+            using var command = Command(sql, args);
+            return command.ExecuteNonQuery();
+        }
     }
 
     /// <summary><c>prepare(sql).get(...)</c>, mapped; default when there is no row.</summary>
     public T? Get<T>(string sql, Func<SqliteDataReader, T> map, params object?[] args)
     {
-        using var command = Command(sql, args);
-        using var reader = command.ExecuteReader();
-        return reader.Read() ? map(reader) : default;
+        lock (gate)
+        {
+            using var command = Command(sql, args);
+            using var reader = command.ExecuteReader();
+            return reader.Read() ? map(reader) : default;
+        }
     }
 
     /// <summary>Whether <c>prepare(sql).get(...)</c> finds a row.</summary>
     public bool Exists(string sql, params object?[] args)
     {
-        using var command = Command(sql, args);
-        using var reader = command.ExecuteReader();
-        return reader.Read();
+        lock (gate)
+        {
+            using var command = Command(sql, args);
+            using var reader = command.ExecuteReader();
+            return reader.Read();
+        }
     }
 
     /// <summary><c>prepare(sql).all(...)</c>, mapped.</summary>
     public List<T> All<T>(string sql, Func<SqliteDataReader, T> map, params object?[] args)
     {
-        using var command = Command(sql, args);
-        using var reader = command.ExecuteReader();
-        var rows = new List<T>();
-        while (reader.Read()) rows.Add(map(reader));
-        return rows;
+        lock (gate)
+        {
+            using var command = Command(sql, args);
+            using var reader = command.ExecuteReader();
+            var rows = new List<T>();
+            while (reader.Read()) rows.Add(map(reader));
+            return rows;
+        }
     }
 
     /// <summary>
@@ -183,24 +241,30 @@ internal sealed partial class Database : IDisposable
     /// <summary>The first column of the first row, or null.</summary>
     public object? Scalar(string sql, params object?[] args)
     {
-        using var command = Command(sql, args);
-        var value = command.ExecuteScalar();
-        return value is DBNull ? null : value;
+        lock (gate)
+        {
+            using var command = Command(sql, args);
+            var value = command.ExecuteScalar();
+            return value is DBNull ? null : value;
+        }
     }
 
     /// <summary><c>BEGIN</c> ... <c>COMMIT</c>, rolled back if anything throws, as the TypeScript writes it out.</summary>
     public void Transaction(Action body)
     {
-        Exec("BEGIN");
-        try
+        lock (gate)
         {
-            body();
-            Exec("COMMIT");
-        }
-        catch
-        {
-            Exec("ROLLBACK");
-            throw;
+            Exec("BEGIN");
+            try
+            {
+                body();
+                Exec("COMMIT");
+            }
+            catch
+            {
+                Exec("ROLLBACK");
+                throw;
+            }
         }
     }
 

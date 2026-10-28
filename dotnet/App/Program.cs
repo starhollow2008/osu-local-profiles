@@ -11,6 +11,13 @@ using OsuLocalProfiles.Http;
  *   osu-local-profiles-app [--root <install dir>] [--writable]
  */
 
+// Checks run by scripts/ against the Node app's own answers; never part of running the app.
+if (args.Length > 0 && args[0] == "--dev") return OsuLocalProfiles.DevCommands.Run(args[1..]);
+
+// UTF-8 wherever it goes, as Node writes: the tray launcher keeps it as data/logs/app.log, and a
+// beatmap title in Japanese must not reach it in the console's code page.
+Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+
 string? root = null;
 var writable = false;
 for (var i = 0; i < args.Length; i++)

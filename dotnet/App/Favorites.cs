@@ -1,5 +1,6 @@
 using System.Text.Json;
 using OsuLocalProfiles.Calc;
+using OsuLocalProfiles.Clients;
 using OsuLocalProfiles.Db;
 
 namespace OsuLocalProfiles;
@@ -230,56 +231,4 @@ internal static class Favorites
         double d => Js.NumberToString(d),
         _ => value.ToString()!,
     };
-}
-
-/// <summary>Reading a <c>.osu</c> file: src/clients/beatmaps.ts, the parts ported so far.</summary>
-internal static class Beatmaps
-{
-    /// <summary>
-    /// One section of a .osu file: from its header line to the next line that begins with
-    /// <c>[</c>, never the next <c>[</c> anywhere, which is ordinary inside values (<c>osuSection</c>).
-    /// </summary>
-    public static string? OsuSection(string text, string header)
-    {
-        int body;
-        if (text.StartsWith(header, StringComparison.Ordinal))
-        {
-            body = header.Length;
-        }
-        else
-        {
-            var at = text.IndexOf("\n" + header, StringComparison.Ordinal);
-            if (at < 0) return null;
-            body = at + 1 + header.Length;
-        }
-        var next = text.IndexOf("\n[", body, StringComparison.Ordinal);
-        return next < 0 ? text[body..] : text[body..next];
-    }
-
-    /// <summary>A beatmap's mode from its <c>[General]</c> section, 0 when it cannot be read.</summary>
-    public static int Mode(string file)
-    {
-        string text;
-        try
-        {
-            text = Js.ReadFileUtf8(file);
-        }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
-        {
-            return 0;
-        }
-
-        // [General] alone, so a `Mode:` further down the file cannot be picked up.
-        if (OsuSection(text, "[General]") is not { } section) return 0;
-        foreach (var line in section.Split('\n'))
-        {
-            var clean = line.EndsWith('\r') ? line[..^1] : line;
-            var sep = clean.IndexOf(':');
-            if (sep < 0) continue;
-            if (Js.Trim(clean[..sep]) != "Mode") continue;
-            var mode = Js.StringToNumber(Js.Trim(clean[(sep + 1)..]));
-            return mode is 1 or 2 or 3 ? (int)mode : 0;
-        }
-        return 0;
-    }
 }
