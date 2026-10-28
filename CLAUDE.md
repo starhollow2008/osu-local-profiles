@@ -41,6 +41,9 @@ The reasons are in `docs/architecture.md`.
   Ported LESS/TSX names the osu-web file it came from. Anything new from a third party goes in
   `THIRD-PARTY-NOTICES.md`. Never, under any licence: `ppy/osu-resources` (CC-BY-NC), Torus or
   Venera, or the osu!/ppy logos. It can't return to MIT while it carries osu-web's files.
+- **The feed icons come from `starhollow2008/osu-local-profiles-ext-media`** (CC BY 4.0), only through
+  `npm run build:feed-icons` into `web/feed-icons/`, never edited and never fetched by the app. Keep
+  the credit in `THIRD-PARTY-NOTICES.md`.
 - **McOsu plays are built osu!stable replays, scored as stable** (`scoredAsStable`, roadmap
   5.58). Never offered for download, since they hold no cursor data. McOsu's own mods
   (Nightmare, experimental) are one app-own mod, `MC`, never one each and never shown to osu!'s

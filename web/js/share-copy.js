@@ -128,6 +128,9 @@ export async function buildInteractiveHtml(progress = () => {}) {
   if (state.profile.hasAvatar) await carry('/api/image/avatar');
   if (state.profile.hasCover) await carry('/api/image/cover');
   await flag(state.profile.country);
+  // The level-up and new-best icons in the Recent feed.
+  await carry('/feed-icons/level-up.png');
+  await carry('/feed-icons/new-best.png');
   // Every score's owner is this profile, whose pictures are carried once, under the header's
   // own addresses; each score card looks them up there (assetUrl) rather than every score
   // carrying a copy of its own -- which made a profile of forty scores sixteen megabytes.

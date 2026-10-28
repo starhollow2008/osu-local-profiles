@@ -1598,6 +1598,13 @@
   margin-right: -5px;
 }
 
+/* A level or best-performance row: its icon fills the 22px slot, the same height as a medal. */
+.activity__image {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
 /* A rank event's grade: osu-web's icon column is `font-size: 14px`, a 28x14 badge. */
 .activity__icon .score-rank {
   font-size: 14px;

@@ -2,6 +2,7 @@
 import { escapeHtml, fmt, pct, timeAgo, fullDate, MODE_NAMES } from './format.js';
 import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './badges.js';
 import { t } from './i18n.js';
+import { assetUrl } from './static-mode.js';
 import { beatmapArtist, beatmapName, beatmapTitle, original } from './metadata.js';
 
 function titleOf(item) {
@@ -416,6 +417,14 @@ const osuLink = (path, html) =>
   path === null ? html : `<a class="activity__link" href="https://osu.ppy.sh/${path}" target="_blank" rel="noreferrer noopener">${html}</a>`;
 
 /**
+ * An icon for a feed row that osu! gives no medal or grade to. Bundled in web/feed-icons/ (88px
+ * for a 22px slot, so it stays sharp on a high-density screen) and never fetched, so it shows
+ * offline like the rest of the page. A shared copy carries them as data: URIs (share-copy.js).
+ */
+const feedIcon = (file) =>
+  `<img class="activity__image" src="${assetUrl(`/feed-icons/${file}`)}" alt="" draggable="false">`;
+
+/**
  * The Recent section. osu! fills this with account events (medals, rank milestones); a
  * local profile has its own equivalents, derived in src/calc/history.ts, plus the ranks osu!
  * itself reports (src/rank-events.ts).
@@ -432,6 +441,7 @@ export function activityRow(event) {
       icon = medalBadge({ ...event, achievedAt: event.at }, 'recent-activity');
       break;
     case 'best':
+      icon = feedIcon('new-best.png');
       text = t('activity.best', {
         pp: fmt(event.pp, 0),
         map:
@@ -440,6 +450,7 @@ export function activityRow(event) {
       });
       break;
     case 'level':
+      icon = feedIcon('level-up.png');
       text = t('activity.level', { level: fmt(event.level) });
       break;
     case 'rank': {

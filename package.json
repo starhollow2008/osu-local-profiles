@@ -22,6 +22,7 @@
     "build:flags": "node scripts/build-flags.mjs",
     "build:mods": "node scripts/build-mod-table.mjs",
     "build:osu-web": "node scripts/build-osu-web-art.mjs",
+    "build:feed-icons": "node scripts/build-feed-icons.mjs",
     "package": "node scripts/package.mjs",
     "check:app": "node src/main.ts --check-only"
   },
