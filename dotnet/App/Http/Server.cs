@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using OsuLocalProfiles.Calc;
 using OsuLocalProfiles.Db;
 using OsuLocalProfiles.Settings;
 using OsuLocalProfiles.Tracker;
@@ -177,6 +178,105 @@ internal static partial class Server
             return;
         }
 
+        // This profile's avatar or banner, served only if it has one. `?profile=` names another
+        // profile's, for a score page showing whose score it is.
+        var image = ImageRoute().Match(pathname);
+        if (image.Success && method != "PUT")
+        {
+            var asked = Js.StringToNumber(request.Query.TryGetValue("profile", out var profileParam) && profileParam.Count > 0 ? profileParam[0] ?? "" : "");
+            var imageProfile = double.IsFinite(asked) && asked == Math.Floor(asked) && Profiles.Get(db, (long)asked) is not null
+                ? (long)asked
+                : Current();
+            var file = Identity.FindImage(opts.Paths.DataDir, imageProfile, image.Groups[1].Value);
+            if (file is null || !File.Exists(file))
+            {
+                await Text(context, 404, "not found", "text/plain");
+                return;
+            }
+            await SendFile(context, file);
+            return;
+        }
+
+        var scoreRoute = ScoreRoute().Match(pathname);
+        if (scoreRoute.Success && method is "GET" or "HEAD")
+        {
+            var number = Js.StringToNumber(scoreRoute.Groups[1].Value);
+            var id = number >= long.MaxValue ? long.MaxValue : (long)number;
+            // Answered as the profile that owns the score, so its link outlives a profile switch.
+            var owner = Scores.Owner(db, id) is { } ownerId ? Profiles.Get(db, ownerId) : null;
+            if (owner is null)
+            {
+                await Json(context, new { error = $"there is no score {Js.NumberToString(number)}" }, 404);
+                return;
+            }
+
+            if (!scoreRoute.Groups[2].Success)
+            {
+                var ownerSettings = SettingsFor(owner.Id);
+                // A score priced before breakdowns were kept is recalculated here in the Node app;
+                // that waits for the pp helper (phase 3).
+                if (Scores.Detail(db, owner.Id, id, Eligibility.Of(ownerSettings, opts.StatusKnown)) is not { } detail)
+                {
+                    await Json(context, new { error = $"there is no score {Js.NumberToString(number)}" }, 404);
+                    return;
+                }
+                var (hasAvatar, hasCover) = Identity.ImageState(opts.Paths.DataDir, owner.Id);
+                await Json(context, new
+                {
+                    score = detail,
+                    // What prices scores now: the pp helper, in-process from phase 3.
+                    calculator = (string?)null,
+                    owner = new
+                    {
+                        id = owner.Id,
+                        name = owner.Name,
+                        country = ownerSettings.Country,
+                        avatar = hasAvatar ? $"/api/image/avatar?profile={owner.Id}" : null,
+                        // None of its own: the card shows osu-web's default banner.
+                        cover = hasCover ? $"/api/image/cover?profile={owner.Id}" : null,
+                        active = owner.Id == Current(),
+                        // No tracker until phase 4.
+                        tracking = false,
+                    },
+                });
+                return;
+            }
+
+            if (scoreRoute.Groups[2].Value == "/replay")
+            {
+                var (path, fileName, error) = Scores.ReplayDownload(db, owner.Id, id, owner.Name);
+                FileInfo? info = null;
+                if (error is null)
+                {
+                    try
+                    {
+                        info = new FileInfo(path!);
+                        if (!info.Exists) info = null;
+                    }
+                    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                    {
+                        info = null;
+                    }
+                }
+                if (error is not null || info is null)
+                {
+                    await Json(context, new { error = error ?? "the replay could not be read" }, 404);
+                    return;
+                }
+                var response = context.Response;
+                response.StatusCode = 200;
+                // osu-web's own type for a replay download.
+                response.ContentType = "application/x-osu-replay";
+                response.ContentLength = info.Length;
+                response.Headers.ContentDisposition = Scores.AttachmentHeader(fileName!);
+                response.Headers.CacheControl = "no-store";
+                if (method == "HEAD") return;
+                await response.SendFileAsync(info.FullName);
+                return;
+            }
+            // The card as a PNG needs a browser to render it: phase 5, with the profile's screenshot.
+        }
+
         if (pathname == "/api/settings" && method != "POST")
         {
             await Json(context, new { settings = SettingsFor(Current()) });
@@ -228,6 +328,31 @@ internal static partial class Server
         // The translations in web/i18n/, fetched by the page one language at a time.
         [".json"] = "application/json; charset=utf-8",
     };
+
+    [GeneratedRegex(@"^/api/image/(avatar|cover)\z")]
+    private static partial Regex ImageRoute();
+
+    [GeneratedRegex(@"^/api/scores/([0-9]+)(/replay|/screenshot)?\z")]
+    private static partial Regex ScoreRoute();
+
+    /// <summary>A file from disk with the type its extension says and revalidation on every load.</summary>
+    private static async Task SendFile(HttpContext context, string file)
+    {
+        byte[] bytes;
+        try
+        {
+            bytes = await File.ReadAllBytesAsync(file);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            await Text(context, 404, "not found", "text/plain");
+            return;
+        }
+        context.Response.StatusCode = 200;
+        context.Response.ContentType = Mime.GetValueOrDefault(Path.GetExtension(file).ToLowerInvariant(), "application/octet-stream");
+        context.Response.Headers.CacheControl = "no-cache";
+        await context.Response.Body.WriteAsync(bytes);
+    }
 
     /// <summary>A score's own page, <c>/scores/&lt;id&gt;</c>: ASCII digits only, as JavaScript's <c>\d</c>.</summary>
     [GeneratedRegex(@"^/scores/[0-9]+/?\z")]

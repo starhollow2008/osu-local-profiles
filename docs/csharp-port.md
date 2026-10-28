@@ -127,7 +127,11 @@ about-images, `/api/export/*`. The `/api/profile` cache keeps its `total_changes
 - [ ] Two stand-ins until phase 4: lazer's `online.db` is assumed found (`StatusKnown`, which
       decides whether unresolved beatmaps count), and a favourite with no osu! details is drawn
       without the other difficulties `online.db` lists.
-- [ ] `/api/state`, `/api/scores/:id`, `/api/image/*`, about-images, `/api/export/*`.
+- [x] `/api/scores/:id` and its replay download, `/api/image/*`: every score's page identical,
+      and the replays and pictures byte for byte. Two parts wait: a score priced before
+      breakdowns were kept is recalculated on view by the pp helper (phase 3; none in the
+      owner's data), and the card as a PNG needs a browser (phase 5).
+- [ ] `/api/state`, about-images, `/api/export/*`.
 
 ### 3. pp in-process
 
@@ -257,7 +261,7 @@ the helpers.
   TypeScript used it to check a name against a table, the C# checks the table's own keys; fix
   the TypeScript to `Object.hasOwn` when found.
 - **Unported endpoints** answer 501 in the port, where Node answers 404 for a path it doesn't
-  know at all.
+  know at all. The 501 fallback goes when phase 5 is done, so every path answers as Node's does.
 - **Writing the C# sources**: write special characters as code points, such as `(char)0x2028`,
   never as escape sequences in string literals or as the characters themselves. A literal U+2028
   or U+2029 is a line break to the C# compiler, and some editing tools turn escapes into literals.

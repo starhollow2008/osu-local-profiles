@@ -55,7 +55,7 @@ const PER_PROFILE = ['/api/settings', '/api/declined', '/api/profile'];
 const STATIC = ['/', '/scores/1', '/scores/1/', '/js/main.js', '/css/base.css', '/favicon.svg', '/i18n/en.json', '/no-such-file.js'];
 
 /** Headers that must match on every answer. */
-const HEADERS = ['content-type', 'cache-control'];
+const HEADERS = ['content-type', 'cache-control', 'content-disposition'];
 
 const args = process.argv.slice(2);
 const keep = args.includes('--keep');
@@ -218,6 +218,42 @@ async function main() {
       }
     };
     await compareJson(ENDPOINTS);
+
+    // Every score's page, removed ones and one that never existed included, and a sample of
+    // replay downloads byte for byte: with a file, and each kind of refusal.
+    const scores = (() => {
+      const db = new DatabaseSync(path.join(csRoot, 'data', 'profiles.db'), { readOnly: true });
+      try {
+        return db.prepare('SELECT id, replay_path IS NOT NULL AND origin IS NULL AND client <> \'mcosu\' AS replay FROM scores ORDER BY id').all();
+      } finally {
+        db.close();
+      }
+    })();
+    const missingId = (scores.at(-1)?.id ?? 0) + 1000;
+    await compareJson(
+      [...scores.map((s) => s.id), missingId].map((id) => ({
+        path: `/api/scores/${id}`,
+        ignore: {
+          calculator: 'the pp helper is in-process from phase 3',
+          'owner.tracking': 'the port has no tracker until phase 4',
+        },
+      })),
+    );
+    const replays = [
+      ...scores.filter((s) => s.replay === 1).slice(0, 8),
+      ...scores.filter((s) => s.replay !== 1).slice(0, 3),
+      { id: missingId },
+    ];
+    for (const pathname of [
+      ...replays.flatMap((s) => [`/api/scores/${s.id}/replay`]),
+      '/api/image/avatar', '/api/image/cover', '/api/image/avatar?profile=1', '/api/image/cover?profile=3',
+      '/api/image/avatar?profile=99', '/api/image/avatar?profile=abc',
+    ]) {
+      const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
+      const problems = compareMeta(a, b);
+      if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
+      report(pathname, problems, a);
+    }
 
     /*
      * The other profiles: the answers above are the active one's. Each app reads the active
