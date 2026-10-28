@@ -3,6 +3,8 @@ using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OsuLocalProfiles.Db;
 using OsuLocalProfiles.Settings;
@@ -16,6 +18,9 @@ internal sealed class ServerOptions
     public required AppPaths Paths { get; init; }
     public required AppConfig Config { get; init; }
     public required int Port { get; init; }
+
+    /// <summary>Stops the app, deliberately: the page's Quit. Null for a copy that cannot be stopped from the page.</summary>
+    public Action? OnQuit { get; init; }
 }
 
 /// <summary>
@@ -36,6 +41,9 @@ internal static partial class Server
             ContentRootPath = opts.Paths.InstallDir,
         });
         builder.Logging.ClearProviders();
+        // Ctrl+C, signals and the launcher are the app's to handle (Program.cs), so that a deliberate
+        // stop can be told from the system stopping it.
+        builder.Services.AddSingleton<IHostLifetime, AppLifetime>();
         builder.WebHost.ConfigureKestrel(kestrel =>
         {
             kestrel.AddServerHeader = false;
@@ -127,6 +135,32 @@ internal static partial class Server
             return;
         }
 
+        /*
+         * Quit, from the page. Answered first and stopped after, so the page hears that it worked.
+         * Refused for another website's page: one line of script there must not stop the app.
+         */
+        if (pathname == "/api/quit" && method == "POST")
+        {
+            var origin = request.Headers.Origin is { Count: > 0 } o ? o.ToString() : null;
+            if (!IsOwnPage(origin, context.Connection.LocalPort))
+            {
+                await Json(context, new { error = "only this app's own page can stop it" }, 403);
+                return;
+            }
+            if (opts.OnQuit is not { } quit)
+            {
+                await Json(context, new { error = "this copy cannot be stopped from the page" }, 400);
+                return;
+            }
+            context.Response.OnCompleted(async () =>
+            {
+                await Task.Delay(250);
+                quit();
+            });
+            await Json(context, new { ok = true });
+            return;
+        }
+
         if (pathname == "/api/settings" && method != "POST")
         {
             await Json(context, new { settings = SettingsFor(Current()) });
@@ -212,4 +246,12 @@ internal static partial class Server
         context.Response.Headers.CacheControl = "no-cache";
         await context.Response.Body.WriteAsync(bytes);
     }
+}
+
+/// <summary>A host lifetime that leaves Ctrl+C and signals alone: Program.cs decides what they mean.</summary>
+internal sealed class AppLifetime : IHostLifetime
+{
+    public Task WaitForStartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 }

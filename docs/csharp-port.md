@@ -71,7 +71,7 @@ dotnet/
 | #   | Phase                         | Status      |
 | --- | ----------------------------- | ----------- |
 | 0   | This plan                     | done        |
-| 1   | Foundations                   | in progress |
+| 1   | Foundations                   | done        |
 | 2   | Reading a profile             | not started |
 | 3   | pp in-process                 | not started |
 | 4   | Tracking                      | not started |
@@ -98,8 +98,11 @@ dotnet/
       `GET /api/data-folder`.
 - [x] `scripts/api-parity.mjs`: both apps on copies of one `data/`, every ported endpoint
       compared.
-- [ ] Single instance (`src/instance.ts`): a second start finds the first and opens its page.
-- [ ] stdin protocol with the launcher (`stopWhenLauncherCloses`, metered messages).
+- [x] Single instance (`src/instance.ts`): a second start finds the first and opens its page,
+      or opens nothing when the computer started it.
+- [x] Stopping: Ctrl+C, SIGTERM, the launcher closing stdin (`{"quit":true}` first makes it
+      deliberate) and `/api/quit` from the app's own page, one stop path for all four. The
+      metered messages are read but not kept until the updater is ported (phase 5).
 
 First parity run, 2026-10-28, on the owner's data (3 profiles, 47 setting rows, a declined
 play): all five endpoints and eight static paths identical. Found on the way: the Node app kept
@@ -141,7 +144,7 @@ matching half, `src/player-identity.ts`, `src/built-replays.ts`, `src/replay-wri
 
 Every POST/PUT/DELETE endpoint, the SSE feed (`/api/events`, same event names and payloads),
 backup and restore, uploads, screenshots (Chrome over CDP), start with the computer,
-`/api/quit`, the update checker and its installer half (`src/update/*`), the pp source switch.
+the update checker and its installer half (`src/update/*`), the pp source switch.
 The database opens writable by default from here.
 
 ### 6. Updater bridge, in a Node release

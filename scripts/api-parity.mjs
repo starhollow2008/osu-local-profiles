@@ -214,8 +214,8 @@ async function main() {
     console.log(failed === 0 ? '\n  Every answer matches.' : `\n  ${failed} answer(s) differ.`);
     process.exitCode = failed === 0 ? 0 : 1;
 
-    // A quit the Node app treats as deliberate; no Origin, as the tray launcher sends it.
-    await fetch(`http://localhost:${nodePort}/api/quit`, { method: 'POST' }).catch(() => {});
+    // A quit each app treats as deliberate; no Origin, as the tray launcher sends it.
+    for (const port of [nodePort, csPort]) await fetch(`http://localhost:${port}/api/quit`, { method: 'POST' }).catch(() => {});
   } finally {
     for (const child of children) {
       if (child.exitCode === null) await new Promise((resolve) => setTimeout(resolve, 1500));

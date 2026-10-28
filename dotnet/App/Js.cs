@@ -63,6 +63,19 @@ internal static partial class Js
         _ => false,
     });
 
+    /// <summary>
+    /// <c>if (raw)</c>: false for undefined, null, false, 0, NaN and the empty string; true for
+    /// everything else, every object and array included.
+    /// </summary>
+    public static bool Truthy(JsonElement? value) => value switch
+    {
+        null => false,
+        { ValueKind: JsonValueKind.Null or JsonValueKind.False or JsonValueKind.Undefined } => false,
+        { ValueKind: JsonValueKind.Number } n => NumberOf(n) is var d && d != 0 && !double.IsNaN(d),
+        { ValueKind: JsonValueKind.String } s => s.GetString()!.Length > 0,
+        _ => true,
+    };
+
     /// <summary><c>Number(raw)</c>. Undefined is NaN, null is 0, an object NaN, an array its joined text.</summary>
     public static double ToNumber(JsonElement? value) => value switch
     {
