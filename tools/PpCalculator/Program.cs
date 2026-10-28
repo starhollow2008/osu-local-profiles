@@ -127,36 +127,45 @@ public static class Program
         ?? typeof(Beatmap).Assembly.GetName().Version?.ToString()
         ?? "unknown";
 
+    /// <summary>The line that announces readiness and the osu! version.</summary>
+    public static string ReadyLine() => JsonSerializer.Serialize(new { ready = true, version = OsuVersion }, JsonOptions);
+
+    /// <summary>
+    /// One request line answered with one response line: the whole protocol. Called by the loop
+    /// below for the separate helper, and directly by the C# port of the app (docs/csharp-port.md,
+    /// phase 3), so both answer with the same code.
+    /// </summary>
+    public static string Respond(string line)
+    {
+        try
+        {
+            var request = JsonSerializer.Deserialize<Request>(line, JsonOptions)
+                          ?? throw new InvalidOperationException("empty request");
+            object result = request.Type switch
+            {
+                null => Calculate(request),
+                "ranked" => Ranked(request),
+                _ => throw new ArgumentException($"unknown request type {request.Type}"),
+            };
+            return JsonSerializer.Serialize(result, JsonOptions);
+        }
+        catch (Exception ex)
+        {
+            return JsonSerializer.Serialize(new { ok = false, error = ex.Message }, JsonOptions);
+        }
+    }
+
     public static int Main()
     {
         // Announce readiness so the caller does not race the first request.
-        Console.Out.WriteLine(JsonSerializer.Serialize(new { ready = true, version = OsuVersion }, JsonOptions));
+        Console.Out.WriteLine(ReadyLine());
         Console.Out.Flush();
 
         string? line;
         while ((line = Console.In.ReadLine()) != null)
         {
             if (line.Length == 0) continue;
-
-            string response;
-            try
-            {
-                var request = JsonSerializer.Deserialize<Request>(line, JsonOptions)
-                              ?? throw new InvalidOperationException("empty request");
-                object result = request.Type switch
-                {
-                    null => Calculate(request),
-                    "ranked" => Ranked(request),
-                    _ => throw new ArgumentException($"unknown request type {request.Type}"),
-                };
-                response = JsonSerializer.Serialize(result, JsonOptions);
-            }
-            catch (Exception ex)
-            {
-                response = JsonSerializer.Serialize(new { ok = false, error = ex.Message }, JsonOptions);
-            }
-
-            Console.Out.WriteLine(response);
+            Console.Out.WriteLine(Respond(line));
             Console.Out.Flush();
         }
 
