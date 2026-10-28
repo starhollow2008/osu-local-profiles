@@ -2,5 +2,9 @@
 # line-ending conversion make these differ from the commit web/osu-web/README.md names.
 web/osu-web/** -text
 
+# The Recent feed's icons, vendored the same way by scripts/build-feed-icons.mjs from the commit
+# web/feed-icons/README.md names.
+web/feed-icons/** -text
+
 # Run on the maintenance VM (docs/automated-maintenance.md), where bash and systemd reject CRLF.
 tools/maintenance/** text eol=lf

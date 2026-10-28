@@ -576,9 +576,12 @@ v1.22.0 stays MIT, and that notice is kept in `THIRD-PARTY-NOTICES.md`.
 - **Still off limits:** `ppy/osu-resources` (CC-BY-NC, incompatible with the AGPL), Torus and Venera
   (licensed to osu!'s website alone), and the osu!/ppy logos (trademarks).
 
-Flags come from Twemoji (CC-BY 4.0, where osu! got them too). Generated files:
-`web/js/mod-definitions.js` (`npm run build:mods`), `web/flags/` (`npm run build:flags`),
-`web/osu-web/` and `web/css/osu-web-art.css` (`npm run build:osu-web`).
+Flags come from Twemoji (CC-BY 4.0, where osu! got them too). The Recent feed's level-up and new
+best icons are FlareonGhh's, from `starhollow2008/osu-local-profiles-ext-media` (CC BY 4.0), copied
+byte for byte from one commit like osu-web's art (recorded in `web/feed-icons/README.md`).
+Generated files: `web/js/mod-definitions.js` (`npm run build:mods`), `web/flags/`
+(`npm run build:flags`), `web/feed-icons/` (`npm run build:feed-icons`), `web/osu-web/` and
+`web/css/osu-web-art.css` (`npm run build:osu-web`).
 
 ## Medals: osu!'s definitions, not symmetric
 
