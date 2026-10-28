@@ -200,6 +200,7 @@ Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and 
 - [fyne.io/systray](https://github.com/fyne-io/systray), [godbus/dbus](https://github.com/godbus/dbus) and [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) for the tray launcher
 - [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's video](https://youtu.be/5wVU4kYC3So) and McOsu for the idea
 - [Nunito](https://github.com/googlefonts/nunito) - the page's font (SIL Open Font License)
+- [FlareonGhh](https://github.com/starhollow2008/osu-local-profiles-ext-media) - Other icons provider: recent feed icons for level-ups and new bests (CC BY 4.0)
 
 
 Full license details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

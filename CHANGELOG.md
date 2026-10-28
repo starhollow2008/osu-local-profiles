@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.32.0
+
+- **Level-ups and new best performances have icons in Recent.** *Reached level N* and *New best
+  performance* rows had an empty space where medals and ranks show their badge, and now have an
+  icon of their own.
+  Thanks to [@starhollow2008](https://github.com/starhollow2008).
+
+- **Import past plays shows how far it has got.** A bar in the dialog counts the plays brought in,
+  and once the dialog is closed a notice in the cover's corner keeps counting and opens it again.
+  Import no longer waits for Check, which is optional.
+  Reported in [#12](https://github.com/jonathant09/osu-local-profiles/issues/12).
+  Thanks to [@NoelleTGS](https://github.com/NoelleTGS).
+
 ## 1.31.0
 
 - **Other players' replays you collected are no longer imported as your plays.** A top play its
