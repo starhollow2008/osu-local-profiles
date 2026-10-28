@@ -53,7 +53,7 @@ internal static class Favorites
     }
 
     /// <summary>The favourites as cards, most recently favourited first, <paramref name="limit"/> at a time.</summary>
-    public static List<Dictionary<string, object?>> List(Database db, FavoriteScope scope, int limit)
+    public static List<Dictionary<string, object?>> List(Database db, FavoriteScope scope, long limit)
     {
         var (table, where, args) = Resolve(scope);
         var rows = db.Rows($"""

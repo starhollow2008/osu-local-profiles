@@ -107,14 +107,41 @@ internal static partial class Js
             item.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? "" : ToJsString(item)));
 
     /// <summary>
-    /// Text for a number that reads back as the same number. Not JavaScript's exact format past
-    /// 1e15, where .NET switches to an exponent sooner; it is only ever parsed again here.
+    /// <c>String(n)</c>, exactly: the shortest digits that read back as the same number, laid out
+    /// as the spec's Number::toString does. .NET switches to an exponent at 1e15 and 1e-5;
+    /// JavaScript at 1e21 and 1e-7, and writes <c>1e+21</c> where .NET writes <c>1E+21</c>. An
+    /// export writes numbers as text, so the layout is part of the answer.
     /// </summary>
-    public static string NumberToString(double n) =>
-        double.IsNaN(n) ? "NaN"
-        : double.IsPositiveInfinity(n) ? "Infinity"
-        : double.IsNegativeInfinity(n) ? "-Infinity"
-        : n.ToString("R", CultureInfo.InvariantCulture);
+    public static string NumberToString(double n)
+    {
+        if (double.IsNaN(n)) return "NaN";
+        if (n == 0) return "0";
+        if (double.IsInfinity(n)) return n > 0 ? "Infinity" : "-Infinity";
+        if (n < 0) return "-" + NumberToString(-n);
+
+        // .NET's round-trip form has the shortest digits; take them and their exponent out of it.
+        var r = n.ToString("R", CultureInfo.InvariantCulture);
+        var e = r.IndexOf('E');
+        var mantissa = e < 0 ? r : r[..e];
+        var exponent = e < 0 ? 0 : int.Parse(r[(e + 1)..], CultureInfo.InvariantCulture);
+        var dot = mantissa.IndexOf('.');
+        var digits = dot < 0 ? mantissa : mantissa.Remove(dot, 1);
+        var point = (dot < 0 ? mantissa.Length : dot) + exponent;
+        var lead = 0;
+        while (lead < digits.Length - 1 && digits[lead] == '0') lead++;
+        digits = digits[lead..];
+        point -= lead;
+        digits = digits.TrimEnd('0');
+
+        // value = 0.digits * 10^point, the spec's n being `point` and k the digit count.
+        int k = digits.Length, p = point;
+        if (k <= p && p <= 21) return digits + new string('0', p - k);
+        if (0 < p && p <= 21) return digits[..p] + "." + digits[p..];
+        if (-6 < p && p <= 0) return "0." + new string('0', -p) + digits;
+        var sign = p - 1 >= 0 ? "+" : "-";
+        var power = Math.Abs(p - 1).ToString(CultureInfo.InvariantCulture);
+        return k == 1 ? $"{digits}e{sign}{power}" : $"{digits[0]}.{digits[1..]}e{sign}{power}";
+    }
 
     [GeneratedRegex(@"^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\z")]
     private static partial Regex DecimalLiteral();

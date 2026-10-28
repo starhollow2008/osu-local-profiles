@@ -117,6 +117,30 @@ public sealed class ServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_me_image_is_served_from_data_by_its_address_and_nothing_else_is()
+    {
+        var folder = Path.Combine(install, "data", "about-images", "1");
+        Directory.CreateDirectory(folder);
+        File.WriteAllBytes(Path.Combine(folder, "0123456789abcdef.png"), [1, 2, 3]);
+        File.WriteAllText(Path.Combine(install, "data", "secret.txt"), "secret");
+
+        var found = await client.GetAsync("/api/about-image/1/0123456789abcdef.png");
+        Assert.Equal(HttpStatusCode.OK, found.StatusCode);
+        Assert.Equal("image/png", found.Content.Headers.ContentType!.ToString());
+        Assert.Equal("max-age=31536000, immutable", found.Headers.CacheControl!.ToString());
+        Assert.Equal([1, 2, 3], await found.Content.ReadAsByteArrayAsync());
+
+        // Gone, or not an address the page gives: a 404, as the Node app's static files answer.
+        foreach (var path in new[] { "/api/about-image/1/fedcba9876543210.png", "/api/about-image/1/0123456789ABCDEF.png" })
+        {
+            var missing = await client.GetAsync(path);
+            Assert.True(missing.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.NotImplemented, path);
+            Assert.DoesNotContain("secret", await missing.Content.ReadAsStringAsync());
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/about-image/1/fedcba9876543210.png")).StatusCode);
+    }
+
+    [Fact]
     public void The_page_is_recognised_under_each_name_for_this_machine_on_this_port_only()
     {
         Assert.True(Server.IsOwnPage(null, 7272));

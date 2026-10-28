@@ -252,9 +252,33 @@ internal static partial class Scores
     }
 }
 
-/// <summary>A profile's avatar and banner in <c>data/</c>: src/identity.ts, the reading half.</summary>
-internal static class Identity
+/// <summary>
+/// A profile's avatar and banner in <c>data/</c>, and the images in its me!: src/identity.ts and
+/// src/about-images.ts, the reading halves.
+/// </summary>
+internal static partial class Identity
 {
+    /// <summary>The types a stored image may have, by extension (MIME_FOR_EXTENSION).</summary>
+    private static readonly Dictionary<string, string> MimeForExtension = new()
+    {
+        [".png"] = "image/png", [".jpg"] = "image/jpeg", [".jpeg"] = "image/jpeg", [".webp"] = "image/webp", [".gif"] = "image/gif",
+    };
+
+    /// <summary>The address <c>saveAboutImage</c> gives an image: a profile, its content's hash, its type.</summary>
+    [GeneratedRegex(@"^/api/about-image/([0-9]+)/([0-9a-f]{16})\.(png|jpg|webp|gif)\z")]
+    private static partial Regex AboutImageRoute();
+
+    public static bool IsAboutImageRoute(string pathname) => AboutImageRoute().IsMatch(pathname);
+
+    /// <summary>The file behind a me! image's address, or null for anything else or a file that is gone.</summary>
+    public static (string File, string Mime)? AboutImageFile(string dataDir, string pathname)
+    {
+        var m = AboutImageRoute().Match(pathname);
+        if (!m.Success) return null;
+        var file = Path.Combine(dataDir, "about-images", m.Groups[1].Value, $"{m.Groups[2].Value}.{m.Groups[3].Value}");
+        return MimeForExtension.TryGetValue($".{m.Groups[3].Value}", out var mime) && File.Exists(file) ? (file, mime) : null;
+    }
+
     private static readonly string[] Extensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 
     /// <summary>The names from before profiles had their own, kept working.</summary>

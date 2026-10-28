@@ -22,6 +22,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
+import { extractZip } from '../src/update/zip.ts';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -252,6 +253,46 @@ async function main() {
       const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
       const problems = compareMeta(a, b);
       if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
+      report(pathname, problems, a);
+    }
+
+    // The exports. The JSON's own timestamp is the moment each app answered; a workbook is a zip
+    // whose compressed bytes differ between Node's zlib and .NET's, so the files inside it are compared.
+    await compareJson([{ path: '/api/export', ignore: { exportedAt: 'the moment each app answered' } }]);
+    for (const pathname of ['/api/export/scores.csv', '/api/export/scores.csv?lang=de', '/api/export/scores.csv?lang=xx']) {
+      const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
+      const problems = compareMeta(a, b);
+      if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
+      report(pathname, problems, a);
+    }
+    for (const pathname of ['/api/export/profile.xlsx', '/api/export/profile.xlsx?lang=ja']) {
+      const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
+      const problems = compareMeta(a, b);
+      const unpacked = [a, b].map((answer, i) => {
+        const file = path.join(work, `workbook-${i}.xlsx`);
+        const dir = path.join(work, `workbook-${i}`);
+        fs.rmSync(dir, { recursive: true, force: true });
+        fs.writeFileSync(file, answer.body);
+        try {
+          extractZip(file, dir);
+        } catch (e) {
+          problems.push(`${i === 0 ? 'node' : 'cs'}: not a zip (${e.message})`);
+          return new Map();
+        }
+        const files = new Map();
+        const walk = (at, prefix) => {
+          for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
+            if (entry.isDirectory()) walk(path.join(at, entry.name), `${prefix}${entry.name}/`);
+            else files.set(`${prefix}${entry.name}`, fs.readFileSync(path.join(at, entry.name)));
+          }
+        };
+        walk(dir, '');
+        return files;
+      });
+      for (const name of new Set([...unpacked[0].keys(), ...unpacked[1].keys()])) {
+        const [x, y] = [unpacked[0].get(name), unpacked[1].get(name)];
+        if (!x || !y || !x.equals(y)) problems.push(`${name}: node ${x?.length ?? 'missing'} bytes | cs ${y?.length ?? 'missing'} bytes, different`);
+      }
       report(pathname, problems, a);
     }
 

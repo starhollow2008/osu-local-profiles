@@ -131,7 +131,11 @@ about-images, `/api/export/*`. The `/api/profile` cache keeps its `total_changes
       and the replays and pictures byte for byte. Two parts wait: a score priced before
       breakdowns were kept is recalculated on view by the pp helper (phase 3; none in the
       owner's data), and the card as a PNG needs a browser (phase 5).
-- [ ] `/api/state`, about-images, `/api/export/*`.
+- [x] me! images, and the exports: `/api/export` (JSON), `/api/export/scores.csv` byte for byte, and
+      `/api/export/profile.xlsx` file for file inside the zip (Node's zlib and .NET's compress the
+      same files differently), each in the page's language. Numbers are written as JavaScript writes
+      them (`Js.NumberToString`), since an export is text.
+- [ ] `/api/state`.
 
 ### 3. pp in-process
 

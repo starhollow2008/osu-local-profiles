@@ -29,6 +29,9 @@ internal sealed class Row
 
     public bool Has(string column) => values.ContainsKey(column);
 
+    /// <summary>Every column, for writing the row out whole as JSON, as <c>JSON.stringify(row)</c> does.</summary>
+    public IReadOnlyDictionary<string, object?> Columns => values;
+
     /// <summary>A number, or null for NULL or text.</summary>
     public double? Num(string column) => this[column] switch
     {

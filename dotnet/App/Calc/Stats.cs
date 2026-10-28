@@ -418,7 +418,7 @@ internal static class Stats
             """, profileId, mode, profileId, mode));
 
     /// <summary>osu-web's Most Played Beatmaps: every attempt counts, abandoned ones included.</summary>
-    public static List<MostPlayedEntry> MostPlayed(Database db, long profileId, double mode, int limit, Eligibility e) =>
+    public static List<MostPlayedEntry> MostPlayed(Database db, long profileId, double mode, long limit, Eligibility e) =>
         [.. db.Rows($"""
             SELECT p.beatmap_md5, MAX(p.beatmap_id) AS beatmap_id,
                    COUNT(*) AS count, MAX(p.played_at) AS last_played,

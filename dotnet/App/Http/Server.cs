@@ -301,8 +301,42 @@ internal static partial class Server
             return;
         }
 
-        // Everything else under /api/ is still the Node app's (docs/csharp-port.md).
-        if (pathname.StartsWith("/api/", StringComparison.Ordinal))
+        if (pathname is "/api/export/scores.csv" or "/api/export/profile.xlsx" && method == "GET")
+        {
+            await ExportApi.Spreadsheet(context, opts, Current(), csv: pathname.EndsWith(".csv", StringComparison.Ordinal));
+            return;
+        }
+
+        if (pathname == "/api/export")
+        {
+            await ExportApi.Json(context, opts, Current());
+            return;
+        }
+
+        // An image in a profile's me!, saved by the page; never anything else in data/.
+        if (method is "GET" or "HEAD" && Identity.AboutImageFile(opts.Paths.DataDir, pathname) is { } aboutImage)
+        {
+            byte[] bytes;
+            try
+            {
+                bytes = await File.ReadAllBytesAsync(aboutImage.File);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                await Text(context, 404, "not found", "text/plain");
+                return;
+            }
+            context.Response.StatusCode = 200;
+            context.Response.ContentType = aboutImage.Mime;
+            // Named by their content's hash, so a name never comes to mean another image.
+            context.Response.Headers.CacheControl = "max-age=31536000, immutable";
+            await context.Response.Body.WriteAsync(bytes);
+            return;
+        }
+
+        // Everything else under /api/ is still the Node app's (docs/csharp-port.md). A me! image
+        // that is not there falls through to the static files and their 404, as in Node.
+        if (pathname.StartsWith("/api/", StringComparison.Ordinal) && !Identity.IsAboutImageRoute(pathname))
         {
             await Json(context, new { error = $"{method} {pathname} is not ported yet" }, 501);
             return;
