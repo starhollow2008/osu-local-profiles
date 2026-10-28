@@ -299,6 +299,12 @@ internal static partial class Js
             : double.NaN;
     }
 
+    /// <summary>
+    /// <c>fs.readFileSync(file, 'utf8')</c>: a byte-order mark is kept as U+FEFF, where
+    /// <see cref="File.ReadAllText(string)"/> would drop it, and bad bytes become U+FFFD.
+    /// </summary>
+    public static string ReadFileUtf8(string file) => new UTF8Encoding(false).GetString(File.ReadAllBytes(file));
+
     /// <summary><c>Date.now()</c>.</summary>
     public static long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 }

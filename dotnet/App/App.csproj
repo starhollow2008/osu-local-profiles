@@ -13,6 +13,8 @@
   <ItemGroup>
     <!-- One schema for both apps while the port runs. -->
     <EmbeddedResource Include="..\..\src\db\schema.sql" LogicalName="schema.sql" />
+    <EmbeddedResource Include="..\..\src\calc\medal-definitions.json" LogicalName="medal-definitions.json" />
+    <EmbeddedResource Include="..\..\src\calc\rank-tables\*.json" LogicalName="rank-tables/%(Filename)%(Extension)" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="App.Tests" />

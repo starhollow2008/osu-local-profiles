@@ -39,7 +39,17 @@ const ENDPOINTS = [
   { path: '/api/app-config' },
   { path: '/api/declined' },
   { path: '/api/data-folder', ignore: { path: 'each app runs on its own copy of data/' } },
+  // Every mode, with the page's own first pages, and with every section asked for in full.
+  ...[0, 1, 2, 3].flatMap((mode) => [
+    { path: `/api/profile?mode=${mode}` },
+    { path: `/api/profile?mode=${mode}&top=100&recent=10000&mostPlayed=10000&favorites=10000&events=10000` },
+  ]),
+  // What the page never sends, read as the Node app reads it.
+  { path: '/api/profile?mode=abc&top=0&recent=-3&events=2.9' },
 ];
+
+/** Endpoints whose answer depends on the active profile, asked again for every other profile. */
+const PER_PROFILE = ['/api/settings', '/api/declined', '/api/profile'];
 
 /** Files and pages, compared byte for byte. */
 const STATIC = ['/', '/scores/1', '/scores/1/', '/js/main.js', '/css/base.css', '/favicon.svg', '/i18n/en.json', '/no-such-file.js'];
@@ -180,9 +190,10 @@ async function main() {
     await Promise.all([waitFor(nodePort, nodeApp, 'the Node app'), waitFor(csPort, csApp, 'the C# app')]);
 
     let failed = 0;
-    const report = (pathname, problems) => {
+    const report = (pathname, problems, answer) => {
       if (problems.length === 0) {
-        console.log(`  same     ${pathname}`);
+        // Status and size, so two apps failing alike cannot pass for agreement.
+        console.log(`  same     ${pathname}  (${answer.status}, ${(answer.body.length / 1024).toFixed(1)} KB)`);
         return;
       }
       failed++;
@@ -194,21 +205,47 @@ async function main() {
       ...HEADERS.filter((h) => a.headers[h] !== b.headers[h]).map((h) => `${h}: node ${a.headers[h]} | cs ${b.headers[h]}`),
     ];
 
-    for (const { path: pathname, ignore = {} } of ENDPOINTS) {
-      const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
-      const problems = compareMeta(a, b);
-      try {
-        problems.push(...differences(JSON.parse(a.body.toString('utf8')), JSON.parse(b.body.toString('utf8')), '', ignore));
-      } catch (e) {
-        problems.push(`not JSON: ${e.message}`);
+    const compareJson = async (endpoints, label = '') => {
+      for (const { path: pathname, ignore = {} } of endpoints) {
+        const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
+        const problems = compareMeta(a, b);
+        try {
+          problems.push(...differences(JSON.parse(a.body.toString('utf8')), JSON.parse(b.body.toString('utf8')), '', ignore));
+        } catch (e) {
+          problems.push(`not JSON: ${e.message}`);
+        }
+        report(`${label}${pathname}`, problems, a);
       }
-      report(pathname, problems);
+    };
+    await compareJson(ENDPOINTS);
+
+    /*
+     * The other profiles: the answers above are the active one's. Each app reads the active
+     * profile from its database on every request, so switching it in both copies is enough.
+     */
+    const copies = [path.join(nodeRoot, 'data', 'profiles.db'), path.join(csRoot, 'data', 'profiles.db')];
+    const profileIds = (() => {
+      const db = new DatabaseSync(copies[0], { readOnly: true });
+      try {
+        const active = db.prepare("SELECT value FROM kv WHERE key = 'activeProfileId'").get()?.value;
+        return db.prepare('SELECT id FROM profiles ORDER BY id').all().map((r) => r.id).filter((id) => String(id) !== active);
+      } finally {
+        db.close();
+      }
+    })();
+    for (const id of profileIds) {
+      for (const file of copies) {
+        const db = new DatabaseSync(file);
+        db.prepare("INSERT INTO kv (key, value) VALUES ('activeProfileId', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(String(id));
+        db.close();
+      }
+      await compareJson(ENDPOINTS.filter((e) => PER_PROFILE.some((prefix) => e.path.startsWith(prefix))), `[profile ${id}] `);
     }
     for (const pathname of STATIC) {
       const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
       const problems = compareMeta(a, b);
       if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
-      report(pathname, problems);
+      report(pathname, problems, a);
     }
 
     console.log(failed === 0 ? '\n  Every answer matches.' : `\n  ${failed} answer(s) differ.`);

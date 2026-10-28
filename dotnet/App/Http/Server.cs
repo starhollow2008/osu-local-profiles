@@ -21,6 +21,15 @@ internal sealed class ServerOptions
 
     /// <summary>Stops the app, deliberately: the page's Quit. Null for a copy that cannot be stopped from the page.</summary>
     public Action? OnQuit { get; init; }
+
+    /// <summary>
+    /// Whether anything on this machine can say if a beatmap is ranked: lazer's online.db. Found by
+    /// install detection, which is ported with the tracker (phase 4); until then, assumed.
+    /// </summary>
+    public bool StatusKnown { get; init; } = true;
+
+    /// <summary>The cache behind /api/profile, made with the server.</summary>
+    internal ProfileCache? Cache { get; set; }
 }
 
 /// <summary>
@@ -54,6 +63,7 @@ internal static partial class Server
              */
             kestrel.ListenAnyIP(opts.Port);
         });
+        opts.Cache ??= new ProfileCache(opts.Db);
         var app = builder.Build();
         app.Run(context => Handle(context, opts));
         return app;
@@ -158,6 +168,12 @@ internal static partial class Server
                 quit();
             });
             await Json(context, new { ok = true });
+            return;
+        }
+
+        if (pathname == "/api/profile")
+        {
+            await Json(context, ProfileApi.Answer(request, opts, opts.Cache!, Current()));
             return;
         }
 

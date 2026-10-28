@@ -72,7 +72,7 @@ dotnet/
 | --- | ----------------------------- | ----------- |
 | 0   | This plan                     | done        |
 | 1   | Foundations                   | done        |
-| 2   | Reading a profile             | not started |
+| 2   | Reading a profile             | in progress |
 | 3   | pp in-process                 | not started |
 | 4   | Tracking                      | not started |
 | 5   | Everything that writes        | not started |
@@ -118,6 +118,16 @@ fields stubbed until phase 4), `/api/profile`, `/api/scores/:id`, `/api/image/*`
 about-images, `/api/export/*`. The `/api/profile` cache keeps its `total_changes()` and
 `data_version` stamp. Port `test/calc.test.ts`, `eligibility`, `medals`, `rank`,
 `play-time`, `metadata`, `scores`, `favorites`, `export` alongside.
+
+- [x] `/api/profile`: stats, top, pinned, recent (with runs of quits folded), most played,
+      medals (every family, imported ones, the all-mode count), history (pp and rank charts,
+      monthly play counts, the Recent feed with medal and rank events), rank estimate, borrowed
+      standing, favourites, behind the same database-stamped cache. Identical on every profile in
+      every mode on the owner's data, up to 472 KB an answer.
+- [ ] Two stand-ins until phase 4: lazer's `online.db` is assumed found (`StatusKnown`, which
+      decides whether unresolved beatmaps count), and a favourite with no osu! details is drawn
+      without the other difficulties `online.db` lists.
+- [ ] `/api/state`, `/api/scores/:id`, `/api/image/*`, about-images, `/api/export/*`.
 
 ### 3. pp in-process
 
@@ -238,6 +248,9 @@ the helpers.
   matter. Strings are written unescaped like `JSON.stringify` (`UnsafeRelaxedJsonEscaping`). A
   lone surrogate (text cut in the middle of an emoji) is written as U+FFFD, where JavaScript
   keeps it; accepted.
+- **NaN and Infinity** are written as `null`, as `JSON.stringify` writes them (.NET would throw).
+- **SQLite values** come back as node:sqlite returns them through `Row`: whole numbers, decimals,
+  text or null, read with the TypeScript's own casts and `=== 1` tests.
 - **Object key order**: kept where it is visible (settings follow `DEFS`' order); the parity
   script ignores it.
 - **`in` on an object** also finds inherited names (`"constructor" in {}` is true). Where the

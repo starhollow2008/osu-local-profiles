@@ -170,6 +170,16 @@ internal sealed partial class Database : IDisposable
         return rows;
     }
 
+    /// <summary>
+    /// <c>prepare(sql).all(...)</c> as node:sqlite returns it: each row's columns by name, as
+    /// <c>long</c>, <c>double</c>, <c>string</c>, <c>byte[]</c> or null. For code ported from
+    /// TypeScript that reads columns loosely, so it reads them the same way.
+    /// </summary>
+    public List<Row> Rows(string sql, params object?[] args) => All(sql, Row.From, args);
+
+    /// <summary><c>prepare(sql).get(...)</c> in the same shape, or null when there is no row.</summary>
+    public Row? FirstRow(string sql, params object?[] args) => Get(sql, Row.From, args);
+
     /// <summary>The first column of the first row, or null.</summary>
     public object? Scalar(string sql, params object?[] args)
     {

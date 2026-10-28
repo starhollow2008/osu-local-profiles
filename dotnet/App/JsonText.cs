@@ -17,7 +17,23 @@ internal static class JsonText
         DictionaryKeyPolicy = null,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+        Converters = { new FiniteOrNull() },
     };
+
+    /// <summary>
+    /// <c>JSON.stringify</c> writes NaN and Infinity as <c>null</c>; .NET would throw. A figure the
+    /// arithmetic could not produce reaches the page as nothing, as it always did.
+    /// </summary>
+    private sealed class FiniteOrNull : JsonConverter<double>
+    {
+        public override double Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => reader.GetDouble();
+
+        public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
+        {
+            if (double.IsFinite(value)) writer.WriteNumberValue(value);
+            else writer.WriteNullValue();
+        }
+    }
 
     public static string Stringify<T>(T value) => JsonSerializer.Serialize(value, Options);
 
