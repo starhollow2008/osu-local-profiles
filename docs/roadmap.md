@@ -93,6 +93,7 @@ does not have to make it again.
 | 5.79 | Ranks achieved on beatmaps, in Recent                     | done   |
 | 5.80 | Recent, named and placed as on osu!                       | done   |
 | 5.81 | An import's progress, and Import without Check           | done   |
+| 5.82 | One .NET app in place of Node                             | in progress |
 
 ## Constraints on every item
 
@@ -1597,3 +1598,16 @@ way to tell whether it was still running.
   settings. Without one it brings in every kind of past play, as a preview offers them all ticked.
   It is held only while something runs, or when nothing could be imported (no install ticked,
   every kind unticked).
+
+## 5.82 - One .NET app in place of Node
+
+**Status:** in progress (nothing ships until the switch-over)
+
+The server, tracker and pp in one .NET process, replacing Node and the JSON pipe to the pp
+helper: about half the download (62 MB to about 31 MB zipped, measured on 1.32.0), with the
+same page, data, rules and pp. Built in `dotnet/` on `main` and left out of every package until
+it answers every endpoint exactly as the Node app does.
+
+The plan, its phases, the updater bridge an install needs to reach it, and the JavaScript and
+.NET differences the port has to keep are in [`docs/csharp-port.md`](csharp-port.md), which is
+also where its progress is recorded.
