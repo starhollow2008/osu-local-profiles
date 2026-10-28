@@ -40,6 +40,20 @@ function cs(...command) {
   return run.stdout.trim().split('\n').filter(Boolean).map((l) => JSON.parse(l));
 }
 
+/** Every replay the database knows of, and every file in osu!stable's Data/r, in a stable order. */
+function knownReplays() {
+  const db = new DatabaseSync(path.join(data, 'profiles.db'), { readOnly: true });
+  const known = db
+    .prepare(`SELECT replay_path AS p FROM scores WHERE replay_path IS NOT NULL
+              UNION SELECT replay_path FROM declined_plays WHERE replay_path IS NOT NULL`)
+    .all()
+    .map((r) => r.p);
+  db.close();
+  const stableFolders = new Set(known.map((p) => path.dirname(p)).filter((d) => /[\\/]Data[\\/]r$/i.test(d)));
+  return [...new Set([...known, ...[...stableFolders].flatMap((d) => fs.readdirSync(d).map((f) => path.join(d, f)))])]
+    .filter((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+}
+
 let failed = 0;
 const result = (name, total, differences) => {
   console.log(`  ${differences.length === 0 ? 'same   ' : 'DIFFERS'}  ${name}: ${total - differences.length} of ${total} agree`);
@@ -49,16 +63,7 @@ const result = (name, total, differences) => {
 
 const checks = {
   async replays() {
-    const db = new DatabaseSync(path.join(data, 'profiles.db'), { readOnly: true });
-    const known = db
-      .prepare(`SELECT replay_path AS p FROM scores WHERE replay_path IS NOT NULL
-                UNION SELECT replay_path FROM declined_plays WHERE replay_path IS NOT NULL`)
-      .all()
-      .map((r) => r.p);
-    db.close();
-    const stableFolders = new Set(known.map((p) => path.dirname(p)).filter((d) => /[\\/]Data[\\/]r$/i.test(d)));
-    const paths = [...new Set([...known, ...[...stableFolders].flatMap((d) => fs.readdirSync(d).map((f) => path.join(d, f)))])]
-      .filter((p) => fs.existsSync(p) && fs.statSync(p).isFile());
+    const paths = knownReplays();
     const list = path.join(work, 'replays.txt');
     fs.writeFileSync(list, paths.join('\n'));
     const theirs = new Map(cs('parse-replays', list).map((a) => [a.path, a.error !== undefined ? { error: 'failed' } : { score: a.score }]));
@@ -159,6 +164,94 @@ const checks = {
     csAfter.close();
     nodeDb.close();
     result('resolve', md5s.length, differences);
+  },
+
+  /*
+   * Every replay the profiles know of, ingested by both into a fresh profile beside a copy of this
+   * machine's beatmap index: as a re-ingest (`plain`), and as an import (`judged`) with the owner
+   * worked out and a filter that turns some plays away. The outcomes, and every row each writes,
+   * compared. Slow: each play is priced by osu!'s calculator, twice.
+   */
+  async ingest() {
+    const config = JSON.parse(fs.readFileSync(path.join(data, 'config.json'), 'utf8'));
+    const { installs } = await discoverInstalls({ configured: config.installRoots ?? [], remembered: config.discoveredRoots ?? [], noSearch: true });
+    const { openDb } = await import('../src/db/index.ts');
+    const { seedFirstProfile } = await import('../src/profiles.ts');
+    const { updateSettings, getSettings } = await import('../src/settings.ts');
+    const { BeatmapResolver } = await import('../src/clients/beatmaps.ts');
+    const { ingestReplayFile } = await import('../src/tracker/ingest.ts');
+    const { resolveIdentity } = await import('../src/player-identity.ts');
+    const { OfficialCalculator } = await import('../src/calc/official.ts');
+    const official = await OfficialCalculator.create();
+    if (!official) throw new Error("osu!'s calculator is not built: npm run build:pp");
+
+    const real = path.join(data, 'profiles.db');
+    const files = knownReplays();
+    const list = path.join(work, 'ingest.txt');
+    fs.writeFileSync(list, files.join('\n'));
+    const installsFile = path.join(work, 'installs.json');
+    fs.writeFileSync(installsFile, JSON.stringify(installs));
+    // Something to turn away on every criterion the filter has, while letting most plays through.
+    const filter = {
+      enabled: true,
+      stars: { min: 0, max: 7 },
+      length: { min: 20, max: 600 },
+      mods: { HR: 'excluded' },
+      categories: ['ranked', 'qualified', 'loved', 'pending', 'wip', 'unsubmitted'],
+      submitted: { from: Date.UTC(2010, 0, 1), to: null, includeUnknown: true },
+      rules: [{ conditions: [{ field: 'any', test: 'notContains', values: ['remix'] }] }, { conditions: [{ field: 'mapper', test: 'is', values: ['sotarks'] }] }],
+    };
+    // Nulls left out, so an outcome Node writes without a key reads as one C# writes with null.
+    const bare = (v) => JSON.parse(JSON.stringify(v, (_, x) => (x === null ? undefined : x)));
+
+    for (const mode of ['plain', 'judged']) {
+      const nodeFile = path.join(work, `ingest-node-${mode}.db`);
+      const csFile = path.join(work, `ingest-cs-${mode}.db`);
+      const setup = openDb(nodeFile);
+      setup.exec(`ATTACH DATABASE '${real.replaceAll("'", "''")}' AS real`);
+      setup.exec('INSERT INTO osu_files SELECT * FROM real.osu_files');
+      setup.exec('DETACH DATABASE real');
+      seedFirstProfile(setup, 'check');
+      setup.exec('UPDATE profiles SET tracking_since = 0');
+      const profileId = setup.prepare('SELECT id FROM profiles ORDER BY id LIMIT 1').get().id;
+      if (mode === 'judged') updateSettings(setup, profileId, { trackingFilter: filter });
+      setup.close();
+      fs.copyFileSync(nodeFile, csFile);
+
+      const db = openDb(nodeFile);
+      const ctx = { db, resolver: new BeatmapResolver(db, installs), profileId, trackingSince: 0, official };
+      if (mode === 'judged') Object.assign(ctx, { filter: getSettings(db, profileId).trackingFilter, identity: resolveIdentity(db, profileId, installs), declines: 'import' });
+      const ours = [];
+      for (const file of files) ours.push(bare(await ingestReplayFile(file, ctx)));
+      const theirs = cs('ingest', csFile, installsFile, list, mode).map(bare);
+
+      const differences = [];
+      files.forEach((f, i) => {
+        if (!isDeepStrictEqual(ours[i], theirs[i])) differences.push(`${path.basename(f)}: node ${JSON.stringify(ours[i])} | cs ${JSON.stringify(theirs[i])}`);
+      });
+      const csDb = new DatabaseSync(csFile, { readOnly: true });
+      for (const [table, key, skip] of [
+        ['scores', 'id', []],
+        ['declined_plays', 'id', ['declined_at']],
+        ['beatmaps', 'md5', ['cached_at']],
+      ]) {
+        const rows = (d) => new Map(d.prepare(`SELECT * FROM ${table}`).all().map((r) => {
+          for (const s of skip) delete r[s];
+          return [r[key], JSON.stringify(r)];
+        }));
+        const [a, b] = [rows(db), rows(csDb)];
+        for (const k of new Set([...a.keys(), ...b.keys()])) {
+          if (a.get(k) !== b.get(k)) differences.push(`${table} ${k}: node ${a.get(k) ?? 'missing'} | cs ${b.get(k) ?? 'missing'}`);
+        }
+        console.log(`           ${mode} ${table}: ${a.size} rows (node), ${b.size} rows (cs)`);
+      }
+      const tally = ours.reduce((t, o) => ({ ...t, [o.reason ?? o.status]: (t[o.reason ?? o.status] ?? 0) + 1 }), {});
+      console.log(`           ${mode} outcomes: ${JSON.stringify(tally)}`);
+      csDb.close();
+      db.close();
+      result(`ingest (${mode})`, files.length, differences);
+    }
+    official.dispose();
   },
 
   discover: () => discover(false),

@@ -81,6 +81,11 @@ test('an unrecognised judgement refuses to guess rather than under-report', () =
   assert.equal(lazerAccuracy(odd), null);
   // It falls back to the legacy formula instead of returning a silently wrong figure.
   assert.equal((accuracy(odd, 0) * 100).toFixed(2), '89.11');
+  // A name every object inherits is no judgement either.
+  const inherited = wonderfulWonder({
+    extras: { statistics: { great: 100, constructor: 1 }, maximum_statistics: { great: 100 } },
+  });
+  assert.equal(lazerAccuracy(inherited), null);
 });
 
 test('missing maximum_statistics falls back instead of dividing by zero', () => {

@@ -36,7 +36,7 @@ function weighJudgements(stats: Record<string, number>): { total: number; unknow
   let total = 0;
   const unknown: string[] = [];
   for (const [key, count] of Object.entries(stats)) {
-    const value = HIT_VALUES[key];
+    const value = Object.hasOwn(HIT_VALUES, key) ? HIT_VALUES[key] : undefined;
     if (value === undefined) unknown.push(key);
     else total += value * count;
   }

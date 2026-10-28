@@ -140,7 +140,7 @@ internal sealed class OfficialCalculator
     /// Whether osu! ranks a mod combination, from osu!'s own mod classes: lazer's mods, or a stable
     /// bitmask. Null when it cannot answer.
     /// </summary>
-    public async Task<(bool Ranked, string[] Unranked)?> Ranked(int ruleset, IReadOnlyList<JsonElement>? mods, long? legacyMods)
+    public async Task<(bool Ranked, string[] Unranked)?> Ranked(int ruleset, JsonElement? mods, long? legacyMods)
     {
         var response = await Send(new { type = "ranked", ruleset, mods, legacyMods });
         if (Js.Get(response, "ok") is not { ValueKind: JsonValueKind.True } || Js.Get(response, "ranked") is not { ValueKind: JsonValueKind.True or JsonValueKind.False } ranked)

@@ -17,7 +17,7 @@ internal static class JsonText
         DictionaryKeyPolicy = null,
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-        Converters = { new FiniteOrNull() },
+        Converters = { new FiniteOrNull(), new AsJavaScript() },
     };
 
     /// <summary>
@@ -30,8 +30,57 @@ internal static class JsonText
 
         public override void Write(Utf8JsonWriter writer, double value, JsonSerializerOptions options)
         {
-            if (double.IsFinite(value)) writer.WriteNumberValue(value);
+            if (double.IsFinite(value)) writer.WriteRawValue(Js.NumberToString(value), skipInputValidation: true);
             else writer.WriteNullValue();
+        }
+    }
+
+    /// <summary>
+    /// Parsed JSON written back out as <c>JSON.stringify(JSON.parse(text))</c> would: numbers in
+    /// JavaScript's shortest form (lazer writes <c>4.0</c>, JavaScript <c>4</c>), a repeated key
+    /// once with its last value, and integer keys first, as a JavaScript object orders them.
+    /// </summary>
+    private sealed class AsJavaScript : JsonConverter<JsonElement>
+    {
+        public override JsonElement Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            using var doc = JsonDocument.ParseValue(ref reader);
+            return doc.RootElement.Clone();
+        }
+
+        public override void Write(Utf8JsonWriter writer, JsonElement value, JsonSerializerOptions options)
+        {
+            switch (value.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    writer.WriteStartObject();
+                    foreach (var (key, item) in Js.Entries(value))
+                    {
+                        writer.WritePropertyName(key);
+                        Write(writer, item, options);
+                    }
+                    writer.WriteEndObject();
+                    break;
+                case JsonValueKind.Array:
+                    writer.WriteStartArray();
+                    foreach (var item in value.EnumerateArray()) Write(writer, item, options);
+                    writer.WriteEndArray();
+                    break;
+                case JsonValueKind.Number:
+                    var n = Js.NumberOf(value);
+                    if (double.IsFinite(n)) writer.WriteRawValue(Js.NumberToString(n), skipInputValidation: true);
+                    else writer.WriteNullValue();
+                    break;
+                case JsonValueKind.String:
+                    writer.WriteStringValue(value.GetString());
+                    break;
+                case JsonValueKind.True or JsonValueKind.False:
+                    writer.WriteBooleanValue(value.ValueKind == JsonValueKind.True);
+                    break;
+                default:
+                    writer.WriteNullValue();
+                    break;
+            }
         }
     }
 

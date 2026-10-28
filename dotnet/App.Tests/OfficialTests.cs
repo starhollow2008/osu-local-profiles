@@ -27,12 +27,12 @@ public class OfficialTests
     {
         var calculator = Calculator();
         var mod = (string acronym) => JsonText.From(new { acronym });
-        Assert.Equal((true, Array.Empty<string>()), await calculator.Ranked(0, [mod("HD"), mod("DT")], null));
-        var relax = await calculator.Ranked(0, [mod("RX")], null);
+        Assert.Equal((true, Array.Empty<string>()), await calculator.Ranked(0, JsonText.From(new[] { mod("HD"), mod("DT") }), null));
+        var relax = await calculator.Ranked(0, JsonText.From(new[] { mod("RX") }), null);
         Assert.False(relax!.Value.Ranked);
         Assert.Equal(["RX"], relax.Value.Unranked);
         // A changed speed unranks Double Time.
-        Assert.False((await calculator.Ranked(0, [JsonText.From(new { acronym = "DT", settings = new { speed_change = 1.3 } })], null))!.Value.Ranked);
+        Assert.False((await calculator.Ranked(0, JsonText.From(new[] { new { acronym = "DT", settings = new { speed_change = 1.3 } } }), null))!.Value.Ranked);
         // osu!stable's bitmask, through osu!'s own conversion: bit 7 is Relax.
         Assert.False((await calculator.Ranked(0, null, 128))!.Value.Ranked);
         Assert.True((await calculator.Ranked(0, null, 8))!.Value.Ranked);

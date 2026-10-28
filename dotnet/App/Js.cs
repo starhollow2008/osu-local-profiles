@@ -24,6 +24,45 @@ internal static partial class Js
     public static JsonElement? Get(JsonElement? value, string key) =>
         value is { ValueKind: JsonValueKind.Object } obj && obj.TryGetProperty(key, out var found) ? found : null;
 
+    /// <summary>
+    /// <c>Object.entries(JSON.parse(...))</c>: an object's keys once each with their last value,
+    /// integer keys first in numeric order and the rest as written; an array's indexes; a
+    /// string's characters; nothing for anything else.
+    /// </summary>
+    public static List<(string Key, JsonElement Value)> Entries(JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case JsonValueKind.Object:
+            {
+                var order = new List<string>();
+                var values = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+                foreach (var p in value.EnumerateObject())
+                {
+                    if (!values.ContainsKey(p.Name)) order.Add(p.Name);
+                    values[p.Name] = p.Value;
+                }
+                var indexes = order.Where(k => ArrayIndex(k) is not null).OrderBy(k => ArrayIndex(k)!.Value);
+                return [.. indexes.Concat(order.Where(k => ArrayIndex(k) is null)).Select(k => (k, values[k]))];
+            }
+            case JsonValueKind.Array:
+                return [.. value.EnumerateArray().Select((item, i) => (i.ToString(CultureInfo.InvariantCulture), item))];
+            case JsonValueKind.String:
+                var text = value.GetString()!;
+                return [.. text.Select((c, i) => (i.ToString(CultureInfo.InvariantCulture), JsonText.From(c.ToString())))];
+            default:
+                return [];
+        }
+    }
+
+    /// <summary>A key JavaScript orders as an array index: a canonical integer below 2^32 - 1.</summary>
+    private static uint? ArrayIndex(string key)
+    {
+        if (key.Length == 0 || key.Length > 10 || (key.Length > 1 && key[0] == '0') || !key.All(char.IsAsciiDigit)) return null;
+        var n = ulong.Parse(key, CultureInfo.InvariantCulture);
+        return n < uint.MaxValue ? (uint)n : null;
+    }
+
     /// <summary><c>typeof raw === 'object' &amp;&amp; raw !== null &amp;&amp; !Array.isArray(raw)</c>.</summary>
     public static bool IsRecord(JsonElement? value) => value is { ValueKind: JsonValueKind.Object };
 

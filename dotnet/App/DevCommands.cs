@@ -64,10 +64,46 @@ internal static class DevCommands
                 }
                 return 0;
             }
+            case "ingest" when args.Length == 5 && args[4] is "plain" or "judged":
+                return IngestAll(args[1], args[2], args[3], judged: args[4] == "judged").GetAwaiter().GetResult();
             default:
-                Console.Error.WriteLine("usage: --dev parse-replays <list> | discover <data folder> [force] | index-beatmaps <db> <roots.json> | resolve <db> <installs.json> <md5 list>");
+                Console.Error.WriteLine("usage: --dev parse-replays <list> | discover <data folder> [force] | index-beatmaps <db> <roots.json> | resolve <db> <installs.json> <md5 list> | ingest <db> <installs.json> <list> plain|judged");
                 return 2;
         }
+    }
+
+    /// <summary>
+    /// Each replay in the list ingested into the database's first profile, one outcome per line.
+    /// <c>plain</c> is a re-ingest (no filter, everyone's plays, nothing recorded); <c>judged</c> is an
+    /// import: the profile's own filter and owner, and every play turned away recorded.
+    /// </summary>
+    private static async Task<int> IngestAll(string dbFile, string installsFile, string listFile, bool judged)
+    {
+        using var db = Db.Database.Open(dbFile);
+        var installs = System.Text.Json.JsonSerializer.Deserialize<List<Clients.OsuInstall>>(File.ReadAllText(installsFile), JsonText.Options)!;
+        var profile = db.FirstRow("SELECT id, tracking_since FROM profiles ORDER BY id LIMIT 1")!;
+        var profileId = (long)profile.Num("id")!;
+        var (calculator, problem) = Calc.OfficialCalculator.Create();
+        if (calculator is null)
+        {
+            Console.Error.WriteLine(problem);
+            return 1;
+        }
+        var ctx = new Tracker.IngestContext(db, new Clients.BeatmapResolver(db, installs), profileId, profile.Num("tracking_since") ?? 0, calculator);
+        if (judged)
+        {
+            ctx = ctx with
+            {
+                Filter = Settings.SettingsStore.Get(db, profileId).TrackingFilter,
+                Identity = Players.Resolve(db, profileId, installs),
+                Declines = "import",
+            };
+        }
+        foreach (var file in File.ReadAllLines(listFile).Where(l => l.Length > 0))
+        {
+            Console.WriteLine(JsonText.Stringify(await Tracker.Ingest.ReplayFile(file, ctx)));
+        }
+        return 0;
     }
 
     /// <summary>A config list of text, as the Node app reads one: an array's strings.</summary>

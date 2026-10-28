@@ -63,6 +63,16 @@ internal sealed class ScoreDetail(Play play)
 internal static partial class Scores
 {
     /// <summary>
+    /// How an unfinished play's key is remembered in <c>deleted_scores</c>: prefixed, so it can never
+    /// be mistaken for a replay's.
+    /// </summary>
+    public static string DeletedIncompleteKey(string dedupeKey) => $"incomplete:{dedupeKey}";
+
+    /// <summary>Whether a replay with this key was deleted from the profile, and must not come back.</summary>
+    public static bool WasDeleted(Database db, long profileId, string dedupeKey) =>
+        db.Exists("SELECT 1 AS hit FROM deleted_scores WHERE profile_id = ? AND dedupe_key = ?", profileId, dedupeKey);
+
+    /// <summary>
     /// A stable score's six counters, named as lazer names them for the ruleset: what lazer
     /// does when it imports one, so a stable score reads like a lazer one.
     /// </summary>

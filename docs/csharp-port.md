@@ -191,8 +191,17 @@ Each part below is checked against the Node app's own code on the owner's files 
       beatmap the profiles have played resolved to the same answer and cached row (681 of 681).
       SQLite is shared by threads here, so every database call holds one lock, and the indexer
       holds it for each slice of work as Node's single thread did.
-- [ ] Ingestion: pricing, grades, McOsu, built replays, player identity, the filter's matching,
-      declined plays, lazer's log and incomplete plays.
+- [x] Ingesting a replay (`Tracker/Ingest.cs`), with what it decides on: grades and accuracy,
+      mods (stable's bits both ways, McOsu's mods), pricing (`Tracker/Pricing.cs`), whose play
+      it is (`PlayerIdentity.cs`, the sessions osu! is signed in as), the filter's matching half,
+      duplicates under another record, and declined plays. Every replay the owner's profiles know
+      of, ingested by both apps into fresh profiles, gives the same outcome and the same rows
+      (607 of 607): once as a re-ingest, and once as an import with the owner worked out and a
+      filter that turns plays away on every criterion (492 added, 108 filtered, 1 another
+      player's). JSON is written as `JSON.stringify` writes it (`JsonText`), numbers and key
+      order included, since mods and statistics are stored as JSON.
+- [ ] McOsu's `scores.db` and the replays built from it, the replays built from a score's osu!
+      link or entered by hand, lazer's log and incomplete plays.
 - [ ] Watching and the queue, wired into startup; import, catch-up and recompute; a reingest of
       every replay by both apps into fresh profiles, compared table by table.
 
