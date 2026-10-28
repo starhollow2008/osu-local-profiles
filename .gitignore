@@ -20,3 +20,7 @@ reference/
 
 # go-winres output, made and removed by scripts/build-launcher.mjs
 tools/launcher/*.syso
+
+# .NET build output for the C# port (docs/csharp-port.md)
+dotnet/**/bin/
+dotnet/**/obj/

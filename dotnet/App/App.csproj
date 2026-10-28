@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>osu-local-profiles-app</AssemblyName>
+    <RootNamespace>OsuLocalProfiles</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Kestrel. HttpListener goes through http.sys on Windows, which needs admin rights to answer
+         anything but "localhost" as the host (docs/csharp-port.md, Decisions). -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- One schema for both apps while the port runs. -->
+    <EmbeddedResource Include="..\..\src\db\schema.sql" LogicalName="schema.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="App.Tests" />
+  </ItemGroup>
+</Project>

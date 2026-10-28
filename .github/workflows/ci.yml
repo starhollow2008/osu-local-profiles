@@ -71,3 +71,23 @@ jobs:
             echo "::error::the pp calculator was not found -- scores would be tracked with no pp"
             exit 1
           fi
+
+  # The C# port (docs/csharp-port.md). Not in any package yet, so a failure here never blocks a
+  # release; it runs on all three systems because the port has to work on each before it can ship.
+  port:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test the C# port
+        run: dotnet test dotnet/OsuLocalProfiles.slnx --nologo
