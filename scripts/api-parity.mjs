@@ -43,9 +43,6 @@ const ENDPOINTS = [
       tracking: 'the port has no tracker until phase 4',
       indexing: 'the beatmap index comes with the tracker in phase 4',
       installs: 'install detection comes with the tracker in phase 4',
-      'ppCalculator.version': 'the pp helper is in-process from phase 3',
-      'ppCalculator.outdated': 'counted against the helper version, from phase 3',
-      'ppCalculator.source': 'the source-built calculator is ported in phase 3',
     },
   },
   { path: '/api/app-config' },
@@ -246,7 +243,6 @@ async function main() {
       [...scores.map((s) => s.id), missingId].map((id) => ({
         path: `/api/scores/${id}`,
         ignore: {
-          calculator: 'the pp helper is in-process from phase 3',
           'owner.tracking': 'the port has no tracker until phase 4',
         },
       })),

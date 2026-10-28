@@ -11,6 +11,12 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.14" />
   </ItemGroup>
   <ItemGroup>
+    <!-- osu!'s own calculators, in-process: the helper's code itself, so the osu! package versions
+         stay in tools/PpCalculator/PpCalculator.csproj alone, where the weekly job updates them
+         (docs/automated-maintenance.md). -->
+    <ProjectReference Include="..\..\tools\PpCalculator\PpCalculator.csproj" />
+  </ItemGroup>
+  <ItemGroup>
     <!-- One schema for both apps while the port runs. -->
     <EmbeddedResource Include="..\..\src\db\schema.sql" LogicalName="schema.sql" />
     <EmbeddedResource Include="..\..\src\calc\medal-definitions.json" LogicalName="medal-definitions.json" />

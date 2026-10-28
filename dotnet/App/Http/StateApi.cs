@@ -80,6 +80,16 @@ internal static class StateApi
            AND (map_status IS NULL OR mods_ranked_by IS NULL)
         """, profileId));
 
+    /// <summary>
+    /// Scores a different osu! release priced, or one before the release was recorded, that their
+    /// replay could price again (outdatedPpCount, outdatedPpSql).
+    /// </summary>
+    private static double OutdatedPp(Db.Database db, long profileId, string current) => Convert.ToDouble(db.Scalar($"""
+        SELECT COUNT(*) AS n FROM scores s
+         WHERE s.profile_id = ? AND {Eligibility.VisibleSql()} AND s.replay_path IS NOT NULL AND s.imported_at IS NULL
+           AND s.pp IS NOT NULL AND (s.pp_version IS NULL OR s.pp_version <> ?)
+        """, profileId, current));
+
     private static double Count(Db.Database db, string sql, params object?[] args) => Convert.ToDouble(db.Scalar(sql, args));
 
     public static object Answer(ServerOptions opts, long profileId, bool fromTray)
@@ -148,8 +158,24 @@ internal static class StateApi
             filterNarrowing = TrackingFilter.Narrows(settings.TrackingFilter),
             indexing = new { active = false, visible = false, phase = "indexing", scanned = 0, total = 0, indexed = 0, firstRun = false, waiting = 0, error = (string?)null },
             importing = new { active = false, phase = "scanning", scanned = 0, files = 0, done = 0, total = 0, origin = "import" },
-            // The pp helper is in-process from phase 3; the source-built one stays the release's until then.
-            ppCalculator = new { version = (string?)null, source = (object?)null, recalculating = false, outdated = 0 },
+            /*
+             * Which osu! release prices scores, and how many of this profile's a different one priced:
+             * after an update that brings a pp rework, the ones Settings offers to recalculate.
+             */
+            ppCalculator = new
+            {
+                version = opts.Calculator?.Version,
+                source = new
+                {
+                    source = opts.PpSource,
+                    version = opts.PpSource.Length == 0 ? null : opts.Calculator?.Version,
+                    building = (object?)null,
+                    error = opts.CalculatorProblem,
+                },
+                // A recalculation runs through the tracker (phase 4).
+                recalculating = false,
+                outdated = opts.Calculator?.Version is { } current ? OutdatedPp(db, profileId, current) : 0,
+            },
             staleScores = StaleScores(db, profileId),
             // Removed scores, and each attempt of a removed unfinished play.
             hiddenScores = Count(db, """

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using OsuLocalProfiles;
+using OsuLocalProfiles.Calc;
 using OsuLocalProfiles.Db;
 using OsuLocalProfiles.Http;
 
@@ -65,6 +66,27 @@ using var db = Database.Open(dbFile, writable);
 if (writable) Profiles.SeedFirst(db, config.ProfileName);
 
 /*
+ * osu!'s calculators, in-process. With an osu! source configured (roadmap 5.70), only the
+ * calculator built from it, never the release in its place: building and running that one is
+ * not ported yet, so there is none, and Settings says why.
+ */
+var ppSource = Js.IsString(config["ppSource"], out var source) ? source : "";
+OfficialCalculator? calculator = null;
+string? calculatorProblem = null;
+if (ppSource.Length == 0)
+{
+    var (loaded, problem) = OfficialCalculator.Create();
+    calculator = loaded;
+    if (loaded is null) Console.WriteLine($"\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating ({problem})");
+    else Console.WriteLine($"\n  pp: osu!'s official calculator ({loaded.Version})");
+}
+else
+{
+    calculatorProblem = $"the calculator built from your osu! source at {ppSource} is not in the C# port yet";
+    Console.WriteLine($"\n  WARNING: {calculatorProblem}.");
+}
+
+/*
  * Reachable four ways, and two can arrive together, so only the first one counts. `deliberate`
  * is Quit from the page or the tray, or Ctrl+C: not the launcher dying or the system stopping the
  * app. Only a deliberate stop will install an update waiting for the quit (phase 5).
@@ -80,6 +102,9 @@ var app = Server.Build(new ServerOptions
     Port = config.Port,
     OnQuit = () => Shutdown(0, true),
     FromTray = fromTray,
+    Calculator = calculator,
+    PpSource = ppSource,
+    CalculatorProblem = calculatorProblem,
 });
 
 Console.CancelKeyPress += (_, e) =>

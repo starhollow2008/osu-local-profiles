@@ -73,7 +73,7 @@ dotnet/
 | 0   | This plan                     | done        |
 | 1   | Foundations                   | done        |
 | 2   | Reading a profile             | done        |
-| 3   | pp in-process                 | not started |
+| 3   | pp in-process                 | done        |
 | 4   | Tracking                      | not started |
 | 5   | Everything that writes        | not started |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
@@ -145,15 +145,27 @@ What phase 2 leaves to later phases, each listed in `scripts/api-parity.mjs` wit
 
 ### 3. pp in-process
 
-- `tools/PpCalculator/Program.cs` becomes a library the app calls; the console protocol stays
-  for the source-built helper (5.70) and for `scripts/pp-parity.mjs`.
-- One place for the osu! package versions (`Directory.Packages.props` at the repo root), read
-  by both projects. Same commit: `docs/automated-maintenance.md` step 2 and
-  `docs/maintaining.md` *Keeping pp current*, so the VM job edits the new file.
-- Every pp still carries its osu! release version and breakdown.
-- A helper failure in-process is an exception per score, as now. A stack overflow or running
-  out of memory would end the app, which the launcher then reports. Accepted: neither has
-  ever happened with the helper.
+Done (2026-10-28):
+
+- **The helper's own code, called in-process.** `Program.cs`'s request loop body is
+  `Program.Respond(line)`, which the loop calls for the separate helper and the app calls
+  directly (`dotnet/App/Calc/Official.cs`), with the same JSON requests and answers. Proven a
+  pure extraction by `scripts/pp-parity.mjs`: the helper before and after answered all 1820
+  corpus requests identically, and `npm run build:pp:local`'s slim check passed.
+- **The osu! package versions stay in `tools/PpCalculator/PpCalculator.csproj` alone.** The app
+  references that project instead of listing the packages again, so a pp rework is still a
+  version bump in one file and the weekly job's procedure is unchanged. (The plan was a shared
+  `Directory.Packages.props`; referencing the project needs no change to the job at all.)
+- Every pp still carries its osu! release version: `/api/state`'s calculator version and
+  outdated count, and a score's `calculator`, now match the Node app's.
+- No fallback: when osu!'s code cannot be loaded there is no calculator and no pp, as before.
+  A failure in-process is an error answer per request, as over the pipe. A stack overflow or
+  running out of memory would end the app, which the launcher then reports. Accepted: neither
+  has ever happened with the helper.
+
+Moved to phase 5, since Settings switches it: the calculator built from the player's own osu!
+source (5.70), which stays a separate process. Until then a configured source means no
+calculator, and Settings says why.
 
 ### 4. Tracking
 
@@ -166,7 +178,9 @@ matching half, `src/player-identity.ts`, `src/built-replays.ts`, `src/replay-wri
 
 ### 5. Everything that writes
 
-Every POST/PUT/DELETE endpoint, the SSE feed (`/api/events`, same event names and payloads),
+The calculator built from the player's osu! source (5.70, `src/pp-source.ts`,
+`src/calc/source-helper.ts`), a separate process as now. Every POST/PUT/DELETE endpoint, the
+SSE feed (`/api/events`, same event names and payloads),
 backup and restore, uploads, screenshots (Chrome over CDP), start with the computer,
 the update checker and its installer half (`src/update/*`), the pp source switch.
 The database opens writable by default from here.

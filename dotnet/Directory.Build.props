@@ -6,5 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>true</InvariantGlobalization>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Advisories on osu!'s own dependencies stay warnings, as they are for the pp helper: they
+         are osu!'s to update, and its packages are pinned to the release that prices pp. -->
+    <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
   </PropertyGroup>
 </Project>

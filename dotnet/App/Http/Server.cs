@@ -29,6 +29,15 @@ internal sealed class ServerOptions
     /// </summary>
     public bool StatusKnown { get; init; } = true;
 
+    /// <summary>osu!'s calculators, in-process; null when they could not be loaded, and then no pp is stored.</summary>
+    public OfficialCalculator? Calculator { get; init; }
+
+    /// <summary>The osu! source folder pricing scores in place of the release (roadmap 5.70), or empty.</summary>
+    public string PpSource { get; init; } = "";
+
+    /// <summary>Why the calculator wanted could not be had at the start, for Settings to say.</summary>
+    public string? CalculatorProblem { get; init; }
+
     /// <summary>Started by the tray launcher, as <c>/api/state</c> tells the page.</summary>
     public bool FromTray { get; init; }
 
@@ -233,8 +242,8 @@ internal static partial class Server
                 await Json(context, new
                 {
                     score = detail,
-                    // What prices scores now: the pp helper, in-process from phase 3.
-                    calculator = (string?)null,
+                    // What prices scores now, so the card can say when this one came from another.
+                    calculator = opts.Calculator?.Version,
                     owner = new
                     {
                         id = owner.Id,
