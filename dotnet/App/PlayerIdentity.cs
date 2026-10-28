@@ -163,6 +163,17 @@ internal static class Players
         return null;
     }
 
+    /// <summary>
+    /// Player names in alphabetical order, ignoring case, the same on every machine: <c>compareNames</c>,
+    /// lowercased as JavaScript lowercases and then compared code unit by code unit.
+    /// </summary>
+    public static int CompareNames(string a, string b)
+    {
+        var (x, y) = (Js.ToLower(a), Js.ToLower(b));
+        if (x != y) return Math.Sign(string.CompareOrdinal(x, y));
+        return Math.Sign(string.CompareOrdinal(a, b));
+    }
+
     /// <summary>A positive JSON number, or null.</summary>
     private static double? Positive(JsonElement? value) =>
         value is { ValueKind: JsonValueKind.Number } n && Js.NumberOf(n) > 0 ? Js.NumberOf(n) : null;
@@ -274,7 +285,7 @@ internal static class Players
 
         var byPlayer = order.Select(n => (n, counts[n]))
             .OrderByDescending(p => p.Item2)
-            .ThenBy(p => p.n, StringComparer.Create(CultureInfo.InvariantCulture, CompareOptions.None))
+            .ThenBy(p => p.n, Comparer<string>.Create(CompareNames))
             .ToList();
         return new ForeignScoreSweep(checkedRows, hidden, byPlayer, unattributable);
     }

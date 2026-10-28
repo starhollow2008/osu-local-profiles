@@ -32,19 +32,11 @@ const ENDPOINTS = [
     path: '/api/app',
     ignore: {
       pid: 'each app is its own process',
-      tracking: 'the port has no tracker until phase 4',
       update: 'the port has no update check until phase 5',
     },
   },
   { path: '/api/settings' },
-  {
-    path: '/api/state',
-    ignore: {
-      tracking: 'the port has no tracker until phase 4',
-      indexing: 'the beatmap index comes with the tracker in phase 4',
-      installs: 'install detection comes with the tracker in phase 4',
-    },
-  },
+  { path: '/api/state' },
   { path: '/api/app-config' },
   { path: '/api/declined' },
   { path: '/api/data-folder', ignore: { path: 'each app runs on its own copy of data/' } },
@@ -125,6 +117,13 @@ function copyData(to, port) {
   const snapshot = new DatabaseSync(path.join(source, 'profiles.db'), { readOnly: true });
   snapshot.exec(`VACUUM INTO '${path.join(to, 'profiles.db').replaceAll("'", "''")}'`);
   snapshot.close();
+  // No catch-up: an import can let go of an uploaded replay, and the copies' replays are the real
+  // data folder's own files. Tracking otherwise runs as it does for the player.
+  const copy = new DatabaseSync(path.join(to, 'profiles.db'));
+  copy.exec(`INSERT INTO profile_settings (profile_id, key, value)
+               SELECT id, 'importPlaysWhileClosed', 'false' FROM profiles WHERE true
+               ON CONFLICT (profile_id, key) DO UPDATE SET value = excluded.value`);
+  copy.close();
 
   const file = path.join(to, 'config.json');
   const config = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
@@ -146,6 +145,20 @@ async function waitFor(port, child, name, timeoutMs = 180_000) {
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
   throw new Error(`${name} did not answer within ${timeoutMs / 1000}s`);
+}
+
+/**
+ * Until the work each app does after its start is over: the beatmap index, an import, a
+ * recalculation. Then a moment more, for what follows them without saying so.
+ */
+async function settled(port, timeoutMs = 600_000) {
+  const until = Date.now() + timeoutMs;
+  while (Date.now() < until) {
+    const state = await (await fetch(`http://localhost:${port}/api/state`)).json();
+    if (!state.indexing.active && !state.importing.active && !state.ppCalculator.recalculating) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 
 /** Every difference between two parsed values, as `path: node | cs` lines. Key order is not one. */
@@ -191,12 +204,13 @@ async function main() {
 
     const log = (name) => fs.openSync(path.join(work, `${name}.log`), 'w');
     const nodeApp = spawn(process.execPath, ['src/main.ts'], { cwd: nodeRoot, stdio: ['pipe', log('node'), log('node-err')] });
-    // Read-only, as the port runs by default: these answers must not need a write.
-    const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot], { stdio: ['pipe', log('cs'), log('cs-err')] });
+    // Writable, as the Node app is: both track, each on its own copy.
+    const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot, '--writable'], { stdio: ['pipe', log('cs'), log('cs-err')] });
     children.push(nodeApp, csApp);
 
     console.log(`  starting both apps (logs in ${work})`);
     await Promise.all([waitFor(nodePort, nodeApp, 'the Node app'), waitFor(csPort, csApp, 'the C# app')]);
+    await Promise.all([settled(nodePort), settled(csPort)]);
 
     let failed = 0;
     const report = (pathname, problems, answer) => {
@@ -240,12 +254,7 @@ async function main() {
     })();
     const missingId = (scores.at(-1)?.id ?? 0) + 1000;
     await compareJson(
-      [...scores.map((s) => s.id), missingId].map((id) => ({
-        path: `/api/scores/${id}`,
-        ignore: {
-          'owner.tracking': 'the port has no tracker until phase 4',
-        },
-      })),
+      [...scores.map((s) => s.id), missingId].map((id) => ({ path: `/api/scores/${id}` })),
     );
     const replays = [
       ...scores.filter((s) => s.replay === 1).slice(0, 8),

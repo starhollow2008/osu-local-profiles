@@ -95,6 +95,7 @@ internal static class StateApi
     public static object Answer(ServerOptions opts, long profileId, bool fromTray)
     {
         var db = opts.Db;
+        var tracker = opts.Tracker;
         var profile = Profiles.Get(db, profileId)!;
         var settings = SettingsStore.Get(db, profileId, opts.Config.SettingsFallbacks());
         var version = opts.Paths.Version();
@@ -150,14 +151,14 @@ internal static class StateApi
                 hasCover,
             },
             profiles = Profiles.List(db),
-            // The tracker's fields: their values before anything is tracked (phase 4).
-            tracking = false,
-            scoresThisSession = 0,
-            playsFiltered = 0,
-            playsRefused = 0,
+            // A read-only copy tracks nothing: the tracker's fields as they are before anything is tracked.
+            tracking = tracker?.IsTracking ?? false,
+            scoresThisSession = tracker?.ScoresAdded ?? 0,
+            playsFiltered = tracker?.PlaysFiltered ?? 0,
+            playsRefused = tracker?.PlaysRefused ?? 0,
             filterNarrowing = TrackingFilter.Narrows(settings.TrackingFilter),
-            indexing = new { active = false, visible = false, phase = "indexing", scanned = 0, total = 0, indexed = 0, firstRun = false, waiting = 0, error = (string?)null },
-            importing = new { active = false, phase = "scanning", scanned = 0, files = 0, done = 0, total = 0, origin = "import" },
+            indexing = tracker?.IndexState ?? new Tracker.IndexState(false, false, "indexing", 0, 0, 0, false, 0, null),
+            importing = tracker?.ImportState ?? new Tracker.ImportState(false, "scanning", 0, 0, 0, 0, "import"),
             /*
              * Which osu! release prices scores, and how many of this profile's a different one priced:
              * after an update that brings a pp rework, the ones Settings offers to recalculate.
@@ -172,11 +173,11 @@ internal static class StateApi
                     building = (object?)null,
                     error = opts.CalculatorProblem,
                 },
-                // A recalculation runs through the tracker (phase 4).
-                recalculating = false,
+                recalculating = tracker?.IsRecalculating ?? false,
                 outdated = opts.Calculator?.Version is { } current ? OutdatedPp(db, profileId, current) : 0,
             },
-            staleScores = StaleScores(db, profileId),
+            // The tracker's profile, as the Node app reads it.
+            staleScores = tracker is null ? StaleScores(db, profileId) : tracker.StaleScores,
             // Removed scores, and each attempt of a removed unfinished play.
             hiddenScores = Count(db, """
                 SELECT (SELECT COUNT(*) FROM scores WHERE profile_id = ? AND hidden_at IS NOT NULL)
@@ -189,8 +190,14 @@ internal static class StateApi
             modesWithPlays = Stats.ModesWithPlays(db, profileId, Eligibility.Of(settings, opts.StatusKnown)),
             // A brand-new install's one-time offer to import from an osu! account.
             welcome = db.Exists("SELECT 1 AS hit FROM kv WHERE key = ?", "welcomePending"),
-            // Found by install detection, which comes with the tracker (phase 4).
-            installs = Array.Empty<object>(),
+            installs = opts.Installs.Select(i => new
+            {
+                kind = i.Kind,
+                // osu!'s development client, a lazer of its own beside release lazer.
+                development = i.Development,
+                root = i.Root,
+                hasOnlineDb = i.OnlineDb is not null,
+            }),
         };
     }
 }

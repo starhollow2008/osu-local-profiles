@@ -543,6 +543,17 @@ export async function sweepForeignScores(
 
   sweep.byPlayer = [...counts]
     .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+    .sort((a, b) => b.count - a.count || compareNames(a.name, b.name));
   return sweep;
+}
+
+/**
+ * Player names in alphabetical order, ignoring case, the same on every machine. Not
+ * `localeCompare`, whose order is the system locale's, so it differed from one computer to the
+ * next.
+ */
+export function compareNames(a: string, b: string): number {
+  const [x, y] = [a.toLowerCase(), b.toLowerCase()];
+  if (x !== y) return x < y ? -1 : 1;
+  return a < b ? -1 : a > b ? 1 : 0;
 }

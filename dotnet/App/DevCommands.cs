@@ -64,6 +64,31 @@ internal static class DevCommands
                 }
                 return 0;
             }
+            case "mcosu" when args.Length == 3:
+                // Each McOsu scores.db in the list read, its plays answered, and their replays built into the folder named.
+                foreach (var file in File.ReadAllLines(args[1]).Where(l => l.Length > 0))
+                {
+                    object answer;
+                    try
+                    {
+                        var scores = Clients.Mcosu.ParseScores(File.ReadAllBytes(file));
+                        foreach (var score in scores)
+                        {
+                            var path = Clients.Mcosu.BuiltReplayPath(args[2], score.BeatmapMD5, score.PlayedAt);
+                            Directory.CreateDirectory(args[2]);
+                            File.WriteAllBytes(path, Clients.Mcosu.BuildReplay(score));
+                        }
+                        answer = new { file, scores };
+                    }
+                    catch (Exception e)
+                    {
+                        answer = new { file, error = e is Clients.McosuVersionException ? "version" : "short" };
+                    }
+                    Console.WriteLine(JsonText.Stringify(answer));
+                }
+                return 0;
+            case "backfill" when args.Length == 3:
+                return BackfillAll(args[1], args[2]).GetAwaiter().GetResult();
             case "ingest" when args.Length == 5 && args[4] is "plain" or "judged":
                 return IngestAll(args[1], args[2], args[3], judged: args[4] == "judged").GetAwaiter().GetResult();
             default:
@@ -103,6 +128,28 @@ internal static class DevCommands
         {
             Console.WriteLine(JsonText.Stringify(await Tracker.Ingest.ReplayFile(file, ctx)));
         }
+        return 0;
+    }
+
+    /// <summary>
+    /// Import past plays from the beginning into the database's first profile, everything it takes,
+    /// as its filter and owner decide: what Check previews, then what the import brings in.
+    /// </summary>
+    private static async Task<int> BackfillAll(string dbFile, string installsFile)
+    {
+        using var db = Db.Database.Open(dbFile);
+        var installs = System.Text.Json.JsonSerializer.Deserialize<List<Clients.OsuInstall>>(File.ReadAllText(installsFile), JsonText.Options)!;
+        var profileId = (long)db.FirstRow("SELECT id FROM profiles ORDER BY id LIMIT 1")!.Num("id")!;
+        var (calculator, problem) = Calc.OfficialCalculator.Create();
+        if (calculator is null)
+        {
+            Console.Error.WriteLine(problem);
+            return 1;
+        }
+        var tracker = new Tracker.PlayTracker(db, new Clients.BeatmapResolver(db, installs), installs, profileId, 0, calculator);
+        var (replays, log) = await tracker.PreviewBackfill(0);
+        Console.WriteLine(JsonText.Stringify(new { replays, log }));
+        Console.WriteLine(JsonText.Stringify(await tracker.RunBackfill(0, Tracker.BackfillSources.Everything)));
         return 0;
     }
 

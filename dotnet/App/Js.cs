@@ -319,6 +319,27 @@ internal static partial class Js
 
     /* ------------------------------------------------------------------- dates */
 
+    /// <summary>
+    /// <c>Date.UTC(year, month, day, hours, minutes, seconds)</c>: any field may run over into the
+    /// next (month 12 is next January, day 0 the month before's last), and a year 0 to 99 is 1900
+    /// onwards, as JavaScript reads it.
+    /// </summary>
+    public static double DateUtc(double year, double month, double day = 1, double hours = 0, double minutes = 0, double seconds = 0)
+    {
+        if (year is >= 0 and <= 99 && year == Math.Floor(year)) year += 1900;
+        var y = year + Math.Floor(month / 12);
+        var m = ((month % 12) + 12) % 12;
+        // Days from 1970-01-01 to the first of that month, by the civil-from-days algorithm.
+        var yy = m < 2 ? y - 1 : y;
+        var era = Math.Floor(yy / 400);
+        var yoe = yy - era * 400;
+        var mp = (m + 10) % 12;
+        var doy = Math.Floor((153 * mp + 2) / 5);
+        var doe = yoe * 365 + Math.Floor(yoe / 4) - Math.Floor(yoe / 100) + doy;
+        var days = era * 146097 + doe - 719468 + (day - 1);
+        return days * 86_400_000 + hours * 3_600_000 + minutes * 60_000 + seconds * 1000;
+    }
+
     [GeneratedRegex(@"^([+-]\d{6}|\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:T(\d{2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?(Z|[+-]\d{2}:\d{2})?)?\z")]
     private static partial Regex IsoDate();
 

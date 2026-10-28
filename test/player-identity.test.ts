@@ -9,6 +9,7 @@ import { BeatmapResolver } from '../src/clients/beatmaps.ts';
 import { ingestScore } from '../src/tracker/ingest.ts';
 import {
   certainlySomeoneElse,
+  compareNames,
   confirmSameAccount,
   dominantTrackedName,
   JUST_SET_MS,
@@ -857,4 +858,9 @@ test('names listed as yours join a known owner, and never make one', () => {
     stable.cleanup();
     h.cleanup();
   }
+});
+
+test('names are listed alphabetically ignoring case, the same on every machine', () => {
+  const names = ['FlyingTuna', 'chushberry', 'Ångström', 'flyingtuna', 'Zed', 'apple'];
+  assert.deepEqual(names.sort(compareNames), ['apple', 'chushberry', 'FlyingTuna', 'flyingtuna', 'Zed', 'Ångström']);
 });

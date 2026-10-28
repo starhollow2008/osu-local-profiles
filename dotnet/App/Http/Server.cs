@@ -23,11 +23,14 @@ internal sealed class ServerOptions
     /// <summary>Stops the app, deliberately: the page's Quit. Null for a copy that cannot be stopped from the page.</summary>
     public Action? OnQuit { get; init; }
 
-    /// <summary>
-    /// Whether anything on this machine can say if a beatmap is ranked: lazer's online.db. Found by
-    /// install detection, which is ported with the tracker (phase 4); until then, assumed.
-    /// </summary>
+    /// <summary>Whether anything on this machine can say if a beatmap is ranked: lazer's online.db.</summary>
     public bool StatusKnown { get; init; } = true;
+
+    /// <summary>The osu! installs found at the start.</summary>
+    public IReadOnlyList<Clients.OsuInstall> Installs { get; init; } = [];
+
+    /// <summary>What watches osu! and writes its plays; null in a read-only copy, which tracks nothing.</summary>
+    public Tracker.PlayTracker? Tracker { get; init; }
 
     /// <summary>osu!'s calculators, in-process; null when they could not be loaded, and then no pp is stored.</summary>
     public OfficialCalculator? Calculator { get; init; }
@@ -150,8 +153,8 @@ internal static partial class Server
                 app = AppId,
                 version = opts.Paths.Version(),
                 pid = Environment.ProcessId,
-                // No tracker or update check yet (phases 4 and 5).
-                tracking = false,
+                tracking = opts.Tracker?.IsTracking ?? false,
+                // No update check yet (phase 5).
                 update = (string?)null,
                 updating = false,
             });
@@ -253,8 +256,7 @@ internal static partial class Server
                         // None of its own: the card shows osu-web's default banner.
                         cover = hasCover ? $"/api/image/cover?profile={owner.Id}" : null,
                         active = owner.Id == Current(),
-                        // No tracker until phase 4.
-                        tracking = false,
+                        tracking = owner.Id == Current() && (opts.Tracker?.IsTracking ?? false),
                     },
                 });
                 return;

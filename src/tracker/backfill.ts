@@ -1,6 +1,6 @@
 import { wasDeleted } from '../scores.ts';
 import { findExistingScore, replaces, replayIdentity } from './online-import.ts';
-import { ownsPlay, replayPlayer, UNKNOWN_IDENTITY, wasWrittenLater, type PlayerIdentity } from '../player-identity.ts';
+import { compareNames, ownsPlay, replayPlayer, UNKNOWN_IDENTITY, wasWrittenLater, type PlayerIdentity } from '../player-identity.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Db } from '../db/index.ts';
@@ -259,7 +259,7 @@ export async function scanForReplays(
     starsUnchecked: applyFilter && (filter.stars.min > 0 || filter.stars.max !== null),
     otherPlayers: [...others]
       .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      .sort((a, b) => b.count - a.count || compareNames(a.name, b.name)),
     earliest: importable[0]?.playedAt ?? null,
     latest: importable[importable.length - 1]?.playedAt ?? null,
   };

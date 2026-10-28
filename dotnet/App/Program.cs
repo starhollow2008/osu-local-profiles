@@ -69,8 +69,39 @@ if (!writable && !File.Exists(dbFile))
     return 1;
 }
 
+/*
+ * Find osu!: what the profile pointed at, then where it was found before, then everywhere it is
+ * normally installed, and only once ever a search of the whole machine. Remembered in
+ * config.json, which a read-only copy leaves alone.
+ */
+var discovery = await OsuLocalProfiles.Clients.Discover.Run(
+    config.Strings("installRoots"), config.Strings("discoveredRoots"), NodePath.Join(paths.DataDir, "mcosu"),
+    noSearch: Js.Truthy(config["searchedForInstalls"]),
+    onProgress: (dirs, _, _) => Console.Write($"\r  searching for osu!... {dirs} folders"));
+var installs = discovery.Installs;
+if (writable)
+{
+    config.Save(paths.DataDir);
+    config.RememberDiscovery(discovery, paths.DataDir);
+}
+if (installs.Count == 0)
+{
+    Console.WriteLine("\n  No osu! installation found.");
+    Console.WriteLine("  The page opens anyway: use Options -> osu! folders to point at it.");
+}
+foreach (var install in installs)
+{
+    var kind = install.Development ? "lazer (development)" : install.Kind;
+    Console.WriteLine($"  found {kind,-6} {install.Root}{(install.OnlineDb is null ? "" : "  (+ online.db)")}");
+}
+var extra = discovery.Candidates.Count - installs.Count;
+if (extra > 0) Console.WriteLine($"  ({extra} other osu! folder(s) found -- Options -> osu! folders to switch)");
+
 using var db = Database.Open(dbFile, writable);
 if (writable) Profiles.SeedFirst(db, config.ProfileName);
+var active = Profiles.Get(db, Profiles.ActiveId(db))!;
+// The gap the app was closed for, read before this run stamps itself.
+var gapSince = OsuLocalProfiles.Tracker.CatchUp.Since(OsuLocalProfiles.Tracker.CatchUp.LastRunAt(db), active.TrackingSince);
 
 /*
  * osu!'s calculators, in-process. With an osu! source configured (roadmap 5.70), only the
@@ -101,6 +132,13 @@ else
 var stopped = new TaskCompletionSource<(int Code, bool Deliberate)>(TaskCreationOptions.RunContinuationsAsynchronously);
 void Shutdown(int code, bool deliberate) => stopped.TrySetResult((code, deliberate));
 
+var resolver = new OsuLocalProfiles.Clients.BeatmapResolver(db, installs);
+// A read-only copy watches nothing: tracking is writing.
+var tracker = writable
+    ? new OsuLocalProfiles.Tracker.PlayTracker(db, resolver, installs, active.Id, active.TrackingSince, calculator)
+    : null;
+if (tracker is not null) Startup.Announce(db, tracker);
+
 var app = Server.Build(new ServerOptions
 {
     Db = db,
@@ -112,6 +150,9 @@ var app = Server.Build(new ServerOptions
     Calculator = calculator,
     PpSource = ppSource,
     CalculatorProblem = calculatorProblem,
+    StatusKnown = resolver.KnowsStatus,
+    Installs = installs,
+    Tracker = tracker,
 });
 
 Console.CancelKeyPress += (_, e) =>
@@ -131,14 +172,41 @@ if (fromTray)
     _ = Instance.StopWhenLauncherCloses(Console.OpenStandardInput(), deliberate => Shutdown(0, deliberate));
 }
 
+Timer? heartbeat = null;
+if (tracker is not null)
+{
+    // The index first, then what needs it, in the order the Node app runs them.
+    var roots = installs
+        .SelectMany(i => i.BeatmapRoots.Select(p => new OsuLocalProfiles.Clients.IndexRoot(p, i.Kind != "lazer")))
+        .ToList();
+    roots = [.. roots.Where((r, n) => roots.FindIndex(o => OsuLocalProfiles.Tracker.PlayTracker.SamePath(o.Path, r.Path)) == n)];
+    _ = Startup.AfterIndex(db, tracker, roots, gapSince, paths.DataDir);
+    tracker.Start();
+}
+
 await app.StartAsync();
 Console.WriteLine($"\n  osu! local profiles {paths.Version() ?? "(unknown version)"}, C# port");
 Console.WriteLine($"  data: {paths.DataDir}{(writable ? "" : " (read-only)")}");
 Console.WriteLine($"  {url}");
+if (tracker is not null)
+{
+    await Startup.Banner(db, tracker, active, fromTray);
+    // When the app last ran, so the next launch knows the gap it was closed for. Stamped as it
+    // runs too, so a crash loses at most the heartbeat's worth.
+    OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
+    heartbeat = new Timer(_ => OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db), null,
+        TimeSpan.FromMilliseconds(OsuLocalProfiles.Tracker.CatchUp.HeartbeatMs), TimeSpan.FromMilliseconds(OsuLocalProfiles.Tracker.CatchUp.HeartbeatMs));
+}
 if (Js.Truthy(config["openBrowser"]) && !withComputer) Browser.Open(url);
 
 var (exitCode, _) = await stopped.Task;
 Console.WriteLine("\n  stopping...");
+heartbeat?.Dispose();
+if (tracker is not null)
+{
+    tracker.Stop();
+    OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
+}
 await app.StopAsync();
 await app.DisposeAsync();
 return exitCode;

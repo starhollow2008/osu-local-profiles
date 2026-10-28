@@ -15,9 +15,175 @@ internal sealed record BaseDifficulty(double Cs, double Ar, double Od, double Hp
 /// </summary>
 internal sealed record McosuMods(List<JsonElement> Mods, List<JsonElement>? Priced, bool IgnoreLegacyTotalScore);
 
+/// <summary>
+/// One entry in McOsu's <c>scores.db</c>, as <c>OsuDatabase::loadScores</c> reads it. <c>ImportedLegacy</c>
+/// is a copy McOsu took of an osu!stable score, never tracked as McOsu's; <c>PlayedAt</c> is to the second.
+/// </summary>
+internal sealed record McosuScore(
+    string BeatmapMD5,
+    bool ImportedLegacy,
+    double PlayedAt,
+    string PlayerName,
+    int Count300,
+    int Count100,
+    int Count50,
+    int CountGeki,
+    int CountKatu,
+    int CountMiss,
+    double TotalScore,
+    int MaxCombo,
+    int LegacyMods,
+    int MaxPossibleCombo,
+    McosuFacts Facts);
+
+/// <summary>A <c>scores.db</c> from a McOsu newer than this reader, which its format may have changed in.</summary>
+internal sealed class McosuVersionException(int version)
+    : Exception($"McOsu's scores.db is version {version}, newer than this app can read ({Mcosu.ScoresVersion})")
+{
+    public int Version { get; } = version;
+}
+
+/// <summary>A <c>scores.db</c> cut short: a write still in progress, read again once it settles.</summary>
+internal sealed class McosuShortReadException(string message) : Exception(message);
+
 /// <summary>McOsu: src/clients/mcosu.ts. Its plays are built osu!stable replays, scored as stable.</summary>
 internal static partial class Mcosu
 {
+    /// <summary>The newest <c>scores.db</c> format this reader knows (<c>osu_scores_custom_version</c>).</summary>
+    public const int ScoresVersion = 20210110;
+
+    /// <summary>Written as the built replay's version: a current osu!stable one, so the decoder treats it as such.</summary>
+    public const int BuiltReplayVersion = 20260711;
+
+    /// <summary>The bit McOsu (from 20210104) sets in the per-score "gamemode" byte for an imported stable score.</summary>
+    private const int ImportedLegacyFlag = 0xa9;
+
+    private sealed class Reader(byte[] b)
+    {
+        private int o;
+
+        private ReadOnlySpan<byte> Take(int n)
+        {
+            if (o < 0 || o + n > b.Length) throw new McosuShortReadException("scores.db ends early");
+            var span = b.AsSpan(o, n);
+            o += n;
+            return span;
+        }
+
+        public int Byte() => Take(1)[0];
+        public int Short() => System.Buffers.Binary.BinaryPrimitives.ReadInt16LittleEndian(Take(2));
+        public int Int() => System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(Take(4));
+        public ulong Long() => System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(Take(8));
+        public double Float() => System.Buffers.Binary.BinaryPrimitives.ReadSingleLittleEndian(Take(4));
+
+        /// <summary>osu!'s strings: 0x0b, a ULEB128 length, then UTF-8. Anything else is empty.</summary>
+        public string String()
+        {
+            if (Byte() != 0x0b) return "";
+            int len = 0, shift = 0, octet;
+            do
+            {
+                octet = Byte();
+                len |= (octet & 0x7f) << shift;
+                shift += 7;
+            } while ((octet & 0x80) != 0);
+            if (o + len > b.Length) throw new McosuShortReadException("string runs past the end of scores.db");
+            // A length past 2^31 reads as nothing and steps back, as the TypeScript's arithmetic does.
+            var s = len > 0 ? System.Text.Encoding.UTF8.GetString(b, o, len) : "";
+            o += len;
+            return s;
+        }
+    }
+
+    /// <summary>
+    /// Read McOsu's <c>scores.db</c>. A file cut short throws <see cref="McosuShortReadException"/>:
+    /// McOsu rewrites it after every play, so a short read is a write in progress. A newer version
+    /// throws <see cref="McosuVersionException"/>, as McOsu itself refuses one.
+    /// </summary>
+    public static List<McosuScore> ParseScores(byte[] buf)
+    {
+        var r = new Reader(buf);
+        var dbVersion = r.Int();
+        if (dbVersion > ScoresVersion) throw new McosuVersionException(dbVersion);
+        var numBeatmaps = r.Int();
+
+        var output = new List<McosuScore>();
+        for (var m = 0; m < numBeatmaps; m++)
+        {
+            var md5 = r.String();
+            var numScores = r.Int();
+            // McOsu's own rules: a short hash is one bad entry, a long one a corrupt file.
+            if (md5.Length > 32) throw new McosuShortReadException("corrupt beatmap hash in scores.db");
+            var validMd5 = md5.Length == 32;
+
+            for (var s = 0; s < numScores; s++)
+            {
+                var gamemode = r.Byte();
+                var scoreVersion = r.Int();
+                var importedLegacy = false;
+                if (dbVersion == 20210103 && scoreVersion > 20190103) importedLegacy = r.Byte() != 0;
+                else if (dbVersion > 20210103 && scoreVersion > 20190103) importedLegacy = (gamemode & ImportedLegacyFlag) != 0;
+                var unixSeconds = r.Long();
+                var playerName = r.String();
+                var count300 = r.Short();
+                var count100 = r.Short();
+                var count50 = r.Short();
+                var countGeki = r.Short();
+                var countKatu = r.Short();
+                var countMiss = r.Short();
+                double totalScore = r.Long();
+                var maxCombo = r.Short();
+                var legacyMods = r.Int();
+                r.Short(); // slider breaks
+                for (var i = 0; i < 7; i++) r.Float(); // McOsu's own pp, unstable rate, hit errors, stars
+                var speed = r.Float();
+                var cs = r.Float();
+                var ar = r.Float();
+                var od = r.Float();
+                var hp = r.Float();
+                var maxPossibleCombo = -1;
+                if (scoreVersion > 20180722)
+                {
+                    maxPossibleCombo = r.Int();
+                    r.Int(); // hit objects
+                    r.Int(); // circles
+                }
+                var experimental = r.String();
+
+                // McOsu's own gamemode filter: osu!standard only, with the byte reused as a flag later.
+                var standard = gamemode == 0 || (dbVersion > 20210103 && scoreVersion > 20190103);
+                if (!validMd5 || !standard) continue;
+
+                output.Add(new McosuScore(md5, importedLegacy, (double)unixSeconds * 1000, playerName,
+                    count300, count100, count50, countGeki, countKatu, countMiss, totalScore, maxCombo, legacyMods, maxPossibleCombo,
+                    new McosuFacts(speed, cs, ar, od, hp, (legacyMods & NightmareBit) != 0,
+                        [.. experimental.Split(';').Where(name => name != "")])));
+            }
+        }
+        return output;
+    }
+
+    /// <summary>Where a McOsu play's built replay is kept, named by its beatmap and when it was played.</summary>
+    public static string BuiltReplayPath(string dir, string beatmapMD5, double playedAt) =>
+        NodePath.Join(dir, $"{beatmapMD5}-{Js.NumberToString(Math.Floor(playedAt / 1000))}.osr");
+
+    /// <summary>
+    /// The osu!stable replay for a McOsu play, with no cursor data and this app's block after it. No
+    /// replay hash, so the play is known by its beatmap and time; Cinema's bit cleared, since it is
+    /// Nightmare here and osu! would read the play as Cinema.
+    /// </summary>
+    public static byte[] BuildReplay(McosuScore score) => Replays.ReplayWriter.Encode(
+        new Replays.ReplayHeader(
+            0, BuiltReplayVersion, score.BeatmapMD5, score.PlayerName, null,
+            new Replays.LegacyCounts(score.Count300, score.Count100, score.Count50, score.CountGeki, score.CountKatu, score.CountMiss),
+            score.TotalScore, score.MaxCombo,
+            score.MaxPossibleCombo > 0 && score.MaxCombo >= score.MaxPossibleCombo,
+            score.LegacyMods & ~NightmareBit,
+            // McOsu keeps the second a play ended, so that is what the replay says.
+            Math.Floor(score.PlayedAt / 1000) * 1000,
+            0),
+        [Replays.AppBlocks.Write(Replays.AppBlocks.McosuBlock, score.Facts)]);
+
     public const int NightmareBit = 1 << 22;
 
     /// <summary>The acronym everything McOsu has and osu! does not is filed under.</summary>

@@ -200,10 +200,30 @@ Each part below is checked against the Node app's own code on the owner's files 
       filter that turns plays away on every criterion (492 added, 108 filtered, 1 another
       player's). JSON is written as `JSON.stringify` writes it (`JsonText`), numbers and key
       order included, since mods and statistics are stored as JSON.
-- [ ] McOsu's `scores.db` and the replays built from it, the replays built from a score's osu!
-      link or entered by hand, lazer's log and incomplete plays.
-- [ ] Watching and the queue, wired into startup; import, catch-up and recompute; a reingest of
-      every replay by both apps into fresh profiles, compared table by table.
+- [x] McOsu's `scores.db` and the replays built from it (`Clients/Mcosu.cs`,
+      `Replays/ReplayWriter.cs`): the real file from the tests and generated ones reaching every
+      branch of the format read to the same plays, and the built replays identical byte for
+      byte; then ingested by both, priced on beatmaps this machine has, with McOsu's rates,
+      overrides and own mods (8 of 8).
+- [x] lazer's log and unfinished plays (`Clients/LazerLog.cs`, `Tracker/Incomplete.cs`).
+- [x] The tracker (`Tracker/Tracker.cs`): one queue for every write, the watchers
+      (`Tracker/Watchers.cs`: replays, lazer's live log, McOsu's scores files, stable's Songs),
+      Import past plays and its preview (`Tracker/Backfill.cs`), catch-up, Track anyway,
+      recalculation and the startup repairs (`Tracker/Recompute.cs`), wired into startup as
+      src/main.ts runs them (`Startup.cs`). An import of everything on the owner's machine by both
+      apps into fresh profiles, with the owner worked out and a filter on, gives the same preview,
+      the same result and the same rows: 73,704 files walked, 2,273 scores, 136 unfinished plays
+      from lazer's logs, 401 filtered and 98 replays of other players turned away. With both
+      apps tracking, every `/api/state` answer matches, the tracker's, the index's and the installs'
+      fields included.
+- [x] Found on the way: the sort of other players' names used `localeCompare`, whose order is the
+      machine's locale, so it differed between computers. Fixed in Node first (`compareNames`).
+- Left for phase 5, since each comes with an endpoint that writes: replays built from a score's
+  osu! link or entered by hand, and pricing the scores imported from osu! from their own
+  numbers at startup (`src/score-entry.ts`, `src/built-replays.ts`, `src/clients/osu-web.ts`),
+  and the live feed the tracker's events go to.
+- A read-only copy (the default until the switch-over) finds osu! and reads `online.db`, but
+  tracks nothing: tracking is writing.
 
 ### 5. Everything that writes
 

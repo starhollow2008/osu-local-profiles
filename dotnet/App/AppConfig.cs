@@ -111,7 +111,62 @@ internal sealed class AppConfig
     }
 
     /// <summary>A value as stored, or null when the key is not there at all.</summary>
-    public JsonElement? this[string key] => values.TryGetValue(key, out var value) ? value : null;
+    public JsonElement? this[string key]
+    {
+        get => values.TryGetValue(key, out var value) ? value : null;
+        set
+        {
+            if (value is { } v) values[key] = v;
+            else values.Remove(key);
+        }
+    }
+
+    /// <summary>
+    /// Written back as <c>JSON.stringify(config, null, 2)</c> and a newline: every key, defaults
+    /// included, in the order they were first set.
+    /// </summary>
+    public void Save(string dataDir)
+    {
+        Directory.CreateDirectory(dataDir);
+        using var output = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(output, new JsonWriterOptions
+        {
+            Indented = true,
+            IndentSize = 2,
+            NewLine = "\n",
+            Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        }))
+        {
+            JsonSerializer.Serialize(writer, values, JsonText.Options);
+        }
+        File.WriteAllText(Path.Combine(dataDir, "config.json"), System.Text.Encoding.UTF8.GetString(output.ToArray()) + "\n");
+    }
+
+    /// <summary>A config list of text, as the Node app reads one: an array's strings.</summary>
+    public List<string> Strings(string key) =>
+        this[key] is { ValueKind: JsonValueKind.Array } list
+            ? [.. list.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString()!)]
+            : [];
+
+    /// <summary>
+    /// Remember where osu! was found, so the next start goes there first, and that the search ran:
+    /// <c>rememberDiscovery</c>. Written only when something changed.
+    /// </summary>
+    public void RememberDiscovery(Clients.DiscoveryResult discovery, string dataDir)
+    {
+        var discovered = discovery.Candidates.Where(c => c.Source != "configured").Select(c => c.Root).ToList();
+        // `config.searchedForInstalls || discovery.searched`: the stored value itself when it is truthy.
+        var current = this["searchedForInstalls"];
+        var searched = Js.Truthy(current) ? current!.Value : JsonText.From(discovery.Searched);
+        var searchedSame = Js.Truthy(current) || (!discovery.Searched && current is { ValueKind: JsonValueKind.False });
+        var remembered = this["discoveredRoots"];
+        var same = searchedSame && remembered is { ValueKind: JsonValueKind.Array } list && list.GetArrayLength() == discovered.Count
+            && list.EnumerateArray().Select((e, i) => e.ValueKind == JsonValueKind.String && e.GetString() == discovered[i]).All(x => x);
+        if (same) return;
+        this["discoveredRoots"] = JsonText.From(discovered);
+        this["searchedForInstalls"] = searched;
+        Save(dataDir);
+    }
 
     public string ProfileName => this["profileName"] is { } name ? Js.ToJsString(name) : "Local Profile";
 
