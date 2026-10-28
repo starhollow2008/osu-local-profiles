@@ -234,6 +234,106 @@ backup and restore, uploads, screenshots (Chrome over CDP), start with the compu
 the update checker and its installer half (`src/update/*`), the pp source switch.
 The database opens writable by default from here.
 
+#### Handoff (2026-10-28): where phase 5 stands
+
+Phases 0 to 4 are done and pushed (last pushed commit `671c6fe`). Phase 5 has just begun.
+
+**In the working tree, not committed:** `dotnet/App/ProfileWrites.cs`. It builds, but is not
+wired to any endpoint and has no tests yet. It holds:
+
+- image writes (`Identity.SniffImage`, `SaveImage`, `ClearImage`, `SaveAboutImage`);
+- the writing half of `src/scores.ts` (`Scores.SetIncompleteHidden`, `ApplyAction`,
+  `ReorderPins`, `HiddenCount`, `Hidden`, `DeleteRemoved`, `ClassicLabel`, `WholeIds`);
+- `ProfileData.DismissWelcome`, `OfferWelcome`, and `Reset` (`/api/profile/reset`'s
+  transaction).
+
+Review it against the TypeScript before relying on it.
+
+**Next, in this order.** Every handler is in `src/http/server.ts`; its line numbers are in the
+route list there.
+
+1. **Server plumbing.**
+   - The live feed, `/api/events` (SSE): `retry: 2000`, a ping every 20s, and the same event
+     names and payloads. Send it every tracker event, as `startServer` does: score, incomplete,
+     filtered, refused, caught-up, recompute-progress (only when the percent changes),
+     recompute (with `everyProfile`), tracker-error, indexing, importing.
+   - A `readBody` equivalent:
+     - `JSON.parse(raw || '{}')`, or 400 `expected a JSON body`.
+     - A handler's exception is a 500 `{ error: message }`.
+     - A `null` body throws JavaScript's TypeError message.
+     - `key in body` throws for primitives.
+   - Add `Events`, `Folders` and `OnRestart` to `ServerOptions`.
+   - Remove a route from the 501 fallback in `Server.cs` once it is ported.
+2. **The local writes, needing no network:**
+   - `/api/welcome`, `/api/settings` POST (and `retrackOwnNames` when `ownNames` changes),
+     `/api/app-config` POST (writes `config.json` through `AppConfig.Save`), `/api/tracking`
+   - `/api/scores` POST, `/api/declined` POST (track, delete, delete-all; `its-me` needs osu!'s
+     API, so it goes with step 4), `/api/profiles` POST, `/api/profile/reset`
+   - `/api/backfill` and `/api/backfill/preview`, `/api/recompute`
+   - image PUT, `/api/about-image` PUT, `/api/replays` POST (upload), `/api/identity` actions
+     `suggestions`, `unlink` and `clear-image`
+   - `/api/installs` GET and POST (port `src/clients/folders.ts`; save only `installRoots`,
+     `discoveredRoots` and `searchedForInstalls`, into a freshly loaded config)
+   - `/api/startup` (port `src/startup.ts`: the registry Run key on Windows, a LaunchAgent on
+     macOS, an autostart entry on Linux)
+   - `/api/data-folder/open`
+3. **Startup writes the Node app does that the C# Program does not yet:**
+   - `seedSeenVersion`, and `offerWelcome` on a first run;
+   - `applyPendingRestore`, then `markRunning`;
+   - `syncFavoriteSharing`;
+   - the `RankEventWatcher` (`src/rank-events.ts`);
+   - `pruneUpdateLeftovers`.
+4. **osu!'s web API** (`src/clients/osu-web.ts`, `src/clients/request-gate.ts`). Then, built on
+   it:
+   - `/api/favorites` POST;
+   - `/api/identity` actions `lookup`, `link` and `import`;
+   - `/api/score-link` and its `/check`, `/api/beatmaps/search` and `/find`,
+     `/api/manual-score` (port `src/score-entry.ts`, `src/built-replays.ts`, `lazerBlock` from
+     `src/replay-writer.ts`, and online-import's `importMode`);
+   - `convertImportedScores` at startup (see `Startup.AfterIndex`);
+   - `/api/declined` `its-me`.
+5. **Backup and restore:** `/api/backup`, `/api/restore` PUT, DELETE and apply
+   (`src/backup.ts`).
+6. **Screenshots:** `/api/screenshot` and a score card's `/screenshot`, through Chrome over CDP
+   (`src/screenshot.ts`). `Browsers.Find` is already ported.
+7. **The updater:** `/api/update*`, the checker and installer (`src/update/*`), and `/api/app`'s
+   `update` and `updating`.
+8. **The pp source switch** (5.70): `/api/pp-source`, `src/pp-source.ts`,
+   `src/calc/source-helper.ts`.
+9. **Make writable the default**, and remove the `--writable` flag.
+
+**Checking writes.** Add a write stage to `scripts/api-parity.mjs`:
+
+- send the same requests, in order, to both apps (each on its own copy of `data/`);
+- compare each answer, then the GET answers it should change;
+- at the end, compare the database tables of both copies, leaving out timestamps such as
+  `hidden_at`, `pinned_at`, `declined_at` and `tracking_since`.
+
+Both apps already run writable and tracking there. The script turns catch-up off in its copies.
+That is deliberate: an import can release a replay file in the real `data/replays/`, which the
+copies point at.
+
+**Commands:**
+
+- `npm run check`: the Node typecheck and tests. Run it before every commit.
+- `npm run check:port`: the C# tests.
+- `node scripts/api-parity.mjs`: every API answer of both apps (about 5 minutes).
+- `node scripts/port-checks.mjs [--only <check>]`: replays, index, resolve, ingest, mcosu,
+  backfill and discover against the Node app's own code (about 15 minutes in all).
+
+**Pitfalls met so far:**
+
+- The file-writing tool turns `\uXXXX` escapes into literal characters. Write `(char)0x2028`,
+  or patch the file with node using `String.fromCharCode(92)`.
+- Never put backticks in a shell command: the shell runs them. Use the editor for Markdown and
+  JavaScript template literals.
+- `InvariantGlobalization` is on, so culture-aware comparison is ordinal. Port any
+  `localeCompare` as an explicit rule, fixing it in Node first.
+- node:sqlite binds every JavaScript number as REAL. That only matters for a TEXT column.
+- SQLite is shared by threads in C#. Every `Database` call holds one re-entrant lock; use
+  `db.Serialized` for multi-statement work. Never call a callback while holding a watcher's lock
+  (a deadlock with `BeatmapResolver.OnMiss`).
+
 ### 6. Updater bridge, in a Node release
 
 This can be done at any time, and should ship well before phase 8, so that most installs
