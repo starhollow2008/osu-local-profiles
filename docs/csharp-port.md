@@ -72,7 +72,7 @@ dotnet/
 | --- | ----------------------------- | ----------- |
 | 0   | This plan                     | done        |
 | 1   | Foundations                   | done        |
-| 2   | Reading a profile             | in progress |
+| 2   | Reading a profile             | done        |
 | 3   | pp in-process                 | not started |
 | 4   | Tracking                      | not started |
 | 5   | Everything that writes        | not started |
@@ -124,7 +124,7 @@ about-images, `/api/export/*`. The `/api/profile` cache keeps its `total_changes
       monthly play counts, the Recent feed with medal and rank events), rank estimate, borrowed
       standing, favourites, behind the same database-stamped cache. Identical on every profile in
       every mode on the owner's data, up to 472 KB an answer.
-- [ ] Two stand-ins until phase 4: lazer's `online.db` is assumed found (`StatusKnown`, which
+- [x] Two stand-ins until phase 4 (below): lazer's `online.db` is assumed found (`StatusKnown`, which
       decides whether unresolved beatmaps count), and a favourite with no osu! details is drawn
       without the other difficulties `online.db` lists.
 - [x] `/api/scores/:id` and its replay download, `/api/image/*`: every score's page identical,
@@ -135,7 +135,13 @@ about-images, `/api/export/*`. The `/api/profile` cache keeps its `total_changes
       `/api/export/profile.xlsx` file for file inside the zip (Node's zlib and .NET's compress the
       same files differently), each in the page's language. Numbers are written as JavaScript writes
       them (`Js.NumberToString`), since an export is text.
-- [ ] `/api/state`.
+- [x] `/api/state`, with the update notes it reads (version order, release notes, what's new,
+      the behind notice's dismissal) and the browser finder for Share's image option.
+
+What phase 2 leaves to later phases, each listed in `scripts/api-parity.mjs` with its reason:
+`/api/state`'s tracker fields (tracking, the beatmap index, installs; phase 4) and pp helper fields
+(phase 3); a score's `calculator` (phase 3); `StatusKnown` and the local favourite card's
+`online.db` difficulties (phase 4); the score card as a PNG (phase 5).
 
 ### 3. pp in-process
 

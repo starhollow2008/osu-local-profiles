@@ -83,7 +83,7 @@ public sealed class ServerTests : IAsyncLifetime
     [Fact]
     public async Task What_is_not_ported_yet_says_so()
     {
-        var response = await client.GetAsync("/api/state");
+        var response = await client.GetAsync("/api/backup");
         Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotImplemented, (await client.PostAsync("/api/settings", new StringContent("{}"))).StatusCode);
     }

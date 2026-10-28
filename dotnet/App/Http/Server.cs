@@ -29,6 +29,9 @@ internal sealed class ServerOptions
     /// </summary>
     public bool StatusKnown { get; init; } = true;
 
+    /// <summary>Started by the tray launcher, as <c>/api/state</c> tells the page.</summary>
+    public bool FromTray { get; init; }
+
     /// <summary>The cache behind /api/profile, made with the server.</summary>
     internal ProfileCache? Cache { get; set; }
 }
@@ -169,6 +172,12 @@ internal static partial class Server
                 quit();
             });
             await Json(context, new { ok = true });
+            return;
+        }
+
+        if (pathname == "/api/state")
+        {
+            await Json(context, StateApi.Answer(opts, Current(), opts.FromTray));
             return;
         }
 

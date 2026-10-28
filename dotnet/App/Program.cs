@@ -79,6 +79,7 @@ var app = Server.Build(new ServerOptions
     Config = config,
     Port = config.Port,
     OnQuit = () => Shutdown(0, true),
+    FromTray = fromTray,
 });
 
 Console.CancelKeyPress += (_, e) =>
