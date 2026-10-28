@@ -363,7 +363,7 @@ export function coerceTrackingFilter(raw: unknown): TrackingFilter {
   if (Array.isArray(raw['categories'])) {
     const seen = new Set(
       raw['categories'].filter(
-        (value): value is FilterCategory => typeof value === 'string' && value in FILTER_CATEGORIES,
+        (value): value is FilterCategory => typeof value === 'string' && Object.hasOwn(FILTER_CATEGORIES, value),
       ),
     );
     out.categories = FILTER_CATEGORY_NAMES.filter((name) => seen.has(name));

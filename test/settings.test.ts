@@ -237,6 +237,11 @@ test('a new profile counts every unranked mod and beatmap status by default', ()
     );
     // And the note that says so is shown until it is dismissed.
     assert.equal(settings.showCountingNote, true);
+    // Only real states are kept, never a name every object inherits.
+    assert.deepEqual(
+      updateSettings(h.db, h.profileId, { includeUnrankedMaps: ['constructor', 'loved', 'toString'] }).includeUnrankedMaps,
+      ['loved'],
+    );
   } finally {
     h.cleanup();
   }

@@ -428,7 +428,8 @@ const DEFS: Defs = {
       // different version cannot widen what counts.
       const seen = new Set<string>();
       return raw.filter((value): value is UnrankedMapStatus => {
-        if (typeof value !== 'string' || !(value in UNRANKED_MAP_STATUSES)) return false;
+        // Own keys only: `in` would also accept inherited names such as "constructor".
+        if (typeof value !== 'string' || !Object.hasOwn(UNRANKED_MAP_STATUSES, value)) return false;
         if (seen.has(value)) return false;
         seen.add(value);
         return true;
