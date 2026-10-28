@@ -15,8 +15,11 @@ func hideConsole(*exec.Cmd) {}
 
 // startDetached starts the new launcher after an update in a session of its own, so it outlives
 // this one.
-func startDetached(exe, dir string) error {
-	cmd := exec.Command(exe)
+func startDetached(exe, dir string) error { return startDetachedCommand(exe, nil, dir) }
+
+// startDetachedCommand starts a program in a session of its own: the relaunch after a swap.
+func startDetachedCommand(command string, args []string, dir string) error {
+	cmd := exec.Command(command, args...)
 	cmd.Dir = dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	if err := cmd.Start(); err != nil {

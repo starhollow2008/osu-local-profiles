@@ -186,6 +186,77 @@ test('the launcher reports the version it was built as', { skip, timeout: 900_00
   assert.equal(spawnSync(exe, ['--version'], { encoding: 'utf8' }).stdout.trim(), 'test');
 });
 
+/* ------------------------------------------------------- the swap, without Node */
+
+/*
+ * Roadmap 5.82: a release without Node is installed by its own launcher (tools/launcher/swap.go).
+ * A Node install with such a release staged, as the app leaves them before handing over, swapped
+ * by the real launcher both ways it can be asked: --apply-update from an app that knows of it,
+ * and `<runtime> scripts/apply-update.mjs ...` from one that does not, with the launcher standing
+ * in for the runtime.
+ */
+function stagedSwap(): { install: string; staged: string; launcher: string } {
+  const install = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-swap-'));
+  const put = (rel: string, text = '') => {
+    fs.mkdirSync(path.dirname(path.join(install, rel)), { recursive: true });
+    fs.writeFileSync(path.join(install, rel), text);
+  };
+  put('package.json', JSON.stringify({ version: '1.40.0' }));
+  put(path.basename(process.execPath), 'old runtime');
+  put('src/main.ts', 'old app');
+  put('web/index.html', 'old page');
+  put('data/profiles.db', "the player's scores");
+  fs.cpSync(path.join(builtLauncher(), tray.name), path.join(install, tray.name), { recursive: true });
+
+  const staged = path.join(install, 'data', 'update', '2.0.0');
+  put('data/update/2.0.0/package.json', JSON.stringify({ version: '2.0.0' }));
+  put('data/update/2.0.0/web/index.html', 'new page');
+  put(`data/update/2.0.0/app/osu-local-profiles-app${process.platform === 'win32' ? '.exe' : ''}`, 'new app');
+  fs.cpSync(path.join(builtLauncher(), tray.name), path.join(staged, tray.name), { recursive: true });
+  return { install, staged, launcher: path.join(staged, ...tray.executable.split('/')) };
+}
+
+/** A pid that is certainly gone: the app has exited by the time the swapper looks. */
+const exitedPid = (): number => spawnSync(process.execPath, ['-e', '']).pid ?? 1;
+
+function assertSwapped(install: string): void {
+  assert.equal(fs.readFileSync(path.join(install, 'web', 'index.html'), 'utf8'), 'new page');
+  assert.ok(!fs.existsSync(path.join(install, 'src')), 'the old app is gone');
+  assert.ok(!fs.existsSync(path.join(install, path.basename(process.execPath))), 'the old runtime is gone');
+  assert.equal(fs.readFileSync(path.join(install, 'data', 'profiles.db'), 'utf8'), "the player's scores");
+  assert.deepEqual(fs.readdirSync(install).filter((n) => n.startsWith('.rollback-')), []);
+  assert.match(fs.readFileSync(path.join(install, 'data', 'update.log'), 'utf8'), /^OK: updated to 2\.0\.0\n/);
+}
+
+test('a release without Node installs itself with its launcher', { skip, timeout: 900_000 }, async () => {
+  const { install, staged, launcher } = stagedSwap();
+  try {
+    const args = ['--apply-update', '--install', install, '--staged', staged, '--pid', String(exitedPid()), '--no-relaunch'];
+    const result = spawnSync(launcher, args, { encoding: 'utf8', timeout: 120_000 });
+    assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+    assertSwapped(install);
+  } finally {
+    await remove(install);
+  }
+});
+
+test('an app that only knows the Node swapper still installs one, through the launcher in its place', { skip, timeout: 900_000 }, async () => {
+  const { install, staged, launcher } = stagedSwap();
+  try {
+    // The stand-in phase 7 ships: the launcher under the runtime's name, asked as the runtime is.
+    const standIn = path.join(staged, path.basename(process.execPath));
+    fs.copyFileSync(launcher, standIn);
+    fs.chmodSync(standIn, 0o755);
+    const script = path.join(staged, 'scripts', 'apply-update.mjs');
+    const args = [script, '--install', install, '--staged', staged, '--pid', String(exitedPid()), '--no-relaunch'];
+    const result = spawnSync(standIn, args, { encoding: 'utf8', timeout: 120_000 });
+    assert.equal(result.status, 0, `${result.stdout}${result.stderr}`);
+    assertSwapped(install);
+  } finally {
+    await remove(install);
+  }
+});
+
 process.on('exit', () => {
   if (built !== null) fs.rmSync(built, { recursive: true, force: true });
 });

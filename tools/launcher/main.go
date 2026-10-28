@@ -26,6 +26,15 @@ func main() {
 }
 
 func run() int {
+	// Installing a staged update, before anything else: no tray, no lock, no app (swap.go).
+	if opts, isSwap, err := parseSwapArgs(os.Args[1:]); isSwap {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		return newSwapper(opts).run()
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "--version" {
 		fmt.Println(version)
 		return 0

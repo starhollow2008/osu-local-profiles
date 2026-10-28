@@ -21,8 +21,11 @@ func hideConsole(cmd *exec.Cmd) {
 }
 
 // startDetached starts the new launcher after an update, owing nothing to this process.
-func startDetached(exe, dir string) error {
-	cmd := exec.Command(exe)
+func startDetached(exe, dir string) error { return startDetachedCommand(exe, nil, dir) }
+
+// startDetachedCommand starts a program that owes nothing to this process: the relaunch after a swap.
+func startDetachedCommand(command string, args []string, dir string) error {
+	cmd := exec.Command(command, args...)
 	cmd.Dir = dir
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.DETACHED_PROCESS | windows.CREATE_NEW_PROCESS_GROUP}
 	if err := cmd.Start(); err != nil {

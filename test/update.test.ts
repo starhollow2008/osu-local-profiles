@@ -18,12 +18,17 @@ import {
   CHECK_EVERY_MS,
   checkDue,
   keepCheckingForUpdates,
+  launcherExecutableFor,
+  nativeAppFor,
   offeredVersion,
   pruneUpdateLeftovers,
   RETRY_FAILED_MS,
+  swapperFor,
   updateState,
   type UpdateState,
+  verifyStaged,
 } from '../src/update/index.ts';
+import { trayLauncherFor } from '../scripts/package-files.mjs';
 
 /*
  * The update path replaces the app's own files, so the parts of it that can be checked
@@ -369,4 +374,70 @@ test('a build downloaded ahead of time survives the startup sweep while it is st
   pruneUpdateLeftovers(dir, data);
   assert.equal(fs.existsSync(path.join(data, 'update')), false);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/* ---------------------------------------------------- a release without Node */
+
+/*
+ * Roadmap 5.82: a release made by the C# port has no node.exe and no src/, and installs itself
+ * with its own launcher's --apply-update (tools/launcher/swap.go). Its app is what marks it, so
+ * a Node release that has only lost its runtime is still refused.
+ */
+function stagedBuild(kind: 'node' | 'native' | 'broken-node', platform: string, version = '2.0.0'): string {
+  const dir = tmp();
+  const put = (rel: string) => {
+    fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+    fs.writeFileSync(path.join(dir, rel), '');
+  };
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version }));
+  put(path.join('web', 'index.html'));
+  put(launcherExecutableFor(platform));
+  if (kind === 'native') {
+    put(nativeAppFor(platform));
+  } else {
+    put(path.join('src', 'main.ts'));
+    put(path.join('scripts', 'apply-update.mjs'));
+    if (kind === 'node') put(platform === 'win32' ? 'node.exe' : 'node');
+  }
+  return dir;
+}
+
+test('a release without Node is installed by its own launcher, on every platform', () => {
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    const dir = stagedBuild('native', platform);
+    assert.doesNotThrow(() => verifyStaged(dir, '2.0.0', platform), platform);
+    assert.deepEqual(swapperFor(dir, platform), {
+      command: path.join(dir, launcherExecutableFor(platform)),
+      args: ['--apply-update'],
+    });
+    assert.throws(() => verifyStaged(dir, '2.0.1', platform), /says it is 2\.0\.0/);
+    // With no launcher there is nothing to swap it in with.
+    fs.rmSync(path.join(dir, launcherExecutableFor(platform)));
+    assert.throws(() => verifyStaged(dir, '2.0.0', platform), /has no osu/);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a Node release is still swapped by its own runtime, and refused without one', () => {
+  for (const platform of ['win32', 'darwin', 'linux']) {
+    const dir = stagedBuild('node', platform);
+    assert.doesNotThrow(() => verifyStaged(dir, '2.0.0', platform), platform);
+    const runtime = platform === 'win32' ? 'node.exe' : 'node';
+    assert.deepEqual(swapperFor(dir, platform), {
+      command: path.join(dir, runtime),
+      args: [path.join(dir, 'scripts', 'apply-update.mjs')],
+    });
+    fs.rmSync(dir, { recursive: true, force: true });
+
+    // Antivirus took the runtime: still a Node release, and not taken for one without Node.
+    const broken = stagedBuild('broken-node', platform);
+    assert.throws(() => verifyStaged(broken, '2.0.0', platform), new RegExp(`has no ${runtime}`));
+    fs.rmSync(broken, { recursive: true, force: true });
+  }
+});
+
+test('the launcher is looked for where the packager puts it', () => {
+  for (const [platform, os] of [['win32', 'win'], ['darwin', 'osx'], ['linux', 'linux']] as const) {
+    assert.equal(launcherExecutableFor(platform), path.join(...trayLauncherFor(os).executable.split('/')));
+  }
 });

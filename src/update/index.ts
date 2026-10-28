@@ -351,24 +351,42 @@ function launcherNameFor(platform: string): string {
   return 'osu-local-profiles';
 }
 
-/** Everything an install needs; a staged tree missing any of it is not one. */
-const REQUIRED_ENTRIES = ['package.json', 'src', 'web'];
+/** The launcher's own executable: inside the bundle on macOS (`trayLauncherFor`'s `executable`). */
+export function launcherExecutableFor(platform: string): string {
+  if (platform === 'darwin') return path.join('osu! local profiles.app', 'Contents', 'MacOS', 'osu-local-profiles');
+  return launcherNameFor(platform);
+}
 
-function verifyStaged(dir: string, expectedVersion: string, platform: string): void {
-  for (const entry of REQUIRED_ENTRIES) {
+/**
+ * The app a release without Node carries (roadmap 5.82, docs/csharp-port.md). Its presence is
+ * what marks such a build, so a Node build that only lost `node.exe` to antivirus is still
+ * refused rather than taken for one.
+ */
+export function nativeAppFor(platform: string): string {
+  return path.join('app', platform === 'win32' ? 'osu-local-profiles-app.exe' : 'osu-local-profiles-app');
+}
+
+/**
+ * Whether a staged tree is a whole release of either kind, at the version expected: the Node
+ * app with its runtime and `src/`, or the .NET app swapped in by its own launcher.
+ */
+export function verifyStaged(dir: string, expectedVersion: string, platform: string): void {
+  const native = fs.existsSync(path.join(dir, nativeAppFor(platform)));
+  for (const entry of native ? ['package.json', 'web'] : ['package.json', 'src', 'web']) {
     if (!fs.existsSync(path.join(dir, entry))) {
       throw new Error(`the downloaded build has no ${entry}`);
     }
   }
 
   const runtime = platform === 'win32' ? 'node.exe' : 'node';
-  if (!fs.existsSync(path.join(dir, runtime))) {
+  if (!native && !fs.existsSync(path.join(dir, runtime))) {
     throw new Error(`the downloaded build has no ${runtime}`);
   }
 
-  // What starts the app again once the swap is done (scripts/apply-update.mjs, launcherName).
+  // What starts the app again once the swap is done (scripts/apply-update.mjs, launcherName),
+  // and what does the swap in a release without Node.
   const launcher = launcherNameFor(platform);
-  if (!fs.existsSync(path.join(dir, launcher))) {
+  if (!fs.existsSync(path.join(dir, launcher)) || (native && !fs.existsSync(path.join(dir, launcherExecutableFor(platform))))) {
     throw new Error(`the downloaded build has no ${launcher}`);
   }
 
@@ -555,6 +573,20 @@ export function setMetered(metered: boolean | null): void {
 
 /* -------------------------------------------------------------- the swap */
 
+/**
+ * What installs a staged build, from inside it: the release's own runtime running its updater
+ * script, or for a release without Node its tray launcher in swap mode. Null when it carries
+ * neither.
+ */
+export function swapperFor(stagedDir: string, platform: string): { command: string; args: string[] } | null {
+  if (fs.existsSync(path.join(stagedDir, nativeAppFor(platform)))) {
+    return { command: path.join(stagedDir, launcherExecutableFor(platform)), args: ['--apply-update'] };
+  }
+  const script = path.join(stagedDir, 'scripts', 'apply-update.mjs');
+  if (!fs.existsSync(script)) return null;
+  return { command: path.join(stagedDir, platform === 'win32' ? 'node.exe' : 'node'), args: [script] };
+}
+
 export interface ApplyResult {
   version: string;
   stagedDir: string;
@@ -569,23 +601,26 @@ export interface ApplyResult {
  * process to exit, and does the work. That also means a release always installs itself with
  * its own updater rather than with whatever the older version happened to ship.
  *
+ * A release without Node (roadmap 5.82) has no runtime to run the script with, so its own tray
+ * launcher does the same swap, started from the staged folder with `--apply-update` and the
+ * same arguments (tools/launcher/swap.go).
+ *
  * `relaunch: false` is an install at quit: the swapper starts nothing afterwards, because
  * nobody asked for the app to come back (`--no-relaunch`, known to every swapper since 5.66,
  * which is every one this can hand to).
  */
 function handOff(stagedDir: string, version: string, relaunch: boolean): ApplyResult {
   verifyStaged(stagedDir, version, process.platform);
-  const runtime = path.join(stagedDir, process.platform === 'win32' ? 'node.exe' : 'node');
-  const script = path.join(stagedDir, 'scripts', 'apply-update.mjs');
-  if (!fs.existsSync(script)) {
+  const swapper = swapperFor(stagedDir, process.platform);
+  if (swapper === null) {
     throw new Error(`${version} does not know how to install itself (no updater script)`);
   }
 
   const restarts = relaunch && launcherRestarts();
   const child = spawn(
-    runtime,
+    swapper.command,
     [
-      script,
+      ...swapper.args,
       '--install', installDir(),
       '--staged', stagedDir,
       '--pid', String(process.pid),

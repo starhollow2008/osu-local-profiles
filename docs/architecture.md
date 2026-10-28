@@ -805,6 +805,14 @@ back exactly so on macOS and Linux.
   restart by running `./<own name>` again, so `start.sh` and `Start osu! local profiles.command`
   keep those names and start the tray launcher.
 - `verifyStaged` requires the tray launcher in a downloaded build, since the relaunch depends on it.
+- **A release without Node** (roadmap 5.82, the C# port) is marked by its app,
+  `app/osu-local-profiles-app`, not by a missing `node.exe`: a Node release that lost its runtime
+  to antivirus is still refused. It has no runtime to run the script with, so `swapperFor` starts
+  its tray launcher with `--apply-update` and the same arguments (`tools/launcher/swap.go`, the
+  same swap, log and relaunch). The launcher also answers being run as
+  `<runtime> scripts/apply-update.mjs ...`, which is how installs from before this ask, so such a
+  release can carry it under the runtime's name; the swap leaves that stand-in, and a placeholder
+  `src/` and `scripts/`, out of the install. `test/launcher.test.ts` runs both.
 
 **The zip reader is our own** (`src/update/zip.ts`), which avoids a dependency and Windows-only
 `tar.exe`. It refuses zip64 and path traversal, handles the backslash separators our packager

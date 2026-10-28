@@ -76,7 +76,7 @@ dotnet/
 | 3   | pp in-process                 | not started |
 | 4   | Tracking                      | not started |
 | 5   | Everything that writes        | not started |
-| 6   | Updater bridge (Node release) | not started |
+| 6   | Updater bridge (Node release) | built, ships with the next release |
 | 7   | Packaging                     | not started |
 | 8   | Switch-over release           | not started |
 | 9   | Removing the Node app         | not started |
@@ -157,28 +157,38 @@ already have it when the C# release appears. Findings it is based on:
   `package.json` and the launcher (`verifyStaged`), and then runs the new build's
   `node.exe scripts/apply-update.mjs` (`handOff`). A build without Node fails both.
 
-The bridge:
+What was built (2026-10-28):
 
-- The Go launcher gains `--apply-update`, taking the same arguments as `apply-update.mjs`
-  (`--install`, `--staged`, `--pid`, `--archive`, `--launcher-restarts`, `--no-relaunch`) and
-  doing the same swap: wait for the pid, move aside, copy in, read back, delete the rollback,
-  write `data/update.log`, relaunch per `relaunchPlan`. Its tests port `test/relaunch.test.ts`.
-- `handOff` runs the staged launcher's `--apply-update` when the staged build has one, and the
-  script otherwise. `verifyStaged` accepts a build that has the launcher and a `package.json`
-  with the right version, with or without `node.exe` and `src/`.
+- **The launcher swaps** (`tools/launcher/swap.go`): `--apply-update` with `apply-update.mjs`'s
+  arguments, doing the same swap with the same log lines and outcome (`OK: updated to ...`,
+  which `updatedToFromLog` reads). `relaunchPlan` is ported with `test/relaunch.test.ts`'s
+  cases. Two deliberate differences: a staged `data/` is never copied in, and neither are a
+  release's stand-ins (phase 7).
+- **A release without Node is marked by its app**, `app/osu-local-profiles-app(.exe)`, so a Node
+  release that only lost `node.exe` is still refused. `verifyStaged` then asks for
+  `package.json` at the right version, `web/` and the launcher; `swapperFor` picks the
+  launcher's `--apply-update`. Node releases are swapped by their script exactly as before.
+- **Tested for real**: `test/launcher.test.ts` builds the launcher and swaps a Node install to a
+  staged release without Node, asked both as `--apply-update` and as
+  `<runtime> scripts/apply-update.mjs ...`, on all three systems in CI.
+- **This only helps once installed.** It reaches players in the next Node release; phase 8
+  should come several releases later, and phase 7's stand-ins cover anyone who skipped them.
 
 ### 7. Packaging
 
 - `scripts/package.mjs` publishes the app self-contained per platform, partially trimmed only
   if a parity check proves it answers identically (the rule 5.60 set for the pp helper).
-- The launcher runs the app beside it by absolute path, as now; `runtimeName` and
-  `missingFiles` change to the new executable.
+- The app goes in `app/` (`app/osu-local-profiles-app`, with its libraries beside it), which is
+  what marks a release without Node (phase 6). The launcher runs it by absolute path, as now;
+  `runtimeName` and `missingFiles` change to it.
 - **Stand-ins for installs that never got the bridge.** Their updater still demands Node's
   files, and always downloads the latest release, so they can't be routed through phase 6's.
   The package carries `package.json` (it stays the version file anyway), an `src/` holding a
   placeholder, `scripts/apply-update.mjs` as a placeholder, and a file named `node.exe` (or
   `node`) that is the Go launcher's swap mode under another name, accepting
-  `scripts/apply-update.mjs --install ...`. The swap leaves the stand-ins out of the install.
+  `scripts/apply-update.mjs --install ...`: a copy of the launcher binary, which already answers
+  that (phase 6). The swap already leaves the stand-ins out of the install. Left to do: put them
+  in the package.
 - `start.sh` and `Start osu! local profiles.command` keep their names (1.14-1.16 launchers run
   them after an update).
 - Still four zips and nothing else (5.69).

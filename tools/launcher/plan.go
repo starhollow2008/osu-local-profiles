@@ -7,10 +7,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"path"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
+
+// errSwapUsage is the answer to a swap request missing what it needs.
+var errSwapUsage = errors.New("usage: --apply-update --install <dir> --staged <dir> --pid <n> [--archive <zip>] [--launcher-restarts] [--no-relaunch]")
 
 const (
 	// The id /api/app answers with (APP_ID in src/instance.ts).
@@ -334,4 +340,158 @@ func translocated(exe string) bool {
 func logFiles(root string) (current, previous string) {
 	dir := filepath.Join(root, "data", "logs")
 	return filepath.Join(dir, "app.log"), filepath.Join(dir, "app.previous.log")
+}
+
+/* ------------------------------------------------------------------------- the swap */
+
+// swapArg asks the launcher to install a staged update instead of starting the app: the job
+// scripts/apply-update.mjs does with Node, done here for a build that has no Node (roadmap 5.82,
+// docs/csharp-port.md phase 6).
+const swapArg = "--apply-update"
+
+// swapOptions are apply-update.mjs's arguments, which every swapper keeps understanding: an
+// older app hands the swap to the newer release's swapper (docs/architecture.md, "Updater").
+type swapOptions struct {
+	install, staged, archive     string
+	pid                          int
+	launcherRestarts, noRelaunch bool
+}
+
+// parseSwapArgs reads a swap request from the arguments after the program name, or reports
+// that there is none. Asked either as `--apply-update ...`, or the way every Node release asks
+// its successor's swapper -- `<runtime> scripts/apply-update.mjs --install ...` -- so a build
+// without Node can carry the launcher under the runtime's name for installs that never learnt
+// to ask for --apply-update.
+func parseSwapArgs(args []string) (opts swapOptions, isSwap bool, err error) {
+	if len(args) == 0 {
+		return opts, false, nil
+	}
+	first := strings.ReplaceAll(args[0], `\`, "/")
+	if args[0] != swapArg && path.Base(first) != "apply-update.mjs" {
+		return opts, false, nil
+	}
+	rest := args[1:]
+	for i := 0; i < len(rest); i++ {
+		value := func() string {
+			if i+1 < len(rest) {
+				i++
+				return rest[i]
+			}
+			return ""
+		}
+		switch rest[i] {
+		case "--install":
+			opts.install = value()
+		case "--staged":
+			opts.staged = value()
+		case "--archive":
+			opts.archive = value()
+		case "--pid":
+			n, convErr := strconv.Atoi(value())
+			if convErr != nil {
+				return opts, true, convErr
+			}
+			opts.pid = n
+		case "--launcher-restarts":
+			opts.launcherRestarts = true
+		case "--no-relaunch":
+			opts.noRelaunch = true
+		}
+	}
+	if opts.install == "" || opts.staged == "" || opts.pid <= 0 {
+		return opts, true, errSwapUsage
+	}
+	return opts, true, nil
+}
+
+// launcherName is what each platform's package opens, as scripts/package-files.mjs names it.
+// On macOS it is the bundle, which is what `open` is handed.
+func launcherName(goos string) string {
+	switch goos {
+	case "windows":
+		return "osu! local profiles.exe"
+	case "darwin":
+		return "osu! local profiles.app"
+	}
+	return "osu-local-profiles"
+}
+
+// relaunchStep is how to start the app again once the swap is done, or why not to.
+type relaunchStep struct {
+	skip    string
+	command string
+	args    []string
+}
+
+// relaunchPlan is relaunchPlan in scripts/apply-update.mjs: the app comes back somewhere it can
+// be stopped from, or not at all. Never the runtime directly.
+func relaunchPlan(goos, installDir string, launcherRestarts, noRelaunch bool, exists func(string) bool, getenv func(string) string) relaunchStep {
+	if noRelaunch {
+		return relaunchStep{skip: "installed as the app was quit, so it stays closed until it is started"}
+	}
+	if launcherRestarts {
+		return relaunchStep{skip: "the launcher that started the app is waiting to start it again"}
+	}
+	name := launcherName(goos)
+	launcher := join(goos, installDir, name)
+	if !exists(launcher) {
+		return relaunchStep{skip: "there is no " + name + " to start it with; start the app yourself"}
+	}
+	switch goos {
+	case "windows":
+		return relaunchStep{command: launcher}
+	case "darwin":
+		// -n: the launcher that ran the app may not have finished exiting, and open would only
+		// bring it forward.
+		return relaunchStep{command: "open", args: []string{"-n", launcher}}
+	}
+	if getenv("DISPLAY") == "" && getenv("WAYLAND_DISPLAY") == "" {
+		return relaunchStep{skip: "there is no desktop to show its icon on; run ./start.sh again"}
+	}
+	return relaunchStep{command: launcher}
+}
+
+// replaceable is everything at the top of the install an update replaces: not data/, the
+// user's, and not a previous update's .rollback-*, which moving would bury.
+func replaceable(names []string) []string {
+	var out []string
+	for _, name := range names {
+		if name != "data" && !strings.HasPrefix(name, ".rollback-") {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// rollbackStamp names a rollback folder as apply-update.mjs does: the ISO time to the second,
+// with ':' and '.' made '-' so it is a valid file name everywhere.
+func rollbackStamp(t time.Time) string {
+	return strings.NewReplacer(":", "-", ".", "-").Replace(t.UTC().Format("2006-01-02T15:04:05.000Z"))[:19]
+}
+
+// logStamp is JavaScript's toISOString, which every line of data/update.log starts with.
+func logStamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
+
+// nativeApp is the app a release without Node carries, relative to the release's folder
+// (nativeAppFor in src/update/index.ts). Its presence is what marks such a release.
+func nativeApp(goos string) string {
+	if goos == "windows" {
+		return join(goos, "app", "osu-local-profiles-app.exe")
+	}
+	return join(goos, "app", "osu-local-profiles-app")
+}
+
+// incoming is what of a staged release is copied into the install. Never data/ or a rollback.
+// And from a release without Node, never the stand-ins it carries only so that installs too old
+// to ask for --apply-update can still update to it -- a runtime-named copy of this launcher, a
+// placeholder src/ and scripts/ -- or they would be left behind in the install for good.
+func incoming(names []string, native bool, goos string) []string {
+	var out []string
+	for _, name := range replaceable(names) {
+		if native && (name == runtimeName(goos) || name == "src" || name == "scripts") {
+			continue
+		}
+		out = append(out, name)
+	}
+	return out
 }
