@@ -79,7 +79,7 @@ dotnet/
 | 5   | Everything that writes        | done        |
 | 6   | Updater bridge (Node release) | built; not released on its own (phase 8) |
 | 7   | Packaging                     | done        |
-| 8   | Switch-over release           | rehearsed; release pending |
+| 8   | Switch-over release           | done (1.33.0) |
 | 9   | Removing the Node app         | not started |
 
 ### 1. Foundations
@@ -304,7 +304,7 @@ Each proven by the parity script's write stage (below) and ported tests:
 
 Pushed to `main`. Phase 5 is done: the last parity run matched every answer. Phase 7
 (packaging) is done: built and checked on all three platforms, listening on the loopbacks only.
-Phase 8 is rehearsed on all three platforms; what is left is the release itself, after the bridge has shipped (see its section).
+Phase 8 is done: 1.33.0 is the C# release. Next is phase 9, removing the Node app.
 
 **Pitfalls met this session:**
 
@@ -537,7 +537,9 @@ builds come from a worktree of `main` with `package.json`'s version and reposito
       never shipped osx-x64), Apple silicon 8 of 8 in one run. Its other runs hit GitHub's limit
       of 60 unsigned requests an hour to an address, which macOS runners share; a player's
       address is their own.
-- [ ] **The tag**, `v1.33.0` at the release commit. Then delete the test repository.
+- [x] **Released** (2026-10-29): `v1.33.0`, built by `release.yml` on all four platforms, each
+      trimmed, with its changes in full on the page and in the patch notes (`<!-- in full -->`).
+- [ ] Delete the test repository `jonathant09/osu-local-profiles-switchover-test`.
 
 ### 9. Removing the Node app
 
