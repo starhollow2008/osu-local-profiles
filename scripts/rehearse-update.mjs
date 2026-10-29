@@ -116,7 +116,8 @@ async function zipFor(version, cs) {
 async function install(s, dir, port, osuRoot) {
   const zip = await zipFor(s.from, s.cs);
   fs.mkdirSync(dir, { recursive: true });
-  if (win) execFileSync('tar', ['-xf', zip, '-C', dir]);
+  // Windows' own tar: Git's, first on a runner's PATH in bash, reads `C:` as a host to connect to.
+  if (win) execFileSync(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe'), ['-xf', zip, '-C', dir]);
   else execFileSync('unzip', ['-q', zip, '-d', dir]);
   const root = path.join(dir, fs.readdirSync(dir).find((n) => n.startsWith('osu-local-profiles-')));
   const pkgFile = path.join(root, 'package.json');
@@ -126,7 +127,9 @@ async function install(s, dir, port, osuRoot) {
   fs.mkdirSync(path.join(root, 'data'), { recursive: true });
   fs.writeFileSync(
     path.join(root, 'data', 'config.json'),
-    `${JSON.stringify({ port, openBrowser: false, installRoots: [osuRoot], searchedForInstalls: true }, null, 2)}\n`,
+    // No check of its own at start: GitHub answers 60 unsigned requests an hour to an address,
+    // which a CI runner shares, so only the scenario's own checks ask.
+    `${JSON.stringify({ port, openBrowser: false, checkForUpdates: false, installRoots: [osuRoot], searchedForInstalls: true }, null, 2)}\n`,
   );
   return root;
 }
