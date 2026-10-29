@@ -546,6 +546,8 @@ builds come from a worktree of `main` with `package.json`'s version and reposito
 `src/`, `test/`, the Node scripts that only served it, `package.json`'s Node parts, and the
 Node rules in `CLAUDE.md`. `package.json` stays as the version file if nothing better is
 chosen in phase 7. `docs/architecture.md` is updated as each phase lands, not here.
+`start-csharp.bat`, which runs the C# app from a checkout beside `start.bat`'s Node one, becomes
+`start.bat`.
 
 ## JavaScript in C#
 
