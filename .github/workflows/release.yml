@@ -3,9 +3,11 @@ name: Release
 # Pushing a version tag builds the app on each platform it ships for and attaches the four
 # archives to that version's GitHub release.
 #
-# A package can only be built on the system it is for -- it bundles the Node binary that
-# built it (see scripts/package.mjs) -- so each archive comes from a runner of its own OS.
-# The updater looks for exactly these names (assetNameFor in src/update/github.ts).
+# Each package is the C# app (docs/csharp-port.md, phase 8), built and checked on a runner of
+# its own system: the app is checked there against osu!'s calculators, trimmed only where it
+# answers as the untrimmed one does, and started from another folder before it ships. Every
+# updater since 1.7 looks for exactly these names (assetNameFor in src/update/github.ts), and
+# finds the stand-ins it checks for beside the app (scripts/package.mjs).
 
 on:
   push:
@@ -32,9 +34,8 @@ jobs:
             rid: win-x64
           - os: macos-latest
             rid: osx-arm64
-          # Intel Macs, on a runner of that architecture -- the package bundles the runner's
-          # own `node`, so an Intel build cannot be made on an Apple silicon machine. osu!
-          # itself still ships osx-x64, and about a tenth of its macOS users are on it.
+          # Intel Macs, on a runner of that architecture, where the app is checked running.
+          # osu! itself still ships osx-x64, and about a tenth of its macOS users are on it.
           # `macos-13` was retired; `macos-15-intel` is the standard (free) replacement.
           - os: macos-15-intel
             rid: osx-x64
@@ -48,7 +49,7 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
-      # This exact Node binary ships inside the archive, so pin it the way a release pins it.
+      # Node runs the packaging and its checks; nothing of it ships.
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
@@ -76,11 +77,13 @@ jobs:
             exit 1
           fi
 
-      # Builds the pp helper -- full and slim, and the slim one only if it answers every parity
-      # request about generated plays as the full one does on this runner (roadmap 5.60) --
-      # bundles the runtime, starts the result from an unrelated directory to prove it finds
-      # its calculator, and zips it.
-      - run: npm run package -- --rid ${{ matrix.rid }}
+      # Builds the app, checked against the full pp helper on every parity request, and trimmed
+      # only if the trimmed one answers every pp and API parity request as the untrimmed one
+      # does on this runner; then starts it from an unrelated directory to prove it finds osu!'s
+      # calculators, and zips it. The step has a limit: a macOS runner has frozen whole before.
+      - name: Package the C# app
+        timeout-minutes: 30
+        run: npm run package -- --native --rid ${{ matrix.rid }}
 
       - uses: actions/upload-artifact@v4
         with:

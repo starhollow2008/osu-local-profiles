@@ -1,12 +1,13 @@
-# The switch-over rehearsal on macOS and Linux (docs/csharp-port.md, phase 8). Run by hand, in
-# two steps, since the test releases are published to another repository, which this
-# workflow's token cannot write to:
+# The switch-over rehearsal (docs/csharp-port.md, phase 8), on every platform a release ships
+# for. Run by hand, in steps, since the releases rehearsed with are published to a test
+# repository, which this workflow's token cannot write to:
 #
-#   1. step: build. Each platform's test releases, kept as this run's artifacts: the bridge
-#      (1.33.0, a Node release), a C# release to update from (1.34.2), and the target.
-#   2. Publish each platform's target zip to the test repository's release of that version.
-#   3. step: rehearse, with the build run's id. Old installs update to the target there
-#      (scripts/rehearse-update.mjs).
+#   1. The target: the release's own zips, from a dry run of release.yml (no tag), published to
+#      the test repository as its latest release.
+#   2. step: build. Each platform's C# release to update from (`from_cs`, older than the
+#      target, its repository the test one), kept as this run's artifacts.
+#   3. step: rehearse, with the build run's id. Installs of every old version from the oldest
+#      that can update, and of `from_cs`, update to the target (scripts/rehearse-update.mjs).
 name: Switch-over rehearsal
 
 on:
@@ -24,8 +25,11 @@ on:
         description: The test repository
         default: jonathant09/osu-local-profiles-switchover-test
       target:
-        description: The C# release to update to, its latest
-        default: 1.34.3
+        description: The release to update to, the test repository's latest
+        default: 1.33.0
+      from_cs:
+        description: The C# release to update from, older than the target
+        default: 1.32.1
 
 permissions:
   contents: read
@@ -37,7 +41,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     steps:
@@ -58,33 +70,28 @@ jobs:
 
       - run: npm ci
 
-      # Built as releases are, with the version and the repository each would carry there.
-      - name: Build the test releases
+      # Built as a release is, with the version and the repository it would carry there.
+      - name: Build the C# release to update from
         shell: bash
         env:
           REPO: ${{ inputs.repo }}
-          TARGET: ${{ inputs.target }}
+          FROM_CS: ${{ inputs.from_cs }}
         run: |
           set -e
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            p.version = process.argv[1];
+            p.repository.url = 'https://github.com/' + process.argv[2] + '.git';
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          " "$FROM_CS" "$REPO"
+          npm run package -- --native --rid ${{ matrix.rid }}
           mkdir -p rehearsal
-          for spec in "1.33.0 node" "1.34.2 native" "$TARGET native"; do
-            set -- $spec
-            node -e "
-              const fs = require('fs');
-              const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              p.version = process.argv[1];
-              p.repository.url = 'https://github.com/' + process.argv[2] + '.git';
-              fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
-            " "$1" "$REPO"
-            if [ "$2" = native ]; then npm run package -- --native; else npm run package; fi
-            cp dist/osu-local-profiles-"$1"-*.zip rehearsal/
-            git checkout -- package.json
-          done
-          ls -la rehearsal
+          cp dist/osu-local-profiles-"$FROM_CS"-*.zip rehearsal/
 
       - uses: actions/upload-artifact@v4
         with:
-          name: rehearsal-${{ matrix.os }}
+          name: rehearsal-${{ matrix.rid }}
           path: rehearsal/*.zip
           retention-days: 7
 
@@ -93,9 +100,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
@@ -108,7 +123,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: rehearsal-${{ matrix.os }}
+          name: rehearsal-${{ matrix.rid }}
           run-id: ${{ inputs.build_run }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: rehearsal
@@ -124,9 +139,7 @@ jobs:
         env:
           REPO: ${{ inputs.repo }}
           TARGET: ${{ inputs.target }}
+          FROM_CS: ${{ inputs.from_cs }}
         run: |
-          if [ "$RUNNER_OS" = Linux ]; then
-            xvfb-run -a node scripts/rehearse-update.mjs --builds rehearsal --repo "$REPO" --target "$TARGET"
-          else
-            node scripts/rehearse-update.mjs --builds rehearsal --repo "$REPO" --target "$TARGET"
-          fi
+          run=(node scripts/rehearse-update.mjs --builds rehearsal --repo "$REPO" --target "$TARGET" --from-cs "$FROM_CS")
+          if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a "${run[@]}"; else "${run[@]}"; fi

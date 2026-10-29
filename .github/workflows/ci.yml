@@ -100,7 +100,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        # The four a release ships, on the runners release.yml builds them on.
+        include:
+          - os: windows-latest
+            rid: win-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+          - os: macos-latest
+            rid: osx-arm64
+          - os: macos-15-intel
+            rid: osx-x64
 
     runs-on: ${{ matrix.os }}
 
@@ -126,12 +135,12 @@ jobs:
       # where a runner that dies keeps none.
       - name: Package the C# app
         timeout-minutes: 25
-        run: npm run package -- --native
+        run: npm run package -- --native --rid ${{ matrix.rid }}
 
       # For trying a build by hand, and for phase 8's rehearsal. Kept a short while, and never
       # attached to a release.
       - uses: actions/upload-artifact@v4
         with:
-          name: native-${{ matrix.os }}
+          name: native-${{ matrix.rid }}
           path: dist/*.zip
           retention-days: 14
