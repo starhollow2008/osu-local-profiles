@@ -51,3 +51,17 @@ test('a browser that stops answering fails the capture at its time limit', async
     await browser.close();
   }
 });
+
+test('a browser that never opens its debugging endpoint fails at the time limit', async () => {
+  // A port with nothing on it: the browser never opens its debugging endpoint.
+  const free = http.createServer();
+  await new Promise<void>((resolve) => free.listen(0, '127.0.0.1', resolve));
+  const { port } = free.address() as AddressInfo;
+  await new Promise((resolve) => free.close(resolve));
+  const started = Date.now();
+  await assert.rejects(capture({ url: 'http://127.0.0.1:1/', port, browser: process.execPath, limitMs: 1500 }), {
+    message: CAPTURE_TIMED_OUT,
+  });
+  const took = Date.now() - started;
+  assert.ok(took >= 1400 && took < 5000, `gave up after ${took}ms`);
+});

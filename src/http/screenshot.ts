@@ -215,9 +215,10 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
       { stdio: 'ignore' },
     );
 
-    // Wait for the debugging endpoint, then for the page to have drawn itself.
+    // Wait for the debugging endpoint, then for the page to have drawn itself. The endpoint gets
+    // as long as the capture has: a browser's first start on a slow machine took over 12s.
     let target: { webSocketDebuggerUrl?: string } | undefined;
-    for (let attempt = 0; attempt < 60; attempt++) {
+    while (!target) {
       try {
         const list = (await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(2000) })).json()) as {
           type: string;

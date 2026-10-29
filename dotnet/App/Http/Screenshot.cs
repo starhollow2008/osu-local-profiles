@@ -111,9 +111,10 @@ internal static class Screenshot
             }
             started = Process.Start(start);
 
-            // Wait for the debugging endpoint, then for the page to have drawn itself.
+            // Wait for the debugging endpoint, then for the page to have drawn itself. The endpoint
+            // gets as long as the capture has: a browser's first start on a slow machine took over 12s.
             string? target = null;
-            for (var attempt = 0; attempt < 60 && target is null; attempt++)
+            while (target is null)
             {
                 try
                 {

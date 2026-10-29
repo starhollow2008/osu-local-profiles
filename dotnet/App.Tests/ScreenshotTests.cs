@@ -87,4 +87,19 @@ public class ScreenshotTests
             stop();
         }
     }
+
+    [Fact]
+    public async Task A_browser_that_never_opens_its_debugging_endpoint_fails_at_the_time_limit()
+    {
+        // A port with nothing on it: the browser never opens its debugging endpoint.
+        var free = new TcpListener(IPAddress.Loopback, 0);
+        free.Start();
+        var port = ((IPEndPoint)free.LocalEndpoint).Port;
+        free.Stop();
+        var watch = Stopwatch.StartNew();
+        var e = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Screenshot.Capture("http://127.0.0.1:1/", port, browser: "node", limitMs: 1500));
+        Assert.Equal(Screenshot.TimedOut, e.Message);
+        Assert.InRange(watch.ElapsedMilliseconds, 1400, 5000);
+    }
 }
