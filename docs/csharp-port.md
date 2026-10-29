@@ -79,7 +79,7 @@ dotnet/
 | 5   | Everything that writes        | done        |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
 | 7   | Packaging                     | done        |
-| 8   | Switch-over release           | rehearsing  |
+| 8   | Switch-over release           | rehearsed; release pending |
 | 9   | Removing the Node app         | not started |
 
 ### 1. Foundations
@@ -304,7 +304,7 @@ Each proven by the parity script's write stage (below) and ported tests:
 
 Pushed to `main`. Phase 5 is done: the last parity run matched every answer. Phase 7
 (packaging) is done: built and checked on all three platforms, listening on the loopbacks only.
-Phase 8 is rehearsing: Windows done, macOS and Linux next (see its section).
+Phase 8 is rehearsed on all three platforms; what is left is the release itself, after the bridge has shipped (see its section).
 
 **Pitfalls met this session:**
 
@@ -500,7 +500,19 @@ builds come from a worktree of `main` with `package.json`'s version and reposito
   made by Windows PowerShell's `Compress-Archive` on this machine has backslashes in its paths
   (the release zips, built by CI, do not); every updater unpacked it anyway. 1.16's `.bat`
   goes with the swap, as it already did on any update to 1.17 or later.
-- [ ] macOS and Linux: the same, on CI runners (the `.app` bundle is the case to watch).
+- [x] **macOS and Linux** (2026-10-29), by `.github/workflows/rehearsal.yml`: step `build`
+      makes each platform's 1.33.0, 1.34.2 and 1.34.3 as artifacts, the 1.34.3 zips are
+      published to the test repository by hand (the workflow's token cannot write there), and
+      step `rehearse` runs `scripts/rehearse-update.mjs` on a macOS runner and on a Linux one
+      under `xvfb-run` (a display with no tray). Each updates to 1.34.3 from 1.16.0 (start
+      script, Install now), 1.32.0 (tray launcher, Install now; on macOS `open -n` on the
+      `.app`), the bridge (tray launcher, When I quit) and 1.34.2 (tray launcher, Install now;
+      start script, When I quit), with a stand-in osu!stable install since 1.16 stops without
+      one, and checks each as on Windows, Quit stopping everything run from the install. All
+      ten passed, 14 to 20 seconds each.
+- [ ] **The release itself.** The bridge (phase 6) ships first, in a Node release, and this
+      one comes several releases after it, built by CI like any other. Then delete the test
+      repository.
 
 ### 9. Removing the Node app
 
