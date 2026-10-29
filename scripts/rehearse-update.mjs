@@ -126,10 +126,26 @@ function start(root, how, log) {
 
 const leftovers = (root) => ['node', 'src', 'scripts', 'node_modules'].filter((n) => fs.existsSync(path.join(root, n)));
 
-/** Every process whose command line names this install. */
+/** Where a process is running from: start.sh starts the launcher as `./osu-local-profiles`. */
+function cwdOf(pid) {
+  try {
+    if (!mac) return fs.readlinkSync(`/proc/${pid}/cwd`);
+    const out = execFileSync('lsof', ['-a', '-p', String(pid), '-d', 'cwd', '-Fn'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return out.split('\n').find((l) => l.startsWith('n'))?.slice(1) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Every process run from this install: named in its command line, or working in it. */
 function runningFrom(root) {
   const ps = execFileSync('ps', ['-axo', 'pid=,command='], { encoding: 'utf8' });
-  return ps.split('\n').filter((line) => line.includes(root) && !line.includes('rehearse-update'));
+  return ps.split('\n').filter((line) => {
+    if (!line.trim() || line.includes('rehearse-update')) return false;
+    if (line.includes(root)) return true;
+    const pid = Number(line.trim().split(/\s+/)[0]);
+    return pid !== process.pid && /osu-local-profiles|osu! local profiles|src\/main\.ts/.test(line) && cwdOf(pid).startsWith(root);
+  });
 }
 
 const profilesOf = (state) => JSON.stringify(state.profiles.map(({ id, name, createdAt, trackingSince, scoreCount }) => ({ id, name, createdAt, trackingSince, scoreCount })));
