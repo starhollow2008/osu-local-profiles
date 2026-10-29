@@ -415,31 +415,38 @@ as a workflow artifact for 14 days, never on a release.
       (`launcherFor(os, node, true)`); the README says what is included (`readmeFor(os, true)`).
 - [x] Still four zips: the native package has the Node one's name, as the release replacing it
       will.
-- [x] Tried for real on Windows: the package's tray launcher started the app, which found osu!,
+- [x] Tried for real on Windows, untrimmed and trimmed: the package's tray launcher started the
+      app, which found osu!,
       indexed 73,848 files, tracked, priced with osu! 2026.916.0, and stopped with its launcher
       on Quit.
-- [ ] **Trimming: decide.** See the measurements below.
+- [x] **Trimmed, only where proven** (decided 2026-10-29): each build makes the app twice and
+      ships the trimmed one only if, on that platform, it answers every pp parity request and
+      every `scripts/api-parity.mjs` answer as the untrimmed one does; the untrimmed one
+      otherwise, with the reason, as a CI warning. Trimmed as the slim helper is
+      (`SLIM_PUBLISH_ARGS`: partial, so the app's own assembly and osu!'s stay whole, with
+      reflection-based JSON on), and pruned of the slim helper's natives except SQLite's, which
+      the app opens. The API check needs no osu! install: `scripts/parity-data.mjs` builds a
+      stand-in osu!stable install from the pp check's generated beatmaps and replays, the
+      untrimmed app imports it (19 scores in all four rulesets, priced), and
+      `api-parity.mjs --reference <untrimmed> --app <trimmed>` compares the two on that (213
+      answers on Windows). Before settling on it, the trimmed app also matched the Node app on
+      all 840 answers on the owner's data.
+- [ ] CI's first `package-native` run, which is the only build and check of the macOS and Linux
+      packages so far, and says whether each platform ships trimmed.
 
 **Measured on Windows, 1.32.0, against the numbers at the top:**
 
-| | Node release | C# untrimmed | C# trimmed |
+| | Node release | C# untrimmed | C# trimmed (ships) |
 | --- | --- | --- | --- |
-| Installed | 161 MB | 166 MB (app 149) | about 89 MB (app 72) |
-| Zipped | 62 MB | 72 MB | not built yet |
-| Memory, idle | 125 + 32 MB (helper) | 107 MB | |
-| Memory, peak while indexing | 125 MB | 284 MB, falling to 110 by the end | |
+| Installed | 161 MB | 166 MB (app 149) | 87 MB (app 70) |
+| Zipped | 62 MB | 72 MB | 37 MB |
+| Memory, idle | 125 + 32 MB (helper) | 107 MB | 87 MB |
+| Memory, peak while indexing | 125 MB | 284 MB | 275 MB |
 
-Untrimmed, the package is bigger than the Node one: the Node release ships the slim pp helper
-(58 MB), and the app carries the full one's files plus ASP.NET Core. Trimmed as the slim helper
-is (`SLIM_PUBLISH_ARGS`: partial, so the app's own assembly and osu!'s stay whole), with the slim
-helper's natives pruned except SQLite's, which the app opens, the app is 72 MB. That build
-answered all 840 of `scripts/api-parity.mjs`'s answers as the Node app does on the owner's data
-(`--app <folder>` compares a published app), and all 1,820 pp requests as the untrimmed app does.
-What is not settled is how to prove it on macOS and Linux, where the API parity check cannot run
-(it needs an osu! install).
-
-The peak while indexing is worth a look once packaging is settled: the C# indexer holds more at
-once than Node's.
+Untrimmed, the package was bigger than the Node one: the Node release ships the slim pp helper
+(58 MB), and the app carries the full one's files plus ASP.NET Core. The peak while indexing
+(73,848 files, falling back under 110 MB by the end) is worth a look: the C# indexer holds more
+at once than Node's.
 
 ### 8. Switch-over release
 
@@ -517,6 +524,4 @@ the helpers.
 
 ## Open questions
 
-- How trimming affects reflection-based JSON (phase 7): source-generated serialisation, or
-  partial trimming that leaves the app's own assembly alone.
 - The firewall prompt (above).

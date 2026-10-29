@@ -220,36 +220,74 @@ export function buildCheckedPpHelper(outDir, target = defaultRid(), { live = fal
 }
 
 /**
- * The C# app, published into `outDir` for a package (docs/csharp-port.md, phase 7), and pruned as
- * the full helper is: osu!'s fonts and sounds, and the natives a pp calculator never calls, BASS
- * among them, which may not be redistributed.
+ * The C# app for a package (docs/csharp-port.md, phase 7), in `outDir`: trimmed if, and only if,
+ * it answers exactly as the untrimmed app does on this platform, and untrimmed otherwise, with
+ * the reason.
  *
- * Then checked as a slim helper is (roadmap 5.60): `scripts/pp-parity.mjs` asks the app, with
- * `--dev pp-helper`, every request it asks the full helper, and the build fails unless every
- * answer is identical. The app carries osu!'s code beside its own dependencies, so a library
- * resolved to another version, or a file pruned that this process needed, would otherwise price
- * plays differently without saying so. Not trimmed: nothing yet proves a trimmed app answers every
- * API request as the untrimmed one, and the API parity check needs an osu! install, so it cannot
- * run on every platform's build.
+ * Both are pruned as the full helper is: osu!'s fonts and sounds, and the natives a pp calculator
+ * never calls, BASS among them, which may not be redistributed. The untrimmed one must then answer
+ * every pp parity request as the full helper does, through `--dev pp-helper`, or the build fails:
+ * the app resolves osu!'s dependencies beside its own, and a library at another version would
+ * otherwise price plays differently without saying so.
+ *
+ * The trimmed one is trimmed as the slim helper is (`SLIM_PUBLISH_ARGS`: partial, so the app's own
+ * assembly and osu!'s stay whole, with reflection-based JSON on) and loses the slim helper's
+ * natives too, except SQLite's, which the app opens. It ships only past two checks against the
+ * untrimmed one, here on this platform: every pp parity request, and every answer
+ * `scripts/api-parity.mjs` compares, on data the untrimmed app made by importing generated plays
+ * (`scripts/parity-data.mjs`), so no osu! install is needed.
  */
 export function buildCheckedApp(outDir, target = defaultRid()) {
-  const reference = `${outDir}.helper`;
-  fs.rmSync(outDir, { recursive: true, force: true });
-  fs.rmSync(reference, { recursive: true, force: true });
+  const full = `${outDir}.full`;
+  const slim = `${outDir}.slim`;
+  const helper = `${outDir}.helper`;
+  const data = `${outDir}.data`;
+  const clear = () => {
+    for (const dir of [full, slim, helper, data]) fs.rmSync(dir, { recursive: true, force: true });
+  };
+  clear();
   try {
-    const app = publishAndPrune(outDir, target, false, APP_PROJECT);
+    const fullResult = publishAndPrune(full, target, false, APP_PROJECT);
     const runner = runnerFor(target);
     if (runner === null) throw new Error(`this machine cannot run a ${target} app to check its pp against the helper`);
-    const helper = publishAndPrune(reference, target, false);
-    console.log(`
-  checking the app's pp (${mb(app.after)}) against the full helper (${mb(helper.after)})...`);
-    const check = spawnSync(process.execPath, [path.join(root, 'scripts', 'pp-parity.mjs'), reference, outDir, ...runner], { stdio: 'inherit' });
-    if (check.status !== 0) {
+    const helperResult = publishAndPrune(helper, target, false);
+    console.log(`\n  checking the app's pp (${mb(fullResult.after)}) against the full helper (${mb(helperResult.after)})...`);
+    const priced = spawnSync(process.execPath, [path.join(root, 'scripts', 'pp-parity.mjs'), helper, full, ...runner], { stdio: 'inherit' });
+    if (priced.status !== 0) {
       throw new Error('the app did not answer every parity request as the full helper does: it would price plays differently');
     }
-    return app;
+
+    let verdict;
+    let slimResult = null;
+    try {
+      slimResult = publishAndPrune(slim, target, true, APP_PROJECT);
+    } catch (e) {
+      verdict = { slim: false, reason: `the trimmed app did not build (${e.message})` };
+    }
+    if (slimResult) {
+      console.log(`\n  checking the trimmed app (${mb(slimResult.after)}) against the untrimmed one...`);
+      const pp = spawnSync(process.execPath, [path.join(root, 'scripts', 'pp-parity.mjs'), full, slim], { stdio: 'inherit' });
+      const made = pp.status === 0
+        ? spawnSync(process.execPath, [path.join(root, 'scripts', 'parity-data.mjs'), data, full], { stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8' })
+        : null;
+      // parity-data.mjs prints the data folder it made last.
+      const dataDir = made?.status === 0 ? made.stdout.trim().split(/\r?\n/).at(-1) : null;
+      const api = dataDir
+        ? spawnSync(process.execPath, [path.join(root, 'scripts', 'api-parity.mjs'), dataDir, '--reference', full, '--app', slim], { stdio: 'inherit' })
+        : null;
+      verdict =
+        pp.status !== 0
+          ? { slim: false, reason: 'the trimmed app did not answer every pp parity request as the untrimmed one does' }
+          : dataDir === null
+            ? { slim: false, reason: 'the untrimmed app could not make the data to compare the two on' }
+            : api.status !== 0
+              ? { slim: false, reason: 'the trimmed app did not answer every API request as the untrimmed one does' }
+              : { slim: true, reason: 'identical to the untrimmed app on every pp and API parity request' };
+    }
+    swapIn(verdict.slim ? slim : full, outDir);
+    return { ...verdict, before: fullResult.before, full: fullResult.after, after: sizeOf(outDir) };
   } finally {
-    fs.rmSync(reference, { recursive: true, force: true });
+    clear();
   }
 }
 
@@ -294,9 +332,12 @@ function renameSettled(from, to) {
 const HELPER_PROJECT = path.join(root, 'tools', 'PpCalculator', 'PpCalculator.csproj');
 const APP_PROJECT = path.join(root, 'dotnet', 'App', 'App.csproj');
 
+/** SQLite's engine, which the slim helper drops and the app needs: it keeps its profiles in it. */
+const APP_KEEPS = nativePattern('e_sqlite3');
+
 /**
- * Publish a project self-contained into `outDir`, and prune it: the full helper's list, or the
- * slim one's too with `slim`. The app gets the full list alone, since it opens SQLite itself.
+ * Publish a project self-contained into `outDir`, and prune it: the full helper's list, or with
+ * `slim` trimmed and the slim helper's list too. The app keeps SQLite's engine either way.
  */
 function publishAndPrune(outDir, target, slim, project = HELPER_PROJECT) {
   const result = spawnSync(
@@ -327,6 +368,7 @@ function publishAndPrune(outDir, target, slim, project = HELPER_PROJECT) {
       continue;
     }
     if (!shouldPrune(entry.name, slim)) continue;
+    if (project === APP_PROJECT && APP_KEEPS.test(entry.name)) continue;
     fs.rmSync(path.join(outDir, entry.name), { force: true });
     removed++;
   }

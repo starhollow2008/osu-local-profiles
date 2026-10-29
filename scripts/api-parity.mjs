@@ -1,10 +1,14 @@
 /**
  * Do the Node app and its C# port answer the same? (docs/csharp-port.md, rule 3)
  *
- *   node scripts/api-parity.mjs [data folder] [--keep] [--app <folder>]
+ *   node scripts/api-parity.mjs [data folder] [--keep] [--app <folder>] [--reference <folder>]
  *
  * `--app` compares a C# app already published, such as a package's app/ folder, in place of a
  * build of this checkout: how a trimmed build is shown to answer as the Node app does.
+ * `--reference` puts another published C# app where the Node app is, so two builds can be
+ * compared on a machine with no osu! (with data from scripts/parity-data.mjs): how a package
+ * shows its trimmed app answers as its untrimmed one, on every platform (docs/csharp-port.md,
+ * phase 7). The answers are still labelled node and cs.
  *
  * Starts both apps on copies of one `data/` folder (default: this checkout's), asks each the
  * same questions, and compares the answers: JSON as parsed values, files byte for byte, plus
@@ -66,9 +70,10 @@ const HEADERS = ['content-type', 'cache-control', 'content-disposition'];
 
 const args = process.argv.slice(2);
 const keep = args.includes('--keep');
-const appArg = args.includes('--app') ? args[args.indexOf('--app') + 1] : null;
-const publishedApp = appArg ? path.resolve(appArg) : null;
-const source = path.resolve(args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--app') ?? path.join(repo, 'data'));
+const valueOf = (flag) => (args.includes(flag) ? path.resolve(args[args.indexOf(flag) + 1]) : null);
+const publishedApp = valueOf('--app');
+const referenceApp = valueOf('--reference');
+const source = path.resolve(args.find((a, i) => !a.startsWith('--') && !['--app', '--reference'].includes(args[i - 1])) ?? path.join(repo, 'data'));
 const exe = process.platform === 'win32' ? '.exe' : '';
 
 function freePort() {
@@ -580,12 +585,18 @@ async function main() {
       if (build.status !== 0) throw new Error('the C# build failed');
     }
 
-    // The Node app finds data/ beside its own src/, so it gets a folder of its own.
+    // The Node app finds data/ beside its own src/, so it gets a folder of its own; a reference C#
+    // app is given its folder, as the other is.
     const nodeRoot = path.join(work, 'node');
     fs.mkdirSync(nodeRoot);
-    fs.cpSync(path.join(repo, 'src'), path.join(nodeRoot, 'src'), { recursive: true });
     fs.copyFileSync(path.join(repo, 'package.json'), path.join(nodeRoot, 'package.json'));
-    for (const shared of ['web', 'node_modules', 'tools']) link(path.join(repo, shared), path.join(nodeRoot, shared));
+    if (referenceApp) {
+      console.log(`  the reference C# app in ${referenceApp}`);
+      link(path.join(repo, 'web'), path.join(nodeRoot, 'web'));
+    } else {
+      fs.cpSync(path.join(repo, 'src'), path.join(nodeRoot, 'src'), { recursive: true });
+      for (const shared of ['web', 'node_modules', 'tools']) link(path.join(repo, shared), path.join(nodeRoot, shared));
+    }
     copyData(path.join(nodeRoot, 'data'), nodePort);
 
     const csRoot = path.join(work, 'cs');
@@ -595,7 +606,9 @@ async function main() {
     copyData(path.join(csRoot, 'data'), csPort);
 
     const log = (name) => fs.openSync(path.join(work, `${name}.log`), 'w');
-    const nodeApp = spawn(process.execPath, ['src/main.ts'], { cwd: nodeRoot, stdio: ['pipe', log('node'), log('node-err')] });
+    const nodeApp = referenceApp
+      ? spawn(path.join(referenceApp, `osu-local-profiles-app${exe}`), ['--root', nodeRoot], { stdio: ['pipe', log('node'), log('node-err')] })
+      : spawn(process.execPath, ['src/main.ts'], { cwd: nodeRoot, stdio: ['pipe', log('node'), log('node-err')] });
     // Writable, as the Node app is: both track, each on its own copy.
     const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot], { stdio: ['pipe', log('cs'), log('cs-err')] });
     children.push(nodeApp, csApp);

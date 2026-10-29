@@ -99,12 +99,17 @@ fs.mkdirSync(out, { recursive: true });
 
 if (native) {
   /*
-   * The C# app, self-contained, with osu!'s calculators in-process: no helper beside it. Pruned
-   * as the full helper is, and checked against it on every parity request, or the build fails.
+   * The C# app, self-contained, with osu!'s calculators in-process: no helper beside it. Checked
+   * against the full helper on every pp parity request, or the build fails; trimmed only past the
+   * checks against the untrimmed app, here on this platform, and untrimmed otherwise.
    */
   console.log('  building the app (self-contained)...');
   const app = buildCheckedApp(path.join(out, 'app'), target);
-  console.log(`    ${mb(app.before)} -> ${mb(app.after)}: pruned as the full helper is, and pricing every parity request as it does\n`);
+  console.log(`    ${mb(app.before)} -> ${mb(app.after)}: ${app.slim ? 'trimmed' : 'untrimmed'} app -- ${app.reason}\n`);
+  // Said where a run's summary shows it, so a platform shipping the untrimmed app is noticed.
+  if (process.env.GITHUB_ACTIONS) {
+    console.log(`::${app.slim ? 'notice' : 'warning'} title=app (${target})::${app.slim ? 'trimmed' : 'untrimmed'} app, ${mb(app.after)}: ${app.reason}`);
+  }
 } else {
   console.log('  building the pp calculator (self-contained)...');
   const ppOut = path.join(out, 'tools', 'pp');
