@@ -302,8 +302,9 @@ Each proven by the parity script's write stage (below) and ported tests:
 
 #### Hand-off (2026-10-29)
 
-Pushed nothing; every commit is on local `main`. Phase 5 is done: the last parity run matched
-every answer. Phase 7 (packaging) is under way: see its own section.
+Pushed to `main`. Phase 5 is done: the last parity run matched every answer. Phase 7
+(packaging) is built and checked on all three platforms; what is left is the listening decision
+under Decisions.
 
 **Pitfalls met this session:**
 
@@ -431,8 +432,11 @@ as a workflow artifact for 14 days, never on a release.
       `api-parity.mjs --reference <untrimmed> --app <trimmed>` compares the two on that (213
       answers on Windows). Before settling on it, the trimmed app also matched the Node app on
       all 840 answers on the owner's data.
-- [ ] CI's first `package-native` run, which is the only build and check of the macOS and Linux
-      packages so far, and says whether each platform ships trimmed.
+- [x] **Built and checked on all three platforms** by CI's `package-native` job (2026-10-29):
+      each ships trimmed, identical to the untrimmed app on every pp and API parity request.
+      The app is 70 MB on Windows, 75 MB on Linux and 72 MB on macOS. The job's first macOS runs
+      hung on `/api/screenshot`, where the runner's Chrome stopped answering. A capture now has a
+      minute in both apps (`CAPTURE_LIMIT_MS`), and api-parity's requests 20 minutes of silence.
 
 **Measured on Windows, 1.32.0, against the numbers at the top:**
 
