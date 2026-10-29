@@ -32,6 +32,13 @@ declare module '*/release-notes.mjs' {
   /** The line that marks a version everyone should have. */
   export const IMPORTANT_MARK: string;
   export function isImportant(changelog: string, version: string): boolean;
+  /** The line that puts a version's entries on its release page and patch notes whole. */
+  export const IN_FULL_MARK: string;
+  export function isInFull(changelog: string, version: string): boolean;
+  /** Past this, every installed app cuts a patch-notes line short. */
+  export const MAX_NOTE_LINE: number;
+  /** A section's entries whole, as plain lines of at most `MAX_NOTE_LINE`. */
+  export function fullLines(section: string): string[];
   /** Every version with a section, newest first. */
   export function changelogVersions(changelog: string): string[];
   export const MAX_NOTES_VERSIONS: number;

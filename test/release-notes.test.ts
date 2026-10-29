@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { MAX_HIGHLIGHTS, assetsFor, changelogSection, headline, releaseNotes } from '../scripts/release-notes.mjs';
+import { MAX_HIGHLIGHTS, MAX_NOTE_LINE, assetsFor, changelogSection, headline, notesJson, releaseNotes } from '../scripts/release-notes.mjs';
+import { notesFromBody } from '../src/update/notes.ts';
 import { assetNameFor } from '../src/update/github.ts';
 
 const CHANGELOG = '# Changelog\r\n\r\n## 1.10.0\r\n\r\n- new\r\n\r\n## 1.9.0\r\n\r\n- old\r\n';
@@ -123,4 +124,36 @@ test('the issues a change came from stay on its line, as #n a release page links
     headline(`**Fixed the importer.** See ${issue(4)} for how. It works now.`),
     'Fixed the importer.',
   );
+});
+
+test('a version marked in full carries every entry whole, in lines no installed app cuts', () => {
+  const long = 'Each sentence here is long enough that two of them will not fit on a single line of patch notes.';
+  const changelog = [
+    '# Changelog',
+    '',
+    '## 2.0.0',
+    '',
+    '<!-- in full -->',
+    '',
+    `- **A change worth reading in full.** ${long} ${long}`,
+    `  ${long} See [the page](https://example.com/page) for *more*.`,
+    '',
+    '- **A short one.** It says one more thing.',
+    '',
+    '## 1.9.0',
+    '',
+    '- **Old.** Detail that stays in the CHANGELOG.',
+    '',
+  ].join('\n');
+  const lines = notesJson(changelog).versions[0]!.highlights;
+  assert.ok(lines.length > 2);
+  assert.ok(lines.every((l) => l.length <= MAX_NOTE_LINE && !l.includes('*') && !l.includes('](')));
+  assert.equal(lines.join(' '), `A change worth reading in full. ${long} ${long} ${long} See the page for more. A short one. It says one more thing.`);
+  assert.equal(lines.at(-1), 'A short one. It says one more thing.');
+  // The mark is no part of the text, and a version without it keeps its one line each.
+  assert.ok(!changelogSection(changelog, '2.0.0')!.includes('<!-- in full -->'));
+  assert.deepEqual(notesJson(changelog).versions[1]!.highlights, ['Old.']);
+  // An install reading the release page before it updates gets the same lines, whole.
+  const body = releaseNotes(changelog, '2.0.0');
+  assert.deepEqual(notesFromBody(body, '2.0.0', null)[0]!.highlights, lines);
 });

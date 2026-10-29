@@ -41,6 +41,51 @@ const CONTRIBUTOR_HEADINGS = new Set(['development', 'for contributors']);
  */
 export const IMPORTANT_MARK = '<!-- important -->';
 
+/**
+ * Written on a line of its own in a version's CHANGELOG section, it puts the whole of each entry
+ * on the release page and in the app's patch notes, not only its lead: for a release whose few
+ * entries all say something a player should read (1.33.0, the move to C#).
+ */
+export const IN_FULL_MARK = '<!-- in full -->';
+
+/** Whether a version's section carries `IN_FULL_MARK`. */
+export function isInFull(changelog, version) {
+  return (sectionLines(changelog, version) ?? []).some((l) => l.trim() === IN_FULL_MARK);
+}
+
+/**
+ * Past this, every version of the app cuts a patch-notes line short (MAX_LINE in
+ * src/update/notes.ts), the ones already installed included.
+ */
+export const MAX_NOTE_LINE = 200;
+
+/**
+ * A section's entries in full, as plain lines the app's patch notes and older installs can show:
+ * links and emphasis left as their text, and each entry's sentences joined into lines of at most
+ * `MAX_NOTE_LINE`, its lead first.
+ */
+export function fullLines(section) {
+  const out = [];
+  for (const entry of entries(section)) {
+    const plain = entry
+      .replace(/\s+/g, ' ')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/\*\*|(?<!\w)\*(?!\s)|(?<!\s)\*(?!\w)/g, '')
+      .trim();
+    let line = '';
+    for (const sentence of plain.split(/(?<=[.!?])\s+(?=[A-Z0-9("`])/)) {
+      if (line && line.length + 1 + sentence.length > MAX_NOTE_LINE) {
+        out.push(line);
+        line = sentence;
+      } else {
+        line = line ? `${line} ${sentence}` : sentence;
+      }
+    }
+    if (line) out.push(line);
+  }
+  return out;
+}
+
 /** A version's lines, marks included: under `## <version>`, up to the next heading. */
 function sectionLines(changelog, version) {
   const lines = changelog.replace(/\r\n/g, '\n').split('\n');
@@ -55,7 +100,7 @@ function sectionLines(changelog, version) {
 export function changelogSection(changelog, version) {
   const lines = sectionLines(changelog, version);
   if (lines === null) return null;
-  return lines.filter((l) => l.trim() !== IMPORTANT_MARK).join('\n').trim();
+  return lines.filter((l) => l.trim() !== IMPORTANT_MARK && l.trim() !== IN_FULL_MARK).join('\n').trim();
 }
 
 /** Whether a version's section carries `IMPORTANT_MARK`. */
@@ -205,7 +250,7 @@ export function releaseNotes(changelog, version, assets = Object.values(assetsFo
   const section = changelogSection(changelog, version);
   if (section === null) throw new Error(`CHANGELOG.md has no "## ${version}" section`);
 
-  const all = highlights(section).filter((h) => !isHowToUpdate(h));
+  const all = isInFull(changelog, version) ? fullLines(section) : highlights(section).filter((h) => !isHowToUpdate(h));
   const shown = all.slice(0, MAX_HIGHLIGHTS).map((h) => `- ${h}`);
   if (all.length > MAX_HIGHLIGHTS) shown.push(`- ...and ${all.length - MAX_HIGHLIGHTS} more`);
 
@@ -242,7 +287,9 @@ export function notesJson(changelog, dates = {}) {
         version,
         date: dates[version] ?? null,
         important: isImportant(changelog, version),
-        highlights: highlights(changelogSection(changelog, version) ?? '').filter((h) => !isHowToUpdate(h)),
+        highlights: isInFull(changelog, version)
+          ? fullLines(changelogSection(changelog, version) ?? '')
+          : highlights(changelogSection(changelog, version) ?? '').filter((h) => !isHowToUpdate(h)),
       })),
   };
 }
