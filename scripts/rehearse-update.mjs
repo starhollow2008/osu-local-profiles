@@ -150,7 +150,8 @@ function start(root, how, log) {
       ? ['open', ['-n', trayLauncher(root)], {}]
       : [trayLauncher(root), [], {}]
     : win
-      ? [process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `"${script}"`], { windowsVerbatimArguments: true }]
+      ? // `call` and the whole path: cmd reads a quoted "Start ..." as its own start command.
+        [process.env.ComSpec ?? 'cmd.exe', ['/d', '/c', 'call', path.join(root, script)], {}]
       : ['sh', [script], {}];
   const child = spawn(command, argv, { cwd: root, detached: true, stdio: ['ignore', out, out], windowsHide: true, ...extra });
   child.unref();
