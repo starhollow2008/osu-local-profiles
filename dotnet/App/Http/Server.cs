@@ -44,6 +44,18 @@ internal sealed class ServerOptions
     /// <summary>Started by the tray launcher, as <c>/api/state</c> tells the page.</summary>
     public bool FromTray { get; init; }
 
+    /// <summary>The live feed every open page listens to.</summary>
+    public LiveFeed Events { get; init; } = new();
+
+    /// <summary>Where osu! is, and how to change the answer; null in a copy that cannot change its osu! folders.</summary>
+    public Clients.OsuFolders? Folders { get; init; }
+
+    /// <summary>
+    /// Stop the app for its launcher to start it again, which is how a restored backup is applied.
+    /// Null when nothing would start it again, and the page then asks for a restart instead.
+    /// </summary>
+    public Action? OnRestart { get; init; }
+
     /// <summary>The cache behind /api/profile, made with the server.</summary>
     internal ProfileCache? Cache { get; set; }
 }
@@ -78,8 +90,11 @@ internal static partial class Server
              * and on Windows `localhost` resolves to ::1 first (docs/architecture.md).
              */
             kestrel.ListenAnyIP(opts.Port);
+            // Each upload has its own ceiling, checked as it arrives (a backup's is 1 GB).
+            kestrel.Limits.MaxRequestBodySize = null;
         });
         opts.Cache ??= new ProfileCache(opts.Db);
+        if (opts.Tracker is { } tracker) opts.Events.Follow(tracker);
         var app = builder.Build();
         app.Run(context => Handle(context, opts));
         return app;
@@ -142,6 +157,15 @@ internal static partial class Server
         }
 
         var db = opts.Db;
+
+        // A copy opened read-only (no --writable) changes nothing: not the database, config.json
+        // or a picture. Quit stops it, which writes nothing.
+        if (!db.Writable && method is "POST" or "PUT" or "DELETE" && pathname != "/api/quit")
+        {
+            await Json(context, new { error = "this copy is read-only: start it with --writable to change anything" }, 403);
+            return;
+        }
+
         long Current() => Profiles.ActiveId(db);
         ProfileSettings SettingsFor(long profileId) => SettingsStore.Get(db, profileId, opts.Config.SettingsFallbacks());
 
@@ -190,6 +214,14 @@ internal static partial class Server
         if (pathname == "/api/state")
         {
             await Json(context, StateApi.Answer(opts, Current(), opts.FromTray));
+            return;
+        }
+
+        // The welcome, left: every way out of it ends it for good, so there is nothing to send but that.
+        if (pathname == "/api/welcome" && method == "POST")
+        {
+            ProfileData.DismissWelcome(db);
+            await Json(context, new { ok = true });
             return;
         }
 
@@ -297,15 +329,121 @@ internal static partial class Server
             // The card as a PNG needs a browser to render it: phase 5, with the profile's screenshot.
         }
 
-        if (pathname == "/api/settings" && method != "POST")
+        if (pathname == "/api/settings")
         {
-            await Json(context, new { settings = SettingsFor(Current()) });
+            if (method != "POST") await Json(context, new { settings = SettingsFor(Current()) });
+            else await PostSettings(context, opts, Current());
             return;
         }
 
-        if (pathname == "/api/app-config" && method != "POST")
+        if (pathname == "/api/startup")
         {
-            await Json(context, new { config = opts.Config.PageView() });
+            await StartupSwitch(context, opts);
+            return;
+        }
+
+        if (pathname == "/api/app-config")
+        {
+            if (method != "POST") await Json(context, new { config = opts.Config.PageView() });
+            else await PostAppConfig(context, opts);
+            return;
+        }
+
+        if (pathname == "/api/installs")
+        {
+            await OsuFolderRoute(context, opts);
+            return;
+        }
+
+        // Everything below that needs the tracker: a copy without one tracks and imports nothing.
+        async Task<PlayTracker?> TrackerOrRefuse()
+        {
+            if (opts.Tracker is { } t) return t;
+            await Json(context, new { error = "this copy tracks nothing" }, 503);
+            return null;
+        }
+
+        if (pathname == "/api/recompute" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PostRecompute(context, opts, t);
+            return;
+        }
+
+        if (image.Success && method == "PUT")
+        {
+            await PutImage(context, opts, Current(), image.Groups[1].Value);
+            return;
+        }
+
+        if (pathname == "/api/about-image" && method == "PUT")
+        {
+            await PutAboutImage(context, opts, Current());
+            return;
+        }
+
+        if (pathname == "/api/replays" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PostReplay(context, opts, t);
+            return;
+        }
+
+        if (pathname == "/api/identity" && method == "POST")
+        {
+            await PostIdentity(context, opts, Current());
+            return;
+        }
+
+        if (pathname == "/api/scores" && method == "POST")
+        {
+            await PostScores(context, opts, Current());
+            return;
+        }
+
+        if (pathname == "/api/declined" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PostDeclined(context, opts, t);
+            return;
+        }
+
+        if (pathname == "/api/profile/reset" && method == "POST")
+        {
+            await ResetProfile(context, opts, opts.Tracker, Current());
+            return;
+        }
+
+        if (pathname is "/api/backfill" or "/api/backfill/preview" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PostBackfill(context, opts, t, preview: pathname.EndsWith("/preview", StringComparison.Ordinal));
+            return;
+        }
+
+        if (pathname == "/api/profiles" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PostProfiles(context, opts, t);
+            return;
+        }
+
+        if (pathname == "/api/data-folder/open" && method == "POST")
+        {
+            if (!FromOwnPage(context))
+            {
+                await Json(context, new { error = "only this app's own page can open the data folder" }, 403);
+                return;
+            }
+            Browser.OpenFolder(opts.Paths.DataDir);
+            await Json(context, new { ok = true });
+            return;
+        }
+
+        if (pathname == "/api/tracking" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PostTracking(context, opts, t);
+            return;
+        }
+
+        if (pathname == "/api/events")
+        {
+            await opts.Events.Serve(context);
             return;
         }
 

@@ -116,6 +116,26 @@ internal static class Browser
     public static string Platform =>
         OperatingSystem.IsWindows() ? "win32" : OperatingSystem.IsMacOS() ? "darwin" : "linux";
 
+    /// <summary>
+    /// Opening a folder in the system's file manager: Explorer, Finder, or whatever <c>xdg-open</c>
+    /// hands a directory to. Not through <c>cmd</c>: <c>explorer.exe</c> takes the path as its one
+    /// argument. Best effort, as the page shows the path as well.
+    /// </summary>
+    public static void OpenFolder(string dir)
+    {
+        var command = Platform switch { "win32" => "explorer.exe", "darwin" => "open", _ => "xdg-open" };
+        try
+        {
+            var start = new ProcessStartInfo(command) { UseShellExecute = false, CreateNoWindow = true };
+            start.ArgumentList.Add(dir);
+            using var process = Process.Start(start);
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            /* no file manager to hand it to; the path is on the page */
+        }
+    }
+
     /// <summary>Best effort: the URL is printed in the console as well.</summary>
     public static void Open(string url)
     {

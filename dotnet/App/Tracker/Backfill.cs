@@ -81,7 +81,7 @@ internal static class Backfill
             try
             {
                 FileSystemInfo info = File.Exists(path) ? new FileInfo(path) : new DirectoryInfo(path);
-                if (info.Exists) mtime = (info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalMilliseconds;
+                if (info.Exists) mtime = Js.MtimeMs(info.LastWriteTimeUtc);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

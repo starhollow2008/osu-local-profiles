@@ -487,7 +487,7 @@ internal sealed partial class BeatmapResolver
                 var info = new FileInfo(file);
                 if (!info.Exists) return $"{file}@missing";
                 // fs.statSync's mtimeMs: milliseconds, with the sub-millisecond part.
-                var ms = (info.LastWriteTimeUtc - DateTime.UnixEpoch).Ticks / 10_000.0;
+                var ms = Js.MtimeMs(info.LastWriteTimeUtc);
                 return $"{file}@{Js.NumberToString(ms)}";
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)

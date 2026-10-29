@@ -116,7 +116,7 @@ internal static partial class LazerLog
             {
                 FileSystemInfo info = File.Exists(runtime) ? new FileInfo(runtime) : new DirectoryInfo(runtime);
                 if (!info.Exists) continue;
-                modifiedAt = (info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalMilliseconds;
+                modifiedAt = Js.MtimeMs(info.LastWriteTimeUtc);
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

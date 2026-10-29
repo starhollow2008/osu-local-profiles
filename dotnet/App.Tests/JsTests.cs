@@ -93,4 +93,13 @@ public class JsTests
         Assert.True(double.IsNaN(Js.DateParse("2020-13-01")));
         Assert.True(double.IsNaN(Js.DateParse("not a date")));
     }
+
+    [Fact]
+    public void A_file_time_reads_as_Nodes_mtimeMs_to_the_last_digit()
+    {
+        // osu!'s development online.db on the owner's machine: dividing the ticks at once gives .8003.
+        Assert.Equal("1790501699477.8005", Js.NumberToString(Js.MtimeMs(DateTime.UnixEpoch.AddTicks(17905016994778005))));
+        Assert.Equal("1791161260162.3623", Js.NumberToString(Js.MtimeMs(DateTime.UnixEpoch.AddTicks(17911612601623623))));
+        Assert.Equal("0", Js.NumberToString(Js.MtimeMs(DateTime.UnixEpoch)));
+    }
 }

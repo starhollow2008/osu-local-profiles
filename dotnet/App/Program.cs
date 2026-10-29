@@ -97,8 +97,19 @@ foreach (var install in installs)
 var extra = discovery.Candidates.Count - installs.Count;
 if (extra > 0) Console.WriteLine($"  ({extra} other osu! folder(s) found -- Options -> osu! folders to switch)");
 
+// Decided before the database is created: only a brand-new install is welcomed, never one upgraded
+// from a version that had no welcome.
+var firstRun = !File.Exists(dbFile);
 using var db = Database.Open(dbFile, writable);
-if (writable) Profiles.SeedFirst(db, config.ProfileName);
+if (writable)
+{
+    OsuLocalProfiles.Update.Notes.SeedSeenVersion(db, paths.Version(), paths.DataDir);
+    // config.json's profileName only names the very first profile; after that they are the page's.
+    Profiles.SeedFirst(db, config.ProfileName);
+    if (firstRun) ProfileData.OfferWelcome(db);
+    // Before any request is answered: the favourite lists must agree with the setting as it stands.
+    Favorites.SyncSharing(db, config["sharedFavorites"] is not { ValueKind: System.Text.Json.JsonValueKind.False });
+}
 var active = Profiles.Get(db, Profiles.ActiveId(db))!;
 // The gap the app was closed for, read before this run stamps itself.
 var gapSince = OsuLocalProfiles.Tracker.CatchUp.Since(OsuLocalProfiles.Tracker.CatchUp.LastRunAt(db), active.TrackingSince);
@@ -146,6 +157,13 @@ var app = Server.Build(new ServerOptions
     Config = config,
     Port = config.Port,
     OnQuit = () => Shutdown(0, true),
+    /*
+     * Only the tray launcher: it starts the app again on this exit code, and with no update in
+     * progress there is no swap to wait for. A restored backup is applied that way.
+     */
+    OnRestart = fromTray ? () => Shutdown(RestartExitCode, false) : null,
+    Folders = new OsuLocalProfiles.Clients.OsuFolders(config, OsuLocalProfiles.Clients.OsuFolders.SaveInto(paths.DataDir), installs,
+        discovery, NodePath.Join(paths.DataDir, "mcosu")),
     FromTray = fromTray,
     Calculator = calculator,
     PpSource = ppSource,
@@ -209,4 +227,23 @@ if (tracker is not null)
 }
 await app.StopAsync();
 await app.DisposeAsync();
+if (exitCode == RestartExitCode)
+{
+    // Left by an update long finished, a swapper pid would have the launcher wait on whatever
+    // process has that number now.
+    try
+    {
+        File.Delete(Path.Combine(paths.DataDir, "update", "swapper.pid"));
+    }
+    catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+    {
+        /* the launcher waits a moment longer */
+    }
+}
 return exitCode;
+
+partial class Program
+{
+    /// <summary>What tells the tray launcher to start the app again (src/update/index.ts).</summary>
+    private const int RestartExitCode = 75;
+}

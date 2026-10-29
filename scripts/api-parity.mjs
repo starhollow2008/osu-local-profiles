@@ -11,8 +11,11 @@
  * reads a consistent snapshot even while the app is running on it. The Node app still needs an
  * osu! installation to start, so this runs on a player's machine, not in CI.
  *
- * Each endpoint the port answers goes in ENDPOINTS. A field left out of the comparison is
- * listed with the reason, so a difference is never ignored without saying why.
+ * Each endpoint the port answers goes in ENDPOINTS, and each write in `writeSteps`, which ends
+ * the run by sending both apps the same writes and comparing their answers, live feeds and
+ * tables. A field left out of the comparison is listed with the reason, so a difference is never
+ * ignored without saying why. The copies point at the uploads in the real data/replays: the
+ * writes are chosen so that none is let go of, and the run fails if one goes missing.
  */
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
@@ -161,9 +164,19 @@ async function settled(port, timeoutMs = 600_000) {
   await new Promise((resolve) => setTimeout(resolve, 5000));
 }
 
+/** Whether a dotted path is left out: named exactly, or by a pattern where `*` stands for one part. */
+function ignored(ignore, dotted) {
+  if (Object.hasOwn(ignore, dotted)) return true;
+  const parts = dotted.split('.');
+  return Object.keys(ignore).some((key) => {
+    const want = key.split('.');
+    return key.includes('*') && want.length === parts.length && want.every((w, i) => w === '*' || w === parts[i]);
+  });
+}
+
 /** Every difference between two parsed values, as `path: node | cs` lines. Key order is not one. */
 function differences(a, b, at = '', ignore = {}) {
-  if (Object.hasOwn(ignore, at.slice(1))) return [];
+  if (ignored(ignore, at.slice(1))) return [];
   if (isDeepStrictEqual(a, b)) return [];
   const bothObjects = a && b && typeof a === 'object' && typeof b === 'object' && Array.isArray(a) === Array.isArray(b);
   if (!bothObjects) return [`${at.slice(1) || '(whole answer)'}: node ${JSON.stringify(a)} | cs ${JSON.stringify(b)}`];
@@ -171,9 +184,208 @@ function differences(a, b, at = '', ignore = {}) {
   return [...keys].flatMap((key) => differences(a[key], b[key], `${at}.${key}`, ignore));
 }
 
-async function ask(port, pathname) {
-  const r = await fetch(`http://localhost:${port}${pathname}`);
+async function ask(port, pathname, init) {
+  const r = await fetch(`http://localhost:${port}${pathname}`, init);
   return { status: r.status, headers: Object.fromEntries(HEADERS.map((h) => [h, r.headers.get(h)])), body: Buffer.from(await r.arrayBuffer()) };
+}
+
+/* ---------------------------------------------------------------- the writes */
+
+/**
+ * Columns holding the moment an app did something, left out when the tables are compared: each
+ * app did it at its own moment. The `kv` keys the same.
+ */
+const MOMENTS = new Set([
+  'created_at', 'tracking_since', 'hidden_at', 'pinned_at', 'declined_at', 'deleted_at',
+  'imported_at', 'cached_at', 'indexed_at', 'fetched_at', 'favorited_at',
+]);
+const KV_MOMENTS = new Set(['lastRunAt']);
+
+/** Tables not compared, each with why. */
+const TABLES_SKIPPED = {
+  rank_events: "asked of osu! by the Node app's rank event watcher, which the port has yet to have (phase 5, step 4)",
+};
+
+/** Events whose count depends on timing: only the last of each is compared. */
+const PROGRESS_EVENTS = new Set(['indexing', 'importing', 'recompute-progress', 'osu-progress']);
+
+/** Every event an app's live feed sends from now until `stop()`, parsed. */
+function listen(port) {
+  const events = [];
+  const controller = new AbortController();
+  const done = (async () => {
+    const r = await fetch(`http://localhost:${port}/api/events`, { signal: controller.signal });
+    const decoder = new TextDecoder();
+    let buffered = '';
+    for await (const chunk of r.body) {
+      buffered += decoder.decode(chunk, { stream: true });
+      let end;
+      while ((end = buffered.indexOf('\n\n')) !== -1) {
+        const block = buffered.slice(0, end);
+        buffered = buffered.slice(end + 2);
+        const name = /^event: (.*)$/m.exec(block)?.[1];
+        const data = /^data: (.*)$/m.exec(block)?.[1];
+        if (name !== undefined) events.push({ name, data: data === undefined ? null : JSON.parse(data) });
+      }
+    }
+  })().catch(() => {});
+  return {
+    events,
+    stop: async () => {
+      controller.abort();
+      await done;
+    },
+  };
+}
+
+/** A copy's tables, every row with its moments taken out, sorted so the order rows were written in is not compared. */
+function tables(file) {
+  const db = new DatabaseSync(file, { readOnly: true });
+  try {
+    const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name);
+    return new Map(names.filter((name) => !Object.hasOwn(TABLES_SKIPPED, name)).map((name) => {
+      const rows = db.prepare(`SELECT * FROM "${name}"`).all().map((row) => {
+        if (name === 'kv' && KV_MOMENTS.has(row.key)) return JSON.stringify({ key: row.key });
+        return JSON.stringify(Object.fromEntries(Object.entries(row).filter(([column]) => !MOMENTS.has(column))));
+      });
+      return [name, rows.sort()];
+    }));
+  } finally {
+    db.close();
+  }
+}
+
+/** The files in a folder, by name, or none when it is not there. */
+function listing(dir) {
+  try {
+    return fs.readdirSync(dir).sort();
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The same writes, in the same order, to both apps, built from what the copy holds. Each step's
+ * answer is compared, then the answers it should have changed (`after`). Removing, emptying and
+ * deleting happen in a profile made for it, never one with the player's own plays: a play turned
+ * away can point at an uploaded replay in the real data/replays, which the copies share, and
+ * letting go of the play would delete that file.
+ */
+function writeSteps(file, csData) {
+  const db = new DatabaseSync(file, { readOnly: true });
+  try {
+    const active = Number(db.prepare("SELECT value FROM kv WHERE key = 'activeProfileId'").get()?.value);
+    const visible = db
+      .prepare('SELECT id, mode FROM scores WHERE profile_id = ? AND hidden_at IS NULL ORDER BY played_at DESC LIMIT 3')
+      .all(active);
+    const unfinished = db
+      .prepare('SELECT id FROM incomplete_plays WHERE profile_id = ? AND hidden_at IS NULL ORDER BY played_at DESC LIMIT 1')
+      .get(active);
+    // Plays not tracked with no uploaded copy to let go of.
+    const declined = db
+      .prepare("SELECT id, replay_path FROM declined_plays WHERE profile_id = ? AND kind = 'score' ORDER BY declined_at DESC")
+      .all(active)
+      .filter((r) => r.replay_path === null || !/[\\/]replays[\\/][0-9a-f]{32}\.osr$/.test(r.replay_path))
+      .slice(0, 2);
+    // A replay osu! wrote, to upload.
+    const upload = db
+      .prepare("SELECT replay_path FROM scores WHERE replay_path IS NOT NULL AND origin IS NULL AND client <> 'mcosu' ORDER BY played_at DESC")
+      .all()
+      .map((r) => r.replay_path)
+      .find((p) => !/[\\/]replays[\\/][0-9a-f]{32}\.osr$/.test(p) && fs.existsSync(p));
+    const nextProfile = Number(db.prepare('SELECT COALESCE(MAX(id), 0) + 1 AS id FROM profiles').get().id);
+    const picture = fs.readFileSync(path.join(repo, 'web', 'feed-icons', 'level-up.png'));
+    const monthAgo = Date.now() - 30 * 86_400_000;
+    const profile = (mode) => `/api/profile?mode=${mode}&top=100&recent=10000&mostPlayed=10000&events=10000`;
+    const turnedAway = { 'plays.*.declinedAt': 'the moment each app turned the play away' };
+    const created = { 'profile.createdAt': 'the moment each app made it', 'profile.trackingSince': 'the same', 'profiles.*.createdAt': 'the same', 'profiles.*.trackingSince': 'the same' };
+
+    const [first, second, third] = visible;
+    return [
+      { path: '/api/welcome' },
+      { path: '/api/settings', body: { tagline: 'parity check', country: 'NZ' }, after: ['/api/settings'] },
+      ...['null', '[1]', '{', '5'].map((raw) => ({ path: '/api/settings', raw })),
+      { path: '/api/app-config', body: { font: 'system', originalMetadata: true }, after: ['/api/app-config'] },
+      { path: '/api/app-config', body: { openBrowser: 'no' } },
+      { path: '/api/app-config', body: { language: 'xx' } },
+      { path: '/api/app-config', body: { language: {} } },
+      { path: '/api/app-config', body: {} },
+      { path: '/api/app-config', body: { sharedFavorites: false }, after: [`${profile(0)}&favorites=10000`] },
+      { path: '/api/app-config', body: { sharedFavorites: true }, after: [`${profile(0)}&favorites=10000`] },
+      ...(first && second && third
+        ? [
+            { path: '/api/scores', body: { action: 'pin', id: first.id } },
+            { path: '/api/scores', body: { action: 'pin', id: second.id } },
+            { path: '/api/scores', body: { action: 'reorder', ids: [second.id, first.id] }, after: [profile(first.mode)] },
+            { path: '/api/scores', body: { action: 'hide', id: first.id }, after: [profile(first.mode), '/api/state'] },
+            { path: '/api/scores', body: { action: 'list-hidden' }, ignore: { 'hidden.*.hiddenAt': 'the moment each app removed it' } },
+            { path: '/api/scores', body: { action: 'restore', id: first.id }, after: [profile(first.mode)] },
+            { path: '/api/scores', body: { action: 'unpin', id: second.id } },
+            { path: '/api/scores', body: { action: 'hide', id: third.id } },
+            { path: '/api/scores', body: { action: 'delete', ids: [third.id] }, after: [profile(third.mode)] },
+            { path: '/api/scores', body: { action: 'delete', ids: [first.id] } },
+            { path: '/api/scores', body: { action: 'destroy', id: first.id } },
+            { path: '/api/scores', body: { action: 'pin', id: 99_999_999 } },
+            { path: '/api/scores', body: { action: 'pin' } },
+          ]
+        : []),
+      ...(unfinished
+        ? [
+            { path: '/api/scores', body: { action: 'hide', kind: 'incomplete', ids: [unfinished.id] }, after: [profile(0)] },
+            { path: '/api/scores', body: { action: 'restore', kind: 'incomplete', ids: [unfinished.id, 99_999_999] } },
+          ]
+        : []),
+      ...(declined.length > 0 ? [{ path: '/api/declined', body: { action: 'track', id: declined[0].id }, after: [{ path: '/api/declined', ignore: turnedAway }, profile(0)] }] : []),
+      ...(declined.length > 1 ? [{ path: '/api/declined', body: { action: 'delete', id: declined[1].id }, after: [{ path: '/api/declined', ignore: turnedAway }] }] : []),
+      { path: '/api/declined', body: { action: 'track', id: 'x' } },
+      { path: '/api/declined', body: { action: 'nonsense' } },
+      { path: '/api/tracking', body: { enabled: false } },
+      { path: '/api/tracking', raw: 'nonsense' },
+      { path: '/api/identity', body: { action: 'suggestions' } },
+      { path: '/api/identity', body: { action: 'clear-image', kind: 'banner' } },
+      { path: '/api/identity', body: { action: 'nope' } },
+      { path: '/api/recompute', body: { confirm: false } },
+      { path: '/api/recompute', body: { confirm: true } },
+      { path: '/api/installs', method: 'GET' },
+      { path: '/api/installs', body: { add: '  ' } },
+      { path: '/api/installs', body: { add: path.join(csData, 'no such folder') }, ignore: { error: 'each app names its own copy of data/' } },
+      { path: '/api/installs', body: {} },
+      { path: '/api/startup', method: 'GET' },
+      { path: '/api/backfill/preview', body: { since: 0, sources: ['replays', 'unfinished', 'attempts'] } },
+      { path: '/api/backfill/preview', body: { since: monthAgo, until: monthAgo } },
+      { path: '/api/backfill/preview', body: { since: -1 } },
+      { path: '/api/backfill/preview', raw: 'null' },
+      { path: '/api/backfill', body: { since: monthAgo } },
+
+      // A profile of its own, for what empties one.
+      { path: '/api/profiles', body: { action: 'create', name: '  Parity check  ' }, ignore: created, after: [{ path: '/api/state', ignore: created }] },
+      { path: '/api/profiles', body: { action: 'create', name: 'Parity check' } },
+      { path: '/api/profiles', body: { action: 'switch', id: 'x' } },
+      { path: '/api/profiles', body: { action: 'switch', id: 1.5 } },
+      { path: '/api/profiles', body: { action: 'rename', id: nextProfile, name: '' } },
+      { path: '/api/backfill', body: { since: monthAgo, confirm: true, sources: ['replays', 'unfinished', 'attempts'] }, after: [profile(0), { path: '/api/declined', ignore: turnedAway }] },
+      ...(upload
+        ? [
+            { path: '/api/replays?applyFilter=0', raw: fs.readFileSync(upload), after: [profile(0)] },
+            { path: '/api/replays', raw: fs.readFileSync(upload) },
+          ]
+        : []),
+      { path: '/api/replays', raw: 'definitely not a replay' },
+      { path: '/api/image/avatar', method: 'PUT', raw: picture, after: [`/api/image/avatar?profile=${nextProfile}`] },
+      { path: '/api/image/cover', method: 'PUT', raw: 'not a picture at all' },
+      { path: '/api/about-image', method: 'PUT', raw: picture },
+      { path: '/api/identity', body: { action: 'clear-image', kind: 'avatar' } },
+      { path: '/api/profile/reset', body: { confirm: 'yes' } },
+      { path: '/api/profile/reset', body: { confirm: true }, ignore: { trackingSince: 'the moment each app reset it' }, after: [profile(0)] },
+      { path: '/api/profiles', body: { action: 'rename', id: nextProfile, name: 'Parity renamed' }, ignore: created },
+      { path: '/api/profiles', body: { action: 'switch', id: active }, ignore: created },
+      { path: '/api/profiles', body: { action: 'delete', id: nextProfile } },
+      { path: '/api/profiles', body: { action: 'delete', id: nextProfile, confirm: true }, after: [{ path: '/api/state', ignore: created }] },
+      { path: '/api/tracking', body: { enabled: true } },
+    ];
+  } finally {
+    db.close();
+  }
 }
 
 async function main() {
@@ -339,6 +551,121 @@ async function main() {
       const problems = compareMeta(a, b);
       if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
       report(pathname, problems, a);
+    }
+
+    /*
+     * The writes: the same requests in order to both, each answer compared and then what it
+     * should have changed, the live feed's events, and at the end every table of both copies.
+     */
+    console.log('\n  writes');
+    // Back on the profile each app is tracking, which the loop above moved away from.
+    const original = (() => {
+      const db = new DatabaseSync(path.join(source, 'profiles.db'), { readOnly: true });
+      try {
+        return db.prepare("SELECT value FROM kv WHERE key = 'activeProfileId'").get()?.value ?? '1';
+      } finally {
+        db.close();
+      }
+    })();
+    for (const file of copies) {
+      const db = new DatabaseSync(file);
+      db.prepare("INSERT INTO kv (key, value) VALUES ('activeProfileId', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(original);
+      db.close();
+    }
+    const realReplays = path.join(source, 'replays');
+    const replaysBefore = listing(realReplays);
+    const feeds = [listen(nodePort), listen(csPort)];
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    for (const step of writeSteps(copies[0], path.join(csRoot, 'data'))) {
+      const method = step.method ?? 'POST';
+      const body = step.raw ?? (step.body === undefined ? undefined : JSON.stringify(step.body));
+      const init = method === 'GET' ? undefined : { method, body };
+      const label = `${method} ${step.path} ${step.raw !== undefined ? (Buffer.isBuffer(step.raw) ? `(${step.raw.length} bytes)` : step.raw) : (body ?? '')}`.slice(0, 110);
+      const [a, b] = await Promise.all([ask(nodePort, step.path, init), ask(csPort, step.path, init)]);
+      const problems = compareMeta(a, b);
+      try {
+        problems.push(...differences(JSON.parse(a.body.toString('utf8')), JSON.parse(b.body.toString('utf8')), '', step.ignore ?? {}));
+      } catch (e) {
+        problems.push(`not JSON: ${e.message}`);
+      }
+      report(label, problems, a);
+      for (const after of step.after ?? []) {
+        const { path: pathname, ignore = {} } = typeof after === 'string' ? { path: after } : after;
+        const [x, y] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
+        const changed = compareMeta(x, y);
+        if (pathname.startsWith('/api/image/')) {
+          if (!x.body.equals(y.body)) changed.push(`body: node ${x.body.length} bytes | cs ${y.body.length} bytes, different`);
+        } else {
+          changed.push(...differences(JSON.parse(x.body.toString('utf8')), JSON.parse(y.body.toString('utf8')), '', ignore));
+        }
+        report(`  then ${pathname}`, changed, x);
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await Promise.all(feeds.map((f) => f.stop()));
+
+    // What each live feed said: every event in order, and the last of each kind of progress.
+    const told = feeds.map(({ events }) => {
+      const last = new Map();
+      for (const e of events) if (PROGRESS_EVENTS.has(e.name)) last.set(e.name, e);
+      return [...events.filter((e) => !PROGRESS_EVENTS.has(e.name)), ...[...last.values()].sort((x, y) => x.name.localeCompare(y.name))];
+    });
+    const feedProblems = [];
+    if (told[0].length !== told[1].length) {
+      feedProblems.push(`count: node ${told[0].length} (${told[0].map((e) => e.name).join(', ')}) | cs ${told[1].length} (${told[1].map((e) => e.name).join(', ')})`);
+    }
+    for (let i = 0; i < Math.min(told[0].length, told[1].length); i++) {
+      const [x, y] = [told[0][i], told[1][i]];
+      if (x.name !== y.name) feedProblems.push(`${i}: node ${x.name} | cs ${y.name}`);
+      else feedProblems.push(...differences(x.data, y.data, '', { at: 'the moment each app said it', trackingSince: 'the same' }).map((d) => `${i} ${x.name}: ${d}`));
+    }
+    report('/api/events (the writes above)', feedProblems, { status: 200, body: Buffer.from(JSON.stringify(told[0])) });
+
+    // Every table of both copies, with the moments each app wrote taken out.
+    const [nodeTables, csTables] = copies.map(tables);
+    for (const [name, rows] of nodeTables) {
+      const other = csTables.get(name) ?? [];
+      const extra = rows.filter((r) => !other.includes(r));
+      const missing = other.filter((r) => !rows.includes(r));
+      const problems = [
+        ...(rows.length === other.length ? [] : [`rows: node ${rows.length} | cs ${other.length}`]),
+        ...extra.slice(0, 3).map((r) => `only node: ${r.slice(0, 300)}`),
+        ...missing.slice(0, 3).map((r) => `only cs:   ${r.slice(0, 300)}`),
+      ];
+      report(`table ${name}`, problems, { status: 200, body: Buffer.from(rows.join('\n')) });
+    }
+    for (const [name, why] of Object.entries(TABLES_SKIPPED)) console.log(`  skipped  table ${name}: ${why}`);
+    // config.json, but for the port each copy was given.
+    const configs = [nodeRoot, csRoot].map((root) => {
+      const config = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config.json'), 'utf8'));
+      delete config.port;
+      return config;
+    });
+    report('data/config.json', differences(configs[0], configs[1]), { status: 200, body: Buffer.from(JSON.stringify(configs[0])) });
+    // The copies' pictures, me! images and uploaded replays, file for file.
+    const kept = (root) => {
+      const files = [];
+      const walk = (dir, prefix) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (entry.isDirectory()) {
+            if (prefix === '' && !['replays', 'about-images'].includes(entry.name)) continue;
+            walk(path.join(dir, entry.name), `${prefix}${entry.name}/`);
+          } else if (/\.(png|jpg|jpeg|webp|gif|osr)$/.test(entry.name)) {
+            files.push([`${prefix}${entry.name}`, fs.readFileSync(path.join(dir, entry.name)).toString('base64')]);
+          }
+        }
+      };
+      walk(path.join(root, 'data'), '');
+      return Object.fromEntries(files.sort(([x], [y]) => (x < y ? -1 : 1)));
+    };
+    const [nodeFiles, csFiles] = [kept(nodeRoot), kept(csRoot)];
+    report('data/ pictures and replays', differences(nodeFiles, csFiles).map((d) => d.slice(0, 200)), { status: 200, body: Buffer.from(Object.keys(nodeFiles).join()) });
+
+    // The safety check: nothing in the real data/replays was let go of by either copy.
+    const gone = replaysBefore.filter((name) => !listing(realReplays).includes(name));
+    if (gone.length > 0) {
+      failed++;
+      console.log(`  LOST     ${gone.length} file(s) from ${realReplays}: ${gone.join(', ')}`);
     }
 
     console.log(failed === 0 ? '\n  Every answer matches.' : `\n  ${failed} answer(s) differ.`);

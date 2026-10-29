@@ -248,8 +248,8 @@ internal sealed partial class TrackingFilter
         if (!info.Exists) return 0;
         try
         {
-            var born = Js.Round((info.CreationTimeUtc - DateTime.UnixEpoch).TotalMilliseconds);
-            return born > 0 ? born : Js.Round((info.LastWriteTimeUtc - DateTime.UnixEpoch).TotalMilliseconds);
+            var born = Js.Round(Js.MtimeMs(info.CreationTimeUtc));
+            return born > 0 ? born : Js.Round(Js.MtimeMs(info.LastWriteTimeUtc));
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {

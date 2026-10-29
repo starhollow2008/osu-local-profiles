@@ -103,7 +103,7 @@ internal static class Ingest
             var info = new FileInfo(file);
             if (!info.Exists && !Directory.Exists(file)) return null;
             var written = info.Exists ? info.LastWriteTimeUtc : Directory.GetLastWriteTimeUtc(file);
-            return (written - DateTime.UnixEpoch).TotalMilliseconds;
+            return Js.MtimeMs(written);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException)
         {

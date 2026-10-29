@@ -74,8 +74,8 @@ dotnet/
 | 1   | Foundations                   | done        |
 | 2   | Reading a profile             | done        |
 | 3   | pp in-process                 | done        |
-| 4   | Tracking                      | not started |
-| 5   | Everything that writes        | not started |
+| 4   | Tracking                      | done        |
+| 5   | Everything that writes        | in progress |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
 | 7   | Packaging                     | not started |
 | 8   | Switch-over release           | not started |
@@ -234,55 +234,37 @@ backup and restore, uploads, screenshots (Chrome over CDP), start with the compu
 the update checker and its installer half (`src/update/*`), the pp source switch.
 The database opens writable by default from here.
 
-#### Handoff (2026-10-28): where phase 5 stands
+#### Where phase 5 stands (2026-10-28)
 
-Phases 0 to 4 are done and pushed (last pushed commit `671c6fe`). Phase 5 has just begun.
+Done, each proven by the parity script's write stage (below) and ported tests:
 
-**In the working tree, not committed:** `dotnet/App/ProfileWrites.cs`. It builds, but is not
-wired to any endpoint and has no tests yet. It holds:
+- [x] **The live feed** (`Http/LiveFeed.cs`): `/api/events` with `retry: 2000`, a ping every
+      20s, and every tracker event under Node's names and payloads. Each page has its own queue,
+      so none is held up by another or sees events out of order.
+- [x] **Request bodies** (`Http/WriteApi.cs`): `JSON.parse(raw || '{}')`, and anything but an
+      object refused with 400 `expected a JSON body`; a handler's exception is a 500. Fixed in
+      Node first: a `null` or non-object body used to reach a handler that read a field of it
+      before its first await, and the TypeError ended the app.
+- [x] **The local writes**: `/api/welcome`, `/api/settings` POST (with `retrackOwnNames`),
+      `/api/app-config` POST (into config.json read afresh), `/api/tracking`, `/api/scores` POST,
+      `/api/declined` POST (track, delete, delete-all), `/api/profiles` POST,
+      `/api/profile/reset`, `/api/backfill` and its preview, `/api/recompute` (one profile),
+      avatar and banner PUT, `/api/about-image` PUT, `/api/replays` upload, `/api/identity`
+      `suggestions`, `unlink` and `clear-image`, `/api/installs` (`Clients/Folders.cs`),
+      `/api/startup` (`StartWithComputer.cs`), `/api/data-folder/open`.
+- [x] **Startup writes**: `seedSeenVersion`, `offerWelcome` on a first run,
+      `syncFavoriteSharing`. A read-only copy refuses every write with 403.
+- [x] Found on the way: Microsoft.Data.Sqlite refuses to bind NaN, where SQLite and node:sqlite
+      make it NULL (`Number(body.id)` of a missing id); and the C# file times rounded the last
+      digit of `mtimeMs` differently, so lazer's `online.db` stamp differed (`Js.MtimeMs`).
 
-- image writes (`Identity.SniffImage`, `SaveImage`, `ClearImage`, `SaveAboutImage`);
-- the writing half of `src/scores.ts` (`Scores.SetIncompleteHidden`, `ApplyAction`,
-  `ReorderPins`, `HiddenCount`, `Hidden`, `DeleteRemoved`, `ClassicLabel`, `WholeIds`);
-- `ProfileData.DismissWelcome`, `OfferWelcome`, and `Reset` (`/api/profile/reset`'s
-  transaction).
+Waiting, each answering 501 until its step: `/api/recompute` with `all` and `/api/declined`
+`its-me` and `/api/identity` `lookup`, `link`, `import` (step 4), and from step 3,
+`applyPendingRestore` (with backup, step 5), the `RankEventWatcher` (step 4: it asks osu!) and
+`pruneUpdateLeftovers` (step 7).
 
-Review it against the TypeScript before relying on it.
+**Next, in this order.** Every handler is in `src/http/server.ts`.
 
-**Next, in this order.** Every handler is in `src/http/server.ts`; its line numbers are in the
-route list there.
-
-1. **Server plumbing.**
-   - The live feed, `/api/events` (SSE): `retry: 2000`, a ping every 20s, and the same event
-     names and payloads. Send it every tracker event, as `startServer` does: score, incomplete,
-     filtered, refused, caught-up, recompute-progress (only when the percent changes),
-     recompute (with `everyProfile`), tracker-error, indexing, importing.
-   - A `readBody` equivalent:
-     - `JSON.parse(raw || '{}')`, or 400 `expected a JSON body`.
-     - A handler's exception is a 500 `{ error: message }`.
-     - A `null` body throws JavaScript's TypeError message.
-     - `key in body` throws for primitives.
-   - Add `Events`, `Folders` and `OnRestart` to `ServerOptions`.
-   - Remove a route from the 501 fallback in `Server.cs` once it is ported.
-2. **The local writes, needing no network:**
-   - `/api/welcome`, `/api/settings` POST (and `retrackOwnNames` when `ownNames` changes),
-     `/api/app-config` POST (writes `config.json` through `AppConfig.Save`), `/api/tracking`
-   - `/api/scores` POST, `/api/declined` POST (track, delete, delete-all; `its-me` needs osu!'s
-     API, so it goes with step 4), `/api/profiles` POST, `/api/profile/reset`
-   - `/api/backfill` and `/api/backfill/preview`, `/api/recompute`
-   - image PUT, `/api/about-image` PUT, `/api/replays` POST (upload), `/api/identity` actions
-     `suggestions`, `unlink` and `clear-image`
-   - `/api/installs` GET and POST (port `src/clients/folders.ts`; save only `installRoots`,
-     `discoveredRoots` and `searchedForInstalls`, into a freshly loaded config)
-   - `/api/startup` (port `src/startup.ts`: the registry Run key on Windows, a LaunchAgent on
-     macOS, an autostart entry on Linux)
-   - `/api/data-folder/open`
-3. **Startup writes the Node app does that the C# Program does not yet:**
-   - `seedSeenVersion`, and `offerWelcome` on a first run;
-   - `applyPendingRestore`, then `markRunning`;
-   - `syncFavoriteSharing`;
-   - the `RankEventWatcher` (`src/rank-events.ts`);
-   - `pruneUpdateLeftovers`.
 4. **osu!'s web API** (`src/clients/osu-web.ts`, `src/clients/request-gate.ts`). Then, built on
    it:
    - `/api/favorites` POST;
@@ -290,28 +272,34 @@ route list there.
    - `/api/score-link` and its `/check`, `/api/beatmaps/search` and `/find`,
      `/api/manual-score` (port `src/score-entry.ts`, `src/built-replays.ts`, `lazerBlock` from
      `src/replay-writer.ts`, and online-import's `importMode`);
-   - `convertImportedScores` at startup (see `Startup.AfterIndex`);
-   - `/api/declined` `its-me`.
+   - `convertImportedScores` at startup (see `Startup.AfterIndex`), and `/api/recompute`'s
+     `all`, which runs it first;
+   - `/api/declined` `its-me`;
+   - the `RankEventWatcher` (`src/rank-events.ts`), then take `rank_events` out of the parity
+     script's `TABLES_SKIPPED`.
 5. **Backup and restore:** `/api/backup`, `/api/restore` PUT, DELETE and apply
-   (`src/backup.ts`).
+   (`src/backup.ts`), and `applyPendingRestore` then `markRunning` at startup.
 6. **Screenshots:** `/api/screenshot` and a score card's `/screenshot`, through Chrome over CDP
    (`src/screenshot.ts`). `Browsers.Find` is already ported.
-7. **The updater:** `/api/update*`, the checker and installer (`src/update/*`), and `/api/app`'s
-   `update` and `updating`.
+7. **The updater:** `/api/update*`, the checker and installer (`src/update/*`), `/api/app`'s
+   `update` and `updating`, `pruneUpdateLeftovers` at startup, and telling the updater when
+   `/api/app-config` changes Auto-update (`autoUpdateChanged`).
 8. **The pp source switch** (5.70): `/api/pp-source`, `src/pp-source.ts`,
    `src/calc/source-helper.ts`.
 9. **Make writable the default**, and remove the `--writable` flag.
 
-**Checking writes.** Add a write stage to `scripts/api-parity.mjs`:
+**Checking writes.** `scripts/api-parity.mjs` ends with a write stage (`writeSteps`): the same
+requests in order to both apps, each answer compared and then the answers it should have
+changed, both live feeds' events, and at the end every table of both copies (the moments each
+app wrote left out: `MOMENTS`), config.json, and the pictures and uploads file for file. Add each
+newly ported write there.
 
-- send the same requests, in order, to both apps (each on its own copy of `data/`);
-- compare each answer, then the GET answers it should change;
-- at the end, compare the database tables of both copies, leaving out timestamps such as
-  `hidden_at`, `pinned_at`, `declined_at` and `tracking_since`.
-
-Both apps already run writable and tracking there. The script turns catch-up off in its copies.
-That is deliberate: an import can release a replay file in the real `data/replays/`, which the
-copies point at.
+The copies' databases point at uploads in the real `data/replays/`, and letting go of a play
+(deleting a declined play, a reset, Track anyway on one already there) deletes its upload once
+nothing points at it. So the stage empties and deletes only in a profile it makes for that, picks
+declined plays with no upload, and fails with `LOST` if any file in the real `data/replays/` went
+missing. The copies turn catch-up off for the same reason. With `--keep`, the work folder holds
+junctions into this checkout (`web`, `node_modules`, `tools`): unlink them before deleting it.
 
 **Commands:**
 
@@ -428,6 +416,10 @@ the helpers.
 - **NaN and Infinity** are written as `null`, as `JSON.stringify` writes them (.NET would throw).
 - **SQLite values** come back as node:sqlite returns them through `Row`: whole numbers, decimals,
   text or null, read with the TypeScript's own casts and `=== 1` tests.
+- **NaN bound to SQL** is NULL, as SQLite and node:sqlite make it, so `WHERE id = ?` with
+  `Number('x')` finds nothing. Microsoft.Data.Sqlite refuses NaN; `Database` binds it as NULL.
+- **An id from the page** is a JavaScript number, so it can be NaN or 1.5: pass it on as a
+  `double`, as the TypeScript does, and the refusal names it as `String(id)` would.
 - **Object key order**: kept where it is visible (settings follow `DEFS`' order); the parity
   script ignores it.
 - **`in` on an object** also finds inherited names (`"constructor" in {}` is true). Where the

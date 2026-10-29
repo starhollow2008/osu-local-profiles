@@ -224,6 +224,40 @@ internal static class Favorites
         };
     }
 
+    /// <summary>
+    /// Bring the two lists together when sharing is switched, so nothing is lost either way: on,
+    /// every profile's own favourites join the shared list; off, the shared list is copied into
+    /// every profile's own. What was last applied is kept in <c>kv</c>, so this runs once per switch,
+    /// including one made by hand in config.json while the app was closed.
+    /// </summary>
+    public static string? SyncSharing(Database db, bool shared) => db.Serialized(() =>
+    {
+        var row = db.Get("SELECT value FROM kv WHERE key = 'favoritesShared'", r => r.GetString(0));
+        var was = row == "1";
+        void Record() => db.Run(
+            "INSERT INTO kv (key, value) VALUES ('favoritesShared', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            shared ? "1" : "0");
+        if (was == shared)
+        {
+            if (row is null) Record();
+            return null;
+        }
+        db.Transaction(() =>
+        {
+            db.Exec(shared
+                ? """
+                  INSERT OR IGNORE INTO shared_favorite_beatmapsets (beatmapset_id, favorited_at)
+                  SELECT beatmapset_id, MAX(favorited_at) FROM favorite_beatmapsets GROUP BY beatmapset_id
+                  """
+                : """
+                  INSERT OR IGNORE INTO favorite_beatmapsets (profile_id, beatmapset_id, favorited_at)
+                  SELECT p.id, s.beatmapset_id, s.favorited_at FROM profiles p CROSS JOIN shared_favorite_beatmapsets s
+                  """);
+            Record();
+        });
+        return shared ? "merged" : "copied";
+    });
+
     private static string ToText(object? value) => value switch
     {
         null => "null",

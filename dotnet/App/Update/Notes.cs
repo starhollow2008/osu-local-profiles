@@ -124,6 +124,17 @@ internal static partial class Notes
 
     private static string? Read(Database db, string key) => db.Get("SELECT value FROM kv WHERE key = ?", r => r.GetString(0), key);
 
+    /// <summary>
+    /// At startup: a first launch has nothing to announce, so it starts the record here. Unless
+    /// <c>data/update.log</c> says the last update installed this very version.
+    /// </summary>
+    public static void SeedSeenVersion(Database db, string? current, string dataDir)
+    {
+        if (current is null || Read(db, SeenKey) is not null) return;
+        if (UpdatedToFromLog(dataDir) == current) return;
+        db.Run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", SeenKey, current);
+    }
+
     /// <summary>What this version brought since the last one this install ran, until it has been seen.</summary>
     public static object? WhatsNew(Database db, string? current, string installDir, string dataDir)
     {

@@ -124,7 +124,9 @@ internal sealed partial class Database : IDisposable
         command.CommandText = NamePlaceholders(sql);
         for (var i = 0; i < args.Length; i++)
         {
-            command.Parameters.AddWithValue($"$p{i + 1}", args[i] ?? DBNull.Value);
+            // NaN is bound as NULL, which is what SQLite makes of it and so what node:sqlite binds:
+            // `WHERE id = ?` with Number('x') finds nothing rather than failing.
+            command.Parameters.AddWithValue($"$p{i + 1}", args[i] is null or double.NaN ? DBNull.Value : args[i]);
         }
         return command;
     }

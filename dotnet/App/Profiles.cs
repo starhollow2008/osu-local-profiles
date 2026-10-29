@@ -61,11 +61,12 @@ internal static class Profiles
         return first;
     }
 
-    public static void SetActive(Database db, long id)
+    /// <summary>The id as the page sends it, a JavaScript number: one that is no profile's, NaN or 1.5 included, is refused.</summary>
+    public static void SetActive(Database db, double id)
     {
-        if (!db.Exists("SELECT 1 AS hit FROM profiles WHERE id = ?", id)) throw new UserError($"no profile with id {id}");
+        if (!db.Exists("SELECT 1 AS hit FROM profiles WHERE id = ?", id)) throw new UserError($"no profile with id {Js.NumberToString(id)}");
         db.Run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?",
-            ActiveKey, id.ToString(), id.ToString());
+            ActiveKey, Js.NumberToString(id), Js.NumberToString(id));
     }
 
     private static string CleanName(string? name)
@@ -88,21 +89,21 @@ internal static class Profiles
         return Get(db, id)!;
     }
 
-    public static Profile Rename(Database db, long id, string? name)
+    public static Profile Rename(Database db, double id, string? name)
     {
         var clean = CleanName(name);
         var clash = db.Get("SELECT id FROM profiles WHERE name = ?", r => (long?)r.GetInt64(0), clean);
         if (clash is not null && clash != id) throw new UserError($"a profile called \"{clean}\" already exists");
 
-        if (db.Run("UPDATE profiles SET name = ? WHERE id = ?", clean, id) == 0) throw new UserError($"no profile with id {id}");
-        return Get(db, id)!;
+        if (db.Run("UPDATE profiles SET name = ? WHERE id = ?", clean, id) == 0) throw new UserError($"no profile with id {Js.NumberToString(id)}");
+        return Get(db, (long)id)!;
     }
 
     /// <summary>
     /// Delete a profile and everything it tracked (ON DELETE CASCADE). The last one cannot go:
     /// the app must always have somewhere to put the next score.
     /// </summary>
-    public static (long DeletedScores, long NextActive) Delete(Database db, long id)
+    public static (long DeletedScores, long NextActive) Delete(Database db, double id)
     {
         if (Convert.ToInt64(db.Scalar("SELECT COUNT(*) AS n FROM profiles")) <= 1)
         {
@@ -117,7 +118,7 @@ internal static class Profiles
 
         db.Transaction(() =>
         {
-            if (db.Run("DELETE FROM profiles WHERE id = ?", id) == 0) throw new UserError($"no profile with id {id}");
+            if (db.Run("DELETE FROM profiles WHERE id = ?", id) == 0) throw new UserError($"no profile with id {Js.NumberToString(id)}");
         });
 
         // ActiveId repairs a dangling selection by falling back to the oldest profile.

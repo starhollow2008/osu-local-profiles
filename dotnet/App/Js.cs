@@ -394,4 +394,17 @@ internal static partial class Js
 
     /// <summary><c>Date.now()</c>.</summary>
     public static long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+
+    /// <summary>
+    /// <c>fs.statSync(file).mtimeMs</c> for a time .NET read: libuv splits the file time into whole
+    /// seconds and nanoseconds, and Node adds <c>sec * 1000 + nsec / 1e6</c>. Dividing the ticks at
+    /// once can round the last digit the other way, and a stamp kept as text then differs.
+    /// </summary>
+    public static double MtimeMs(DateTime utc)
+    {
+        var ticks = (utc - DateTime.UnixEpoch).Ticks;
+        double seconds = ticks / TimeSpan.TicksPerSecond;
+        double nanoseconds = ticks % TimeSpan.TicksPerSecond * 100;
+        return seconds * 1000 + nanoseconds / 1e6;
+    }
 }
