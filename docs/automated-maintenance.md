@@ -173,10 +173,13 @@ Commits, each ending in a `Co-Authored-By:` trailer for the model you are, as ea
 - `npm version <version> --no-git-tag-version`, committed as `chore: release v<version>`
 
 After a rework, `npm run build:pp` again, so the tests use the new helper. Then `npm run check`
-must pass, and `node src/main.ts --check-only` must print both
-`No osu! installation found` and `pp: osu!'s official calculator` (this VM has no osu!). If
-either fails because of this run's changes, fix it once; otherwise, or if that fails too, stop
-and report a failure.
+and `npm run check:port` must pass, and both `node src/main.ts --check-only` and
+`dotnet run --project dotnet/App -c Release -- --check-only` must print
+`No osu! installation found` and `pp: osu!'s official calculator` (this VM has no osu!). Since
+1.33.0 the release is the C# app (`dotnet/`, docs/csharp-port.md), which prices plays with the
+same `tools/PpCalculator/` code in-process; the Node app's checks stay until it is removed. If
+any fails because of this run's changes, fix it once; otherwise, or if that fails too, stop and
+report a failure.
 
 ### 6. Publish
 
@@ -187,8 +190,10 @@ gh pr checks <number> --watch --interval 60
 ```
 
 If it says no checks are reported yet, wait a minute and run it again; it exits 8 while any is
-still pending. Every check must pass: CI on three systems, and `pp helper` when a rework changed the csproj (the
-slim helper's parity, which a release would otherwise quietly fall back from). A failure: leave
+still pending. Every check must pass: CI on three systems, its `package-native` builds of the
+release on all four platforms (each checks the app's pp against the full helper on every parity
+request, and ships trimmed only where that answers as untrimmed: a warning on the run says a
+platform fell back), and `pp helper` when a rework changed the csproj. A failure: leave
 the pull request open, comment on it with what failed, and report a failure.
 
 When they pass, `gh pr merge <number> --rebase --delete-branch`. If it can't merge because
