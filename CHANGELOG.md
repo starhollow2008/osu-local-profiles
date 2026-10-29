@@ -2,10 +2,15 @@
 
 ## 1.33.0
 
-- **The app is one program now, and about half the size to download.** It no longer comes with
-  Node.js and a separate pp calculator: osu!'s calculators are built into it. The download is
-  37 MB on Windows instead of 63, and the app uses less memory. Updating moves you over by itself
-  and keeps your profiles.
+<!-- in full -->
+
+- **The app is rewritten in C#, as one program.** It no longer comes with Node.js and a separate
+  pp calculator: osu!'s own calculators are built into it. On Windows, the download is 37 MB
+  instead of 62, it takes 87 MB of disk space instead of 161, and it uses 87 MB of memory instead
+  of 157. Every page, setting and pp figure is the same as before.
+
+- **Updating moves you over by itself.** It keeps your profiles, scores and settings, and deletes
+  the old Node.js and JavaScript files.
 
 - **Windows no longer asks to let the app through its firewall.** It only listens to this
   computer now.
