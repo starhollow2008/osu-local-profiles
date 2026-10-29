@@ -530,8 +530,14 @@ builds come from a worktree of `main` with `package.json`'s version and reposito
       C# build by both, on win-x64, linux-x64, osx-arm64 and osx-x64.
 - [x] **`release.yml` builds the C# packages** (`npm run package -- --native --rid`), and CI's
       `package-native` job builds all four, Intel Macs included.
-- [ ] **The release itself**: rehearsed with its own zips first, from a dry run of `release.yml`
-      published to the test repository; then the tag. Then delete the test repository.
+- [x] **1.33.0's own zips rehearsed** (2026-10-29): a dry run of `release.yml` at the release
+      commit built all four, each trimmed, and they were published to the test repository as
+      its v1.33.0, in place of the earlier test builds. Every scenario passed on every platform
+      against them: Windows 9 of 9 (1.7.0 on), Linux 8 of 8, Intel Mac 4 of 4 (older versions
+      never shipped osx-x64), Apple silicon 8 of 8 in one run. Its other runs hit GitHub's limit
+      of 60 unsigned requests an hour to an address, which macOS runners share; a player's
+      address is their own.
+- [ ] **The tag**, `v1.33.0` at the release commit. Then delete the test repository.
 
 ### 9. Removing the Node app
 
