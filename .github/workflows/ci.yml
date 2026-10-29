@@ -122,7 +122,10 @@ jobs:
 
       - run: npm ci
 
+      # Linux and Windows take under 10 minutes. A stuck build fails here with its log kept,
+      # where a runner that dies keeps none.
       - name: Package the C# app
+        timeout-minutes: 25
         run: npm run package -- --native
 
       # For trying a build by hand, and for phase 8's rehearsal. Kept a short while, and never

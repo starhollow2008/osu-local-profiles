@@ -34,8 +34,8 @@ public sealed class FavoriteWritesTests : IDisposable
     public void Details_cached_without_the_video_flag_are_listed_as_missing_until_saved_again()
     {
         h.Db.Run("INSERT INTO beatmapset_details (beatmapset_id, data, fetched_at) VALUES (4, ?, 0)", """{"id":4,"title":"t","artist":"a"}""");
-        Favorites.Add(h.Db, Own(h.ProfileId), 4);
-        Favorites.Add(h.Db, Own(h.ProfileId), 5);
+        Favorites.Add(h.Db, Own(h.ProfileId), 4, 1000);
+        Favorites.Add(h.Db, Own(h.ProfileId), 5, 2000);
         Assert.Equal([5, 4], Favorites.MissingDetails(h.Db, Own(h.ProfileId), 5));
         Favorites.SaveDetails(h.Db, Details(4));
         Assert.Equal([5], Favorites.MissingDetails(h.Db, Own(h.ProfileId), 5));
