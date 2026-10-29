@@ -91,3 +91,44 @@ jobs:
 
       - name: Test the C# port
         run: dotnet test dotnet/OsuLocalProfiles.slnx --nologo
+
+  # The C# port's package (docs/csharp-port.md, phase 7): the app published self-contained, its
+  # pp checked against the full helper on every parity request, the stand-ins older installs
+  # update through, and the packaged app started from another folder. Built on each system, as a
+  # release would be, but never released: every release is the Node app until the switch-over.
+  package-native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/launcher/go.mod
+          cache-dependency-path: tools/launcher/go.sum
+
+      - run: npm ci
+
+      - name: Package the C# app
+        run: npm run package -- --native
+
+      # For trying a build by hand, and for phase 8's rehearsal. Kept a short while, and never
+      # attached to a release.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: dist/*.zip
+          retention-days: 14

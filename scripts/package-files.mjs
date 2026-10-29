@@ -16,6 +16,9 @@
  */
 const RELEASES_URL = 'https://github.com/jonathant09/osu-local-profiles/releases';
 
+/** The C# app in a release without Node (nativeAppFor in src/update/index.ts), on macOS and Linux. */
+const NATIVE_APP = 'app/osu-local-profiles-app';
+
 /**
  * The tray launcher each package carries (tools/launcher, built by scripts/build-launcher.mjs):
  * what the user opens, and where its executable is inside that.
@@ -48,11 +51,16 @@ export function trayLauncherFor(hostOs) {
  * whatever directory the file manager felt like, and the app would look for its `data/`
  * somewhere else entirely and silently start from scratch.
  */
-export function launcherFor(hostOs, nodeBinary) {
+export function launcherFor(hostOs, nodeBinary, native = false) {
   if (hostOs === 'win') return null;
 
   const tray = trayLauncherFor(hostOs);
   const quote = (p) => `"./${p}"`;
+  // What runs the app: the C# app in a release without Node (docs/csharp-port.md, phase 7), whose
+  // runtime-named file is only a stand-in for older installs; otherwise Node on src/main.ts.
+  const runtime = native ? NATIVE_APP : nodeBinary;
+  const complete = native ? `[ ! -f ./${runtime} ]` : `[ ! -f ./${runtime} ] || [ ! -f src/main.ts ]`;
+  const executables = native ? `./${runtime}` : `./${runtime} tools/pp/osu-pp`;
 
   return {
     name: hostOs === 'osx' ? 'Start osu! local profiles.command' : 'start.sh',
@@ -67,7 +75,7 @@ export function launcherFor(hostOs, nodeBinary) {
        * runtime. A zip extracted by a tool that drops permissions is the other case, leaving
        * the runtime present and unrunnable, which `sh` reports only as "Permission denied".
        */
-      `if [ ! -f ./${nodeBinary} ] || [ ! -f src/main.ts ] || [ ! -e ${quote(tray.name)} ]; then`,
+      `if ${complete} || [ ! -e ${quote(tray.name)} ]; then`,
       '  echo ""',
       '  echo "  osu! local profiles cannot start: this folder is incomplete."',
       '  echo ""',
@@ -80,16 +88,16 @@ export function launcherFor(hostOs, nodeBinary) {
       '  exit 1',
       'fi',
       '',
-      `if [ ! -x ./${nodeBinary} ] || [ ! -x ${quote(tray.executable)} ]; then`,
+      `if [ ! -x ./${runtime} ] || [ ! -x ${quote(tray.executable)} ]; then`,
       '  echo ""',
       '  echo "  The bundled programs are not executable. Some unzip tools drop that."',
       '  echo ""',
-      `  echo "  Restore them from this folder with:  chmod +x ./${nodeBinary} tools/pp/osu-pp '${tray.executable}'"`,
+      `  echo "  Restore them from this folder with:  chmod +x ${executables} '${tray.executable}'"`,
       '  echo ""',
       '  exit 1',
       'fi',
       '',
-      ...(hostOs === 'osx' ? macStart(nodeBinary, tray) : linuxStart(nodeBinary, tray)),
+      ...(hostOs === 'osx' ? macStart(runtime, tray, native) : linuxStart(runtime, tray, native)),
     ].join('\n'),
     // Without this the archive carries a launcher nobody can run, and `chmod +x` is not an
     // obvious fix for someone who has just downloaded a zip.
@@ -97,7 +105,7 @@ export function launcherFor(hostOs, nodeBinary) {
   };
 }
 
-function macStart(nodeBinary, tray) {
+function macStart(runtime, tray, native) {
   return [
     /*
      * macOS quarantines everything unpacked from a browser download, and refuses each unsigned
@@ -107,7 +115,9 @@ function macStart(nodeBinary, tray) {
      * Approving this script is the user deciding to trust this folder, and removing the
      * attribute from files the user owns needs no password.
      */
-    `if xattr -p com.apple.quarantine ./${nodeBinary} >/dev/null 2>&1 || xattr -p com.apple.quarantine tools/pp/osu-pp >/dev/null 2>&1; then`,
+    native
+      ? `if xattr -p com.apple.quarantine ./${runtime} >/dev/null 2>&1; then`
+      : `if xattr -p com.apple.quarantine ./${runtime} >/dev/null 2>&1 || xattr -p com.apple.quarantine tools/pp/osu-pp >/dev/null 2>&1; then`,
     '  xattr -dr com.apple.quarantine . 2>/dev/null',
     '  echo "  Allowed the rest of this folder to run: macOS had quarantined the download."',
     'fi',
@@ -119,7 +129,7 @@ function macStart(nodeBinary, tray) {
   ];
 }
 
-function linuxStart(nodeBinary, tray) {
+function linuxStart(runtime, tray, native) {
   return [
     // With a desktop, the tray launcher runs the app, and this terminal can be closed.
     'if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then',
@@ -143,7 +153,7 @@ function linuxStart(nodeBinary, tray) {
      * The swap replaces this file while it runs. The shell reads on from the file it
      * opened, which the swap has moved aside, not from the new one.
      */
-    `OSU_LOCAL_PROFILES_LAUNCHER=restarts ./${nodeBinary} src/main.ts`,
+    `OSU_LOCAL_PROFILES_LAUNCHER=restarts ./${runtime}${native ? '' : ' src/main.ts'}`,
     'status=$?',
     '[ "$status" -eq 75 ] || exit "$status"',
     '',
@@ -169,7 +179,7 @@ function linuxStart(nodeBinary, tray) {
  * met with a warning rather than an app. Saying so here, with the way round it, is the honest
  * option; leaving it out would have them assume the build is broken.
  */
-function howToStart(hostOs) {
+function howToStart(hostOs, native) {
   if (hostOs === 'win') {
     return [
       'Double-click "osu! local profiles.exe".',
@@ -223,16 +233,16 @@ function howToStart(hostOs) {
     '',
     'If it will not run, the executable bit was lost in transit. Restore it with:',
     '',
-    '    chmod +x start.sh node osu-local-profiles tools/pp/osu-pp',
+    native ? '    chmod +x start.sh osu-local-profiles app/osu-local-profiles-app' : '    chmod +x start.sh node osu-local-profiles tools/pp/osu-pp',
   ];
 }
 
-export function readmeFor(hostOs) {
+export function readmeFor(hostOs, native = false) {
   return [
     'osu! local profiles',
     '===================',
     '',
-    ...howToStart(hostOs),
+    ...howToStart(hostOs, native),
     '',
     'Your browser opens at http://localhost:7272 and tracking begins.',
     '',
@@ -241,7 +251,7 @@ export function readmeFor(hostOs) {
     'To stop it, press Quit on its icon, or Quit at the top of the page. Starting it again while',
     'it runs opens the page, so that is also how to find the page again.',
     '',
-    "Nothing needs installing. Node and osu!'s pp calculator are both included.",
+    native ? "Nothing needs installing. osu!'s pp calculator is included." : "Nothing needs installing. Node and osu!'s pp calculator are both included.",
     '',
     'Everything this app records lives in the "data" folder next to this file, so you can',
     'move or copy the whole folder and your profiles come with it. Deleting "data" resets',

@@ -1,7 +1,10 @@
 /**
  * Do the Node app and its C# port answer the same? (docs/csharp-port.md, rule 3)
  *
- *   node scripts/api-parity.mjs [data folder] [--keep]
+ *   node scripts/api-parity.mjs [data folder] [--keep] [--app <folder>]
+ *
+ * `--app` compares a C# app already published, such as a package's app/ folder, in place of a
+ * build of this checkout: how a trimmed build is shown to answer as the Node app does.
  *
  * Starts both apps on copies of one `data/` folder (default: this checkout's), asks each the
  * same questions, and compares the answers: JSON as parsed values, files byte for byte, plus
@@ -63,7 +66,9 @@ const HEADERS = ['content-type', 'cache-control', 'content-disposition'];
 
 const args = process.argv.slice(2);
 const keep = args.includes('--keep');
-const source = path.resolve(args.find((a) => !a.startsWith('--')) ?? path.join(repo, 'data'));
+const appArg = args.includes('--app') ? args[args.indexOf('--app') + 1] : null;
+const publishedApp = appArg ? path.resolve(appArg) : null;
+const source = path.resolve(args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--app') ?? path.join(repo, 'data'));
 const exe = process.platform === 'win32' ? '.exe' : '';
 
 function freePort() {
@@ -566,10 +571,14 @@ async function main() {
   try {
     const [nodePort, csPort] = [await freePort(), await freePort()];
 
-    console.log('  building the C# app');
-    const bin = path.join(work, 'cs-bin');
-    const build = spawnSync('dotnet', ['build', path.join(repo, 'dotnet', 'App', 'App.csproj'), '-c', 'Release', '-o', bin, '--nologo', '-v', 'q'], { stdio: 'inherit' });
-    if (build.status !== 0) throw new Error('the C# build failed');
+    const bin = publishedApp ?? path.join(work, 'cs-bin');
+    if (publishedApp) {
+      console.log(`  the C# app in ${publishedApp}`);
+    } else {
+      console.log('  building the C# app');
+      const build = spawnSync('dotnet', ['build', path.join(repo, 'dotnet', 'App', 'App.csproj'), '-c', 'Release', '-o', bin, '--nologo', '-v', 'q'], { stdio: 'inherit' });
+      if (build.status !== 0) throw new Error('the C# build failed');
+    }
 
     // The Node app finds data/ beside its own src/, so it gets a folder of its own.
     const nodeRoot = path.join(work, 'node');

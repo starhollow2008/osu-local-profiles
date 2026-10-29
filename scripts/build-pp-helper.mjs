@@ -220,6 +220,40 @@ export function buildCheckedPpHelper(outDir, target = defaultRid(), { live = fal
 }
 
 /**
+ * The C# app, published into `outDir` for a package (docs/csharp-port.md, phase 7), and pruned as
+ * the full helper is: osu!'s fonts and sounds, and the natives a pp calculator never calls, BASS
+ * among them, which may not be redistributed.
+ *
+ * Then checked as a slim helper is (roadmap 5.60): `scripts/pp-parity.mjs` asks the app, with
+ * `--dev pp-helper`, every request it asks the full helper, and the build fails unless every
+ * answer is identical. The app carries osu!'s code beside its own dependencies, so a library
+ * resolved to another version, or a file pruned that this process needed, would otherwise price
+ * plays differently without saying so. Not trimmed: nothing yet proves a trimmed app answers every
+ * API request as the untrimmed one, and the API parity check needs an osu! install, so it cannot
+ * run on every platform's build.
+ */
+export function buildCheckedApp(outDir, target = defaultRid()) {
+  const reference = `${outDir}.helper`;
+  fs.rmSync(outDir, { recursive: true, force: true });
+  fs.rmSync(reference, { recursive: true, force: true });
+  try {
+    const app = publishAndPrune(outDir, target, false, APP_PROJECT);
+    const runner = runnerFor(target);
+    if (runner === null) throw new Error(`this machine cannot run a ${target} app to check its pp against the helper`);
+    const helper = publishAndPrune(reference, target, false);
+    console.log(`
+  checking the app's pp (${mb(app.after)}) against the full helper (${mb(helper.after)})...`);
+    const check = spawnSync(process.execPath, [path.join(root, 'scripts', 'pp-parity.mjs'), reference, outDir, ...runner], { stdio: 'inherit' });
+    if (check.status !== 0) {
+      throw new Error('the app did not answer every parity request as the full helper does: it would price plays differently');
+    }
+    return app;
+  } finally {
+    fs.rmSync(reference, { recursive: true, force: true });
+  }
+}
+
+/**
  * Put `staging` where `outDir` is. The old helper is renamed aside first rather than deleted:
  * with the app running, Windows refuses to rename a folder whose files are open, all at once,
  * where deleting it would get half way and leave a helper that cannot start.
@@ -256,11 +290,19 @@ function renameSettled(from, to) {
   }
 }
 
-function publishAndPrune(outDir, target, slim) {
+/** The helper's project, and the C# app's (docs/csharp-port.md), which carries the same osu! code. */
+const HELPER_PROJECT = path.join(root, 'tools', 'PpCalculator', 'PpCalculator.csproj');
+const APP_PROJECT = path.join(root, 'dotnet', 'App', 'App.csproj');
+
+/**
+ * Publish a project self-contained into `outDir`, and prune it: the full helper's list, or the
+ * slim one's too with `slim`. The app gets the full list alone, since it opens SQLite itself.
+ */
+function publishAndPrune(outDir, target, slim, project = HELPER_PROJECT) {
   const result = spawnSync(
     'dotnet',
     [
-      'publish', path.join(root, 'tools', 'PpCalculator', 'PpCalculator.csproj'),
+      'publish', project,
       '-c', 'Release', '-r', target, '--self-contained', 'true',
       '-o', outDir, '--nologo', '-v', 'q',
       ...(slim ? SLIM_PUBLISH_ARGS : []),

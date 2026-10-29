@@ -278,13 +278,22 @@ const toWsl = (p) => {
 };
 const PATH_FIELDS = ['replayPath', 'beatmapPath'];
 
+/**
+ * A helper's folder, or the C# app's (docs/csharp-port.md, phase 7), which answers the same
+ * protocol in-process with `--dev pp-helper`: so a packaged app can be checked against the
+ * helper as a slim helper is.
+ */
 function helper(dir) {
   const abs = path.resolve(dir);
-  const exe = path.join(abs, process.platform === 'win32' && !WSL ? 'osu-pp.exe' : 'osu-pp');
+  const windows = process.platform === 'win32' && !WSL;
+  const app = path.join(abs, windows ? 'osu-local-profiles-app.exe' : 'osu-local-profiles-app');
+  const isApp = fs.existsSync(app);
+  const exe = isApp ? app : path.join(abs, windows ? 'osu-pp.exe' : 'osu-pp');
   if (!fs.existsSync(exe)) throw new Error(`no helper at ${exe}`);
+  const extra = isApp ? ['--dev', 'pp-helper'] : [];
   const child = WSL
-    ? spawn('wsl.exe', ['-e', `${toWsl(abs)}/osu-pp`], { stdio: ['pipe', 'pipe', 'pipe'] })
-    : spawn(exe, [], { stdio: ['pipe', 'pipe', 'pipe'] });
+    ? spawn('wsl.exe', ['-e', `${toWsl(abs)}/${path.basename(exe)}`, ...extra], { stdio: ['pipe', 'pipe', 'pipe'] })
+    : spawn(exe, extra, { stdio: ['pipe', 'pipe', 'pipe'] });
   let stderr = '';
   child.stderr.on('data', (d) => (stderr += d));
   const lines = readline.createInterface({ input: child.stdout })[Symbol.asyncIterator]();

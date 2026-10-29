@@ -89,7 +89,7 @@ func trayReadyPlatform() { C.hideFromDock() }
 // helper and each of its libraries one at a time. The user approved this launcher, which is the
 // decision to trust the folder; removing the attribute from their own files needs no password.
 func releaseQuarantine(root string) {
-	for _, rel := range []string{"node", filepath.Join("tools", "pp", "osu-pp")} {
+	for _, rel := range []string{nativeApp("darwin"), "node", filepath.Join("tools", "pp", "osu-pp")} {
 		if exec.Command("/usr/bin/xattr", "-p", "com.apple.quarantine", filepath.Join(root, rel)).Run() == nil {
 			_ = exec.Command("/usr/bin/xattr", "-dr", "com.apple.quarantine", root).Run()
 			return

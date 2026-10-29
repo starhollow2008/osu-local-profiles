@@ -111,10 +111,32 @@ func runtimeName(goos string) string {
 	return "node"
 }
 
+// nativeRelease reports whether the folder holds a release without Node, whose app is in app/
+// (docs/csharp-port.md, phase 7). The stand-ins such a release carries for installs too old to
+// know it (a runtime-named copy of this launcher, a placeholder src/) are never what runs.
+func nativeRelease(root, goos string, exists func(string) bool) bool {
+	return exists(join(goos, root, "app"))
+}
+
+// appCommand is what starts the app, by absolute path and never from PATH: a release's own app,
+// or the Node runtime beside it on src/main.ts.
+func appCommand(root, goos string, native bool) (string, []string) {
+	if native {
+		return join(goos, root, nativeApp(goos)), nil
+	}
+	return join(goos, root, runtimeName(goos)), []string{join(goos, "src", "main.ts")}
+}
+
 // missingFiles names what an incomplete folder lacks, runtime first: it is the file antivirus
 // is likeliest to have taken, and nothing here needs installing, so saying which file is gone
 // is the whole message.
 func missingFiles(root, goos string, exists func(string) bool) []string {
+	if nativeRelease(root, goos, exists) {
+		if !exists(join(goos, root, nativeApp(goos))) {
+			return []string{nativeApp(goos)}
+		}
+		return nil
+	}
 	var missing []string
 	for _, rel := range []string{runtimeName(goos), join(goos, "src", "main.ts")} {
 		if !exists(join(goos, root, rel)) {

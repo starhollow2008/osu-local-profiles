@@ -78,7 +78,7 @@ dotnet/
 | 4   | Tracking                      | done        |
 | 5   | Everything that writes        | done        |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
-| 7   | Packaging                     | not started |
+| 7   | Packaging                     | in progress |
 | 8   | Switch-over release           | not started |
 | 9   | Removing the Node app         | not started |
 
@@ -303,7 +303,7 @@ Each proven by the parity script's write stage (below) and ported tests:
 #### Hand-off (2026-10-29)
 
 Pushed nothing; every commit is on local `main`. Phase 5 is done: the last parity run matched
-every answer. Next is phase 7 (packaging).
+every answer. Phase 7 (packaging) is under way: see its own section.
 
 **Pitfalls met this session:**
 
@@ -385,23 +385,61 @@ What was built (2026-10-28):
 
 ### 7. Packaging
 
-- `scripts/package.mjs` publishes the app self-contained per platform, partially trimmed only
-  if a parity check proves it answers identically (the rule 5.60 set for the pp helper).
-- The app goes in `app/` (`app/osu-local-profiles-app`, with its libraries beside it), which is
-  what marks a release without Node (phase 6). The launcher runs it by absolute path, as now;
-  `runtimeName` and `missingFiles` change to it.
-- **Stand-ins for installs that never got the bridge.** Their updater still demands Node's
-  files, and always downloads the latest release, so they can't be routed through phase 6's.
-  The package carries `package.json` (it stays the version file anyway), an `src/` holding a
-  placeholder, `scripts/apply-update.mjs` as a placeholder, and a file named `node.exe` (or
-  `node`) that is the Go launcher's swap mode under another name, accepting
-  `scripts/apply-update.mjs --install ...`: a copy of the launcher binary, which already answers
-  that (phase 6). The swap already leaves the stand-ins out of the install. Left to do: put them
-  in the package.
-- `start.sh` and `Start osu! local profiles.command` keep their names (1.14-1.16 launchers run
-  them after an update).
-- Still four zips and nothing else (5.69).
-- Measure the zips and memory against the numbers at the top.
+`npm run package -- --native` builds the C# package; `npm run package` is still the Node
+release, unchanged. CI's `package-native` job builds it on all three systems and keeps the zip
+as a workflow artifact for 14 days, never on a release.
+
+#### Where phase 7 stands (2026-10-29)
+
+- [x] **The app, self-contained, in `app/`** (`buildCheckedApp` in
+      `scripts/build-pp-helper.mjs`): published per platform and pruned as the full helper is
+      (osu!'s resources, BASS, ffmpeg, SDL, the translation folders). Then
+      `scripts/pp-parity.mjs` asks it every request it asks the full helper, through
+      `--dev pp-helper` (the helper's protocol answered in-process), and the build fails unless
+      every answer is identical: the app resolves osu!'s dependencies beside its own, and a
+      library at another version would otherwise price plays differently without saying so.
+      On Windows: 1,820 of 1,820 identical.
+- [x] **`--check-only`**, as Node's: finds osu!, loads the calculator, says so and exits. The
+      package starts the packaged app with it from another folder before it ships.
+- [x] **The launcher runs `app/` when a release has it** (`nativeRelease`, `appCommand` in
+      `plan.go`): by absolute path, with no arguments; Node on `src/main.ts` otherwise. A
+      release without Node is judged by its app alone in `missingFiles`, so the stand-ins never
+      cover a missing app. macOS lifts the quarantine when the app carries it.
+- [x] **Stand-ins for installs that never got the bridge**: `node(.exe)` is a copy of the tray
+      launcher (signed on its own on macOS), `src/README.txt` and `scripts/apply-update.mjs` are
+      placeholders. Every release from 1.14 checks the download for `package.json`, `src`,
+      `web` and the runtime (and from 1.17 the launcher), runs the downloaded runtime on the
+      downloaded script, and keeps Unix modes when it unpacks. The package checks the stand-in
+      answers `--version` as this release's launcher.
+- [x] `start.sh` and the `.command` keep their names, and check and run the app
+      (`launcherFor(os, node, true)`); the README says what is included (`readmeFor(os, true)`).
+- [x] Still four zips: the native package has the Node one's name, as the release replacing it
+      will.
+- [x] Tried for real on Windows: the package's tray launcher started the app, which found osu!,
+      indexed 73,848 files, tracked, priced with osu! 2026.916.0, and stopped with its launcher
+      on Quit.
+- [ ] **Trimming: decide.** See the measurements below.
+
+**Measured on Windows, 1.32.0, against the numbers at the top:**
+
+| | Node release | C# untrimmed | C# trimmed |
+| --- | --- | --- | --- |
+| Installed | 161 MB | 166 MB (app 149) | about 89 MB (app 72) |
+| Zipped | 62 MB | 72 MB | not built yet |
+| Memory, idle | 125 + 32 MB (helper) | 107 MB | |
+| Memory, peak while indexing | 125 MB | 284 MB, falling to 110 by the end | |
+
+Untrimmed, the package is bigger than the Node one: the Node release ships the slim pp helper
+(58 MB), and the app carries the full one's files plus ASP.NET Core. Trimmed as the slim helper
+is (`SLIM_PUBLISH_ARGS`: partial, so the app's own assembly and osu!'s stay whole), with the slim
+helper's natives pruned except SQLite's, which the app opens, the app is 72 MB. That build
+answered all 840 of `scripts/api-parity.mjs`'s answers as the Node app does on the owner's data
+(`--app <folder>` compares a published app), and all 1,820 pp requests as the untrimmed app does.
+What is not settled is how to prove it on macOS and Linux, where the API parity check cannot run
+(it needs an osu! install).
+
+The peak while indexing is worth a look once packaging is settled: the C# indexer holds more at
+once than Node's.
 
 ### 8. Switch-over release
 

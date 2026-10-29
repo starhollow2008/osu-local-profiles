@@ -9,7 +9,7 @@ using OsuLocalProfiles.Http;
  * Node app is the product. It opens data/ as the Node app does, writing to it, so it never runs on
  * the same folder as a Node app that is running.
  *
- *   osu-local-profiles-app [--root <install dir>]
+ *   osu-local-profiles-app [--root <install dir>] [--check-only]
  */
 
 // Checks run by scripts/ against the Node app's own answers; never part of running the app.
@@ -20,6 +20,9 @@ if (args.Length > 0 && args[0] == "--dev") return OsuLocalProfiles.DevCommands.R
 Console.OutputEncoding = new System.Text.UTF8Encoding(false);
 
 string? root = null;
+// Verify the install and exit, rather than starting to track: does it find osu!, and does it find
+// the pp calculator? What a package proves itself with before it ships (scripts/package.mjs).
+var checkOnly = false;
 for (var i = 0; i < args.Length; i++)
 {
     switch (args[i])
@@ -27,9 +30,12 @@ for (var i = 0; i < args.Length; i++)
         case "--root" when i + 1 < args.Length:
             root = args[++i];
             break;
+        case "--check-only":
+            checkOnly = true;
+            break;
         default:
             Console.Error.WriteLine($"unknown argument: {args[i]}");
-            Console.Error.WriteLine("usage: osu-local-profiles-app [--root <install dir>]");
+            Console.Error.WriteLine("usage: osu-local-profiles-app [--root <install dir>] [--check-only]");
             return 2;
     }
 }
@@ -47,9 +53,10 @@ var url = $"http://localhost:{config.Port}";
 
 /*
  * Already running: open that copy's page rather than starting a second one, which would only
- * fail on the port. Starting the app again is how to find it again.
+ * fail on the port. Starting the app again is how to find it again. --check-only never serves, so
+ * it has nothing to collide with.
  */
-var running = await Instance.RunningInstance(config.Port);
+var running = checkOnly ? default : await Instance.RunningInstance(config.Port);
 if (running.Running)
 {
     Console.WriteLine($"\n  Already running{(running.Version is null ? "" : $" ({running.Version})")} -> {url}");
@@ -72,7 +79,7 @@ var updater = new OsuLocalProfiles.Update.Updater(paths.InstallDir, paths.DataDi
  * not get to install at its quit: install it now, before anything is tracked, and come back as
  * the new version.
  */
-if (updater.InstallAtStart() is { } pending)
+if (!checkOnly && updater.InstallAtStart() is { } pending)
 {
     Console.WriteLine($"\n  Installing update {pending.Version}...");
     Console.WriteLine("  It was downloaded earlier; the app starts again once it is in place.\n");
@@ -97,6 +104,17 @@ if (installs.Count == 0)
 {
     Console.WriteLine("\n  No osu! installation found.");
     Console.WriteLine("  The page opens anyway: use Options -> osu! folders to point at it.");
+    /*
+     * "osu! is not where I looked" and "the pp calculator will not load" are separate faults, so
+     * --check-only reports both from one run, which also lets CI, where there is never an osu!
+     * install, check the calculator on each platform. A normal run carries on with nothing to
+     * watch, so the page is there to say where osu! is.
+     */
+    if (checkOnly)
+    {
+        ReportPpCalculator();
+        return 1;
+    }
 }
 foreach (var install in installs)
 {
@@ -130,6 +148,14 @@ Favorites.SyncSharing(db, config["sharedFavorites"] is not { ValueKind: System.T
 var active = Profiles.Get(db, Profiles.ActiveId(db))!;
 // The gap the app was closed for, read before this run stamps itself.
 var gapSince = OsuLocalProfiles.Tracker.CatchUp.Since(OsuLocalProfiles.Tracker.CatchUp.LastRunAt(db), active.TrackingSince);
+
+// --check-only stops here, before the beatmap index, which is slow and beside the question.
+if (checkOnly)
+{
+    var ok = ReportPpCalculator();
+    Console.WriteLine($"  data: {paths.DataDir}");
+    return ok ? 0 : 1;
+}
 
 /*
  * osu!'s calculators, in-process. There is no fallback calculator on purpose: a second
@@ -300,6 +326,19 @@ return exitCode;
 
 partial class Program
 {
+    /// <summary>Load osu!'s calculator and say whether it worked, as --check-only reports it.</summary>
+    private static bool ReportPpCalculator()
+    {
+        var (calculator, problem) = OfficialCalculator.Create();
+        if (calculator is not null)
+        {
+            Console.WriteLine("\n  pp: osu!'s official calculator");
+            return true;
+        }
+        Console.WriteLine($"\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating ({problem})");
+        return false;
+    }
+
     /// <summary>What tells the tray launcher to start the app again (src/update/index.ts).</summary>
     private const int RestartExitCode = 75;
 }

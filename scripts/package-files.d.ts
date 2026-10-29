@@ -12,12 +12,16 @@ declare module '*/package-files.mjs' {
   /** The tray launcher a package carries: what the user opens, and its executable inside that. */
   export function trayLauncherFor(hostOs: HostOs): { name: string; executable: string };
 
-  /** The script beside the tray launcher on macOS and Linux; null on Windows. */
+  /**
+   * The script beside the tray launcher on macOS and Linux; null on Windows. `native` is a release
+   * without Node, which runs the C# app (docs/csharp-port.md, phase 7).
+   */
   export function launcherFor(
     hostOs: HostOs,
     nodeBinary: string,
+    native?: boolean,
   ): { name: string; content: string; mode: number } | null;
 
   /** The README.txt that ships beside it. */
-  export function readmeFor(hostOs: HostOs): string;
+  export function readmeFor(hostOs: HostOs, native?: boolean): string;
 }

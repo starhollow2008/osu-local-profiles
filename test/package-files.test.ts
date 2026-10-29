@@ -150,3 +150,40 @@ test('the Windows README is CRLF so Notepad can read it', () => {
   assert.ok(readmeFor('win').includes('\r\n'));
   assert.ok(!readmeFor('linux').includes('\r\n'));
 });
+
+/* ------------------------------------------------- a release without Node */
+
+/*
+ * The C# app's package (docs/csharp-port.md, phase 7). Its `node` is a stand-in for older
+ * installs to update through and its src/ a placeholder, so the scripts check and run the app
+ * itself: a missing app must never be covered by the stand-in being there.
+ */
+const nativeScript = (os: 'osx' | 'linux') => {
+  const launcher = launcherFor(os, 'node', true);
+  assert.ok(launcher, `${os} has a script`);
+  return launcher;
+};
+
+test('without Node, the scripts keep their names and check the app, not the stand-ins', () => {
+  assert.equal(launcherFor('win', 'node.exe', true), null);
+  assert.equal(nativeScript('osx').name, 'Start osu! local profiles.command');
+  assert.equal(nativeScript('linux').name, 'start.sh');
+  for (const os of unix) {
+    const { content, mode } = nativeScript(os);
+    assert.equal(mode, 0o755);
+    assert.match(content, /if \[ ! -f \.\/app\/osu-local-profiles-app \] \|\| \[ ! -e "\.\//);
+    assert.match(content, /if \[ ! -x \.\/app\/osu-local-profiles-app \] \|\| \[ ! -x "\.\//);
+    assert.match(content, /chmod \+x \.\/app\/osu-local-profiles-app '/);
+    assert.doesNotMatch(content, /\.\/node\b|src\/main\.ts|tools\/pp/);
+  }
+  assert.match(nativeScript('osx').content, /xattr -p com\.apple\.quarantine \.\/app\/osu-local-profiles-app /);
+  assert.match(nativeScript('linux').content, /^OSU_LOCAL_PROFILES_LAUNCHER=restarts \.\/app\/osu-local-profiles-app$/m);
+});
+
+test('without Node, the README names what is included and what to make executable', () => {
+  for (const os of ['win', 'osx', 'linux'] as const) {
+    assert.match(readmeFor(os, true), /Nothing needs installing\. osu!'s pp calculator is included\./);
+    assert.doesNotMatch(readmeFor(os, true), /Node/);
+  }
+  assert.match(readmeFor('linux', true), /chmod \+x start\.sh osu-local-profiles app\/osu-local-profiles-app/);
+});

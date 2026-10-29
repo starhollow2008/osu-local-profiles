@@ -99,7 +99,8 @@ func (l *launcher) start() error {
 		return err
 	}
 
-	cmd := exec.Command(filepath.Join(l.root, runtimeName(runtime.GOOS)), filepath.Join("src", "main.ts"))
+	command, args := appCommand(l.root, runtime.GOOS, nativeRelease(l.root, runtime.GOOS, exists))
+	cmd := exec.Command(command, args...)
 	cmd.Dir = l.root
 	l.mu.Lock()
 	startup := l.startup

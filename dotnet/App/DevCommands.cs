@@ -14,6 +14,22 @@ internal static class DevCommands
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         switch (args.FirstOrDefault())
         {
+            case "pp-helper" when args.Length == 1:
+                /*
+                 * The pp helper's protocol answered by this app's own copy of osu!'s code: a ready
+                 * line, then one answer per request line. scripts/pp-parity.mjs compares a packaged
+                 * app with the full helper this way, which is what proves the app, with its own
+                 * dependencies and its pruning, prices every play exactly as the helper does.
+                 */
+                Console.Out.WriteLine(OsuLocalProfiles.PpCalculator.Program.ReadyLine());
+                Console.Out.Flush();
+                while (Console.In.ReadLine() is { } line)
+                {
+                    if (line.Length == 0) continue;
+                    Console.Out.WriteLine(OsuLocalProfiles.PpCalculator.Program.Respond(line));
+                    Console.Out.Flush();
+                }
+                return 0;
             case "parse-replays" when args.Length == 2:
                 // One path per line of the file named; each answered with what the parser read, or why not.
                 foreach (var path in File.ReadAllLines(args[1]).Where(l => l.Length > 0))

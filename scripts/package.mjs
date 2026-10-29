@@ -1,7 +1,8 @@
 /**
  * Build the portable distribution: a folder the user extracts anywhere and runs.
  *
- *   npm run package
+ *   npm run package                 # the Node app: every release until the switch-over
+ *   npm run package -- --native     # the C# app (docs/csharp-port.md, phase 7), not released yet
  *
  * The result needs nothing installed -- not Node, not the .NET runtime, not osu!'s SDK.
  * `data/` is created beside the app, so the whole folder can be copied or carried on a
@@ -10,12 +11,18 @@
  * The pp helper is published and pruned by scripts/build-pp-helper.mjs, which is shared
  * with `npm run build:pp:local` so the shipped helper and the development one in `tools/pp`
  * are always built the same way.
+ *
+ * `--native` packages the C# app instead, in `app/`, with osu!'s calculators inside it and no
+ * Node. Beside it go stand-ins for installs too old to know such a release, whose updater still
+ * looks for Node's files and runs `node scripts/apply-update.mjs` from the download: a copy of
+ * the tray launcher under the runtime's name, which swaps when asked that way (phase 6), a
+ * placeholder `src/`, and a placeholder script. The swap leaves all three out of the install.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildCheckedPpHelper, defaultRid } from './build-pp-helper.mjs';
+import { buildCheckedApp, buildCheckedPpHelper, defaultRid } from './build-pp-helper.mjs';
 import { launcherFor, readmeFor } from './package-files.mjs';
 import { buildLauncher } from './build-launcher.mjs';
 import { notesJson, tagDates } from './release-notes.mjs';
@@ -26,6 +33,8 @@ const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))
 const target = process.argv.includes('--rid')
   ? process.argv[process.argv.indexOf('--rid') + 1]
   : defaultRid();
+// The C# app rather than the Node one. Named the same, as the release that replaces it will be.
+const native = process.argv.includes('--native');
 
 /*
  * A package can only be built on the machine it is for -- the same OS *and* the same
@@ -81,25 +90,34 @@ function sizeOf(dir) {
 
 const mb = (bytes) => `${(bytes / 1048576).toFixed(0)}MB`;
 
-console.log(`\n  packaging ${name}\n`);
+console.log(`\n  packaging ${name}${native ? ' (the C# app)' : ''}\n`);
 
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(out, { recursive: true });
 
 /* ------------------------------------------------- 1. the pp helper (.NET) */
 
-console.log('  building the pp calculator (self-contained)...');
-const ppOut = path.join(out, 'tools', 'pp');
-/*
- * Slim only past the parity check, run here on this platform against generated plays (roadmap
- * 5.60); the full helper, which is always safe, otherwise.
- */
-const pruned = buildCheckedPpHelper(ppOut, target);
-console.log(`    ${mb(pruned.before)} -> ${mb(pruned.after)}: ${pruned.slim ? 'slim' : 'full'} helper -- ${pruned.reason}
-`);
-// Said where a release's summary shows it, so a platform shipping the full helper is noticed.
-if (process.env.GITHUB_ACTIONS) {
-  console.log(`::${pruned.slim ? 'notice' : 'warning'} title=pp helper (${target})::${pruned.slim ? 'slim' : 'full'} helper, ${mb(pruned.after)}: ${pruned.reason}`);
+if (native) {
+  /*
+   * The C# app, self-contained, with osu!'s calculators in-process: no helper beside it. Pruned
+   * as the full helper is, and checked against it on every parity request, or the build fails.
+   */
+  console.log('  building the app (self-contained)...');
+  const app = buildCheckedApp(path.join(out, 'app'), target);
+  console.log(`    ${mb(app.before)} -> ${mb(app.after)}: pruned as the full helper is, and pricing every parity request as it does\n`);
+} else {
+  console.log('  building the pp calculator (self-contained)...');
+  const ppOut = path.join(out, 'tools', 'pp');
+  /*
+   * Slim only past the parity check, run here on this platform against generated plays (roadmap
+   * 5.60); the full helper, which is always safe, otherwise.
+   */
+  const pruned = buildCheckedPpHelper(ppOut, target);
+  console.log(`    ${mb(pruned.before)} -> ${mb(pruned.after)}: ${pruned.slim ? 'slim' : 'full'} helper -- ${pruned.reason}\n`);
+  // Said where a release's summary shows it, so a platform shipping the full helper is noticed.
+  if (process.env.GITHUB_ACTIONS) {
+    console.log(`::${pruned.slim ? 'notice' : 'warning'} title=pp helper (${target})::${pruned.slim ? 'slim' : 'full'} helper, ${mb(pruned.after)}: ${pruned.reason}`);
+  }
 }
 
 /*
@@ -115,13 +133,15 @@ fs.copyFileSync(
 
 /* ------------------------------------------------------- 2. the Node runtime */
 
-console.log('  copying the Node runtime...');
-fs.copyFileSync(process.execPath, path.join(out, path.basename(process.execPath)));
+if (!native) {
+  console.log('  copying the Node runtime...');
+  fs.copyFileSync(process.execPath, path.join(out, path.basename(process.execPath)));
+}
 
 /* ------------------------------------------------------------ 3. the app */
 
-console.log('  copying the app...');
-copyDir(path.join(root, 'src'), path.join(out, 'src'));
+console.log(native ? '  copying the page...' : '  copying the app...');
+if (!native) copyDir(path.join(root, 'src'), path.join(out, 'src'));
 // The .d.ts files beside the page's modules exist only so the tests can typecheck them.
 copyDir(path.join(root, 'web'), path.join(out, 'web'), (src) => !src.endsWith('.d.ts'));
 
@@ -130,11 +150,13 @@ copyDir(path.join(root, 'web'), path.join(out, 'web'), (src) => !src.endsWith('.
  * this file out of the newly downloaded tree, so it has to be in every package or the
  * update after it has nothing to install itself with.
  */
-fs.mkdirSync(path.join(out, 'scripts'), { recursive: true });
-fs.copyFileSync(
-  path.join(root, 'scripts', 'apply-update.mjs'),
-  path.join(out, 'scripts', 'apply-update.mjs'),
-);
+if (!native) {
+  fs.mkdirSync(path.join(out, 'scripts'), { recursive: true });
+  fs.copyFileSync(
+    path.join(root, 'scripts', 'apply-update.mjs'),
+    path.join(out, 'scripts', 'apply-update.mjs'),
+  );
+}
 
 /*
  * The one runtime dependency. Everything else in node_modules is types and tooling.
@@ -144,7 +166,7 @@ fs.copyFileSync(
  * every release. Its code requires nothing, which the packaged build's own start-up check
  * below proves: osr.ts loads it at startup.
  */
-for (const dep of Object.keys(pkg.dependencies ?? {})) {
+for (const dep of native ? [] : Object.keys(pkg.dependencies ?? {})) {
   const from = path.join(root, 'node_modules', dep);
   copyDir(from, path.join(out, 'node_modules', dep), (src) => !src.startsWith(path.join(from, 'node_modules')));
 }
@@ -158,8 +180,8 @@ fs.writeFileSync(
       version: pkg.version,
       private: true,
       description: pkg.description,
-      type: pkg.type,
-      dependencies: pkg.dependencies,
+      // The C# app has no Node dependencies to name.
+      ...(native ? {} : { type: pkg.type, dependencies: pkg.dependencies }),
       // Kept because the update check reads the repository from here rather than having
       // the address written down a second time in the source.
       repository: pkg.repository,
@@ -184,16 +206,44 @@ console.log('  building the tray launcher...');
 const trayExecutable = buildLauncher(out, target, pkg.version);
 
 // On macOS and Linux, the script earlier releases' launchers run again after an update.
-const launcher = launcherFor(hostOs, nodeBinary);
+const launcher = launcherFor(hostOs, nodeBinary, native);
 if (launcher !== null) {
   fs.writeFileSync(path.join(out, launcher.name), launcher.content);
   fs.chmodSync(path.join(out, launcher.name), launcher.mode);
-  // copyFileSync keeps the mode of the Node binary it copied, but say so explicitly rather
-  // than depend on it: an archive whose runtime is not executable starts on nothing.
-  fs.chmodSync(path.join(out, nodeBinary), 0o755);
+  // copyFileSync keeps the mode of the binary it copied, but say so explicitly rather than
+  // depend on it: an archive whose runtime is not executable starts on nothing.
+  fs.chmodSync(path.join(out, native ? path.join('app', 'osu-local-profiles-app') : nodeBinary), 0o755);
 }
 
-fs.writeFileSync(path.join(out, 'README.txt'), readmeFor(hostOs));
+fs.writeFileSync(path.join(out, 'README.txt'), readmeFor(hostOs, native));
+
+/*
+ * The stand-ins, in a release without Node, for installs whose updater predates it (phase 6
+ * of docs/csharp-port.md). Every one of them checks the download for package.json, src/, web/
+ * and the runtime, then runs `<download>/node scripts/apply-update.mjs --install ...`. That
+ * runtime is this launcher under Node's name, which does the swap when asked that way, and the
+ * swap copies none of the three into the install.
+ */
+if (native) {
+  const standIn = path.join(out, nodeBinary);
+  fs.copyFileSync(trayExecutable, standIn);
+  fs.chmodSync(standIn, 0o755);
+  if (hostOs === 'osx') {
+    // Out of its bundle, the copy is signed on its own: Apple silicon runs nothing unsigned.
+    const signed = spawnSync('codesign', ['--force', '--sign', '-', standIn], { encoding: 'utf8' });
+    if (signed.status !== 0) throw new Error(`signing the stand-in runtime failed: ${signed.stderr ?? signed.error}`);
+  }
+  fs.mkdirSync(path.join(out, 'src'), { recursive: true });
+  fs.writeFileSync(
+    path.join(out, 'src', 'README.txt'),
+    'This release runs app/osu-local-profiles-app. This folder is here so that older versions can\nupdate to it, and is removed when they do.\n',
+  );
+  fs.mkdirSync(path.join(out, 'scripts'), { recursive: true });
+  fs.writeFileSync(
+    path.join(out, 'scripts', 'apply-update.mjs'),
+    `// Never run. Older versions start "${nodeBinary} scripts/apply-update.mjs" from a download to install\n// it, and the ${nodeBinary} here is the tray launcher, which installs this release when asked that way.\n`,
+  );
+}
 
 /*
  * The licence and the notices travel with every build. A build is this program conveyed as
@@ -226,11 +276,17 @@ fs.writeFileSync(
  * left for a user to discover.
  */
 console.log('\n  verifying the packaged build...');
-const probe = spawnSync(
-  path.join(out, nodeBinary),
-  [path.join(out, 'src', 'main.ts'), '--check-only'],
-  { cwd: path.parse(out).root, encoding: 'utf8', timeout: 240_000 },
-);
+const probe = native
+  ? spawnSync(path.join(out, 'app', `osu-local-profiles-app${hostOs === 'win' ? '.exe' : ''}`), ['--check-only'], {
+      cwd: path.parse(out).root,
+      encoding: 'utf8',
+      timeout: 240_000,
+    })
+  : spawnSync(
+      path.join(out, nodeBinary),
+      [path.join(out, 'src', 'main.ts'), '--check-only'],
+      { cwd: path.parse(out).root, encoding: 'utf8', timeout: 240_000 },
+    );
 
 const output = `${probe.stdout ?? ''}${probe.stderr ?? ''}`;
 if (probe.error) throw probe.error;
@@ -250,6 +306,15 @@ if (launcherVersion.stdout?.trim() !== pkg.version) {
   );
 }
 console.log(`    the tray launcher runs, and is ${pkg.version}`);
+
+if (native) {
+  // The stand-in is that same launcher, which an older install will ask to do its update.
+  const standIn = spawnSync(path.join(out, nodeBinary), ['--version'], { encoding: 'utf8', timeout: 30_000 });
+  if (standIn.stdout?.trim() !== pkg.version) {
+    throw new Error(`the stand-in ${nodeBinary} is not this release's launcher: ${standIn.stdout ?? ''}${standIn.stderr ?? standIn.error ?? ''}`);
+  }
+  console.log(`    the stand-in ${nodeBinary} is the launcher, which can install this release for older versions`);
+}
 
 // The check created a config and an empty database. Ship a clean folder: the first real
 // run should build `data/` itself, so the user starts genuinely fresh.

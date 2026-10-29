@@ -40,6 +40,45 @@ func TestMissingFilesNamesTheRuntimeFirst(t *testing.T) {
 	}
 }
 
+// A release without Node is judged by its own app alone: its stand-in runtime and placeholder
+// src/ are there for older installs, and a missing app is never covered by them.
+func TestAReleaseWithoutNodeNeedsOnlyItsApp(t *testing.T) {
+	appDirOnly := func(p string) bool { return p == `C:\olp\app` || p == `C:\olp\node.exe` }
+	if got := missingFiles(`C:\olp`, "windows", appDirOnly); strings.Join(got, ",") != `app\osu-local-profiles-app.exe` {
+		t.Errorf("windows: %v", got)
+	}
+	native := func(p string) bool { return p == "/opt/olp/app" || p == "/opt/olp/app/osu-local-profiles-app" }
+	if got := missingFiles("/opt/olp", "linux", native); len(got) != 0 {
+		t.Errorf("complete release without Node reported %v", got)
+	}
+}
+
+func TestTheAppIsStartedByAbsolutePath(t *testing.T) {
+	cases := []struct {
+		goos, root string
+		native     bool
+		command    string
+		args       string
+	}{
+		{"windows", `C:\olp`, false, `C:\olp\node.exe`, `src\main.ts`},
+		{"windows", `C:\olp`, true, `C:\olp\app\osu-local-profiles-app.exe`, ""},
+		{"darwin", "/Users/p/olp", false, "/Users/p/olp/node", "src/main.ts"},
+		{"linux", "/opt/olp", true, "/opt/olp/app/osu-local-profiles-app", ""},
+	}
+	for _, c := range cases {
+		command, args := appCommand(c.root, c.goos, c.native)
+		if command != c.command || strings.Join(args, " ") != c.args {
+			t.Errorf("%s native=%v: got %q %v", c.goos, c.native, command, args)
+		}
+	}
+	if !nativeRelease("/opt/olp", "linux", func(p string) bool { return p == "/opt/olp/app" }) {
+		t.Error("a folder with app/ is a release without Node")
+	}
+	if nativeRelease(`C:\olp`, "windows", func(p string) bool { return p == `C:\olp\node.exe` }) {
+		t.Error("a Node release is not one without Node")
+	}
+}
+
 func TestConfigPortFallsBackToTheAppsDefault(t *testing.T) {
 	cases := map[string]int{
 		`{"port": 8080}`:  8080,
