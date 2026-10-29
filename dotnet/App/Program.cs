@@ -97,6 +97,14 @@ foreach (var install in installs)
 var extra = discovery.Candidates.Count - installs.Count;
 if (extra > 0) Console.WriteLine($"  ({extra} other osu! folder(s) found -- Options -> osu! folders to switch)");
 
+/*
+ * A backup restored from the page is swapped in here, before anything opens the database it
+ * replaces. What it replaced is moved aside, never deleted. A read-only copy swaps nothing.
+ */
+var restored = writable ? Backup.ApplyPendingRestore(paths.DataDir, DateTime.Now) : new RestoreResult(false);
+if (restored.Applied) Console.WriteLine($"\n  Restored a backup. What was here before is in {restored.Aside}\n");
+else if (restored.Error is not null) Console.WriteLine($"\n  The backup could not be restored, and nothing was changed: {restored.Error}\n");
+
 // Decided before the database is created: only a brand-new install is welcomed, never one upgraded
 // from a version that had no welcome.
 var firstRun = !File.Exists(dbFile);
@@ -104,6 +112,9 @@ using var db = Database.Open(dbFile, writable);
 if (writable)
 {
     OsuLocalProfiles.Update.Notes.SeedSeenVersion(db, paths.Version(), paths.DataDir);
+    // A restored database remembers the app last running when the backup was made: without this,
+    // importPlaysWhileClosed would read everything since as a gap the app was closed for.
+    if (restored.Applied) OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
     // config.json's profileName only names the very first profile; after that they are the page's.
     Profiles.SeedFirst(db, config.ProfileName);
     if (firstRun) ProfileData.OfferWelcome(db);

@@ -39,6 +39,107 @@ internal static class Zip
         return output.ToArray();
     }
 
+    /* ------------------------------------------------------------------ reading */
+
+    private const uint Zip64LocatorSignature = 0x07064b50;
+
+    /// <summary>"Version made by" names the host in its high byte; 3 is Unix, where the attributes are a mode.</summary>
+    private const int UnixHost = 3;
+
+    /// <summary>
+    /// One entry of an archive: its name with forward slashes, how it is stored, and the Unix
+    /// permission bits when a Unix <c>zip</c> wrote it (an update's runtime only runs because of them).
+    /// </summary>
+    internal sealed record Entry(string Name, bool IsDirectory, int Method, long CompressedSize, long Size, long LocalHeaderOffset, int? Mode);
+
+    private static int FindEndOfCentralDirectory(byte[] buf)
+    {
+        // The record is 22 bytes plus a comment of up to 64KB, so this is the whole search space.
+        var earliest = Math.Max(0, buf.Length - 22 - 0xffff);
+        for (var i = buf.Length - 22; i >= earliest; i--)
+        {
+            if (BinaryPrimitives.ReadUInt32LittleEndian(buf.AsSpan(i)) == EndSignature) return i;
+        }
+        return -1;
+    }
+
+    /// <summary>A name out of an archive, normalised, or null for anything that points outside the target.</summary>
+    private static string? SafeName(string raw)
+    {
+        var name = raw.Replace('\\', '/').TrimStart('/');
+        if (name == "") return null;
+        if (name.Length >= 2 && char.IsAsciiLetter(name[0]) && name[1] == ':') return null;
+        if (name.Split('/').Any(part => part == "..")) return null;
+        return name;
+    }
+
+    /// <summary>The central directory: src/update/zip.ts's <c>readZipEntries</c>. Throws rather than guessing, zip64 included.</summary>
+    public static List<Entry> ReadEntries(byte[] buf)
+    {
+        var eocd = FindEndOfCentralDirectory(buf);
+        if (eocd < 0) throw new InvalidOperationException("not a zip file (no end-of-central-directory record)");
+        var locator = eocd - 20;
+        if (locator >= 0 && BinaryPrimitives.ReadUInt32LittleEndian(buf.AsSpan(locator)) == Zip64LocatorSignature)
+        {
+            throw new InvalidOperationException("zip64 archives are not supported");
+        }
+        var count = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(eocd + 10));
+        long offset = BinaryPrimitives.ReadUInt32LittleEndian(buf.AsSpan(eocd + 16));
+        if (count == 0xffff || offset == 0xffffffff) throw new InvalidOperationException("zip64 archives are not supported");
+
+        var entries = new List<Entry>();
+        for (var i = 0; i < count; i++)
+        {
+            if (offset + 46 > buf.Length || BinaryPrimitives.ReadUInt32LittleEndian(buf.AsSpan((int)offset)) != CentralSignature)
+            {
+                throw new InvalidOperationException($"corrupt central directory at entry {i + 1} of {count}");
+            }
+            var at = buf.AsSpan((int)offset);
+            var madeBy = BinaryPrimitives.ReadUInt16LittleEndian(at[4..]) >> 8;
+            var method = BinaryPrimitives.ReadUInt16LittleEndian(at[10..]);
+            var compressedSize = BinaryPrimitives.ReadUInt32LittleEndian(at[20..]);
+            var size = BinaryPrimitives.ReadUInt32LittleEndian(at[24..]);
+            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(at[28..]);
+            var extraLength = BinaryPrimitives.ReadUInt16LittleEndian(at[30..]);
+            var commentLength = BinaryPrimitives.ReadUInt16LittleEndian(at[32..]);
+            var external = BinaryPrimitives.ReadUInt32LittleEndian(at[38..]);
+            var localHeaderOffset = BinaryPrimitives.ReadUInt32LittleEndian(at[42..]);
+            var raw = Encoding.UTF8.GetString(buf, (int)offset + 46, Math.Min(nameLength, buf.Length - (int)offset - 46));
+            var name = SafeName(raw) ?? throw new InvalidOperationException($"refusing entry with an unsafe path: {raw}");
+            entries.Add(new Entry(name, name.EndsWith('/'), method, compressedSize, size, localHeaderOffset,
+                madeBy == UnixHost && external >> 16 != 0 ? (int)((external >> 16) & 0x1ff) : null));
+            offset += 46 + nameLength + extraLength + commentLength;
+        }
+        return entries;
+    }
+
+    /// <summary>The bytes of one entry, decompressed.</summary>
+    public static byte[] EntryData(byte[] buf, Entry entry)
+    {
+        var header = (int)entry.LocalHeaderOffset;
+        if (header + 30 > buf.Length || BinaryPrimitives.ReadUInt32LittleEndian(buf.AsSpan(header)) != LocalSignature)
+        {
+            throw new InvalidOperationException($"corrupt local header for {entry.Name}");
+        }
+        // The local header has its own extra field, often a different length from the central one's.
+        var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(header + 26));
+        var extraLength = BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(header + 28));
+        var start = header + 30 + nameLength + extraLength;
+        var raw = buf.AsSpan(Math.Min(start, buf.Length), (int)Math.Min(entry.CompressedSize, Math.Max(0, buf.Length - start)));
+        if (entry.Method == Stored) return raw.ToArray();
+        if (entry.Method == Deflated)
+        {
+            using var input = new MemoryStream(raw.ToArray());
+            using var inflate = new DeflateStream(input, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+            inflate.CopyTo(output);
+            return output.ToArray();
+        }
+        throw new InvalidOperationException($"{entry.Name} uses unsupported compression method {entry.Method}");
+    }
+
+    /* ------------------------------------------------------------------ writing */
+
     public static byte[] Write(IReadOnlyList<(string Name, byte[] Data)> files, DateTime at)
     {
         // MS-DOS time and date, in local time, as every unzip tool shows them.

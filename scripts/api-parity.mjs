@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { extractZip } from '../src/update/zip.ts';
+import { entryData, extractZip, readZipEntries } from '../src/update/zip.ts';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -260,8 +260,8 @@ function listen(port) {
  * `<data>` (where a downloaded beatmap or a built replay is kept), sorted so the order rows were
  * written in is not compared.
  */
-function tables(file) {
-  const own = JSON.stringify(path.dirname(file)).slice(1, -1);
+function tables(file, dataDir = path.dirname(file)) {
+  const own = JSON.stringify(dataDir).slice(1, -1);
   const db = new DatabaseSync(file, { readOnly: true });
   try {
     const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name);
@@ -469,6 +469,17 @@ function writeSteps(file, csData) {
         : []),
       { path: '/api/beatmaps/find', body: { link: 'nonsense' } },
       { path: '/api/manual-score', body: {} },
+
+      // Back up everything, and restoring it: staged and confirmed, never applied under the app.
+      { path: '/api/backup', method: 'GET', zip: true },
+      { path: '/api/restore', method: 'PUT', raw: 'not a backup at all' },
+      { path: '/api/restore', method: 'PUT', raw: 'not a backup at all', headers: { origin: 'https://example.com' } },
+      { path: '/api/restore/apply', body: {} },
+      { path: '/api/restore', method: 'PUT', raw: 'backup', backup: true },
+      { path: '/api/restore', method: 'DELETE' },
+      { path: '/api/restore/apply', body: {} },
+      { path: '/api/restore', method: 'PUT', raw: 'backup', backup: true },
+      { path: '/api/restore/apply', body: {} },
       ...(upload
         ? [
             { path: '/api/replays?applyFilter=0', raw: fs.readFileSync(upload), after: [profile(0)] },
@@ -683,16 +694,46 @@ async function main() {
     const realReplays = path.join(source, 'replays');
     const replaysBefore = listing(realReplays);
     const feeds = [listen(nodePort), listen(csPort)];
+    /** The last backup the Node app made, which the restore steps send to both. */
+    let lastBackup = null;
     await new Promise((resolve) => setTimeout(resolve, 500));
     for (const step of writeSteps(copies[0], path.join(csRoot, 'data'))) {
       const method = step.method ?? 'POST';
-      const body = step.raw ?? (step.body === undefined ? undefined : JSON.stringify(step.body));
-      const init = method === 'GET' ? undefined : { method, body };
+      const body = step.backup ? lastBackup : step.raw ?? (step.body === undefined ? undefined : JSON.stringify(step.body));
+      const init = method === 'GET' ? undefined : { method, body, headers: step.headers };
       const label = `${method} ${step.path} ${step.raw !== undefined ? (Buffer.isBuffer(step.raw) ? `(${step.raw.length} bytes)` : step.raw) : (body ?? '')}`.slice(0, 110);
       const [a, b] = step.sequential
         ? [await ask(nodePort, step.path, init), await ask(csPort, step.path, init)]
         : await Promise.all([ask(nodePort, step.path, init), ask(csPort, step.path, init)]);
       const problems = compareMeta(a, b);
+      if (step.zip) {
+        // A zip's compressed bytes differ between Node's zlib and .NET's: its files are compared,
+        // the database in it table by table, as the copies' own are.
+        lastBackup = a.body;
+        const unpack = (answer) => {
+          const entries = readZipEntries(answer.body);
+          return new Map(entries.map((e) => [e.name, entryData(answer.body, e)]));
+        };
+        const [x, y] = [unpack(a), unpack(b)];
+        for (const name of new Set([...x.keys(), ...y.keys()])) {
+          if (name === 'profiles.db' && x.has(name) && y.has(name)) {
+            const files = [x, y].map((files, i) => {
+              const file = path.join(work, `backup-${i}.db`);
+              fs.writeFileSync(file, files.get(name));
+              return file;
+            });
+            const [nodeRows, csRows] = [tables(files[0], path.join(nodeRoot, 'data')), tables(files[1], path.join(csRoot, 'data'))];
+            for (const [table, rows] of nodeRows) {
+              const other = csRows.get(table) ?? [];
+              if (rows.length !== other.length || rows.some((r, i) => r !== other[i])) problems.push(`profiles.db table ${table} differs`);
+            }
+          } else if (!x.get(name)?.equals(y.get(name) ?? Buffer.alloc(0))) {
+            problems.push(`${name}: node ${x.get(name)?.length ?? 'missing'} bytes | cs ${y.get(name)?.length ?? 'missing'} bytes`);
+          }
+        }
+        report(`${label} (${x.size} files)`, problems, a);
+        continue;
+      }
       try {
         problems.push(...differences(JSON.parse(a.body.toString('utf8')), JSON.parse(b.body.toString('utf8')), '', step.ignore ?? {}));
       } catch (e) {
