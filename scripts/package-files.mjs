@@ -251,7 +251,15 @@ export function readmeFor(hostOs, native = false) {
     'To stop it, press Quit on its icon, or Quit at the top of the page. Starting it again while',
     'it runs opens the page, so that is also how to find the page again.',
     '',
-    native ? "Nothing needs installing. osu!'s pp calculator is included." : "Nothing needs installing. Node and osu!'s pp calculator are both included.",
+    ...(native
+      ? [
+          "Nothing needs installing. osu!'s pp calculator is included.",
+          '',
+          // The stand-ins (scripts/package.mjs), which look like part of the app and are not.
+          `${hostOs === 'win' ? 'node.exe' : 'node'}, src and scripts are only there so that versions before 1.33.0 can`,
+          'update to this one. You can ignore them. They go after the next update.',
+        ]
+      : ['Nothing needs installing. Node and osu!\'s pp calculator are both included.']),
     '',
     'Everything this app records lives in the "data" folder next to this file, so you can',
     'move or copy the whole folder and your profiles come with it. Deleting "data" resets',

@@ -184,6 +184,9 @@ test('without Node, the README names what is included and what to make executabl
   for (const os of ['win', 'osx', 'linux'] as const) {
     assert.match(readmeFor(os, true), /Nothing needs installing\. osu!'s pp calculator is included\./);
     assert.doesNotMatch(readmeFor(os, true), /Node/);
+    // The stand-ins, named as each system's package has them, so nobody takes them for the app.
+    assert.match(readmeFor(os, true), new RegExp(`^${os === 'win' ? 'node\\.exe' : 'node'}, src and scripts are only there so that versions before 1\\.33\\.0 can$`, 'm'));
+    assert.doesNotMatch(readmeFor(os), /are only there so that/);
   }
   assert.match(readmeFor('linux', true), /chmod \+x start\.sh osu-local-profiles app\/osu-local-profiles-app/);
 });
