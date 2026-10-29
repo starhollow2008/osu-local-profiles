@@ -71,15 +71,14 @@ Last Updated:
 ## Building from source
 
 ```
-npm install
-npm run build:pp     # builds the osu! pp helper (needs the .NET 10 SDK)
-npm run build:pp:local  # the smaller pp helper releases ship, checked against the full one
-npm run dev          # or double-click start.bat
-npm run check:app    # verify the install without starting to track
+dotnet run --project dotnet/App   # runs the app from this folder, on its data/ (needs the .NET 10 SDK)
+npm install                       # for the packaging scripts
+npm run package -- --native       # builds the release package for this system
+npm run check:port                # runs the C# tests
 ```
 
 Open <http://localhost:7272>. 
-Go is only needed to build the tray launcher.
+Go is only needed to build the tray launcher. Node.js 24 runs the packaging scripts and the old app's tests.
 
 ## Warnings for stable
 
@@ -102,11 +101,11 @@ McOsu users only:
 
 | Technology | Used for |
 |---|---|
-| TypeScript | app, using Node's type stripping (no compile) |
-| Node.js 22.5+ | `node:sqlite`, `node:http`, `node:zlib` |
+| C# / .NET 10 | app, as one self-contained program |
+| ASP.NET Core (Kestrel) | the local web server |
+| Microsoft.Data.Sqlite | profiles database |
 | Vanilla DOM, ES modules and CSS | profile page |
-| .NET 10 | official pp calculator |
-| Official `ppy.osu.Game.Rulesets.*` | official pp calculator |
+| Official `ppy.osu.Game.Rulesets.*` | official pp calculator, built in |
 | Go + `fyne.io/systray` | tray and menu bar launcher |
 | GitHub Actions | CI and cross-platform releases |
 
@@ -178,7 +177,6 @@ App reads from lazer's session log to track incomplete plays:
 
 ## Known limitations
 
-- The official osu! pp calculator adds ~25MB to the download (~58MB unzipped), because it bundles its own .NET 10 runtime
 - pp reworks require manual updates
 - Global rank is an estimate and requires manual refreshes. It is interpolated from a pp->rank curve built
   from a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase
