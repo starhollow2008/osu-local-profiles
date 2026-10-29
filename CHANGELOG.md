@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.33.0
+
+- **The app is one program now, and about half the size to download.** It no longer comes with
+  Node.js and a separate pp calculator: osu!'s calculators are built into it. The download is
+  37 MB on Windows instead of 63, and the app uses less memory. Updating moves you over by itself
+  and keeps your profiles.
+
+- **Windows no longer asks to let the app through its firewall.** It only listens to this
+  computer now.
+
+- **A picture of the page gives up if the browser stops responding.** It stops after a minute,
+  where it used to wait with the browser left open.
+
 ## 1.32.0
 
 - **Level-ups and new best performances have icons in Recent.** *Reached level N* and *New best
