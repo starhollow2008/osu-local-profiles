@@ -63,6 +63,8 @@ test("osu!'s recent activity is read for its rank events and nothing else", () =
     { createdAt: '2026-10-07T00:00:00+00:00', id: 2, type: 'achievement', achievement: {} },
     { createdAt: '2026-10-07T00:00:00+00:00', id: 3, type: 'rank', scoreRank: 'S', rank: 5, mode: 'fruits', beatmap: { url: '/beatmaps/77' } },
     { id: 4, type: 'rank', rank: 1, mode: 'osu', beatmap: { url: 'nowhere' } },
+    // A mode named like one of an object's own properties is no mode.
+    { createdAt: '2026-10-07T00:00:00+00:00', id: 5, type: 'rank', scoreRank: 'S', rank: 5, mode: 'constructor', beatmap: { url: '/beatmaps/77' } },
   ]);
   assert.deepEqual(events, [
     { id: 1066553565, at: Date.parse('2026-10-07T00:21:18Z'), rank: 488, grade: 'A', mode: 0, beatmapId: 2108789 },

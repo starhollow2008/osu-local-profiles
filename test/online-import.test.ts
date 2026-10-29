@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { UNRESOLVED_STATUS } from '../src/clients/beatmaps.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -164,6 +165,13 @@ test('a score is read from the shape osu-web actually answers with', () => {
   );
   assert.equal(score.playedAt, Date.parse('2023-05-04T10:10:36Z'));
   assert.equal(score.weightPercentage, 100);
+});
+
+test('a beatmap status osu! has renamed counts as unresolved, an inherited name included', () => {
+  const beatmap = (payload()['beatmap'] as Record<string, unknown>);
+  for (const status of ['tentative', 'constructor', 'toString']) {
+    assert.equal(parsed({ beatmap: { ...beatmap, status } }).mapStatus, UNRESOLVED_STATUS, status);
+  }
 });
 
 test('a score with no usable id is dropped rather than imported unidentifiable', () => {

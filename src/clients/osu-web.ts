@@ -265,7 +265,8 @@ export async function downloadImage(url: string): Promise<DownloadedImage> {
   if (!response.ok) throw new Error(`downloading the image failed (${response.status})`);
 
   const type = (response.headers.get('content-type') ?? '').split(';')[0]!.trim().toLowerCase();
-  const extension = EXTENSION_FOR[type];
+  // Its own keys only: an inherited name such as `constructor` is not a type.
+  const extension = Object.hasOwn(EXTENSION_FOR, type) ? EXTENSION_FOR[type] : undefined;
   if (!extension) throw new Error(`that is not an image this can use (${type || 'unknown type'})`);
 
   const bytes = Buffer.from(await response.arrayBuffer());
@@ -745,7 +746,7 @@ export function scoreFromJson(raw: Record<string, unknown>): OsuWebScore | null 
     creator: str(set['creator']),
     // A status osu! has since renamed counts as unresolved rather than as ranked.
     mapStatus:
-      statusName !== null && statusName in STATUS_FOR_NAME
+      statusName !== null && Object.hasOwn(STATUS_FOR_NAME, statusName)
         ? STATUS_FOR_NAME[statusName]!
         : UNRESOLVED_STATUS,
     beatmapStars: num(beatmap['difficulty_rating']),
@@ -932,7 +933,8 @@ export function rankEventsFromJson(list: unknown): RankEvent[] {
     const beatmap = raw['beatmap'] as Record<string, unknown> | undefined;
     const beatmapId = Number(/\/beatmaps\/(\d+)/.exec(String(beatmap?.['url'] ?? ''))?.[1]);
     const at = Date.parse(String(raw['createdAt'] ?? raw['created_at'] ?? ''));
-    const mode = RULESET_FOR_MODE[String(raw['mode'])];
+    const modeName = String(raw['mode']);
+    const mode = Object.hasOwn(RULESET_FOR_MODE, modeName) ? RULESET_FOR_MODE[modeName] : undefined;
     const { id, rank, scoreRank } = raw as { id?: unknown; rank?: unknown; scoreRank?: unknown };
     if (typeof id !== 'number' || typeof rank !== 'number' || typeof scoreRank !== 'string') continue;
     if (mode === undefined || !Number.isInteger(beatmapId) || beatmapId <= 0 || !Number.isFinite(at)) continue;
