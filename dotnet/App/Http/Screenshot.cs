@@ -14,23 +14,23 @@ namespace OsuLocalProfiles.Http;
 internal static class Screenshot
 {
     /// <summary>A minimal DevTools client: one connection, one page, a handful of commands.</summary>
-    private sealed class Devtools(ClientWebSocket socket) : IDisposable
+    private sealed class Devtools(ClientWebSocket socket, CancellationToken limit) : IDisposable
     {
         private int nextId = 1;
 
-        public static async Task<Devtools> Connect(string url)
+        public static async Task<Devtools> Connect(string url, CancellationToken limit)
         {
             var socket = new ClientWebSocket();
             try
             {
-                await socket.ConnectAsync(new Uri(url), CancellationToken.None);
+                await socket.ConnectAsync(new Uri(url), limit);
             }
             catch (Exception e) when (e is WebSocketException or IOException or HttpRequestException)
             {
                 socket.Dispose();
                 throw new InvalidOperationException("could not talk to the browser");
             }
-            return new Devtools(socket);
+            return new Devtools(socket, limit);
         }
 
         /// <summary>One command, and its answer: the message with its id, events before it passed over.</summary>
@@ -38,7 +38,7 @@ internal static class Screenshot
         {
             var id = nextId++;
             var text = JsonText.Stringify(new { id, method, @params = parameters ?? new { } });
-            await socket.SendAsync(Encoding.UTF8.GetBytes(text), WebSocketMessageType.Text, true, CancellationToken.None);
+            await socket.SendAsync(Encoding.UTF8.GetBytes(text), WebSocketMessageType.Text, true, limit);
             var buffer = new byte[1 << 16];
             while (true)
             {
@@ -46,7 +46,7 @@ internal static class Screenshot
                 WebSocketReceiveResult result;
                 do
                 {
-                    result = await socket.ReceiveAsync(buffer, CancellationToken.None);
+                    result = await socket.ReceiveAsync(buffer, limit);
                     if (result.MessageType == WebSocketMessageType.Close) throw new InvalidOperationException("the browser closed the connection");
                     message.Write(buffer, 0, result.Count);
                 } while (!result.EndOfMessage);
@@ -77,18 +77,27 @@ internal static class Screenshot
     /// <summary>A value out of a <c>Runtime.evaluate</c> answer.</summary>
     private static JsonElement? Value(JsonElement answer) => Js.Get(Js.Get(Js.Get(answer, "result"), "result"), "value");
 
+    /// <summary>How long a picture may take, from starting the browser to the PNG.</summary>
+    public const int LimitMs = 60_000;
+    public const string TimedOut = "the browser took too long to render the image";
+
     /// <summary>
     /// Render <paramref name="url"/> and return the PNG. <paramref name="selector"/> crops to one
     /// element and sets the viewport to exactly <paramref name="width"/> CSS pixels: a score card is
-    /// laid out for osu!'s 1000px and is captured at 1000px.
+    /// laid out for osu!'s 1000px and is captured at 1000px. A browser that stops answering is
+    /// killed at <see cref="LimitMs"/>, and the capture fails. <paramref name="browser"/> and
+    /// <paramref name="limitMs"/> are for tests.
     /// </summary>
-    public static async Task<byte[]> Capture(string url, int port = 9455, int width = 1280, string? selector = null)
+    public static async Task<byte[]> Capture(string url, int port = 9455, int width = 1280, string? selector = null, string? browser = null, int limitMs = LimitMs)
     {
-        var binary = StateApi.Browsers.Find() ?? throw new InvalidOperationException(
+        var binary = browser ?? StateApi.Browsers.Find() ?? throw new InvalidOperationException(
             "no Chrome, Edge or Chromium found to render the image. Save the page as HTML instead -- that needs nothing installed.");
         var userDataDir = Directory.CreateTempSubdirectory("olp-shot-").FullName;
-        Process? browser = null;
+        Process? started = null;
         Devtools? devtools = null;
+        // Every wait on the browser shares one deadline for the whole capture.
+        using var deadline = new CancellationTokenSource(limitMs);
+        var limit = deadline.Token;
         try
         {
             var start = new ProcessStartInfo(binary) { UseShellExecute = false, CreateNoWindow = true };
@@ -100,7 +109,7 @@ internal static class Screenshot
             {
                 start.ArgumentList.Add(arg);
             }
-            browser = Process.Start(start);
+            started = Process.Start(start);
 
             // Wait for the debugging endpoint, then for the page to have drawn itself.
             string? target = null;
@@ -108,7 +117,7 @@ internal static class Screenshot
             {
                 try
                 {
-                    if (JsonText.TryParse(await Local.GetStringAsync($"http://127.0.0.1:{port}/json"), out var list) && list.ValueKind == JsonValueKind.Array)
+                    if (JsonText.TryParse(await Local.GetStringAsync($"http://127.0.0.1:{port}/json", limit), out var list) && list.ValueKind == JsonValueKind.Array)
                     {
                         target = list.EnumerateArray()
                             .Where(t => Js.IsString(Js.Get(t, "type"), out var type) && type == "page")
@@ -116,15 +125,15 @@ internal static class Screenshot
                             .FirstOrDefault(ws => !string.IsNullOrEmpty(ws));
                     }
                 }
-                catch (Exception e) when (e is HttpRequestException or TaskCanceledException)
+                catch (Exception e) when (e is HttpRequestException or TaskCanceledException && !limit.IsCancellationRequested)
                 {
                     /* not up yet */
                 }
-                if (target is null) await Task.Delay(200);
+                if (target is null) await Task.Delay(200, limit);
             }
             if (target is null) throw new InvalidOperationException("the browser did not start in time");
 
-            devtools = await Devtools.Connect(target);
+            devtools = await Devtools.Connect(target, limit);
             if (selector is not null)
             {
                 await devtools.Send("Emulation.setDeviceMetricsOverride", new { width, height = 1000, deviceScaleFactor = 1, mobile = false });
@@ -135,10 +144,10 @@ internal static class Screenshot
             {
                 var rendered = await devtools.Send("Runtime.evaluate", new { expression = "document.body.dataset.rendered === 'true'", returnByValue = true });
                 if (Value(rendered) is { ValueKind: JsonValueKind.True }) break;
-                await Task.Delay(200);
+                await Task.Delay(200, limit);
             }
             // Cover art and medal icons are remote and load after the markup does.
-            await Task.Delay(1200);
+            await Task.Delay(1200, limit);
 
             double x, y, w, h;
             if (selector is not null)
@@ -180,18 +189,22 @@ internal static class Screenshot
                 ? Convert.FromBase64String(data)
                 : throw new InvalidOperationException("the browser rendered nothing");
         }
+        catch (Exception) when (limit.IsCancellationRequested)
+        {
+            throw new InvalidOperationException(TimedOut);
+        }
         finally
         {
             devtools?.Dispose();
             try
             {
-                if (browser is { HasExited: false }) browser.Kill(entireProcessTree: true);
+                if (started is { HasExited: false }) started.Kill(entireProcessTree: true);
             }
             catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception)
             {
                 /* already gone */
             }
-            browser?.Dispose();
+            started?.Dispose();
             // Not awaited, and never allowed to fail the capture: on Windows the browser holds its
             // profile folder a moment after it is killed.
             _ = RemoveWhenUnlocked(userDataDir);

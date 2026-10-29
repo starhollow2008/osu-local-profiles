@@ -194,9 +194,11 @@ function differences(a, b, at = '', ignore = {}) {
   return [...keys].flatMap((key) => differences(a[key], b[key], `${at}.${key}`, ignore));
 }
 
+const ASK_LIMIT_MS = 20 * 60_000;
+
 /**
- * One request, answered whenever it is answered. Not `fetch`, which gives up on an answer whose
- * headers take more than five minutes: importing a whole osu! account takes longer than that.
+ * One request, given up to `ASK_LIMIT_MS` of silence. Not `fetch`, which gives up on an answer
+ * whose headers take more than five minutes: importing a whole osu! account takes longer than that.
  */
 function ask(port, pathname, init) {
   const body = init?.body === undefined ? null : Buffer.isBuffer(init.body) ? init.body : Buffer.from(init.body, 'utf8');
@@ -213,6 +215,9 @@ function ask(port, pathname, init) {
         res.on('error', reject);
       },
     );
+    // Long enough for an account's import, which says nothing until it is done. A request that
+    // never ends fails here, naming itself, instead of hanging the run.
+    req.setTimeout(ASK_LIMIT_MS, () => req.destroy(new Error(`${pathname} did not answer within ${ASK_LIMIT_MS / 60_000} minutes`)));
     req.on('error', reject);
     req.end(body ?? undefined);
   });

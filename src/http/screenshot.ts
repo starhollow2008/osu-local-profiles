@@ -158,16 +158,24 @@ export interface ScreenshotOptions {
    * it -- a score card is laid out for osu!'s 1000px and should be captured at 1000px.
    */
   selector?: string;
+  /** For tests: the browser to start, and how long it has. */
+  browser?: string;
+  limitMs?: number;
 }
+
+/** How long a picture may take, from starting the browser to the PNG. */
+export const CAPTURE_LIMIT_MS = 60_000;
+export const CAPTURE_TIMED_OUT = 'the browser took too long to render the image';
 
 /**
  * Render `url` and return the PNG bytes.
  *
  * The browser is started with its own empty profile directory and killed afterwards, so it
- * never touches the user's real browser session, and never leaves one running.
+ * never touches the user's real browser session, and never leaves one running. One that stops
+ * answering is killed at `CAPTURE_LIMIT_MS`, and the capture fails.
  */
 export async function capture(options: ScreenshotOptions): Promise<Buffer> {
-  const binary = findBrowser();
+  const binary = options.browser ?? findBrowser();
   if (!binary) {
     throw new Error(
       'no Chrome, Edge or Chromium found to render the image. ' +
@@ -181,6 +189,14 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
 
   let browser: ChildProcess | null = null;
   let devtools: Devtools | null = null;
+
+  // Every wait on the browser is raced against one deadline for the whole capture.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(CAPTURE_TIMED_OUT)), options.limitMs ?? CAPTURE_LIMIT_MS);
+  });
+  expired.catch(() => {});
+  const within = <T>(step: Promise<T>): Promise<T> => Promise.race([step, expired]);
 
   try {
     browser = spawn(
@@ -203,7 +219,7 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
     let target: { webSocketDebuggerUrl?: string } | undefined;
     for (let attempt = 0; attempt < 60; attempt++) {
       try {
-        const list = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()) as {
+        const list = (await (await fetch(`http://127.0.0.1:${port}/json`, { signal: AbortSignal.timeout(2000) })).json()) as {
           type: string;
           webSocketDebuggerUrl?: string;
         }[];
@@ -212,19 +228,19 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
       } catch {
         /* not up yet */
       }
-      await sleep(200);
+      await within(sleep(200));
     }
     if (!target?.webSocketDebuggerUrl) throw new Error('the browser did not start in time');
 
-    devtools = await Devtools.connect(target.webSocketDebuggerUrl);
+    devtools = await within(Devtools.connect(target.webSocketDebuggerUrl));
 
     if (options.selector) {
-      await devtools.send('Emulation.setDeviceMetricsOverride', {
+      await within(devtools.send('Emulation.setDeviceMetricsOverride', {
         width,
         height: 1000,
         deviceScaleFactor: 1,
         mobile: false,
-      });
+      }));
     }
 
     /*
@@ -233,37 +249,37 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
      * fall back to a fixed wait rather than failing outright.
      */
     for (let attempt = 0; attempt < 50; attempt++) {
-      const result = (await devtools.send('Runtime.evaluate', {
+      const result = (await within(devtools.send('Runtime.evaluate', {
         expression: "document.body.dataset.rendered === 'true'",
         returnByValue: true,
-      })) as { result?: { result?: { value?: boolean } } };
+      }))) as { result?: { result?: { value?: boolean } } };
       if (result.result?.result?.value === true) break;
-      await sleep(200);
+      await within(sleep(200));
     }
     // Cover art and medal icons are remote and load after the markup does.
-    await sleep(1200);
+    await within(sleep(1200));
 
     let clip: { x: number; y: number; width: number; height: number };
     if (options.selector) {
-      const box = (await devtools.send('Runtime.evaluate', {
+      const box = (await within(devtools.send('Runtime.evaluate', {
         expression: `(() => {
           const r = document.querySelector(${JSON.stringify(options.selector)})?.getBoundingClientRect();
           return r ? { x: r.left + scrollX, y: r.top + scrollY, width: r.width, height: r.height } : null;
         })()`,
         returnByValue: true,
-      })) as { result?: { result?: { value?: typeof clip | null } } };
+      }))) as { result?: { result?: { value?: typeof clip | null } } };
       const value = box.result?.result?.value;
       if (!value || value.width === 0) throw new Error('the page drew nothing to capture');
       clip = value;
     } else {
-      const metrics = (await devtools.send('Page.getLayoutMetrics')) as {
+      const metrics = (await within(devtools.send('Page.getLayoutMetrics'))) as {
         result?: { cssContentSize?: { width: number; height: number } };
       };
       const size = metrics.result?.cssContentSize ?? { width, height: 2000 };
       clip = { x: 0, y: 0, width: size.width, height: size.height };
     }
 
-    const shot = (await devtools.send('Page.captureScreenshot', {
+    const shot = (await within(devtools.send('Page.captureScreenshot', {
       format: 'png',
       captureBeyondViewport: true,
       clip: {
@@ -274,12 +290,13 @@ export async function capture(options: ScreenshotOptions): Promise<Buffer> {
         height: Math.min(20_000, Math.ceil(clip.height)),
         scale: 1,
       },
-    })) as { result?: { data?: string } };
+    }))) as { result?: { data?: string } };
 
     const data = shot.result?.data;
     if (!data) throw new Error('the browser rendered nothing');
     return Buffer.from(data, 'base64');
   } finally {
+    clearTimeout(timer);
     devtools?.close();
     browser?.kill();
     // Deliberately not awaited and never allowed to throw: on Windows the browser still
