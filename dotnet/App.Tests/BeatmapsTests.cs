@@ -31,6 +31,28 @@ public class BeatmapsTests
     }
 
     [Fact]
+    public void A_section_found_in_a_files_bytes_is_the_section_found_in_its_text()
+    {
+        byte[][] files =
+        [
+            Encoding.UTF8.GetBytes("osu file format v14\r\n[Metadata]\r\nTitle:x\r\nCreator:cRyo[iceeicee]\r\n[Difficulty]\r\nHPDrainRate:5\r\n"),
+            Encoding.UTF8.GetBytes("[Metadata]\nTitle:at the very start\n"),
+            [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("[Metadata]\r\nTitle:after a byte order mark\r\n")],
+            [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("osu file format v14\n[Metadata]\nArtistUnicode:ア\nTitleUnicode:\U0001F3B5\n[Events]\n")],
+            // Invalid UTF-8 at both ends of the section and inside it.
+            [.. Encoding.UTF8.GetBytes("v14\n[Metadata]"), 0xC3, .. Encoding.UTF8.GetBytes("\nTitle:"), 0xFF, 0xE3, 0x82, (byte)'\n', 0xE3, .. Encoding.UTF8.GetBytes("\n[Events]\n")],
+            Encoding.UTF8.GetBytes("osu file format v14\n[General]\nMode:0\n"),
+            Encoding.UTF8.GetBytes("Title:[Metadata] inside a value\n[Metadata]\nTitle:real\n"),
+            [],
+        ];
+        foreach (var file in files)
+        {
+            var text = Encoding.UTF8.GetString(file);
+            Assert.Equal(Beatmaps.OsuSection(text, "[Metadata]"), Beatmaps.OsuSectionUtf8(file, "[Metadata]"));
+        }
+    }
+
+    [Fact]
     public void A_section_ends_at_a_line_beginning_with_a_bracket_not_at_the_next_bracket()
     {
         var text = "osu file format v14\r\n[Metadata]\r\nTitle:x\r\nCreator:cRyo[iceeicee]\r\nTags:[CV. someone]\r\n[Difficulty]\r\nHPDrainRate:5\r\n";
@@ -71,6 +93,21 @@ public class BeatmapsTests
         h.File("Songs/1 Set/audio.mp3", "not read");
         Assert.Equal((1L, 1L, 0L), Beatmaps.IndexFiles(h.H.Db, [new(Path.Combine(h.H.Folder, "Songs"), true)]));
         Assert.Equal(0, h.Count("not_beatmaps"));
+    }
+
+    [Fact]
+    public void Files_bigger_than_the_read_buffer_are_hashed_and_named_whole()
+    {
+        using var h = new Harness();
+        // Small, then over 1 MB, then small again: the buffer grows and is used for what follows.
+        var big = Osu("Big", 7) + "[Events]\r\n" + string.Concat(Enumerable.Repeat("Sprite,Foreground,Centre,\"sb/a.png\",320,240\r\n", 60_000));
+        h.File("Songs/1/a.osu", Osu("Small", 1));
+        h.File("Songs/2/b.osu", big);
+        h.File("Songs/3/c.osu", Osu("After", 3));
+        Assert.True(Encoding.UTF8.GetByteCount(big) > 2 << 20);
+        Assert.Equal((3L, 3L, 0L), Beatmaps.IndexFiles(h.H.Db, [new(Path.Combine(h.H.Folder, "Songs"), true)]));
+        var rows = h.H.Db.Rows("SELECT md5, beatmap_id FROM osu_files ORDER BY beatmap_id").Select(r => (r.Text("md5"), Convert.ToDouble(r["beatmap_id"]))).ToList();
+        Assert.Equal([(Md5(Osu("Small", 1)), 1d), (Md5(Osu("After", 3)), 3d), (Md5(big), 7d)], rows);
     }
 
     [Fact]

@@ -88,11 +88,36 @@ internal static partial class Beatmaps
         return double.IsNaN(n) || n == 0 ? null : n;
     }
 
-    public static OsuMetadata ParseMetadataText(string text)
+    public static OsuMetadata ParseMetadataText(string text) => ParseMetadataSection(OsuSection(text, "[Metadata]"));
+
+    /// <summary>
+    /// <see cref="OsuSection"/> on a file's UTF-8 bytes, decoding only the section: the same text,
+    /// since a newline and <c>[</c> are single bytes in UTF-8 and never part of another character.
+    /// The indexer reads every .osu, and decoding each whole was most of what it allocated.
+    /// </summary>
+    internal static string? OsuSectionUtf8(ReadOnlySpan<byte> bytes, string header)
+    {
+        var name = Encoding.ASCII.GetBytes(header);
+        int body;
+        if (bytes.StartsWith(name))
+        {
+            body = name.Length;
+        }
+        else
+        {
+            var at = bytes.IndexOf([(byte)'\n', .. name]);
+            if (at < 0) return null;
+            body = at + 1 + name.Length;
+        }
+        var next = bytes[body..].IndexOf("\n["u8);
+        return Encoding.UTF8.GetString(next < 0 ? bytes[body..] : bytes.Slice(body, next));
+    }
+
+    private static OsuMetadata ParseMetadataSection(string? section)
     {
         string? artist = null, title = null, artistUnicode = null, titleUnicode = null, version = null, creator = null;
         double? beatmapId = null, beatmapsetId = null;
-        if (OsuSection(text, "[Metadata]") is { } section)
+        if (section is not null)
         {
             foreach (var line in Lines(section))
             {
@@ -209,7 +234,26 @@ internal static partial class Beatmaps
     /// <summary>How long the indexer works before letting everything else at the database.</summary>
     private const double SliceMs = 25;
 
-    private static string Md5Hex(byte[] contents) => Convert.ToHexStringLower(MD5.HashData(contents));
+    private static string Md5Hex(ReadOnlySpan<byte> contents) => Convert.ToHexStringLower(MD5.HashData(contents));
+
+    /// <summary>
+    /// A whole file into <paramref name="buffer"/>, grown when it is too small and kept for the next
+    /// file, as <c>File.ReadAllBytes</c> reads it: to its end. Returns how many bytes it holds.
+    /// </summary>
+    private static int ReadInto(string file, ref byte[] buffer)
+    {
+        using var handle = File.OpenHandle(file);
+        var length = RandomAccess.GetLength(handle);
+        if (length > buffer.Length) buffer = new byte[Math.Max(length, buffer.Length * 2L)];
+        var total = 0;
+        while (true)
+        {
+            if (total == buffer.Length) Array.Resize(ref buffer, buffer.Length * 2);
+            var read = RandomAccess.Read(handle, buffer.AsSpan(total), total);
+            if (read == 0) return total;
+            total += read;
+        }
+    }
 
     /// <summary>
     /// Build, or top up, the MD5-to-path index of local <c>.osu</c> files. Store files are
@@ -250,6 +294,9 @@ internal static partial class Beatmaps
 
         var slice = Stopwatch.StartNew();
         var inTransaction = false;
+        // One buffer for every file read, rather than an array each: most are over the 85 KB past
+        // which .NET puts an allocation on the large object heap, freed only by a full collection.
+        var buffer = new byte[1 << 20];
         // Held for a whole slice, so the transaction it opens has nobody else's statements in it.
         var held = db.Hold();
         void PauseIfDue()
@@ -310,8 +357,10 @@ internal static partial class Beatmaps
                     {
                         try
                         {
-                            var contents = File.ReadAllBytes(file);
-                            var meta = ParseMetadataText(Encoding.UTF8.GetString(contents));
+                            // Read first: a file bigger than the buffer replaces it.
+                            var read = ReadInto(file, ref buffer);
+                            var contents = buffer.AsSpan(0, read);
+                            var meta = ParseMetadataSection(OsuSectionUtf8(contents, "[Metadata]"));
                             Write("INSERT OR REPLACE INTO osu_files (path, md5, beatmap_id, name, size, indexed_at) VALUES (?, ?, ?, ?, ?, ?)",
                                 file, Md5Hex(contents), meta.BeatmapId ?? 0, DisplayName(meta.Artist, meta.Title, meta.Creator, meta.Version), size, Js.Now());
                             indexed++;
