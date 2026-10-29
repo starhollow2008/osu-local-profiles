@@ -79,7 +79,7 @@ dotnet/
 | 5   | Everything that writes        | done        |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
 | 7   | Packaging                     | done        |
-| 8   | Switch-over release           | not started |
+| 8   | Switch-over release           | rehearsing  |
 | 9   | Removing the Node app         | not started |
 
 ### 1. Foundations
@@ -304,7 +304,7 @@ Each proven by the parity script's write stage (below) and ported tests:
 
 Pushed to `main`. Phase 5 is done: the last parity run matched every answer. Phase 7
 (packaging) is done: built and checked on all three platforms, listening on the loopbacks only.
-Next is phase 8, the switch-over rehearsal.
+Phase 8 is rehearsing: Windows done, macOS and Linux next (see its section).
 
 **Pitfalls met this session:**
 
@@ -468,6 +468,39 @@ at once than Node's.
   case to watch).
 - Then a normal release: changelog says what changed for players (smaller download, nothing
   else to do).
+
+#### Where phase 8 stands (2026-10-29)
+
+The test repository is `jonathant09/osu-local-profiles-switchover-test`, public because the
+updater asks GitHub without signing in (a private one has "no published releases"), with full
+releases because old updaters skip pre-releases. Delete it once the rehearsal is over. Its
+builds come from a worktree of `main` with `package.json`'s version and repository changed:
+1.33.0 is a Node release with the bridge, 1.34.x are C# releases.
+
+- [x] **Windows, every path** (old installs' `package.json` pointed at the test repository,
+      each on its own port):
+
+      | From | To | How | Result |
+      | --- | --- | --- | --- |
+      | 1.16.0 (started as its `.bat` does) | 1.34.0 | Install now | came back from the tray launcher |
+      | 1.32.0 (tray) | 1.34.0 | Install now | came back; the old launcher handed over and exited |
+      | 1.33.0, the bridge (tray) | 1.34.0 | When I quit | installed at quit, stayed closed, then started as 1.34.0 |
+      | 1.33.0, the bridge (tray) | 1.34.2 | Install now | came back |
+      | 1.34.2, from the bridge | 1.34.3 | Install now | came back |
+      | 1.34.2, a fresh download | 1.34.3 | When I quit | installed at quit; the stand-ins went with the swap |
+
+      Each time: `OK: updated to` in `data/update.log`, no Node files left (`node.exe`, `src`,
+      `scripts`, `node_modules`), the profiles, their dates and a tagline as before, the
+      beatmap index still answering, and Quit stopping launcher and app.
+- [x] **Found and fixed: no C# install could update.** Dropping a waiting build deleted
+      `data/update/ready.json` with `File.Delete`, which throws when `data/update` is gone, and
+      every C# install sweeps it away at start (1.34.0 refused 1.34.1). Hence 1.34.2 and 1.34.3.
+- Notes, none needing a change: when the old tray launcher is still running, the swap cannot
+  remove the rollback copy (its `.exe` is locked) and the new app's startup sweep does. A zip
+  made by Windows PowerShell's `Compress-Archive` on this machine has backslashes in its paths
+  (the release zips, built by CI, do not); every updater unpacked it anyway. 1.16's `.bat`
+  goes with the swap, as it already did on any update to 1.17 or later.
+- [ ] macOS and Linux: the same, on CI runners (the `.app` bundle is the case to watch).
 
 ### 9. Removing the Node app
 
