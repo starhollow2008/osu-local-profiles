@@ -59,6 +59,15 @@ internal sealed class ServerOptions
     /// </summary>
     public Action? OnRestart { get; init; }
 
+    /// <summary>The update check and the update itself; null where nothing checks (the tests).</summary>
+    public Update.Updater? Updater { get; init; }
+
+    /// <summary>
+    /// Exit with this code once an update is handed to its swapper, which waits for this process to
+    /// end. Null where nothing may stop the process (the tests).
+    /// </summary>
+    public Action<int>? OnUpdateExit { get; init; }
+
     /// <summary>Asks osu! for the profile's rank events, made with the server when it has a tracker.</summary>
     internal RankEventWatcher? RankEvents { get; set; }
 
@@ -100,6 +109,8 @@ internal static partial class Server
             kestrel.Limits.MaxRequestBodySize = null;
         });
         opts.Cache ??= new ProfileCache(opts.Db);
+        // A newer release found while the app runs, or a download finishing: the page follows live.
+        if (opts.Updater is { } updater) updater.Changed += (_, found) => opts.Events.Broadcast("update", StateApi.UpdateView(opts, found));
         if (opts.Tracker is { } tracker)
         {
             opts.Events.Follow(tracker);
@@ -198,9 +209,10 @@ internal static partial class Server
                 version = opts.Paths.Version(),
                 pid = Environment.ProcessId,
                 tracking = opts.Tracker?.IsTracking ?? false,
-                // No update check yet (phase 5).
-                update = (string?)null,
-                updating = false,
+                // The tray launcher polls this, and offers the update from its menu.
+                update = opts.Updater?.OfferedVersion(),
+                // Downloading and installing now, for the tray's status line.
+                updating = opts.Updater?.State().Applying ?? false,
             });
             return;
         }
@@ -563,6 +575,11 @@ internal static partial class Server
         {
             await Json(context, new { plays = Declined.List(db, Current()) });
             return;
+        }
+
+        if (pathname == "/api/update" || pathname.StartsWith("/api/update/", StringComparison.Ordinal))
+        {
+            if (await UpdateRoute(context, opts, pathname)) return;
         }
 
         if (pathname == "/api/backup")

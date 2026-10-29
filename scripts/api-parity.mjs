@@ -35,7 +35,6 @@ const ENDPOINTS = [
     path: '/api/app',
     ignore: {
       pid: 'each app is its own process',
-      update: 'the port has no update check until phase 5',
     },
   },
   { path: '/api/settings' },
@@ -268,6 +267,15 @@ function tables(file, dataDir = path.dirname(file)) {
     return new Map(names.filter((name) => !Object.hasOwn(TABLES_SKIPPED, name)).map((name) => {
       const rows = db.prepare(`SELECT * FROM "${name}"`).all().map((row) => {
         if (name === 'kv' && KV_MOMENTS.has(row.key)) return JSON.stringify({ key: row.key });
+        // The notice's dismissal keeps the version and the moment; the moment is each app's own.
+        if (name === 'kv' && row.key === 'updateNudgeDismissed') {
+          try {
+            const { at: _, ...rest } = JSON.parse(row.value);
+            return JSON.stringify({ key: row.key, value: rest });
+          } catch {
+            /* compared as it is */
+          }
+        }
         if (name === 'beatmapset_details' && typeof row.data === 'string') {
           try {
             const data = JSON.parse(row.data);
@@ -365,6 +373,7 @@ function writeSteps(file, csData) {
     const searchWord = installed ? (db.prepare('SELECT name FROM osu_files WHERE md5 = ?').get(installed.md5)?.name ?? '').split(/[^A-Za-z0-9]+/).find((w) => w.length > 3) : undefined;
     const otherPlayer = db.prepare("SELECT id FROM declined_plays WHERE profile_id = ? AND reason = 'another-player' ORDER BY declined_at DESC LIMIT 1").get(active)?.id;
     const arriving = { events: 'rank events still arriving', 'totals.events': 'the same' };
+    const checked = { checkedAt: 'the moment each app asked GitHub' };
 
     return [
       { path: '/api/welcome' },
@@ -474,6 +483,15 @@ function writeSteps(file, csData) {
       // time, since both drive it on one debugging port.
       { path: '/api/screenshot', method: 'GET', png: true, sequential: true },
       ...(second ? [{ path: `/api/scores/${second.id}/screenshot`, method: 'GET', png: true, sequential: true }] : []),
+
+      // The update check, asked of GitHub once by each app in turn, and what this copy refuses.
+      { path: '/api/update', method: 'GET' },
+      { path: '/api/update', sequential: true, ignore: checked, after: [{ path: '/api/state', ignore: { 'app.update.checkedAt': 'the moment each app asked' } }, { path: '/api/app', ignore: { pid: 'each app is its own process' } }] },
+      { path: '/api/update/later', body: {}, headers: { origin: 'https://example.com' } },
+      { path: '/api/update/later', body: {} },
+      { path: '/api/update/apply', body: {} },
+      { path: '/api/update/seen', body: {} },
+      { path: '/api/update/dismiss', body: {}, after: [{ path: '/api/update', method: 'GET', ignore: checked }] },
 
       // Back up everything, and restoring it: staged and confirmed, never applied under the app.
       { path: '/api/backup', method: 'GET', zip: true },
@@ -783,7 +801,7 @@ async function main() {
     for (let i = 0; i < Math.min(told[0].length, told[1].length); i++) {
       const [x, y] = [told[0][i], told[1][i]];
       if (x.name !== y.name) feedProblems.push(`${i}: node ${x.name} | cs ${y.name}`);
-      else feedProblems.push(...differences(x.data, y.data, '', { at: 'the moment each app said it', trackingSince: 'the same' }).map((d) => `${i} ${x.name}: ${d}`));
+      else feedProblems.push(...differences(x.data, y.data, '', { at: 'the moment each app said it', trackingSince: 'the same', checkedAt: 'the same' }).map((d) => `${i} ${x.name}: ${d}`));
     }
     report('/api/events (the writes above)', feedProblems, { status: 200, body: Buffer.from(JSON.stringify(told[0])) });
 

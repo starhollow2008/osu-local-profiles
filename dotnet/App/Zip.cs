@@ -138,6 +138,41 @@ internal static class Zip
         throw new InvalidOperationException($"{entry.Name} uses unsupported compression method {entry.Method}");
     }
 
+    /// <summary>
+    /// Unpack an archive into <paramref name="dest"/>, dropping <paramref name="stripComponents"/>
+    /// leading folders (a release wraps everything in one). How many files were written, so an
+    /// empty result can be refused rather than swapped in. Unix modes are kept off Windows.
+    /// </summary>
+    public static int Extract(string file, string dest, int stripComponents = 0)
+    {
+        var buf = File.ReadAllBytes(file);
+        var written = 0;
+        var root = Path.GetFullPath(dest);
+        foreach (var entry in ReadEntries(buf))
+        {
+            var parts = entry.Name.Split('/').Skip(stripComponents).ToArray();
+            if (string.Join("/", parts) == "") continue;
+            var target = NodePath.Join([dest, .. parts]);
+            // Belt and braces: SafeName already refused traversal, but the target is what matters.
+            if (!Path.GetFullPath(target).StartsWith(root, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException($"refusing to write outside the target: {entry.Name}");
+            }
+            if (entry.IsDirectory)
+            {
+                Directory.CreateDirectory(target);
+                continue;
+            }
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            var data = EntryData(buf, entry);
+            if (data.Length != entry.Size) throw new InvalidOperationException($"{entry.Name} unpacked to {data.Length} bytes, expected {entry.Size}");
+            File.WriteAllBytes(target, data);
+            if (entry.Mode is { } mode && !OperatingSystem.IsWindows()) File.SetUnixFileMode(target, (UnixFileMode)mode);
+            written++;
+        }
+        return written;
+    }
+
     /* ------------------------------------------------------------------ writing */
 
     public static byte[] Write(IReadOnlyList<(string Name, byte[] Data)> files, DateTime at)

@@ -242,7 +242,7 @@ internal static partial class Server
             if (autoUpdate.ValueKind == JsonValueKind.True) Set("checkForUpdates", autoUpdate);
         }
         current.Save(dataDir);
-        // Telling the updater Auto-update changed waits for the updater (phase 5, step 7).
+        if (patch.ContainsKey("autoUpdate")) opts.Updater?.AutoUpdateChanged();
         var config = opts.Config.PageView();
         opts.Events.Broadcast("app-config", config);
         await Json(context, new { ok = true, config });

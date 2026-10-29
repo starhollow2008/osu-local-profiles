@@ -62,6 +62,26 @@ if (running.Running)
     return 0;
 }
 
+/*
+ * The update check and the update itself, reading config.json's switches on every use so a
+ * change applies at once. A read-only copy installs nothing.
+ */
+var updater = new OsuLocalProfiles.Update.Updater(paths.InstallDir, paths.DataDir, paths.Version,
+    () => config["autoUpdate"] is { ValueKind: System.Text.Json.JsonValueKind.True },
+    () => config["checkForUpdates"] is not { ValueKind: System.Text.Json.JsonValueKind.False });
+
+/*
+ * A newer build downloaded ahead of time, by Auto-update or "When I quit", that the last run did
+ * not get to install at its quit: install it now, before anything is tracked, and come back as
+ * the new version.
+ */
+if (writable && updater.InstallAtStart() is { } pending)
+{
+    Console.WriteLine($"\n  Installing update {pending.Version}...");
+    Console.WriteLine("  It was downloaded earlier; the app starts again once it is in place.\n");
+    return pending.ExitCode;
+}
+
 var dbFile = Path.Combine(paths.DataDir, "profiles.db");
 if (!writable && !File.Exists(dbFile))
 {
@@ -149,10 +169,12 @@ else
 /*
  * Reachable four ways, and two can arrive together, so only the first one counts. `deliberate`
  * is Quit from the page or the tray, or Ctrl+C: not the launcher dying or the system stopping the
- * app. Only a deliberate stop will install an update waiting for the quit (phase 5).
+ * app. Only a deliberate stop installs an update waiting for the quit.
  */
 var stopped = new TaskCompletionSource<(int Code, bool Deliberate)>(TaskCreationOptions.RunContinuationsAsynchronously);
 void Shutdown(int code, bool deliberate) => stopped.TrySetResult((code, deliberate));
+// Set when an update was handed to its swapper, which the launcher then waits for by its pid.
+var handedOff = false;
 
 var resolver = new OsuLocalProfiles.Clients.BeatmapResolver(db, installs);
 // A read-only copy watches nothing: tracking is writing.
@@ -182,6 +204,12 @@ var app = Server.Build(new ServerOptions
     StatusKnown = resolver.KnowsStatus,
     Installs = installs,
     Tracker = tracker,
+    Updater = updater,
+    OnUpdateExit = code =>
+    {
+        handedOff = true;
+        Shutdown(code, false);
+    },
 });
 
 Console.CancelKeyPress += (_, e) =>
@@ -196,9 +224,19 @@ using var sigterm = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context 
 });
 if (fromTray)
 {
-    // The launcher's other message, whether the connection is metered, is for Auto-update and is
-    // read once the updater is ported (phase 5).
-    _ = Instance.StopWhenLauncherCloses(Console.OpenStandardInput(), deliberate => Shutdown(0, deliberate));
+    // The launcher's other message is whether the connection is metered, which Auto-update heeds.
+    _ = Instance.StopWhenLauncherCloses(Console.OpenStandardInput(), deliberate => Shutdown(0, deliberate), message =>
+    {
+        if (message.ValueKind == System.Text.Json.JsonValueKind.Object && message.TryGetProperty("metered", out var metered))
+        {
+            updater.SetMetered(metered.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.True => true,
+                System.Text.Json.JsonValueKind.False => false,
+                _ => null,
+            });
+        }
+    });
 }
 
 Timer? heartbeat = null;
@@ -228,8 +266,24 @@ if (tracker is not null)
 }
 if (Js.Truthy(config["openBrowser"]) && !withComputer) Browser.Open(url);
 
-var (exitCode, _) = await stopped.Task;
+if (writable)
+{
+    // What the last update left behind: a rollback copy, the unpacked release it ran from.
+    var leftovers = updater.PruneLeftovers();
+    if (leftovers.Removed.Count > 0)
+    {
+        Console.WriteLine($"  Cleaned up after the last update: {string.Join(", ", leftovers.Removed)} ({leftovers.Bytes / 1024 / 1024:F0}MB)\n");
+    }
+}
+// Once a day, and an hour after a failed check; nothing while checkForUpdates is off.
+using var updateChecks = updater.KeepChecking();
+
+var (exitCode, deliberate) = await stopped.Task;
 Console.WriteLine("\n  stopping...");
+if (writable && deliberate && exitCode == 0 && updater.InstallAtQuit() is { } installing)
+{
+    Console.WriteLine($"  installing update {installing}; it is there the next time the app starts");
+}
 heartbeat?.Dispose();
 if (tracker is not null)
 {
@@ -238,7 +292,7 @@ if (tracker is not null)
 }
 await app.StopAsync();
 await app.DisposeAsync();
-if (exitCode == RestartExitCode)
+if (exitCode == RestartExitCode && !handedOff)
 {
     // Left by an update long finished, a swapper pid would have the launcher wait on whatever
     // process has that number now.

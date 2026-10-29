@@ -73,6 +73,22 @@ internal static class StateApi
         }
     }
 
+    /// <summary>
+    /// The update's state, for the page: what the updater knows, plus whether the notice above the
+    /// page shows, which depends on what dismissed it last (kept in the database), and, sent on the
+    /// live feed, whether this is the first time this version was found.
+    /// </summary>
+    internal static Dictionary<string, object?> UpdateView(ServerOptions opts, bool? found = null)
+    {
+        var state = opts.Updater?.State() ?? new UpdateState(opts.Paths.Version(), null, false, null, null, null, null, false, [], Notes.ChangelogUrl,
+            null, null, false, false, null, null, null, opts.Config["autoUpdate"] is { ValueKind: JsonValueKind.True });
+        var view = new Dictionary<string, object?>();
+        foreach (var (key, value) in Js.Entries(JsonText.From(state))) view[key] = value;
+        view["nudgeShown"] = Notes.NudgeShown(state.Nudge, state.Notes, Notes.NudgeDismissal(opts.Db), Js.Now());
+        if (found is { } f) view["found"] = f;
+        return view;
+    }
+
     /// <summary>Scores ingested before the eligibility columns, which a recompute can fill in (countStale).</summary>
     private static double StaleScores(Db.Database db, long profileId) => Convert.ToDouble(db.Scalar("""
         SELECT COUNT(*) AS n FROM scores
@@ -101,30 +117,7 @@ internal static class StateApi
         var version = opts.Paths.Version();
         var (hasAvatar, hasCover) = Identity.ImageState(opts.Paths.DataDir, profileId);
 
-        // The updater's state before any check: nothing found, nothing waiting (phase 5).
-        List<VersionNotes> notes = [];
-        var update = new
-        {
-            currentVersion = version,
-            latestVersion = (string?)null,
-            available = false,
-            releaseUrl = (string?)null,
-            blocked = (string?)null,
-            error = (string?)null,
-            checkedAt = (string?)null,
-            applying = false,
-            notes,
-            changelogUrl = Notes.ChangelogUrl,
-            nudge = (string?)null,
-            ready = (string?)null,
-            installOnQuit = false,
-            preparing = false,
-            prepareError = (string?)null,
-            downloadedBytes = (double?)null,
-            metered = (bool?)null,
-            autoUpdate = opts.Config["autoUpdate"] is { ValueKind: JsonValueKind.True },
-            nudgeShown = Notes.NudgeShown(null, notes, Notes.NudgeDismissal(db), Js.Now()),
-        };
+        var update = UpdateView(opts);
 
         return new
         {

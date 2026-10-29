@@ -86,6 +86,50 @@ internal static partial class Notes
         return output;
     }
 
+    /// <summary>Written into a release page when the version's CHANGELOG section carries it: an HTML comment, so GitHub shows nothing.</summary>
+    public const string ImportantMark = "<!-- important -->";
+
+    [GeneratedRegex("^Everything in this release", RegexOptions.IgnoreCase)]
+    private static partial Regex EverythingLine();
+
+    [GeneratedRegex(@"^[0-9]{4}-[0-9]{2}-[0-9]{2}")]
+    private static partial Regex DateStart();
+
+    /// <summary>
+    /// A release's notes from its page, as the release job wrote it: a line per change, then a link
+    /// to the CHANGELOG, and the important mark when the version is one everyone should have.
+    /// </summary>
+    public static List<VersionNotes> FromBody(string body, string version, string? publishedAt)
+    {
+        var lines = body.Replace("\r\n", "\n").Split('\n');
+        var end = Array.FindIndex(lines, l => EverythingLine().IsMatch(l));
+        var highlights = (end < 0 ? lines : lines[..end]).Where(l => l.StartsWith("- ", StringComparison.Ordinal)).Select(l => Js.Trim(l[2..])).ToList();
+        var date = publishedAt is not null && DateStart().IsMatch(publishedAt) ? publishedAt[..10] : null;
+        var important = lines.Any(l => Js.Trim(l) == ImportantMark);
+        return ParseNotes(JsonText.From(new { versions = new[] { new { version, date, important, highlights } } }));
+    }
+
+    /// <summary>Past this, the update waiting is said above the page, not only by its button.</summary>
+    private const double BehindDays = 14;
+
+    /// <summary>How loudly to say an update is waiting: <c>important</c>, <c>behind</c> (the oldest missing one two weeks out), or null.</summary>
+    public static string? NudgeFor(List<VersionNotes> missing, double now)
+    {
+        if (missing.Any(n => n.Important)) return "important";
+        var oldest = missing.Select(n => n.Date).Where(d => d is not null).Order(StringComparer.Ordinal).FirstOrDefault();
+        return oldest is not null && now - Js.DateParse($"{oldest}T00:00:00Z") >= BehindDays * 86_400_000 ? "behind" : null;
+    }
+
+    /// <summary>What changed, after an update: seen, so it is not shown again.</summary>
+    public static void MarkSeen(Database db, string? current)
+    {
+        if (current is not null) db.Run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", SeenKey, current);
+    }
+
+    /// <summary>The notice above the page, put away for a week or until something important comes out.</summary>
+    public static void DismissNudge(Database db, string version, double? now = null) =>
+        db.Run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", DismissedKey, JsonText.Stringify(new { version, at = now ?? Js.Now() }));
+
     /// <summary>The versions after <paramref name="from"/> up to <paramref name="to"/>, newest first.</summary>
     public static List<VersionNotes> Between(List<VersionNotes> all, string? from, string to) =>
         [.. all.Where(n => CompareVersions(n.Version, to) <= 0 && (from is null ? n.Version == to : CompareVersions(n.Version, from) > 0))

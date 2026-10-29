@@ -279,16 +279,52 @@ Done, each proven by the parity script's write stage (below) and ported tests:
       Chrome or Edge over the DevTools protocol, one capture at a time. The parity script asks
       each app in turn (they share the debugging port) and compares the pictures' size.
 
-Waiting, from step 3: `pruneUpdateLeftovers` (step 7).
+- [ ] **The updater** (`Update/Updater.cs`, `Http/UpdateApi.cs`): built, its tests pass, **parity
+      not yet confirmed** (see the hand-off below). The GitHub check, the waiting build
+      (`data/update/ready.json`), install at a deliberate quit and at a start, the hand-off to the
+      release's own swapper, `pruneUpdateLeftovers`, Auto-update and the launcher's metered
+      message, `/api/update*`, and `/api/app`'s `update` and `updating`. "Packaged" means
+      `app/osu-local-profiles-app(.exe)` is beside `package.json` (phase 6's `nativeAppFor`), so a
+      source checkout and the parity copies are refused as Node's are. Releases unpack with
+      `Zip.Extract`, which keeps Unix modes.
 
-**Next, in this order.** Every handler is in `src/http/server.ts`.
+#### Hand-off (2026-10-28, second session)
 
-7. **The updater:** `/api/update*`, the checker and installer (`src/update/*`), `/api/app`'s
-   `update` and `updating`, `pruneUpdateLeftovers` at startup, and telling the updater when
-   `/api/app-config` changes Auto-update (`autoUpdateChanged`).
+Pushed nothing; every commit below is on local `main`. The session stopped part-way through a
+parity run of the updater, which was stopped and its work folder cleaned up.
+
+**First, finish step 7:** run `node scripts/api-parity.mjs` (about 15 minutes now: it imports the
+owner's osu! account into a scratch profile, one app at a time). The write stage has new steps
+for the updater (`/api/update` GET and POST, `later`, `apply`, `seen`, `dismiss`, a foreign
+Origin). If everything matches, tick the updater above. The first run with the updater wired in
+had matched every step it reached (through `/api/startup`) before it was stopped.
+
+**Then, in this order.** Every handler is in `src/http/server.ts`.
+
 8. **The pp source switch** (5.70): `/api/pp-source`, `src/pp-source.ts`,
-   `src/calc/source-helper.ts`.
-9. **Make writable the default**, and remove the `--writable` flag.
+   `src/calc/source-helper.ts`. The helper built from the player's source stays a separate
+   process, so `Calc/Official.cs` needs a second way to answer: `Send` calls
+   `Program.Respond` in-process today; add a child-process backend speaking the same JSON lines
+   as `src/calc/official.ts` (ready line first, one request per line, 30s timeouts, "calculator
+   exited" when it dies), labelled with the source's version. `Tracker.SwitchCalculator`
+   exists. Then `Program.cs`'s `calculatorProblem` branch becomes `startupCalculator`. The
+   `/api/pp-source` answers can be compared with no source configured (404 in Node only when
+   there is no service; check what it answers) and with a nonexistent folder.
+9. **Make writable the default**, and remove the `--writable` flag. Then the 501 fallback goes,
+   so an unknown `/api/` path answers 404 `not found` as Node's static files do.
+
+**Pitfalls met this session:**
+
+- A JavaScript `replace()` replacement string treats `$$` as one `$`: pass a function
+  (`s.replace(a, () => b)`) when editing C# with node. A template literal turns `\\n` into a real
+  newline and `\r` into a carriage return: write those lines with the editor instead.
+- The file-writing tool turns `﻿` into the character itself, in regexes too: use
+  `(char)0xFEFF`, or `Js.IsSpace` for JavaScript's whitespace.
+- lzma-js's mode 1 is its first table entry (64 KB dictionary, BT2), not 1 MB.
+- Both apps' screenshots use Chrome's debugging port 9455, and every step that asks osu! or
+  GitHub must not double the rate: mark such parity steps `sequential`.
+- After `--keep`, or a stopped run, unlink the work folder's junctions (`node/web`,
+  `node/node_modules`, `node/tools`, `cs/web`) before deleting it.
 
 **Checking writes.** `scripts/api-parity.mjs` ends with a write stage (`writeSteps`): the same
 requests in order to both apps, each answer compared and then the answers it should have
