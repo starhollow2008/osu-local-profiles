@@ -70,6 +70,8 @@ const HEADERS = ['content-type', 'cache-control', 'content-disposition'];
 
 const args = process.argv.slice(2);
 const keep = args.includes('--keep');
+// Leaves out the two pictures, which need the browser installed here to render them.
+const noScreenshots = args.includes('--no-screenshots');
 const valueOf = (flag) => (args.includes(flag) ? path.resolve(args[args.indexOf(flag) + 1]) : null);
 const publishedApp = valueOf('--app');
 const referenceApp = valueOf('--reference');
@@ -525,8 +527,12 @@ function writeSteps(file, csData) {
 
       // Pictures of the page and of a score card, by the browser installed here: one app at a
       // time, since both drive it on one debugging port.
-      { path: '/api/screenshot', method: 'GET', png: true, sequential: true },
-      ...(second ? [{ path: `/api/scores/${second.id}/screenshot`, method: 'GET', png: true, sequential: true }] : []),
+      ...(noScreenshots
+        ? []
+        : [
+            { path: '/api/screenshot', method: 'GET', png: true, sequential: true },
+            ...(second ? [{ path: `/api/scores/${second.id}/screenshot`, method: 'GET', png: true, sequential: true }] : []),
+          ]),
 
       // The update check, asked of GitHub once by each app in turn, and what this copy refuses.
       { path: '/api/update', method: 'GET' },

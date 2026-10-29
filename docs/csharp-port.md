@@ -434,9 +434,12 @@ as a workflow artifact for 14 days, never on a release.
       all 840 answers on the owner's data.
 - [x] **Built and checked on all three platforms** by CI's `package-native` job (2026-10-29):
       each ships trimmed, identical to the untrimmed app on every pp and API parity request.
-      The app is 70 MB on Windows, 75 MB on Linux and 72 MB on macOS. The job's first macOS runs
-      hung on `/api/screenshot`, where the runner's Chrome stopped answering. A capture now has a
-      minute in both apps (`CAPTURE_LIMIT_MS`), and api-parity's requests 20 minutes of silence.
+      The app is 70 MB on Windows, 75 MB on Linux and 72 MB on macOS. Three macOS runs in four
+      froze on `/api/screenshot`, the whole runner with them (no step timeout fired, no log
+      kept), while its Chrome rendered the picture. So on GitHub's macOS runners the build's API
+      check leaves the two pictures out (`--no-screenshots`); Windows and Linux check the same
+      capture code. A capture also has a minute now in both apps (`CAPTURE_LIMIT_MS`), and
+      api-parity's requests 20 minutes of silence.
 
 **Measured on Windows, 1.32.0, against the numbers at the top:**
 

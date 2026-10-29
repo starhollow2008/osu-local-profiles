@@ -220,6 +220,13 @@ export function buildCheckedPpHelper(outDir, target = defaultRid(), { live = fal
 }
 
 /**
+ * GitHub's macOS runners have frozen whole, three runs in four, while their Chrome rendered the
+ * parity check's pictures, with no log kept. The pictures go through the same capture code on
+ * Windows and Linux, so there the macOS build leaves them out.
+ */
+const noScreenshots = () => (process.platform === 'darwin' && process.env.GITHUB_ACTIONS ? ['--no-screenshots'] : []);
+
+/**
  * The C# app for a package (docs/csharp-port.md, phase 7), in `outDir`: trimmed if, and only if,
  * it answers exactly as the untrimmed app does on this platform, and untrimmed otherwise, with
  * the reason.
@@ -273,7 +280,7 @@ export function buildCheckedApp(outDir, target = defaultRid()) {
       // parity-data.mjs prints the data folder it made last.
       const dataDir = made?.status === 0 ? made.stdout.trim().split(/\r?\n/).at(-1) : null;
       const api = dataDir
-        ? spawnSync(process.execPath, [path.join(root, 'scripts', 'api-parity.mjs'), dataDir, '--reference', full, '--app', slim], { stdio: 'inherit' })
+        ? spawnSync(process.execPath, [path.join(root, 'scripts', 'api-parity.mjs'), dataDir, '--reference', full, '--app', slim, ...noScreenshots()], { stdio: 'inherit' })
         : null;
       verdict =
         pp.status !== 0
