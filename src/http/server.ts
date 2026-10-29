@@ -446,15 +446,21 @@ export function startServer(opts: ServerOptions): http.Server {
     let raw = '';
     req.on('data', (chunk) => (raw += chunk));
     req.on('end', () => {
-      let body: Record<string, unknown>;
+      let body: unknown;
       try {
-        body = JSON.parse(raw || '{}') as Record<string, unknown>;
+        body = JSON.parse(raw || '{}');
       } catch {
         return json(res, { error: 'expected a JSON body' }, 400);
       }
-      void Promise.resolve(handler(body)).catch((e: unknown) =>
-        json(res, { error: (e as Error).message }, 500),
-      );
+      // Every handler reads named fields: `null`, a number or a list is no body any of them can use.
+      if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+        return json(res, { error: 'expected a JSON body' }, 400);
+      }
+      // Called inside `then`, so a handler that throws before its first await is a 500 as well,
+      // rather than an uncaught exception that ends the app.
+      void Promise.resolve()
+        .then(() => handler(body as Record<string, unknown>))
+        .catch((e: unknown) => json(res, { error: (e as Error).message }, 500));
     });
   };
 
