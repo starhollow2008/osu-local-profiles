@@ -1,0 +1,132 @@
+# The switch-over rehearsal on macOS and Linux (docs/csharp-port.md, phase 8). Run by hand, in
+# two steps, since the test releases are published to another repository, which this
+# workflow's token cannot write to:
+#
+#   1. step: build. Each platform's test releases, kept as this run's artifacts: the bridge
+#      (1.33.0, a Node release), a C# release to update from (1.34.2), and the target.
+#   2. Publish each platform's target zip to the test repository's release of that version.
+#   3. step: rehearse, with the build run's id. Old installs update to the target there
+#      (scripts/rehearse-update.mjs).
+name: Switch-over rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: build, or rehearse
+        type: choice
+        options: [build, rehearse]
+        default: build
+      build_run:
+        description: For rehearse, the id of the build run whose zips to use
+        required: false
+      repo:
+        description: The test repository
+        default: jonathant09/osu-local-profiles-switchover-test
+      target:
+        description: The C# release to update to, its latest
+        default: 1.34.3
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build:
+    if: inputs.step == 'build'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/launcher/go.mod
+          cache-dependency-path: tools/launcher/go.sum
+
+      - run: npm ci
+
+      # Built as releases are, with the version and the repository each would carry there.
+      - name: Build the test releases
+        shell: bash
+        env:
+          REPO: ${{ inputs.repo }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -e
+          mkdir -p rehearsal
+          for spec in "1.33.0 node" "1.34.2 native" "$TARGET native"; do
+            set -- $spec
+            node -e "
+              const fs = require('fs');
+              const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+              p.version = process.argv[1];
+              p.repository.url = 'https://github.com/' + process.argv[2] + '.git';
+              fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+            " "$1" "$REPO"
+            if [ "$2" = native ]; then npm run package -- --native; else npm run package; fi
+            cp dist/osu-local-profiles-"$1"-*.zip rehearsal/
+            git checkout -- package.json
+          done
+          ls -la rehearsal
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rehearsal-${{ matrix.os }}
+          path: rehearsal/*.zip
+          retention-days: 7
+
+  rehearse:
+    if: inputs.step == 'rehearse'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      # For the stand-in osu!stable install's generated replays.
+      - run: npm ci
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: rehearsal-${{ matrix.os }}
+          run-id: ${{ inputs.build_run }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: rehearsal
+
+      # A display with no tray, as a desktop without one: the launcher runs without its icon,
+      # and an update can start the app again.
+      - name: A display (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y xvfb
+
+      - name: Rehearse
+        shell: bash
+        env:
+          REPO: ${{ inputs.repo }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            xvfb-run -a node scripts/rehearse-update.mjs --builds rehearsal --repo "$REPO" --target "$TARGET"
+          else
+            node scripts/rehearse-update.mjs --builds rehearsal --repo "$REPO" --target "$TARGET"
+          fi
