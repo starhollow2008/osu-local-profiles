@@ -452,7 +452,9 @@ internal sealed partial class Updater
     private void DropReady()
     {
         var waiting = ReadReady();
-        File.Delete(Path.Combine(dataDir, "update", ReadyFile));
+        // As rmSync's force: data/update itself may be gone, which File.Delete throws for.
+        var file = Path.Combine(dataDir, "update", ReadyFile);
+        if (File.Exists(file)) File.Delete(file);
         var staged = waiting is null ? null : Path.Combine(dataDir, "update", waiting.Version);
         if (staged is not null && Directory.Exists(staged)) Directory.Delete(staged, recursive: true);
     }

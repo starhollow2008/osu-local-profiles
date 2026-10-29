@@ -258,6 +258,36 @@ public sealed class UpdaterTests : IDisposable
     }
 
     [Fact]
+    public async Task A_release_downloads_ahead_of_time_when_data_update_does_not_exist_yet()
+    {
+        // As every C# install is after its first start: the startup sweep took data/update away.
+        var dir = Tmp();
+        File.WriteAllText(Path.Combine(dir, "package.json"), """{"version":"1.26.0","repository":{"url":"git+https://github.com/x/y.git"}}""");
+        Directory.CreateDirectory(Path.Combine(dir, "app"));
+        File.WriteAllText(Path.Combine(dir, "app", "osu-local-profiles-app.exe"), "");
+        const string folder = "osu-local-profiles-1.27.0-win-x64/";
+        var zip = MakeZip([
+            (folder + "package.json", """{"version":"1.27.0"}"""u8.ToArray(), null),
+            (folder + "web/index.html", "<p></p>"u8.ToArray(), null),
+            (folder + Updater.LauncherExecutableFor("win32"), "launcher"u8.ToArray(), null),
+            (folder + Updater.NativeAppFor("win32"), "app"u8.ToArray(), null),
+            .. Enumerable.Range(0, 8).Select(i => (folder + $"web/{i}.js", "x"u8.ToArray(), (int?)null)),
+        ]);
+        const string asset = "osu-local-profiles-1.27.0-win-x64.zip";
+        var updater = For(dir, github: url =>
+            url.EndsWith("/releases/latest", StringComparison.Ordinal)
+                ? FakeOsu.Answer(ReleaseJson("v1.27.0", asset).Replace("\"size\":5", $"\"size\":{zip.Length}"))
+                : url.EndsWith(asset, StringComparison.Ordinal)
+                    ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(zip) }
+                    : FakeOsu.Answer("[]"));
+        Assert.False(Directory.Exists(Path.Combine(dir, "data", "update")));
+        await updater.CheckForUpdate();
+        await updater.PrepareUpdate("user");
+        Assert.True(File.Exists(Path.Combine(dir, "data", "update", "1.27.0", Updater.NativeAppFor("win32"))));
+        Assert.Contains("\"version\":\"1.27.0\"", File.ReadAllText(Path.Combine(dir, "data", "update", "ready.json")));
+    }
+
+    [Fact]
     public void Notes_come_from_a_release_page_and_an_update_is_said_above_the_page_only_when_it_matters()
     {
         var notes = Notes.FromBody($"- One\r\n- Two\r\n{Notes.ImportantMark}\r\nEverything in this release\r\n- Not this", "1.2.3", "2026-03-04T05:06:07Z");
