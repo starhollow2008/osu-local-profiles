@@ -77,7 +77,7 @@ dotnet/
 | 3   | pp in-process                 | done        |
 | 4   | Tracking                      | done        |
 | 5   | Everything that writes        | done        |
-| 6   | Updater bridge (Node release) | built, ships with the next release |
+| 6   | Updater bridge (Node release) | built; not released on its own (phase 8) |
 | 7   | Packaging                     | done        |
 | 8   | Switch-over release           | rehearsed; release pending |
 | 9   | Removing the Node app         | not started |
@@ -356,7 +356,8 @@ junctions into this checkout (`web`, `node_modules`, `tools`): unlink them befor
 
 ### 6. Updater bridge, in a Node release
 
-This can be done at any time, and should ship well before phase 8, so that most installs
+Built, and never released on its own: 1.33.0 is the C# release, and old installs reach it
+through phase 7's stand-ins (phase 8). The original plan was that this should ship well before phase 8, so that most installs
 already have it when the C# release appears. Findings it is based on:
 
 - The swap already removes every old file. `scripts/apply-update.mjs` moves everything but
@@ -448,12 +449,18 @@ as a workflow artifact for 14 days, never on a release.
 | Installed | 161 MB | 166 MB (app 149) | 87 MB (app 70) |
 | Zipped | 62 MB | 72 MB | 37 MB |
 | Memory, idle | 125 + 32 MB (helper) | 107 MB | 87 MB |
-| Memory, peak while indexing | 125 MB | 284 MB | 275 MB |
+| Memory, peak while indexing | 125 MB | 284 MB | 275 MB, then 124 MB |
 
 Untrimmed, the package was bigger than the Node one: the Node release ships the slim pp helper
-(58 MB), and the app carries the full one's files plus ASP.NET Core. The peak while indexing
-(73,848 files, falling back under 110 MB by the end) is worth a look: the C# indexer holds more
-at once than Node's.
+(58 MB), and the app carries the full one's files plus ASP.NET Core.
+
+The peak while indexing (a first index of 73,848 files) was garbage, not anything held: memory
+rose to about 250 MB and fell to 90 by turns, and ended at 33 MB private. Each `.osu` was read
+into an array of its own and decoded whole, and most are over the 85 KB past which .NET puts an
+allocation on the large object heap, which only a full collection frees. Now the indexer reads
+every file into one buffer and decodes only its `[Metadata]` section (`OsuSectionUtf8`): a flat
+122-124 MB throughout, in the same time, and an index identical to Node 1.32.0's on every one of
+the 14,820 beatmaps and 59,028 other files.
 
 ### 8. Switch-over release
 
@@ -510,9 +517,21 @@ builds come from a worktree of `main` with `package.json`'s version and reposito
       start script, When I quit), with a stand-in osu!stable install since 1.16 stops without
       one, and checks each as on Windows, Quit stopping everything run from the install. All
       ten passed, 14 to 20 seconds each.
-- [ ] **The release itself.** The bridge (phase 6) ships first, in a Node release, and this
-      one comes several releases after it, built by CI like any other. Then delete the test
-      repository.
+- [x] **No bridge release first** (decided 2026-10-29): 1.33.0 is the C# release, straight
+      after 1.32.0. Every Node install updates through the stand-ins (phase 7), which the
+      rehearsals above proved from 1.16.0 and 1.32.0 on every platform; the bridge would only
+      have changed which of two equivalent routes the swap takes, and it is Node code, which a
+      Node install gets only by updating.
+- [x] **The oldest installs that can update** are 1.7.0 on Windows (older ones look for
+      downloads under the app's previous name, so have found none since it changed) and 1.10.0
+      on macOS and Linux (older ones drop the execute bits as they unpack, so never installed any
+      update there). The rehearsal covers each platform from there: 1.7.0, 1.9.0 (Windows) or
+      1.10.0, then 1.13.2, 1.16.0, 1.17.0 (the first tray launcher), 1.32.0 by both routes, and a
+      C# build by both, on win-x64, linux-x64, osx-arm64 and osx-x64.
+- [x] **`release.yml` builds the C# packages** (`npm run package -- --native --rid`), and CI's
+      `package-native` job builds all four, Intel Macs included.
+- [ ] **The release itself**: rehearsed with its own zips first, from a dry run of `release.yml`
+      published to the test repository; then the tag. Then delete the test repository.
 
 ### 9. Removing the Node app
 
