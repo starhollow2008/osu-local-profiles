@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -106,11 +107,15 @@ internal static partial class Server
         {
             kestrel.AddServerHeader = false;
             /*
-             * Every interface, dual-stack, as Node's listen(port) does, and every non-loopback
-             * request refused in the handler. Not bound to 127.0.0.1: that drops IPv6 loopback,
-             * and on Windows `localhost` resolves to ::1 first (docs/architecture.md).
+             * Both loopbacks, so no other machine can reach the port and Windows asks nothing of its
+             * firewall; every non-loopback request is still refused in the handler. Never 127.0.0.1
+             * alone: on Windows `localhost` resolves to ::1 first (docs/architecture.md). ::1 is
+             * left out only on a machine without IPv6. Either failing to bind stops the start, so
+             * the app never runs on one of the two without saying so.
              */
-            kestrel.ListenAnyIP(opts.Port);
+            var port = opts.Port == 0 ? FreeLoopbackPort() : opts.Port;
+            kestrel.Listen(IPAddress.Loopback, port);
+            if (HasIpv6Loopback()) kestrel.Listen(IPAddress.IPv6Loopback, port);
             // Each upload has its own ceiling, checked as it arrives (a backup's is 1 GB).
             kestrel.Limits.MaxRequestBodySize = null;
         });
@@ -137,6 +142,48 @@ internal static partial class Server
         var app = builder.Build();
         app.Run(context => Handle(context, opts));
         return app;
+    }
+
+    /// <summary>Can this machine bind IPv6's loopback? Not where IPv6 is switched off.</summary>
+    private static bool HasIpv6Loopback()
+    {
+        if (!Socket.OSSupportsIPv6) return false;
+        try
+        {
+            using var probe = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+            probe.Bind(new IPEndPoint(IPAddress.IPv6Loopback, 0));
+            return true;
+        }
+        catch (SocketException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// A port free on both loopbacks, for port 0 (tests): each address would otherwise be given a
+    /// different one.
+    /// </summary>
+    private static int FreeLoopbackPort()
+    {
+        var ipv6 = HasIpv6Loopback();
+        for (var attempt = 0; ; attempt++)
+        {
+            using var v4 = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            v4.Bind(new IPEndPoint(IPAddress.Loopback, 0));
+            var port = ((IPEndPoint)v4.LocalEndPoint!).Port;
+            if (!ipv6) return port;
+            try
+            {
+                using var v6 = new Socket(AddressFamily.InterNetworkV6, SocketType.Stream, ProtocolType.Tcp);
+                v6.Bind(new IPEndPoint(IPAddress.IPv6Loopback, port));
+                return port;
+            }
+            catch (SocketException) when (attempt < 20)
+            {
+                /* taken on ::1: another */
+            }
+        }
     }
 
     /// <summary>

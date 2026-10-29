@@ -78,7 +78,7 @@ dotnet/
 | 4   | Tracking                      | done        |
 | 5   | Everything that writes        | done        |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
-| 7   | Packaging                     | in progress |
+| 7   | Packaging                     | done        |
 | 8   | Switch-over release           | not started |
 | 9   | Removing the Node app         | not started |
 
@@ -93,7 +93,7 @@ dotnet/
       filter's shape, coercion and `filterNarrows` (`src/tracking-filter.ts`).
 - [x] Eligibility: `eligibilityOf`, `countsSql`, `visibleSql`, `incompleteSql`, `ppColumn`,
       `scoreColumn`, `starsColumn` (`src/calc/eligibility.ts`).
-- [x] Server: listens like Node (all interfaces, dual-stack), refuses every non-loopback
+- [x] Server: listens on both loopbacks only (see Decisions), refuses every non-loopback
       request, `isOwnPage`, static files from `web/`, the score page route.
 - [x] Endpoints: `/api/app`, `GET /api/settings`, `GET /api/app-config`, `GET /api/declined`,
       `GET /api/data-folder`.
@@ -303,8 +303,8 @@ Each proven by the parity script's write stage (below) and ported tests:
 #### Hand-off (2026-10-29)
 
 Pushed to `main`. Phase 5 is done: the last parity run matched every answer. Phase 7
-(packaging) is built and checked on all three platforms; what is left is the listening decision
-under Decisions.
+(packaging) is done: built and checked on all three platforms, listening on the loopbacks only.
+Next is phase 8, the switch-over rehearsal.
 
 **Pitfalls met this session:**
 
@@ -519,13 +519,15 @@ the helpers.
 - **Kestrel** (ASP.NET Core) for HTTP. `HttpListener` on Windows goes through http.sys, which
   needs admin rights to accept anything but `localhost` as the host, and the app is reached as
   `localhost`, `127.0.0.1` and `[::1]`. Kestrel adds a few MB; measure in phase 7.
-- **Listening**: on all interfaces, dual-stack, refusing non-loopback requests in code, as
-  Node does. Binding to both loopbacks instead (`ListenLocalhost`) would avoid the Windows
-  firewall prompt; decide in phase 7, and keep the refusal in code either way.
+- **Listening** (decided 2026-10-29): on `127.0.0.1` and `[::1]` only, unlike Node's every
+  interface, so no other machine reaches the port and Windows shows no firewall prompt. The
+  refusal of non-loopback requests stays in code. `::1` is left out only where the machine
+  cannot bind it, and a failure to bind either stops the start: not `ListenLocalhost`, which
+  carries on with one of the two and a warning.
 - **SQLite** through `Microsoft.Data.Sqlite`. Its native library is fine in .NET; the "no
   native modules" rule is about Node.
 - **xUnit** for tests, run by `dotnet test dotnet/OsuLocalProfiles.slnx`.
 
 ## Open questions
 
-- The firewall prompt (above).
+None.

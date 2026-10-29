@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting.Server;
@@ -15,6 +16,7 @@ public sealed class ServerTests : IAsyncLifetime
     private TempDb? data;
     private WebApplication? app;
     private HttpClient client = new();
+    private int port;
 
     public async Task InitializeAsync()
     {
@@ -32,7 +34,7 @@ public sealed class ServerTests : IAsyncLifetime
         app = Server.Build(new ServerOptions { Db = data.Db, Paths = paths, Config = AppConfig.Load(paths.DataDir), Port = 0 });
         await app.StartAsync();
         var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
-        var port = new Uri(address.Replace("[::]", "localhost").Replace("0.0.0.0", "localhost")).Port;
+        port = new Uri(address).Port;
         client = new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") };
     }
 
@@ -51,6 +53,21 @@ public sealed class ServerTests : IAsyncLifetime
         Assert.Equal("application/json; charset=utf-8", response.Content.Headers.ContentType!.ToString());
         Assert.Equal("no-store", response.Headers.CacheControl!.ToString());
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.Clone();
+    }
+
+    [Fact]
+    public async Task Answers_on_both_loopbacks_and_on_no_other_address()
+    {
+        using var direct = new HttpClient();
+        Assert.Equal(HttpStatusCode.OK, (await direct.GetAsync($"http://127.0.0.1:{port}/api/app")).StatusCode);
+        if (Socket.OSSupportsIPv6) Assert.Equal(HttpStatusCode.OK, (await direct.GetAsync($"http://[::1]:{port}/api/app")).StatusCode);
+
+        // The machine's own network address, where nothing should be listening.
+        var other = Dns.GetHostAddresses(Dns.GetHostName()).FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a));
+        if (other is null) return;
+        using var socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        using var wait = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<Exception>(async () => await socket.ConnectAsync(new IPEndPoint(other, port), wait.Token));
     }
 
     [Fact]
