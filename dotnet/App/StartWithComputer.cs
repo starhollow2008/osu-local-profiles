@@ -197,7 +197,7 @@ internal static partial class StartWithComputer
         {
             await Reg("export", key, file, "/y");
             var text = Encoding.Unicode.GetString(File.ReadAllBytes(file));
-            return text.StartsWith('\uFEFF') ? text[1..] : text;
+            return text.StartsWith((char)0xFEFF) ? text[1..] : text;
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
         {

@@ -396,6 +396,48 @@ internal static partial class Js
     public static long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
     /// <summary>
+    /// <c>decodeURIComponent</c>: every <c>%XX</c> decoded as UTF-8, and a <c>%</c> not followed by
+    /// two hex digits, or bytes that are not UTF-8, throws as JavaScript's <c>URIError</c> does.
+    /// </summary>
+    public static string DecodeUriComponent(string text)
+    {
+        if (!text.Contains('%')) return text;
+        var output = new StringBuilder(text.Length);
+        var bytes = new List<byte>();
+        var strict = new UTF8Encoding(false, throwOnInvalidBytes: true);
+        for (var i = 0; i < text.Length;)
+        {
+            if (text[i] != '%')
+            {
+                output.Append(text[i++]);
+                continue;
+            }
+            bytes.Clear();
+            while (i < text.Length && text[i] == '%')
+            {
+                if (i + 2 >= text.Length || !char.IsAsciiHexDigit(text[i + 1]) || !char.IsAsciiHexDigit(text[i + 2]))
+                {
+                    throw new UriMalformed();
+                }
+                bytes.Add(Convert.ToByte(text.Substring(i + 1, 2), 16));
+                i += 3;
+            }
+            try
+            {
+                output.Append(strict.GetString([.. bytes]));
+            }
+            catch (DecoderFallbackException)
+            {
+                throw new UriMalformed();
+            }
+        }
+        return output.ToString();
+    }
+
+    /// <summary>JavaScript's <c>URIError: URI malformed</c>.</summary>
+    internal sealed class UriMalformed() : Exception("URI malformed");
+
+    /// <summary>
     /// <c>fs.statSync(file).mtimeMs</c> for a time .NET read: libuv splits the file time into whole
     /// seconds and nanoseconds, and Node adds <c>sec * 1000 + nsec / 1e6</c>. Dividing the ticks at
     /// once can round the last digit the other way, and a stamp kept as text then differs.
