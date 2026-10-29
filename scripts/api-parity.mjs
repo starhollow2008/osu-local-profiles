@@ -470,6 +470,11 @@ function writeSteps(file, csData) {
       { path: '/api/beatmaps/find', body: { link: 'nonsense' } },
       { path: '/api/manual-score', body: {} },
 
+      // Pictures of the page and of a score card, by the browser installed here: one app at a
+      // time, since both drive it on one debugging port.
+      { path: '/api/screenshot', method: 'GET', png: true, sequential: true },
+      ...(second ? [{ path: `/api/scores/${second.id}/screenshot`, method: 'GET', png: true, sequential: true }] : []),
+
       // Back up everything, and restoring it: staged and confirmed, never applied under the app.
       { path: '/api/backup', method: 'GET', zip: true },
       { path: '/api/restore', method: 'PUT', raw: 'not a backup at all' },
@@ -706,6 +711,14 @@ async function main() {
         ? [await ask(nodePort, step.path, init), await ask(csPort, step.path, init)]
         : await Promise.all([ask(nodePort, step.path, init), ask(csPort, step.path, init)]);
       const problems = compareMeta(a, b);
+      if (step.png) {
+        // Rendered twice, a moment apart, so the pixels may differ ("3 minutes ago"); the
+        // picture's kind and size may not.
+        const size = (png) => (png.length > 24 && png.subarray(1, 4).toString('latin1') === 'PNG' ? `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}` : 'not a PNG');
+        if (a.status === 200 && size(a.body) !== size(b.body)) problems.push(`picture: node ${size(a.body)} | cs ${size(b.body)}`);
+        report(`${label} (${a.status === 200 ? size(a.body) : 'none'})`, problems, a);
+        continue;
+      }
       if (step.zip) {
         // A zip's compressed bytes differ between Node's zlib and .NET's: its files are compared,
         // the database in it table by table, as the copies' own are.

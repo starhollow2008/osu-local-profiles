@@ -346,7 +346,35 @@ internal static partial class Server
                 await response.SendFileAsync(info.FullName);
                 return;
             }
-            // The card as a PNG needs a browser to render it: phase 5, with the profile's screenshot.
+            /*
+             * The card as a PNG: the score's own page, rendered by an installed browser at osu-web's
+             * 1000px with the page's controls taken off (?export=1), queued behind any other capture.
+             */
+            if (scoreRoute.Groups[2].Value == "/screenshot")
+            {
+                var play = Scores.Detail(db, owner.Id, id, Eligibility.Vanilla);
+                byte[] png;
+                try
+                {
+                    png = await Screenshot.Queued(() => Screenshot.Capture($"http://127.0.0.1:{OwnPort(context, opts)}/scores/{id}?export=1", width: 1000, selector: "#scoreCard"));
+                }
+                catch (Exception e) when (e is not OutOfMemoryException)
+                {
+                    await Json(context, new { error = e.Message }, 503);
+                    return;
+                }
+                // Named as its replay would be, so the two files sort side by side.
+                var name = Scores.ReplayFileName(owner.Name, play?.Artist, play?.Title, play?.Creator?.ToString(), play?.Version?.ToString(),
+                    play is null ? Js.Now() : Convert.ToDouble(play.PlayedAt))[..^4] + ".png";
+                var response = context.Response;
+                response.StatusCode = 200;
+                response.ContentType = "image/png";
+                response.ContentLength = png.Length;
+                response.Headers.ContentDisposition = Scores.AttachmentHeader(name);
+                response.Headers.CacheControl = "no-store";
+                if (method == "GET") await response.Body.WriteAsync(png);
+                return;
+            }
         }
 
         if (pathname == "/api/settings")
@@ -465,6 +493,30 @@ internal static partial class Server
             return;
         }
 
+        // A full-page PNG, rendered by an already-installed Chrome or Edge. Nothing is bundled.
+        if (pathname == "/api/screenshot")
+        {
+            byte[] png;
+            try
+            {
+                png = await Screenshot.Queued(() => Screenshot.Capture($"http://127.0.0.1:{OwnPort(context, opts)}/?export=1"));
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                await Json(context, new { error = e.Message }, 503);
+                return;
+            }
+            // The day in UTC, as toISOString writes it, and the name with anything odd made a dash.
+            var stamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            var name = $"{NotWordChars().Replace(Profiles.Get(db, Current())!.Name, "-")}-{stamp}.png";
+            context.Response.StatusCode = 200;
+            context.Response.ContentType = "image/png";
+            context.Response.Headers.ContentDisposition = $"attachment; filename=\"{name}\"";
+            context.Response.Headers.CacheControl = "no-store";
+            await context.Response.Body.WriteAsync(png);
+            return;
+        }
+
         if (pathname == "/api/profile/reset" && method == "POST")
         {
             await ResetProfile(context, opts, opts.Tracker, Current());
@@ -512,6 +564,14 @@ internal static partial class Server
             await Json(context, new { plays = Declined.List(db, Current()) });
             return;
         }
+
+        if (pathname == "/api/backup")
+        {
+            await BackupEverything(context, opts);
+            return;
+        }
+
+        if (pathname is "/api/restore" or "/api/restore/apply" && await Restore(context, opts, pathname)) return;
 
         if (pathname == "/api/data-folder" && method == "GET")
         {
@@ -580,6 +640,13 @@ internal static partial class Server
         // The translations in web/i18n/, fetched by the page one language at a time.
         [".json"] = "application/json; charset=utf-8",
     };
+
+    /// <summary><c>/[^\w.-]+/g</c>, JavaScript's ASCII <c>\w</c>.</summary>
+    [GeneratedRegex("[^A-Za-z0-9_.-]+")]
+    private static partial Regex NotWordChars();
+
+    /// <summary>The port this app's pages are on, for a browser to load one: the configured one, or the one asked on.</summary>
+    private static int OwnPort(HttpContext context, ServerOptions opts) => opts.Port > 0 ? opts.Port : context.Connection.LocalPort;
 
     [GeneratedRegex(@"^/api/image/(avatar|cover)\z")]
     private static partial Regex ImageRoute();

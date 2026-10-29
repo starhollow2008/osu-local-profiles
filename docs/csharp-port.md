@@ -271,15 +271,18 @@ Done, each proven by the parity script's write stage (below) and ported tests:
       lzma-js's mode 1 (64 KB dictionary, BT2, an end marker) and Java's text encoding gives the
       same bytes (`ReplayWriter.LazerBlock`, pinned by `BuiltReplayTests`).
 
-Waiting, from step 3: `applyPendingRestore` (with backup, step 5) and `pruneUpdateLeftovers`
-(step 7).
+- [x] **Backup and restore** (`Backup.cs`, `Http/BackupApi.cs`): `/api/backup`, `/api/restore` PUT,
+      DELETE and apply, and `applyPendingRestore` then `markRunning` at startup. Zips are read as
+      well as written (`Zip.ReadEntries`, `EntryData`). The parity script compares the two apps'
+      backups file for file, the database in them table by table.
+- [x] **Screenshots** (`Http/Screenshot.cs`): `/api/screenshot` and a score card's `/screenshot`,
+      Chrome or Edge over the DevTools protocol, one capture at a time. The parity script asks
+      each app in turn (they share the debugging port) and compares the pictures' size.
+
+Waiting, from step 3: `pruneUpdateLeftovers` (step 7).
 
 **Next, in this order.** Every handler is in `src/http/server.ts`.
 
-5. **Backup and restore:** `/api/backup`, `/api/restore` PUT, DELETE and apply
-   (`src/backup.ts`), and `applyPendingRestore` then `markRunning` at startup.
-6. **Screenshots:** `/api/screenshot` and a score card's `/screenshot`, through Chrome over CDP
-   (`src/screenshot.ts`). `Browsers.Find` is already ported.
 7. **The updater:** `/api/update*`, the checker and installer (`src/update/*`), `/api/app`'s
    `update` and `updating`, `pruneUpdateLeftovers` at startup, and telling the updater when
    `/api/app-config` changes Auto-update (`autoUpdateChanged`).

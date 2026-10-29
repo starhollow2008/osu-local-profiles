@@ -299,6 +299,33 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_backup_is_downloaded_and_staged_back_only_from_the_apps_own_page()
+    {
+        data.InsertScore(data.ProfileId, "a");
+        // The app's own database lives in data/ beside the pictures; this test's is elsewhere.
+        var response = await client.GetAsync("/api/backup");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/zip", response.Content.Headers.ContentType!.ToString());
+        Assert.Equal($"attachment; filename=\"{Backup.FileName(DateTime.Now)}\"", response.Content.Headers.ContentDisposition!.ToString());
+        var zip = await response.Content.ReadAsByteArrayAsync();
+        Assert.Contains("profiles.db", Zip.ReadEntries(zip).Select(e => e.Name));
+
+        var foreign = new HttpRequestMessage(HttpMethod.Put, "/api/restore") { Content = new ByteArrayContent(zip) };
+        foreign.Headers.TryAddWithoutValidation("origin", "https://example.com");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(foreign)).StatusCode);
+
+        var (status, staged) = await Put("/api/restore", zip);
+        Assert.Equal(HttpStatusCode.OK, status);
+        Assert.Equal(1, staged.GetProperty("profiles")[0].GetProperty("plays").GetInt32());
+        // Nothing would start the app again here, so the page is told to ask for a restart.
+        var (_, applied) = await Post("/api/restore/apply", new { });
+        Assert.False(applied.GetProperty("restarting").GetBoolean());
+        Assert.True(Backup.HasStagedRestore(DataDir));
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync("/api/restore")).StatusCode);
+        Assert.Equal("no backup has been uploaded to restore", Error((await Post("/api/restore/apply", new { })).Body));
+    }
+
+    [Fact]
     public async Task The_welcome_ends_for_good_however_it_is_left()
     {
         ProfileData.OfferWelcome(data.Db);
