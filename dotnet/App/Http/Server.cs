@@ -44,6 +44,9 @@ internal sealed class ServerOptions
     /// <summary>Started by the tray launcher, as <c>/api/state</c> tells the page.</summary>
     public bool FromTray { get; init; }
 
+    /// <summary>osu!'s website, asked only because a button was pressed; replaced in tests.</summary>
+    public Clients.OsuWeb Osu { get; init; } = Clients.OsuWeb.Shared;
+
     /// <summary>The live feed every open page listens to.</summary>
     public LiveFeed Events { get; init; } = new();
 
@@ -402,6 +405,12 @@ internal static partial class Server
         if (pathname == "/api/declined" && method == "POST")
         {
             if (await TrackerOrRefuse() is { } t) await PostDeclined(context, opts, t);
+            return;
+        }
+
+        if (pathname == "/api/favorites" && method == "POST")
+        {
+            await PostFavorites(context, opts, Current());
             return;
         }
 

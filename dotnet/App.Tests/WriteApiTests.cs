@@ -26,6 +26,10 @@ public sealed class WriteApiTests : IAsyncLifetime
 
     private string DataDir => Path.Combine(install, "data");
 
+    /// <summary>What osu! answers, by URL; offline unless a test says otherwise.</summary>
+    private Func<string, HttpResponseMessage> osuAnswers = _ => throw new HttpRequestException("offline");
+    private FakeOsu? osu;
+
     public async Task InitializeAsync()
     {
         Directory.CreateDirectory(Path.Combine(install, "web"));
@@ -49,6 +53,7 @@ public sealed class WriteApiTests : IAsyncLifetime
             Config = config,
             Port = 0,
             Tracker = tracker,
+            Osu = (osu ??= new FakeOsu(url => osuAnswers(url))).Client(),
             Folders = new OsuFolders(config, OsuFolders.SaveInto(paths.DataDir), [], new DiscoveryResult([], [], false), Path.Combine(paths.DataDir, "mcosu")),
         };
         var app = Server.Build(options);
@@ -267,6 +272,30 @@ public sealed class WriteApiTests : IAsyncLifetime
         var (_, deleted) = await Post("/api/profiles", new { action = "delete", id, confirm = true });
         Assert.Equal(data.ProfileId, deleted.GetProperty("nextActive").GetInt64());
         Assert.Equal(1, deleted.GetProperty("profiles").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task A_favourite_is_saved_first_and_described_by_osu_when_it_answers()
+    {
+        Assert.Equal("a beatmapset id is needed", Error((await Post("/api/favorites", new { action = "add", beatmapsetId = 1.5 })).Body));
+        Assert.Equal("action must be add or remove", Error((await Post("/api/favorites", new { action = "toggle", beatmapsetId = 1 })).Body));
+
+        // Offline: kept regardless, with why osu! could not describe it.
+        var (_, offline) = await Post("/api/favorites", new { action = "add", beatmapsetId = 8495 });
+        Assert.Equal("[8495]", offline.GetProperty("favorites").GetRawText());
+        Assert.Equal("could not reach osu.ppy.sh", offline.GetProperty("detailsError").GetString());
+
+        // Back online, the next press fills in what is missing.
+        osuAnswers = url => FakeOsu.Answer(FakeOsu.BeatmapsetPage(
+            $$"""{"id":{{url.Split('/')[^1]}},"title":"t","artist":"a","status":"ranked","video":false,"beatmaps":[]}"""));
+        var (_, online) = await Post("/api/favorites", new { action = "add", beatmapsetId = 100 });
+        Assert.Equal(JsonValueKind.Null, online.GetProperty("detailsError").ValueKind);
+        // The one just added first, then those still missing.
+        Assert.Equal(["https://osu.ppy.sh/beatmapsets/100", "https://osu.ppy.sh/beatmapsets/8495"], osu!.Asked.Skip(1));
+        Assert.Equal(2L, data.Db.Scalar("SELECT COUNT(*) FROM beatmapset_details"));
+
+        var (_, removed) = await Post("/api/favorites", new { action = "remove", beatmapsetId = 100 });
+        Assert.Equal("[8495]", removed.GetProperty("favorites").GetRawText());
     }
 
     [Fact]

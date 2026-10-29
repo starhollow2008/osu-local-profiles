@@ -224,6 +224,73 @@ internal static class Favorites
         };
     }
 
+    /* ------------------------------------------------------------- the writing half */
+
+    /// <summary>Favourite a set; false when it already was.</summary>
+    public static bool Add(Database db, FavoriteScope scope, double beatmapsetId, double? now = null)
+    {
+        var at = now ?? Js.Now();
+        return scope.Shared
+            ? db.Run("INSERT OR IGNORE INTO shared_favorite_beatmapsets (beatmapset_id, favorited_at) VALUES (?, ?)", beatmapsetId, at) > 0
+            : db.Run("INSERT OR IGNORE INTO favorite_beatmapsets (profile_id, beatmapset_id, favorited_at) VALUES (?, ?, ?)", scope.ProfileId, beatmapsetId, at) > 0;
+    }
+
+    /// <summary>
+    /// Unfavourite a set. From the shared list it goes from every profile's own too, so switching
+    /// sharing off later cannot bring it back.
+    /// </summary>
+    public static bool Remove(Database db, FavoriteScope scope, double beatmapsetId) => db.Serialized(() =>
+    {
+        if (scope.Shared)
+        {
+            var removed = db.Run("DELETE FROM shared_favorite_beatmapsets WHERE beatmapset_id = ?", beatmapsetId) > 0;
+            db.Run("DELETE FROM favorite_beatmapsets WHERE beatmapset_id = ?", beatmapsetId);
+            return removed;
+        }
+        return db.Run("DELETE FROM favorite_beatmapsets WHERE profile_id = ? AND beatmapset_id = ?", scope.ProfileId, beatmapsetId) > 0;
+    });
+
+    /// <summary>
+    /// An account's favourites, copied in with their details; how many were new. A millisecond apart,
+    /// so the first in osu!'s list stays the newest here too.
+    /// </summary>
+    public static int Import(Database db, FavoriteScope scope, IReadOnlyList<BeatmapsetDetails> sets, double? now = null)
+    {
+        var at = now ?? Js.Now();
+        var added = 0;
+        db.Transaction(() =>
+        {
+            for (var index = 0; index < sets.Count; index++)
+            {
+                SaveDetails(db, sets[index], at);
+                if (Add(db, scope, sets[index].Id, at - index)) added++;
+            }
+        });
+        return added;
+    }
+
+    /// <summary>What osu.ppy.sh said about a set, kept as <c>JSON.stringify</c> wrote it.</summary>
+    public static void SaveDetails(Database db, BeatmapsetDetails details, double? now = null) => db.Run("""
+        INSERT INTO beatmapset_details (beatmapset_id, data, fetched_at) VALUES (?, ?, ?)
+        ON CONFLICT(beatmapset_id) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at
+        """, details.Id, JsonText.Stringify(details), now ?? Js.Now());
+
+    /// <summary>
+    /// Favourites osu.ppy.sh has not described yet, most recent first, and ones described before the
+    /// card kept the video and storyboard flags: the ones worth a retry.
+    /// </summary>
+    public static List<double> MissingDetails(Database db, FavoriteScope scope, int limit)
+    {
+        var (table, where, args) = Resolve(scope);
+        return [.. db.Rows($"""
+            SELECT f.beatmapset_id FROM {table} f
+              LEFT JOIN beatmapset_details d ON d.beatmapset_id = f.beatmapset_id
+             WHERE {where}
+               AND (d.beatmapset_id IS NULL OR json_type(d.data, '$.video') IS NULL)
+             ORDER BY f.favorited_at DESC LIMIT ?
+            """, [.. args, limit]).Select(r => Convert.ToDouble(r["beatmapset_id"]))];
+    }
+
     /// <summary>
     /// Bring the two lists together when sharing is switched, so nothing is lost either way: on,
     /// every profile's own favourites join the shared list; off, the shared list is copied into

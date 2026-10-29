@@ -85,7 +85,7 @@ public sealed class ServerTests : IAsyncLifetime
     {
         var response = await client.GetAsync("/api/backup");
         Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
-        Assert.Equal(HttpStatusCode.NotImplemented, (await client.PostAsync("/api/favorites", new StringContent("{}"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotImplemented, (await client.PostAsync("/api/pp-source", new StringContent("{}"))).StatusCode);
     }
 
     [Fact]

@@ -79,23 +79,6 @@ public class OsuWebTests
         Assert.Equal(RequestGate.DefaultPauseMs, RequestGate.RetryAfterMs("soon", now));
     }
 
-    /// <summary>osu!, answering from a function: the real client and gate, with no time between turns.</summary>
-    private sealed class FakeOsu(Func<string, HttpResponseMessage> answer) : HttpMessageHandler
-    {
-        public List<string> Asked { get; } = [];
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Asked.Add(request.RequestUri!.ToString());
-            return Task.FromResult(answer(request.RequestUri!.ToString()));
-        }
-    }
-
-    private static OsuWeb Client(FakeOsu osu) => new(osu, new RequestGate(0));
-
-    private static HttpResponseMessage Answer(string body, HttpStatusCode status = HttpStatusCode.OK) =>
-        new(status) { Content = new StringContent(body, Encoding.UTF8) };
-
     [Fact]
     public async Task The_favourites_import_has_no_cap_ends_on_a_page_with_nothing_new_and_waits_out_a_429()
     {
@@ -113,10 +96,10 @@ public class OsuWebTests
             }
             // Two pages of a hundred, then osu! repeating the last one rather than ending.
             var page = offset >= 200 ? 100 : offset;
-            return Answer($"[{string.Join(",", Enumerable.Range(page + 1, 100).Select(Set))}]");
+            return FakeOsu.Answer($"[{string.Join(",", Enumerable.Range(page + 1, 100).Select(Set))}]");
         });
         var progress = new List<int>();
-        var sets = await Client(osu).FetchFavouriteBeatmapsets(42, progress.Add);
+        var sets = await osu.Client().FetchFavouriteBeatmapsets(42, progress.Add);
         Assert.Equal(200, sets.Count);
         Assert.Equal([100, 200, 200], progress);
         Assert.Equal(4, osu.Asked.Count);
@@ -126,23 +109,23 @@ public class OsuWebTests
     public async Task A_lookup_says_what_went_wrong_in_words_worth_showing()
     {
         var html = """<div data-initial-data="{&quot;user&quot;:{&quot;id&quot;:3119700,&quot;username&quot;:&quot;Tangy&quot;,&quot;country&quot;:{&quot;code&quot;:&quot;NZ&quot;},&quot;page&quot;:{&quot;raw&quot;:&quot;  &quot;},&quot;previous_usernames&quot;:[&quot;old&quot;,&quot;&quot;,5]}}"></div>""";
-        var osu = new FakeOsu(url => url.EndsWith("/Tangy", StringComparison.Ordinal) ? Answer(html)
-            : url.EndsWith("/broken", StringComparison.Ordinal) ? Answer("<html></html>")
-            : Answer("", HttpStatusCode.NotFound));
-        var user = await Client(osu).LookupUser("https://osu.ppy.sh/users/Tangy/mania");
+        var osu = new FakeOsu(url => url.EndsWith("/Tangy", StringComparison.Ordinal) ? FakeOsu.Answer(html)
+            : url.EndsWith("/broken", StringComparison.Ordinal) ? FakeOsu.Answer("<html></html>")
+            : FakeOsu.Answer("", HttpStatusCode.NotFound));
+        var user = await osu.Client().LookupUser("https://osu.ppy.sh/users/Tangy/mania");
         Assert.Equal(3119700, user.Id);
         Assert.Equal("NZ", user.CountryCode);
         Assert.Null(user.PageRaw);
         Assert.Equal(["old"], user.PreviousUsernames);
         Assert.Equal("https://osu.ppy.sh/users/Tangy", osu.Asked[0]);
 
-        Assert.Equal("osu! has no user called \"nobody\"", (await Assert.ThrowsAsync<NoSuchUser>(() => Client(osu).LookupUser("nobody"))).Message);
-        Assert.StartsWith("osu.ppy.sh answered, but", (await Assert.ThrowsAsync<InvalidOperationException>(() => Client(osu).LookupUser("broken"))).Message);
+        Assert.Equal("osu! has no user called \"nobody\"", (await Assert.ThrowsAsync<NoSuchUser>(() => osu.Client().LookupUser("nobody"))).Message);
+        Assert.StartsWith("osu.ppy.sh answered, but", (await Assert.ThrowsAsync<InvalidOperationException>(() => osu.Client().LookupUser("broken"))).Message);
         Assert.Equal("that does not look like an osu! username, user id or profile link",
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => Client(osu).LookupUser("me@example.com"))).Message);
-        Assert.Equal("URI malformed", (await Assert.ThrowsAsync<Js.UriMalformed>(() => Client(osu).LookupUser("%E0%A4%A"))).Message);
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => osu.Client().LookupUser("me@example.com"))).Message);
+        Assert.Equal("URI malformed", (await Assert.ThrowsAsync<Js.UriMalformed>(() => osu.Client().LookupUser("%E0%A4%A"))).Message);
 
-        var offline = new OsuWeb(new FakeOsu(_ => throw new HttpRequestException("no route")), new RequestGate(0));
+        var offline = new FakeOsu(_ => throw new HttpRequestException("no route")).Client();
         Assert.Equal("could not reach osu.ppy.sh -- check your connection, or type a name instead",
             (await Assert.ThrowsAsync<InvalidOperationException>(() => offline.LookupUser("Tangy"))).Message);
     }
@@ -157,11 +140,11 @@ public class OsuWebTests
             return response;
         }
         var osu = new FakeOsu(url => Image(url.EndsWith("png", StringComparison.Ordinal) ? "image/PNG; charset=x" : "constructor"));
-        Assert.Equal(".png", (await Client(osu).DownloadImage("https://a.ppy.sh/1.png")).Extension);
+        Assert.Equal(".png", (await osu.Client().DownloadImage("https://a.ppy.sh/1.png")).Extension);
         Assert.Equal("that is not an image this can use (constructor)",
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => Client(osu).DownloadImage("https://a.ppy.sh/1"))).Message);
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => osu.Client().DownloadImage("https://a.ppy.sh/1"))).Message);
         Assert.Equal("could not download that image",
-            (await Assert.ThrowsAsync<InvalidOperationException>(() => Client(osu).DownloadImage("not a url"))).Message);
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => osu.Client().DownloadImage("not a url"))).Message);
     }
 
     [Fact]
