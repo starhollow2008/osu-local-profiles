@@ -40,8 +40,9 @@ dotnet/
 - `npm run check:port` runs the C# tests (CI's `port` job runs them on all three systems).
   `npm run parity:api` starts both apps on copies of `data/` and compares every ported answer;
   it needs an osu! installation, so it runs on a player's machine, not in CI.
-- `dotnet run --project dotnet/App` serves this checkout's `data/` read-only on its configured
-  port. Stop the Node app first, or give the port its own folder with `-- --root <dir>`.
+- `dotnet run --project dotnet/App` runs the app on this checkout's `data/`, writing to it as
+  the Node app does. While a Node app answers on the same port it only opens that one's page. To
+  try something out, give it a folder of its own with `-- --root <dir>`.
 - `src/db/schema.sql` is embedded into the app from where it is, so there is one schema.
 - `web/` is served from the install root, as now.
 - The weekly maintenance job keeps updating `tools/PpCalculator/PpCalculator.csproj`. Phase 3
@@ -53,9 +54,9 @@ dotnet/
 1. **The Node app is the product.** Fixes and features land there first, as now. Anything that
    changes behaviour the C# app already ports gets the same change there, in the same commit
    when it can.
-2. **The C# app opens the database read-only** unless started with `--writable`. Until it is
-   finished it must not be able to damage real data. The parity script and the tests run it
-   writable against copies.
+2. **Only on copies until it ships.** Until phase 5 the C# app opened the database read-only
+   unless started with `--writable`; it now writes as the Node app does, so try it on a copy
+   (`--root`), as the parity script and the tests do.
 3. **Ported means proven.** A module is ported when its tests are ported and pass, and an
    endpoint is ported when `scripts/api-parity.mjs` finds its answers identical to the Node
    app's on a copy of real data. Any difference that is kept on purpose is listed in the
@@ -75,7 +76,7 @@ dotnet/
 | 2   | Reading a profile             | done        |
 | 3   | pp in-process                 | done        |
 | 4   | Tracking                      | done        |
-| 5   | Everything that writes        | in progress |
+| 5   | Everything that writes        | done        |
 | 6   | Updater bridge (Node release) | built, ships with the next release |
 | 7   | Packaging                     | not started |
 | 8   | Switch-over release           | not started |
@@ -232,11 +233,10 @@ The calculator built from the player's osu! source (5.70, `src/pp-source.ts`,
 SSE feed (`/api/events`, same event names and payloads),
 backup and restore, uploads, screenshots (Chrome over CDP), start with the computer,
 the update checker and its installer half (`src/update/*`), the pp source switch.
-The database opens writable by default from here.
 
-#### Where phase 5 stands (2026-10-28)
+#### Where phase 5 stands (2026-10-29): done
 
-Done, each proven by the parity script's write stage (below) and ported tests:
+Each proven by the parity script's write stage (below) and ported tests:
 
 - [x] **The live feed** (`Http/LiveFeed.cs`): `/api/events` with `retry: 2000`, a ping every
       20s, and every tracker event under Node's names and payloads. Each page has its own queue,
@@ -253,7 +253,7 @@ Done, each proven by the parity script's write stage (below) and ported tests:
       `suggestions`, `unlink` and `clear-image`, `/api/installs` (`Clients/Folders.cs`),
       `/api/startup` (`StartWithComputer.cs`), `/api/data-folder/open`.
 - [x] **Startup writes**: `seedSeenVersion`, `offerWelcome` on a first run,
-      `syncFavoriteSharing`. A read-only copy refuses every write with 403.
+      `syncFavoriteSharing`.
 - [x] Found on the way: Microsoft.Data.Sqlite refuses to bind NaN, where SQLite and node:sqlite
       make it NULL (`Number(body.id)` of a missing id); and the C# file times rounded the last
       digit of `mtimeMs` differently, so lazer's `online.db` stamp differed (`Js.MtimeMs`).
@@ -270,7 +270,6 @@ Done, each proven by the parity script's write stage (below) and ported tests:
       a built replay is compressed as lzma-js compresses it: SharpCompress's encoder with
       lzma-js's mode 1 (64 KB dictionary, BT2, an end marker) and Java's text encoding gives the
       same bytes (`ReplayWriter.LazerBlock`, pinned by `BuiltReplayTests`).
-
 - [x] **Backup and restore** (`Backup.cs`, `Http/BackupApi.cs`): `/api/backup`, `/api/restore` PUT,
       DELETE and apply, and `applyPendingRestore` then `markRunning` at startup. Zips are read as
       well as written (`Zip.ReadEntries`, `EntryData`). The parity script compares the two apps'
@@ -278,40 +277,33 @@ Done, each proven by the parity script's write stage (below) and ported tests:
 - [x] **Screenshots** (`Http/Screenshot.cs`): `/api/screenshot` and a score card's `/screenshot`,
       Chrome or Edge over the DevTools protocol, one capture at a time. The parity script asks
       each app in turn (they share the debugging port) and compares the pictures' size.
+- [x] **The updater** (`Update/Updater.cs`, `Http/UpdateApi.cs`): the GitHub check, the waiting
+      build (`data/update/ready.json`), install at a deliberate quit and at a start, the hand-off
+      to the release's own swapper, `pruneUpdateLeftovers`, Auto-update and the launcher's
+      metered message, `/api/update*`, and `/api/app`'s `update` and `updating`. "Packaged"
+      means `app/osu-local-profiles-app(.exe)` is beside `package.json` (phase 6's
+      `nativeAppFor`), so a source checkout and the parity copies are refused as Node's are.
+      Releases unpack with `Zip.Extract`, which keeps Unix modes.
+- [x] **The pp source switch** (5.70; `PpSource.cs`, `Calc/SourceHelper.cs`): `/api/pp-source`
+      and its `pp-source` events, the build from the player's clone, and `startupCalculator`.
+      That helper stays a separate process (`HelperProcess` in `Calc/Official.cs`: a ready line
+      first, one JSON request per line, 30s timeouts, "calculator exited" when it dies); the
+      release is still in-process. What prices now is the tracker's calculator
+      (`ServerOptions.CalculatorVersion`), since a switch replaces it. The build itself, against
+      a real clone, is checked by hand as in Node (roadmap 5.70).
+- [x] **Writable by default**: `--writable` and the read-only mode are gone, and so is the 501
+      for unported paths: an unknown `/api/` path is a 404 `not found`, as Node's static files
+      answer it.
+- [x] Found on the way: `NodePath.Resolve` kept a trailing separator that `path.resolve` drops,
+      so a folder added in Options as `C:\osu\` was stored differently. And a `helper.json` whose
+      `source` is not text threw at a Node launch (`readSourceHelper`, fixed in Node first). The
+      parity script's requests went through `fetch`, which gives up when an answer's headers take
+      more than five minutes, as the account import does: it uses `node:http` now.
 
-- [ ] **The updater** (`Update/Updater.cs`, `Http/UpdateApi.cs`): built, its tests pass, **parity
-      not yet confirmed** (see the hand-off below). The GitHub check, the waiting build
-      (`data/update/ready.json`), install at a deliberate quit and at a start, the hand-off to the
-      release's own swapper, `pruneUpdateLeftovers`, Auto-update and the launcher's metered
-      message, `/api/update*`, and `/api/app`'s `update` and `updating`. "Packaged" means
-      `app/osu-local-profiles-app(.exe)` is beside `package.json` (phase 6's `nativeAppFor`), so a
-      source checkout and the parity copies are refused as Node's are. Releases unpack with
-      `Zip.Extract`, which keeps Unix modes.
+#### Hand-off (2026-10-29)
 
-#### Hand-off (2026-10-28, second session)
-
-Pushed nothing; every commit below is on local `main`. The session stopped part-way through a
-parity run of the updater, which was stopped and its work folder cleaned up.
-
-**First, finish step 7:** run `node scripts/api-parity.mjs` (about 15 minutes now: it imports the
-owner's osu! account into a scratch profile, one app at a time). The write stage has new steps
-for the updater (`/api/update` GET and POST, `later`, `apply`, `seen`, `dismiss`, a foreign
-Origin). If everything matches, tick the updater above. The first run with the updater wired in
-had matched every step it reached (through `/api/startup`) before it was stopped.
-
-**Then, in this order.** Every handler is in `src/http/server.ts`.
-
-8. **The pp source switch** (5.70): `/api/pp-source`, `src/pp-source.ts`,
-   `src/calc/source-helper.ts`. The helper built from the player's source stays a separate
-   process, so `Calc/Official.cs` needs a second way to answer: `Send` calls
-   `Program.Respond` in-process today; add a child-process backend speaking the same JSON lines
-   as `src/calc/official.ts` (ready line first, one request per line, 30s timeouts, "calculator
-   exited" when it dies), labelled with the source's version. `Tracker.SwitchCalculator`
-   exists. Then `Program.cs`'s `calculatorProblem` branch becomes `startupCalculator`. The
-   `/api/pp-source` answers can be compared with no source configured (404 in Node only when
-   there is no service; check what it answers) and with a nonexistent folder.
-9. **Make writable the default**, and remove the `--writable` flag. Then the 501 fallback goes,
-   so an unknown `/api/` path answers 404 `not found` as Node's static files do.
+Pushed nothing; every commit is on local `main`. Phase 5 is done: the last parity run matched
+every answer. Next is phase 7 (packaging).
 
 **Pitfalls met this session:**
 
@@ -343,7 +335,8 @@ junctions into this checkout (`web`, `node_modules`, `tools`): unlink them befor
 
 - `npm run check`: the Node typecheck and tests. Run it before every commit.
 - `npm run check:port`: the C# tests.
-- `node scripts/api-parity.mjs`: every API answer of both apps (about 5 minutes).
+- `node scripts/api-parity.mjs`: every API answer of both apps (about 15 minutes: it imports the
+  owner's osu! account into a scratch profile, one app at a time).
 - `node scripts/port-checks.mjs [--only <check>]`: replays, index, resolve, ingest, mcosu,
   backfill and discover against the Node app's own code (about 15 minutes in all).
 
@@ -463,8 +456,9 @@ the helpers.
 - **`in` on an object** also finds inherited names (`"constructor" in {}` is true). Where the
   TypeScript used it to check a name against a table, the C# checks the table's own keys; fix
   the TypeScript to `Object.hasOwn` when found.
-- **Unported endpoints** answer 501 in the port, where Node answers 404 for a path it doesn't
-  know at all. The 501 fallback goes when phase 5 is done, so every path answers as Node's does.
+- **Paths**: `path.join` and `path.resolve` normalise where `Path.Combine` doesn't, and
+  `path.resolve` drops a trailing separator (`C:\osu\` is `C:\osu`): `NodePath.Join` and
+  `NodePath.Resolve`, wherever a path is stored or compared.
 - **Writing the C# sources**: write special characters as code points, such as `(char)0x2028`,
   never as escape sequences in string literals or as the characters themselves. A literal U+2028
   or U+2029 is a line break to the C# compiler, and some editing tools turn escapes into literals.

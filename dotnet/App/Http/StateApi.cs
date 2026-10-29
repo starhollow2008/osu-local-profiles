@@ -158,16 +158,12 @@ internal static class StateApi
              */
             ppCalculator = new
             {
-                version = opts.Calculator?.Version,
-                source = new
-                {
-                    source = opts.PpSource,
-                    version = opts.PpSource.Length == 0 ? null : opts.Calculator?.Version,
-                    building = (object?)null,
-                    error = opts.CalculatorProblem,
-                },
+                version = opts.CalculatorVersion,
+                // The player's own osu! source, when that is what prices (roadmap 5.70); null when the
+                // page cannot offer it at all.
+                source = opts.PpSource?.State(),
                 recalculating = tracker?.IsRecalculating ?? false,
-                outdated = opts.Calculator?.Version is { } current ? OutdatedPp(db, profileId, current) : 0,
+                outdated = opts.CalculatorVersion is { } current ? OutdatedPp(db, profileId, current) : 0,
             },
             // The tracker's profile, as the Node app reads it.
             staleScores = tracker is null ? StaleScores(db, profileId) : tracker.StaleScores,

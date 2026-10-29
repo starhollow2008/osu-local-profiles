@@ -29,17 +29,23 @@ internal sealed class ServerOptions
     /// <summary>The osu! installs found at the start.</summary>
     public IReadOnlyList<Clients.OsuInstall> Installs { get; init; } = [];
 
-    /// <summary>What watches osu! and writes its plays; null in a read-only copy, which tracks nothing.</summary>
+    /// <summary>What watches osu! and writes its plays; null in tests that need none, where nothing is tracked.</summary>
     public Tracker.PlayTracker? Tracker { get; init; }
 
-    /// <summary>osu!'s calculators, in-process; null when they could not be loaded, and then no pp is stored.</summary>
+    /// <summary>
+    /// The calculator a copy with no tracker answers with; null when it could not be loaded. A tracker
+    /// has its own, which <see cref="PpSource"/> can switch.
+    /// </summary>
     public OfficialCalculator? Calculator { get; init; }
 
-    /// <summary>The osu! source folder pricing scores in place of the release (roadmap 5.70), or empty.</summary>
-    public string PpSource { get; init; } = "";
+    /// <summary>What prices scores now: the tracker's calculator when there is a tracker.</summary>
+    public string? CalculatorVersion => Tracker is { } t ? t.CalculatorVersion : Calculator?.Version;
 
-    /// <summary>Why the calculator wanted could not be had at the start, for Settings to say.</summary>
-    public string? CalculatorProblem { get; init; }
+    /// <summary>
+    /// Settings, pp calculator: the player's osu! source or the release (roadmap 5.70). Null where the
+    /// page cannot offer it at all.
+    /// </summary>
+    public PpSource? PpSource { get; init; }
 
     /// <summary>Started by the tray launcher, as <c>/api/state</c> tells the page.</summary>
     public bool FromTray { get; init; }
@@ -111,6 +117,8 @@ internal static partial class Server
         opts.Cache ??= new ProfileCache(opts.Db);
         // A newer release found while the app runs, or a download finishing: the page follows live.
         if (opts.Updater is { } updater) updater.Changed += (_, found) => opts.Events.Broadcast("update", StateApi.UpdateView(opts, found));
+        // A build from the player's osu! source, or a switch: what Settings shows, as it happens.
+        if (opts.PpSource is { } ppSource) ppSource.Changed += state => opts.Events.Broadcast("pp-source", state);
         if (opts.Tracker is { } tracker)
         {
             opts.Events.Follow(tracker);
@@ -188,14 +196,6 @@ internal static partial class Server
         }
 
         var db = opts.Db;
-
-        // A copy opened read-only (no --writable) changes nothing: not the database, config.json
-        // or a picture. Quit stops it, which writes nothing.
-        if (!db.Writable && method is "POST" or "PUT" or "DELETE" && pathname != "/api/quit")
-        {
-            await Json(context, new { error = "this copy is read-only: start it with --writable to change anything" }, 403);
-            return;
-        }
 
         long Current() => Profiles.ActiveId(db);
         ProfileSettings SettingsFor(long profileId) => SettingsStore.Get(db, profileId, opts.Config.SettingsFallbacks());
@@ -310,7 +310,7 @@ internal static partial class Server
                 {
                     score = detail,
                     // What prices scores now, so the card can say when this one came from another.
-                    calculator = opts.Calculator?.Version,
+                    calculator = opts.CalculatorVersion,
                     owner = new
                     {
                         id = owner.Id,
@@ -406,6 +406,12 @@ internal static partial class Server
         {
             if (method != "POST") await Json(context, new { config = opts.Config.PageView() });
             else await PostAppConfig(context, opts);
+            return;
+        }
+
+        if (pathname == "/api/pp-source")
+        {
+            await PpSourceRoute(context, opts);
             return;
         }
 
@@ -626,14 +632,6 @@ internal static partial class Server
             // Named by their content's hash, so a name never comes to mean another image.
             context.Response.Headers.CacheControl = "max-age=31536000, immutable";
             await context.Response.Body.WriteAsync(bytes);
-            return;
-        }
-
-        // Everything else under /api/ is still the Node app's (docs/csharp-port.md). A me! image
-        // that is not there falls through to the static files and their 404, as in Node.
-        if (pathname.StartsWith("/api/", StringComparison.Ordinal) && !Identity.IsAboutImageRoute(pathname))
-        {
-            await Json(context, new { error = $"{method} {pathname} is not ported yet" }, 501);
             return;
         }
 

@@ -101,7 +101,7 @@ internal static class ProfileApi
                 e.CountUnsubmitted,
                 // Priced by the player's own osu! source rather than a release: the one departure from
                 // osu! that is about the formula itself, so the note has to say it.
-                ppSource = opts.PpSource.Length > 0 ? opts.Calculator?.Version : null,
+                ppSource = opts.PpSource is { } service && service.State().Source.Length > 0 ? opts.CalculatorVersion : null,
             },
             rank = Ranks.Estimate(stats.TotalPp, mode),
             rankSource = table is null ? null : new { table.Dump, table.Sampled },

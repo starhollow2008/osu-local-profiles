@@ -146,7 +146,8 @@ const rootOf = (dataDir: string) => path.join(dataDir, 'pp-source');
 export function readSourceHelper(dataDir: string): SourceHelper | null {
   try {
     const helper = JSON.parse(fs.readFileSync(path.join(rootOf(dataDir), 'helper.json'), 'utf8')) as SourceHelper;
-    if (typeof helper.version !== 'string' || typeof helper.dir !== 'string') return null;
+    // A source that is not text names no folder, and path.resolve would throw on it at a launch.
+    if (typeof helper.version !== 'string' || typeof helper.dir !== 'string' || typeof helper.source !== 'string') return null;
     return fs.existsSync(path.join(helper.dir, 'osu-pp.dll')) ? helper : null;
   } catch {
     return null;

@@ -20,6 +20,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
+import http from 'node:http';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -183,9 +184,28 @@ function differences(a, b, at = '', ignore = {}) {
   return [...keys].flatMap((key) => differences(a[key], b[key], `${at}.${key}`, ignore));
 }
 
-async function ask(port, pathname, init) {
-  const r = await fetch(`http://localhost:${port}${pathname}`, init);
-  return { status: r.status, headers: Object.fromEntries(HEADERS.map((h) => [h, r.headers.get(h)])), body: Buffer.from(await r.arrayBuffer()) };
+/**
+ * One request, answered whenever it is answered. Not `fetch`, which gives up on an answer whose
+ * headers take more than five minutes: importing a whole osu! account takes longer than that.
+ */
+function ask(port, pathname, init) {
+  const body = init?.body === undefined ? null : Buffer.isBuffer(init.body) ? init.body : Buffer.from(init.body, 'utf8');
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { host: 'localhost', port, path: pathname, method: init?.method ?? 'GET', headers: { ...(body ? { 'content-length': body.length } : {}), ...init?.headers } },
+      (res) => {
+        const chunks = [];
+        res.on('data', (c) => chunks.push(c));
+        res.on('end', () => {
+          const headers = Object.fromEntries(HEADERS.map((h) => [h, res.headers[h] === undefined ? null : String(res.headers[h])]));
+          resolve({ status: res.statusCode, headers, body: Buffer.concat(chunks) });
+        });
+        res.on('error', reject);
+      },
+    );
+    req.on('error', reject);
+    req.end(body ?? undefined);
+  });
 }
 
 /* ---------------------------------------------------------------- the writes */
@@ -374,6 +394,8 @@ function writeSteps(file, csData) {
     const otherPlayer = db.prepare("SELECT id FROM declined_plays WHERE profile_id = ? AND reason = 'another-player' ORDER BY declined_at DESC LIMIT 1").get(active)?.id;
     const arriving = { events: 'rank events still arriving', 'totals.events': 'the same' };
     const checked = { checkedAt: 'the moment each app asked GitHub' };
+    // Once both apps have asked, /api/state carries that moment in every answer after.
+    const stateChecked = { 'app.update.checkedAt': 'the moment each app asked GitHub' };
 
     return [
       { path: '/api/welcome' },
@@ -424,6 +446,13 @@ function writeSteps(file, csData) {
       { path: '/api/installs', body: { add: '  ' } },
       { path: '/api/installs', body: { add: path.join(csData, 'no such folder') }, ignore: { error: 'each app names its own copy of data/' } },
       { path: '/api/installs', body: {} },
+      // Settings -> pp calculator. Each refusal comes before anything is built or switched, so
+      // neither app writes config.json, and the error stays in /api/state until the next try.
+      { path: '/api/pp-source', method: 'GET' },
+      { path: '/api/pp-source', body: {} },
+      { path: '/api/pp-source', body: { source: 5 } },
+      { path: '/api/pp-source', body: { source: path.join(csData, 'no such folder') }, after: [{ path: '/api/pp-source', method: 'GET' }] },
+      { path: '/api/pp-source', body: { source: `  ${csData}  ` }, after: [{ path: '/api/pp-source', method: 'GET' }, { path: '/api/state' }] },
       { path: '/api/startup', method: 'GET' },
       { path: '/api/backfill/preview', body: { since: 0, sources: ['replays', 'unfinished', 'attempts'] } },
       { path: '/api/backfill/preview', body: { since: monthAgo, until: monthAgo } },
@@ -486,7 +515,7 @@ function writeSteps(file, csData) {
 
       // The update check, asked of GitHub once by each app in turn, and what this copy refuses.
       { path: '/api/update', method: 'GET' },
-      { path: '/api/update', sequential: true, ignore: checked, after: [{ path: '/api/state', ignore: { 'app.update.checkedAt': 'the moment each app asked' } }, { path: '/api/app', ignore: { pid: 'each app is its own process' } }] },
+      { path: '/api/update', sequential: true, ignore: checked, after: [{ path: '/api/state', ignore: { ...created, ...stateChecked } }, { path: '/api/app', ignore: { pid: 'each app is its own process' } }] },
       { path: '/api/update/later', body: {}, headers: { origin: 'https://example.com' } },
       { path: '/api/update/later', body: {} },
       { path: '/api/update/apply', body: {} },
@@ -519,7 +548,7 @@ function writeSteps(file, csData) {
       { path: '/api/profiles', body: { action: 'rename', id: nextProfile, name: 'Parity renamed' }, ignore: created },
       { path: '/api/profiles', body: { action: 'switch', id: active }, ignore: created },
       { path: '/api/profiles', body: { action: 'delete', id: nextProfile } },
-      { path: '/api/profiles', body: { action: 'delete', id: nextProfile, confirm: true }, after: [{ path: '/api/state', ignore: created }] },
+      { path: '/api/profiles', body: { action: 'delete', id: nextProfile, confirm: true }, after: [{ path: '/api/state', ignore: { ...created, ...stateChecked } }] },
       ...(otherPlayer ? [{ path: '/api/declined', body: { action: 'its-me', id: otherPlayer }, sequential: true }] : []),
       { path: '/api/declined', body: { action: 'its-me', id: 99_999_999 } },
       { path: '/api/recompute', body: { confirm: true, all: true }, sequential: true, after: [profile(0)] },
@@ -559,7 +588,7 @@ async function main() {
     const log = (name) => fs.openSync(path.join(work, `${name}.log`), 'w');
     const nodeApp = spawn(process.execPath, ['src/main.ts'], { cwd: nodeRoot, stdio: ['pipe', log('node'), log('node-err')] });
     // Writable, as the Node app is: both track, each on its own copy.
-    const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot, '--writable'], { stdio: ['pipe', log('cs'), log('cs-err')] });
+    const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot], { stdio: ['pipe', log('cs'), log('cs-err')] });
     children.push(nodeApp, csApp);
 
     console.log(`  starting both apps (logs in ${work})`);

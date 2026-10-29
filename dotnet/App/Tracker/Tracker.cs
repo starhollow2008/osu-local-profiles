@@ -630,7 +630,9 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         if (recalculation is not null) throw new InvalidOperationException("scores are already being recalculated");
         await Enqueue(() =>
         {
+            var old = calculator;
             calculator = next;
+            if (!ReferenceEquals(old, next)) old?.Dispose();
             return Task.FromResult(0);
         });
         onSwapped?.Invoke();

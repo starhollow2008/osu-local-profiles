@@ -180,6 +180,38 @@ internal static partial class Server
     /// writes the file the app needs to boot. Written into config.json read afresh, so a hand edit
     /// made while the app runs is not overwritten.
     /// </summary>
+    /// <summary>
+    /// Settings, pp calculator. GET says what is in use, and whether the source has changed since it
+    /// was built; POST with a folder builds from it (when needed) and switches every profile to it,
+    /// and with '' switches back to the release. Answered at once: a build takes minutes, and
+    /// <c>pp-source</c> events follow it, then the recalculation's own.
+    /// </summary>
+    private static async Task PpSourceRoute(HttpContext context, ServerOptions opts)
+    {
+        if (opts.PpSource is not { } service)
+        {
+            await Json(context, new { error = "this app cannot use an osu! source" }, 404);
+            return;
+        }
+        if (context.Request.Method != "POST")
+        {
+            await Json(context, service.View());
+            return;
+        }
+        await WithBody(context, async body =>
+        {
+            var source = Js.IsString(Js.Get(body, "source"), out var asked) ? Js.Trim(asked) : null;
+            if (source is null)
+            {
+                await Json(context, new { error = "source must be a folder, or empty for the release" }, 400);
+                return;
+            }
+            _ = source.Length == 0 ? service.UseRelease() : service.Use(source);
+            // Whatever the switch decided before its first wait: a refusal, or a build begun.
+            await Json(context, service.State());
+        });
+    }
+
     private static Task PostAppConfig(HttpContext context, ServerOptions opts) => WithBody(context, async body =>
     {
         var patch = new Dictionary<string, JsonElement>();

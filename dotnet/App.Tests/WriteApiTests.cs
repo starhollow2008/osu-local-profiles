@@ -45,7 +45,7 @@ public sealed class WriteApiTests : IAsyncLifetime
     {
         var paths = new AppPaths(install);
         var config = AppConfig.Load(paths.DataDir);
-        var tracker = db.Writable ? new PlayTracker(db, new BeatmapResolver(db, []), [], Profiles.ActiveId(db), 0, null) : null;
+        var tracker = new PlayTracker(db, new BeatmapResolver(db, []), [], Profiles.ActiveId(db), 0, null);
         var options = new ServerOptions
         {
             Db = db,
@@ -108,20 +108,66 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task A_read_only_copy_changes_nothing()
+    public async Task A_path_the_app_does_not_know_is_not_found_as_in_node()
     {
-        using var readOnly = Database.Open(data.File, writable: false);
-        var (_, other) = await Start(readOnly);
-        using (other)
+        foreach (var path in new[] { "/api/no-such-thing", "/api/about-image/1/0123456789abcdef.png" })
         {
-            var response = await other.PostAsync("/api/app-config", new StringContent("""{"openBrowser":false}"""));
-            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-            Assert.Equal(HttpStatusCode.Forbidden, (await other.PutAsync("/api/image/avatar", new ByteArrayContent(Png()))).StatusCode);
-            Assert.DoesNotContain("openBrowser", File.ReadAllText(Path.Combine(DataDir, "config.json")));
-            Assert.False(File.Exists(Path.Combine(DataDir, $"profile-{data.ProfileId}-avatar.png")));
-            // Reading still works.
-            Assert.Equal(HttpStatusCode.OK, (await other.GetAsync("/api/app-config")).StatusCode);
+            var response = await client.GetAsync(path);
+            Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+            Assert.Equal("not found", await response.Content.ReadAsStringAsync());
         }
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/no-such-thing", null)).StatusCode);
+    }
+
+    [Fact]
+    public async Task The_pp_source_is_read_and_a_folder_that_is_not_one_changes_nothing()
+    {
+        // No service: the page cannot offer a source at all.
+        var view = await client.GetAsync("/api/pp-source");
+        Assert.Equal(HttpStatusCode.NotFound, view.StatusCode);
+
+        var service = new PpSource(PpSourceTracker.Of(opts.Tracker!), DataDir, "Program.cs",
+            () => opts.Config["ppSource"] is { } s ? s.GetString()! : "", _ => throw new InvalidOperationException("must not save"));
+        var (other, otherClient) = await StartWith(service);
+        using (otherClient)
+        {
+            var state = JsonDocument.Parse(await otherClient.GetStringAsync("/api/pp-source")).RootElement;
+            Assert.Equal("", state.GetProperty("source").GetString());
+            Assert.Equal(JsonValueKind.Null, state.GetProperty("now").ValueKind);
+            Assert.Equal(JsonValueKind.Null, state.GetProperty("building").ValueKind);
+
+            var notString = await otherClient.PostAsync("/api/pp-source", new StringContent("""{"source":5}"""));
+            Assert.Equal(HttpStatusCode.BadRequest, notString.StatusCode);
+
+            var refused = await otherClient.PostAsync("/api/pp-source", new StringContent(JsonText.Stringify(new { source = $"  {Path.Combine(install, "nowhere")}  " })));
+            Assert.Equal(HttpStatusCode.OK, refused.StatusCode);
+            var answer = JsonDocument.Parse(await refused.Content.ReadAsStringAsync()).RootElement;
+            Assert.Equal("that folder does not exist", answer.GetProperty("error").GetString());
+            Assert.Equal("", answer.GetProperty("source").GetString());
+            // Kept for Settings, until the next try.
+            var settings = JsonDocument.Parse(await otherClient.GetStringAsync("/api/state")).RootElement;
+            Assert.Equal("that folder does not exist", settings.GetProperty("ppCalculator").GetProperty("source").GetProperty("error").GetString());
+        }
+    }
+
+    private async Task<(ServerOptions, HttpClient)> StartWith(PpSource service)
+    {
+        var options = new ServerOptions
+        {
+            Db = opts.Db,
+            Paths = opts.Paths,
+            Config = opts.Config,
+            Port = 0,
+            Tracker = opts.Tracker,
+            PpSource = service,
+            Osu = opts.Osu,
+        };
+        var app = Server.Build(options);
+        await app.StartAsync();
+        apps.Add(app);
+        var address = app.Services.GetRequiredService<IServer>().Features.Get<IServerAddressesFeature>()!.Addresses.First();
+        var port = new Uri(address.Replace("[::]", "localhost").Replace("0.0.0.0", "localhost")).Port;
+        return (options, new HttpClient { BaseAddress = new Uri($"http://localhost:{port}") });
     }
 
     [Fact]

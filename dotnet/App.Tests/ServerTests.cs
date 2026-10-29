@@ -81,14 +81,6 @@ public sealed class ServerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task What_is_not_ported_yet_says_so()
-    {
-        var response = await client.GetAsync("/api/pp-source");
-        Assert.Equal(HttpStatusCode.NotImplemented, response.StatusCode);
-        Assert.Equal(HttpStatusCode.NotImplemented, (await client.PostAsync("/api/pp-source", new StringContent("{}"))).StatusCode);
-    }
-
-    [Fact]
     public async Task The_page_and_its_files_are_served_and_revalidated()
     {
         var index = await client.GetAsync("/");

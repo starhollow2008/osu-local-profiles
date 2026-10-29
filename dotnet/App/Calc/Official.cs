@@ -1,5 +1,7 @@
+using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading.Channels;
 
 namespace OsuLocalProfiles.Calc;
 
@@ -31,17 +33,25 @@ internal sealed record OfficialResult(
 /// There is no fallback calculator. When osu!'s code cannot be loaded, there is no calculator,
 /// no pp is stored, and the app says so. Requests are answered one at a time, as the helper's pipe
 /// answered them.
+///
+/// The one calculator that is not in-process is the helper built from the player's own osu! source
+/// (roadmap 5.70, <see cref="SourceHelper"/>): it runs code nobody has checked, so it stays a
+/// separate process, asked over the same JSON lines as src/calc/official.ts (<see cref="Start"/>).
 /// </remarks>
-internal sealed class OfficialCalculator
+internal sealed class OfficialCalculator : IDisposable
 {
     private static readonly JsonSerializerOptions RequestOptions = new(JsonText.Options)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
+    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(30);
 
     private readonly SemaphoreSlim one = new(1, 1);
+
+    /// <summary>The separate helper answering in place of the in-process code; null for osu!'s release.</summary>
+    private readonly HelperProcess? helper;
 
     /// <summary>The osu! release whose calculators these are: the ppy.osu.Game package version.</summary>
     public string? Version { get; }
@@ -49,7 +59,11 @@ internal sealed class OfficialCalculator
     /// <summary>The last failure, kept so it is reported rather than silently producing no pp.</summary>
     public string? LastError { get; private set; }
 
-    private OfficialCalculator(string? version) => Version = version;
+    private OfficialCalculator(string? version, HelperProcess? helper = null)
+    {
+        Version = version;
+        this.helper = helper;
+    }
 
     /// <summary>The calculator, or null with the reason when osu!'s code cannot be loaded.</summary>
     public static (OfficialCalculator? Calculator, string? Problem) Create()
@@ -69,6 +83,22 @@ internal sealed class OfficialCalculator
         }
     }
 
+    /// <summary>
+    /// A helper started as its own process, and only that one: a helper built from the player's osu!
+    /// source must never fall through to the release, which would price the profile with a formula
+    /// nobody chose. <paramref name="version"/> names it in place of the one it reports, which for a
+    /// build from source is osu!'s placeholder <c>0.0.0</c>. Null when it cannot start, or does not say
+    /// it is ready within 30 seconds.
+    /// </summary>
+    public static async Task<OfficialCalculator?> Start(HelperCandidate candidate, string? version = null)
+    {
+        var process = await HelperProcess.Start(candidate, StartupTimeout);
+        return process is null ? null : new OfficialCalculator(version ?? process.Version, process);
+    }
+
+    /// <summary>Stops a separate helper; nothing to stop in-process.</summary>
+    public void Dispose() => helper?.Dispose();
+
     /// <summary>One request answered, as the helper's pipe answered it: <c>{ ok: false }</c> on any failure.</summary>
     private async Task<JsonElement> Send(object request)
     {
@@ -76,6 +106,7 @@ internal sealed class OfficialCalculator
         try
         {
             var line = JsonSerializer.Serialize(request, RequestOptions);
+            if (helper is not null) return await helper.Ask(line, RequestTimeout);
             var answer = Task.Run(() => OsuLocalProfiles.PpCalculator.Program.Respond(line));
             if (await Task.WhenAny(answer, Task.Delay(RequestTimeout)) != answer)
             {
@@ -152,5 +183,153 @@ internal sealed class OfficialCalculator
             ? list.EnumerateArray().Select(m => m.GetString() ?? "").ToArray()
             : [];
         return (ranked.ValueKind == JsonValueKind.True, unranked);
+    }
+}
+
+/// <summary>How to start a helper: a program and its arguments (src/calc/official.ts).</summary>
+internal sealed record HelperCandidate(string Command, IReadOnlyList<string> Args);
+
+/// <summary>
+/// A pp helper running as its own process: a ready line first, then one JSON request per line and
+/// one answer line for each (src/calc/official.ts, <c>OfficialCalculator</c>). Asked one request at a
+/// time by <see cref="OfficialCalculator"/>, since the line protocol has no request ids.
+/// </summary>
+internal sealed class HelperProcess : IDisposable
+{
+    private readonly Process process;
+    private readonly ChannelReader<string> lines;
+    private volatile bool dead;
+
+    /// <summary>The osu! release it reported in its ready line, if any.</summary>
+    public string? Version { get; private set; }
+
+    private HelperProcess(Process process, ChannelReader<string> lines)
+    {
+        this.process = process;
+        this.lines = lines;
+    }
+
+    public static async Task<HelperProcess?> Start(HelperCandidate candidate, TimeSpan timeout)
+    {
+        var start = new ProcessStartInfo(candidate.Command)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            StandardOutputEncoding = new System.Text.UTF8Encoding(false),
+            // UTF-8 without a byte-order mark, as Node writes to a pipe.
+            StandardInputEncoding = new System.Text.UTF8Encoding(false),
+        };
+        foreach (var arg in candidate.Args) start.ArgumentList.Add(arg);
+        Process process;
+        try
+        {
+            process = Process.Start(start) ?? throw new InvalidOperationException("the helper did not start");
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return null;
+        }
+        process.StandardInput.AutoFlush = true;
+
+        // Every line it prints, in order; the channel completes when it exits.
+        var channel = Channel.CreateUnbounded<string>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = true });
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                while (await process.StandardOutput.ReadLineAsync() is { } line) channel.Writer.TryWrite(line);
+            }
+            catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
+            {
+                /* gone */
+            }
+            channel.Writer.TryComplete();
+        });
+        // Read and dropped, as Node never reads it, so a chatty helper never fills the pipe and stalls.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await process.StandardError.BaseStream.CopyToAsync(Stream.Null);
+            }
+            catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
+            {
+                /* gone */
+            }
+        });
+
+        var helper = new HelperProcess(process, channel.Reader);
+        if (await helper.NextLine(timeout) is { } hello && JsonText.TryParse(hello, out var ready)
+            && Js.Get(ready, "ready") is { ValueKind: JsonValueKind.True })
+        {
+            helper.Version = Js.IsString(Js.Get(ready, "version"), out var v) ? v : null;
+            return helper;
+        }
+        helper.Dispose();
+        return null;
+    }
+
+    /// <summary>The next line, or null when it exited first or the wait ran out.</summary>
+    private async Task<string?> NextLine(TimeSpan timeout)
+    {
+        using var cancel = new CancellationTokenSource(timeout);
+        try
+        {
+            return await lines.ReadAsync(cancel.Token);
+        }
+        catch (Exception e) when (e is OperationCanceledException or ChannelClosedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>One request and its answer, or <c>{ ok: false }</c> with why.</summary>
+    public async Task<JsonElement> Ask(string request, TimeSpan timeout)
+    {
+        if (dead) return JsonText.From(new { ok = false });
+        try
+        {
+            await process.StandardInput.WriteAsync(request + (char)10);
+        }
+        catch (Exception e) when (e is IOException or ObjectDisposedException or InvalidOperationException)
+        {
+            dead = true;
+            return JsonText.From(new { ok = false, error = "calculator exited" });
+        }
+        using var cancel = new CancellationTokenSource(timeout);
+        try
+        {
+            var line = await lines.ReadAsync(cancel.Token);
+            return JsonText.TryParse(line, out var parsed)
+                ? parsed
+                : JsonText.From(new { ok = false, error = $"unparseable response: {Js.Slice(line, 120)}" });
+        }
+        catch (OperationCanceledException)
+        {
+            return JsonText.From(new { ok = false, error = "calculator timed out" });
+        }
+        catch (ChannelClosedException)
+        {
+            dead = true;
+            return JsonText.From(new { ok = false, error = "calculator exited" });
+        }
+    }
+
+    public void Dispose()
+    {
+        dead = true;
+        try
+        {
+            process.StandardInput.Close();
+            process.Kill(true);
+        }
+        catch (Exception e) when (e is InvalidOperationException or IOException or System.ComponentModel.Win32Exception or NotSupportedException)
+        {
+            /* already gone */
+        }
+        process.Dispose();
     }
 }

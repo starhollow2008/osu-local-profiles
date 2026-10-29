@@ -6,9 +6,10 @@ using OsuLocalProfiles.Http;
 
 /*
  * The C# port of osu! local profiles (docs/csharp-port.md). Not shipped: until the switch-over the
- * Node app is the product, and this opens the database read-only unless asked otherwise.
+ * Node app is the product. It opens data/ as the Node app does, writing to it, so it never runs on
+ * the same folder as a Node app that is running.
  *
- *   osu-local-profiles-app [--root <install dir>] [--writable]
+ *   osu-local-profiles-app [--root <install dir>]
  */
 
 // Checks run by scripts/ against the Node app's own answers; never part of running the app.
@@ -19,7 +20,6 @@ if (args.Length > 0 && args[0] == "--dev") return OsuLocalProfiles.DevCommands.R
 Console.OutputEncoding = new System.Text.UTF8Encoding(false);
 
 string? root = null;
-var writable = false;
 for (var i = 0; i < args.Length; i++)
 {
     switch (args[i])
@@ -27,12 +27,9 @@ for (var i = 0; i < args.Length; i++)
         case "--root" when i + 1 < args.Length:
             root = args[++i];
             break;
-        case "--writable":
-            writable = true;
-            break;
         default:
             Console.Error.WriteLine($"unknown argument: {args[i]}");
-            Console.Error.WriteLine("usage: osu-local-profiles-app [--root <install dir>] [--writable]");
+            Console.Error.WriteLine("usage: osu-local-profiles-app [--root <install dir>]");
             return 2;
     }
 }
@@ -64,7 +61,7 @@ if (running.Running)
 
 /*
  * The update check and the update itself, reading config.json's switches on every use so a
- * change applies at once. A read-only copy installs nothing.
+ * change applies at once.
  */
 var updater = new OsuLocalProfiles.Update.Updater(paths.InstallDir, paths.DataDir, paths.Version,
     () => config["autoUpdate"] is { ValueKind: System.Text.Json.JsonValueKind.True },
@@ -75,7 +72,7 @@ var updater = new OsuLocalProfiles.Update.Updater(paths.InstallDir, paths.DataDi
  * not get to install at its quit: install it now, before anything is tracked, and come back as
  * the new version.
  */
-if (writable && updater.InstallAtStart() is { } pending)
+if (updater.InstallAtStart() is { } pending)
 {
     Console.WriteLine($"\n  Installing update {pending.Version}...");
     Console.WriteLine("  It was downloaded earlier; the app starts again once it is in place.\n");
@@ -83,27 +80,19 @@ if (writable && updater.InstallAtStart() is { } pending)
 }
 
 var dbFile = Path.Combine(paths.DataDir, "profiles.db");
-if (!writable && !File.Exists(dbFile))
-{
-    Console.Error.WriteLine($"  No database at {dbFile}. Start the Node app once first, or pass --writable.");
-    return 1;
-}
 
 /*
  * Find osu!: what the profile pointed at, then where it was found before, then everywhere it is
  * normally installed, and only once ever a search of the whole machine. Remembered in
- * config.json, which a read-only copy leaves alone.
+ * config.json.
  */
 var discovery = await OsuLocalProfiles.Clients.Discover.Run(
     config.Strings("installRoots"), config.Strings("discoveredRoots"), NodePath.Join(paths.DataDir, "mcosu"),
     noSearch: Js.Truthy(config["searchedForInstalls"]),
     onProgress: (dirs, _, _) => Console.Write($"\r  searching for osu!... {dirs} folders"));
 var installs = discovery.Installs;
-if (writable)
-{
-    config.Save(paths.DataDir);
-    config.RememberDiscovery(discovery, paths.DataDir);
-}
+config.Save(paths.DataDir);
+config.RememberDiscovery(discovery, paths.DataDir);
 if (installs.Count == 0)
 {
     Console.WriteLine("\n  No osu! installation found.");
@@ -119,51 +108,54 @@ if (extra > 0) Console.WriteLine($"  ({extra} other osu! folder(s) found -- Opti
 
 /*
  * A backup restored from the page is swapped in here, before anything opens the database it
- * replaces. What it replaced is moved aside, never deleted. A read-only copy swaps nothing.
+ * replaces. What it replaced is moved aside, never deleted.
  */
-var restored = writable ? Backup.ApplyPendingRestore(paths.DataDir, DateTime.Now) : new RestoreResult(false);
+var restored = Backup.ApplyPendingRestore(paths.DataDir, DateTime.Now);
 if (restored.Applied) Console.WriteLine($"\n  Restored a backup. What was here before is in {restored.Aside}\n");
 else if (restored.Error is not null) Console.WriteLine($"\n  The backup could not be restored, and nothing was changed: {restored.Error}\n");
 
 // Decided before the database is created: only a brand-new install is welcomed, never one upgraded
 // from a version that had no welcome.
 var firstRun = !File.Exists(dbFile);
-using var db = Database.Open(dbFile, writable);
-if (writable)
-{
-    OsuLocalProfiles.Update.Notes.SeedSeenVersion(db, paths.Version(), paths.DataDir);
-    // A restored database remembers the app last running when the backup was made: without this,
-    // importPlaysWhileClosed would read everything since as a gap the app was closed for.
-    if (restored.Applied) OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
-    // config.json's profileName only names the very first profile; after that they are the page's.
-    Profiles.SeedFirst(db, config.ProfileName);
-    if (firstRun) ProfileData.OfferWelcome(db);
-    // Before any request is answered: the favourite lists must agree with the setting as it stands.
-    Favorites.SyncSharing(db, config["sharedFavorites"] is not { ValueKind: System.Text.Json.JsonValueKind.False });
-}
+using var db = Database.Open(dbFile);
+OsuLocalProfiles.Update.Notes.SeedSeenVersion(db, paths.Version(), paths.DataDir);
+// A restored database remembers the app last running when the backup was made: without this,
+// importPlaysWhileClosed would read everything since as a gap the app was closed for.
+if (restored.Applied) OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
+// config.json's profileName only names the very first profile; after that they are the page's.
+Profiles.SeedFirst(db, config.ProfileName);
+if (firstRun) ProfileData.OfferWelcome(db);
+// Before any request is answered: the favourite lists must agree with the setting as it stands.
+Favorites.SyncSharing(db, config["sharedFavorites"] is not { ValueKind: System.Text.Json.JsonValueKind.False });
 var active = Profiles.Get(db, Profiles.ActiveId(db))!;
 // The gap the app was closed for, read before this run stamps itself.
 var gapSince = OsuLocalProfiles.Tracker.CatchUp.Since(OsuLocalProfiles.Tracker.CatchUp.LastRunAt(db), active.TrackingSince);
 
 /*
- * osu!'s calculators, in-process. With an osu! source configured (roadmap 5.70), only the
- * calculator built from it, never the release in its place: building and running that one is
- * not ported yet, so there is none, and Settings says why.
+ * osu!'s calculators, in-process. There is no fallback calculator on purpose: a second
+ * implementation would disagree by a few percent and leave one profile holding scores computed two
+ * different ways. The same goes for one built from the player's osu! source (roadmap 5.70): when it
+ * will not start, nothing prices in its place.
  */
 var ppSource = Js.IsString(config["ppSource"], out var source) ? source : "";
-OfficialCalculator? calculator = null;
-string? calculatorProblem = null;
-if (ppSource.Length == 0)
+var (calculator, calculatorProblem) = await PpSource.StartupCalculator(ppSource, paths.DataDir);
+if (calculator is not null && ppSource.Length > 0)
 {
-    var (loaded, problem) = OfficialCalculator.Create();
-    calculator = loaded;
-    if (loaded is null) Console.WriteLine($"\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating ({problem})");
-    else Console.WriteLine($"\n  pp: osu!'s official calculator ({loaded.Version})");
+    Console.WriteLine($"\n  pp: osu!'s calculator from your osu! source at {ppSource} ({calculator.Version})");
+}
+else if (calculator is not null)
+{
+    Console.WriteLine($"\n  pp: osu!'s official calculator ({calculator.Version})");
+}
+else if (ppSource.Length > 0)
+{
+    Console.WriteLine($"\n  WARNING: {calculatorProblem}.");
+    Console.WriteLine("  Scores will still be tracked, but with no pp or star rating.");
+    Console.WriteLine("  Build it again from Settings -> pp calculator, or switch back to the release there.");
 }
 else
 {
-    calculatorProblem = $"the calculator built from your osu! source at {ppSource} is not in the C# port yet";
-    Console.WriteLine($"\n  WARNING: {calculatorProblem}.");
+    Console.WriteLine($"\n  pp: NOT AVAILABLE -- scores would be tracked with no pp or star rating ({calculatorProblem})");
 }
 
 /*
@@ -177,11 +169,24 @@ void Shutdown(int code, bool deliberate) => stopped.TrySetResult((code, delibera
 var handedOff = false;
 
 var resolver = new OsuLocalProfiles.Clients.BeatmapResolver(db, installs);
-// A read-only copy watches nothing: tracking is writing.
-var tracker = writable
-    ? new OsuLocalProfiles.Tracker.PlayTracker(db, resolver, installs, active.Id, active.TrackingSince, calculator)
-    : null;
-if (tracker is not null) Startup.Announce(db, tracker);
+var tracker = new OsuLocalProfiles.Tracker.PlayTracker(db, resolver, installs, active.Id, active.TrackingSince, calculator);
+Startup.Announce(db, tracker);
+
+/*
+ * Settings -> pp calculator: the player's osu! source, or the release. Written through the same
+ * re-read-then-save as the page's other switches, so a hand edit made while the app runs survives.
+ */
+var ppSources = new PpSource(PpSourceTracker.Of(tracker), paths.DataDir,
+    NodePath.Join(paths.InstallDir, "tools", "PpCalculator", "Program.cs"),
+    () => Js.IsString(config["ppSource"], out var current) ? current : "",
+    chosen =>
+    {
+        var current = AppConfig.Load(paths.DataDir);
+        current["ppSource"] = config["ppSource"] = JsonText.From(chosen);
+        current.Save(paths.DataDir);
+    },
+    // Said on the page too, not only in the console: pp has stopped, and Settings is the fix.
+    startupProblem: ppSource.Length > 0 ? calculatorProblem : null);
 
 var app = Server.Build(new ServerOptions
 {
@@ -199,8 +204,7 @@ var app = Server.Build(new ServerOptions
         discovery, NodePath.Join(paths.DataDir, "mcosu")),
     FromTray = fromTray,
     Calculator = calculator,
-    PpSource = ppSource,
-    CalculatorProblem = calculatorProblem,
+    PpSource = ppSources,
     StatusKnown = resolver.KnowsStatus,
     Installs = installs,
     Tracker = tracker,
@@ -239,57 +243,44 @@ if (fromTray)
     });
 }
 
-Timer? heartbeat = null;
-if (tracker is not null)
-{
-    // The index first, then what needs it, in the order the Node app runs them.
-    var roots = installs
-        .SelectMany(i => i.BeatmapRoots.Select(p => new OsuLocalProfiles.Clients.IndexRoot(p, i.Kind != "lazer")))
-        .ToList();
-    roots = [.. roots.Where((r, n) => roots.FindIndex(o => OsuLocalProfiles.Tracker.PlayTracker.SamePath(o.Path, r.Path)) == n)];
-    _ = Startup.AfterIndex(db, tracker, roots, gapSince, paths.DataDir);
-    tracker.Start();
-}
+// The index first, then what needs it, in the order the Node app runs them.
+var roots = installs
+    .SelectMany(i => i.BeatmapRoots.Select(p => new OsuLocalProfiles.Clients.IndexRoot(p, i.Kind != "lazer")))
+    .ToList();
+roots = [.. roots.Where((r, n) => roots.FindIndex(o => OsuLocalProfiles.Tracker.PlayTracker.SamePath(o.Path, r.Path)) == n)];
+_ = Startup.AfterIndex(db, tracker, roots, gapSince, paths.DataDir);
+tracker.Start();
 
 await app.StartAsync();
 Console.WriteLine($"\n  osu! local profiles {paths.Version() ?? "(unknown version)"}, C# port");
-Console.WriteLine($"  data: {paths.DataDir}{(writable ? "" : " (read-only)")}");
+Console.WriteLine($"  data: {paths.DataDir}");
 Console.WriteLine($"  {url}");
-if (tracker is not null)
-{
-    await Startup.Banner(db, tracker, active, fromTray);
-    // When the app last ran, so the next launch knows the gap it was closed for. Stamped as it
-    // runs too, so a crash loses at most the heartbeat's worth.
-    OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
-    heartbeat = new Timer(_ => OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db), null,
-        TimeSpan.FromMilliseconds(OsuLocalProfiles.Tracker.CatchUp.HeartbeatMs), TimeSpan.FromMilliseconds(OsuLocalProfiles.Tracker.CatchUp.HeartbeatMs));
-}
+await Startup.Banner(db, tracker, active, fromTray);
+// When the app last ran, so the next launch knows the gap it was closed for. Stamped as it runs
+// too, so a crash loses at most the heartbeat's worth.
+OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
+using var heartbeat = new Timer(_ => OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db), null,
+    TimeSpan.FromMilliseconds(OsuLocalProfiles.Tracker.CatchUp.HeartbeatMs), TimeSpan.FromMilliseconds(OsuLocalProfiles.Tracker.CatchUp.HeartbeatMs));
 if (Js.Truthy(config["openBrowser"]) && !withComputer) Browser.Open(url);
 
-if (writable)
+// What the last update left behind: a rollback copy, the unpacked release it ran from.
+var leftovers = updater.PruneLeftovers();
+if (leftovers.Removed.Count > 0)
 {
-    // What the last update left behind: a rollback copy, the unpacked release it ran from.
-    var leftovers = updater.PruneLeftovers();
-    if (leftovers.Removed.Count > 0)
-    {
-        Console.WriteLine($"  Cleaned up after the last update: {string.Join(", ", leftovers.Removed)} ({leftovers.Bytes / 1024 / 1024:F0}MB)\n");
-    }
+    Console.WriteLine($"  Cleaned up after the last update: {string.Join(", ", leftovers.Removed)} ({leftovers.Bytes / 1024 / 1024:F0}MB)\n");
 }
 // Once a day, and an hour after a failed check; nothing while checkForUpdates is off.
 using var updateChecks = updater.KeepChecking();
 
 var (exitCode, deliberate) = await stopped.Task;
 Console.WriteLine("\n  stopping...");
-if (writable && deliberate && exitCode == 0 && updater.InstallAtQuit() is { } installing)
+if (deliberate && exitCode == 0 && updater.InstallAtQuit() is { } installing)
 {
     Console.WriteLine($"  installing update {installing}; it is there the next time the app starts");
 }
-heartbeat?.Dispose();
-if (tracker is not null)
-{
-    tracker.Stop();
-    OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
-}
+heartbeat.Dispose();
+tracker.Stop();
+OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
 await app.StopAsync();
 await app.DisposeAsync();
 if (exitCode == RestartExitCode && !handedOff)

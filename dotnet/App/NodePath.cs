@@ -19,8 +19,16 @@ internal static partial class NodePath
         return joined.Length == 0 ? "." : Normalize(joined);
     }
 
-    /// <summary><c>path.resolve(p)</c>: absolute against the working directory, normalised.</summary>
-    public static string Resolve(string p) => Normalize(Path.IsPathRooted(p) && !IsDriveRelative(p) ? p : Path.GetFullPath(p));
+    /// <summary>
+    /// <c>path.resolve(p)</c>: absolute against the working directory, normalised, and with no
+    /// trailing separator unless it is a root (<c>C:\osu\</c> is <c>C:\osu</c>).
+    /// </summary>
+    public static string Resolve(string p)
+    {
+        var resolved = Normalize(Path.IsPathRooted(p) && !IsDriveRelative(p) ? p : Path.GetFullPath(p));
+        var root = resolved.Length == 1 || (OperatingSystem.IsWindows() && resolved.Length == 3 && resolved[1] == ':');
+        return !root && resolved.EndsWith(Sep) ? resolved[..^1] : resolved;
+    }
 
     private static bool IsDriveRelative(string p) => OperatingSystem.IsWindows() && p.Length >= 2 && p[1] == ':' && (p.Length == 2 || p[2] is not ('\\' or '/'));
 
