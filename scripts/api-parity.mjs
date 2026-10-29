@@ -202,8 +202,25 @@ const MOMENTS = new Set([
 const KV_MOMENTS = new Set(['lastRunAt']);
 
 /** Tables not compared, each with why. */
-const TABLES_SKIPPED = {
-  rank_events: "asked of osu! by the Node app's rank event watcher, which the port has yet to have (phase 5, step 4)",
+const TABLES_SKIPPED = {};
+
+/**
+ * Fields of every answer a write is followed by that hold a moment, or a number osu! keeps
+ * changing, each with why. osu!'s counts are asked once per app, a minute or two apart.
+ */
+const AFTER_IGNORED = {
+  'imported.importedAt': 'the moment each app imported it',
+  'favorites.*.favoritedAt': 'the moment each app favourited it',
+  'favorites.*.playCount': "osu!'s own count, which moves between the two apps asking",
+  'favorites.*.favouriteCount': 'the same',
+};
+
+/** In `beatmapset_details`, the counts osu! keeps changing, as above. */
+const LIVE_DETAILS = ['playCount', 'favouriteCount'];
+
+/** Events left out of the feed comparison, each with why. */
+const EVENTS_SKIPPED = {
+  'rank-events': 'sent when osu! answers the rank event watcher, which each app asks at its own moment',
 };
 
 /** Events whose count depends on timing: only the last of each is compared. */
@@ -238,15 +255,29 @@ function listen(port) {
   };
 }
 
-/** A copy's tables, every row with its moments taken out, sorted so the order rows were written in is not compared. */
+/**
+ * A copy's tables, every row with its moments taken out and the copy's own data folder named
+ * `<data>` (where a downloaded beatmap or a built replay is kept), sorted so the order rows were
+ * written in is not compared.
+ */
 function tables(file) {
+  const own = JSON.stringify(path.dirname(file)).slice(1, -1);
   const db = new DatabaseSync(file, { readOnly: true });
   try {
     const names = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all().map((r) => r.name);
     return new Map(names.filter((name) => !Object.hasOwn(TABLES_SKIPPED, name)).map((name) => {
       const rows = db.prepare(`SELECT * FROM "${name}"`).all().map((row) => {
         if (name === 'kv' && KV_MOMENTS.has(row.key)) return JSON.stringify({ key: row.key });
-        return JSON.stringify(Object.fromEntries(Object.entries(row).filter(([column]) => !MOMENTS.has(column))));
+        if (name === 'beatmapset_details' && typeof row.data === 'string') {
+          try {
+            const data = JSON.parse(row.data);
+            for (const key of LIVE_DETAILS) delete data[key];
+            row = { ...row, data: JSON.stringify(data) };
+          } catch {
+            /* compared as it is */
+          }
+        }
+        return JSON.stringify(Object.fromEntries(Object.entries(row).filter(([column]) => !MOMENTS.has(column)))).replaceAll(own, '<data>');
       });
       return [name, rows.sort()];
     }));
@@ -301,6 +332,40 @@ function writeSteps(file, csData) {
     const created = { 'profile.createdAt': 'the moment each app made it', 'profile.trackingSince': 'the same', 'profiles.*.createdAt': 'the same', 'profiles.*.trackingSince': 'the same' };
 
     const [first, second, third] = visible;
+
+    // The player's own osu! account, as linked to the profile on screen, for the steps that ask osu!.
+    const setting = (key) => {
+      const row = db.prepare('SELECT value FROM profile_settings WHERE profile_id = ? AND key = ?').get(active, key);
+      return row === undefined ? null : JSON.parse(row.value);
+    };
+    const linked = setting('linkedUsername') || null;
+    // A score osu! has, set on lazer, to import by its link.
+    const onlineScore = db
+      .prepare("SELECT online_score_id FROM scores WHERE client = 'lazer' AND CAST(online_score_id AS INTEGER) > 0 AND origin IS NULL ORDER BY played_at DESC LIMIT 1")
+      .get()?.online_score_id;
+    // An installed osu! beatmap with its object count, to enter a score on by hand.
+    const installed = db
+      .prepare(`SELECT b.md5, b.beatmap_id, b.osu_path FROM beatmaps b JOIN osu_files f ON f.md5 = b.md5
+                 WHERE b.beatmap_id IS NOT NULL AND b.osu_path IS NOT NULL ORDER BY b.md5 LIMIT 50`)
+      .all()
+      .map((b) => {
+        try {
+          const text = fs.readFileSync(b.osu_path, 'utf8');
+          // An osu! beatmap: its Mode is 0, or not written at all.
+          if (/^Mode:/m.test(text) && !/^Mode:\s*0\s*$/m.test(text)) return null;
+          // The objects of its [HitObjects] section, as the app counts them (osuSection).
+          const section = text.split(/^\[HitObjects\]\s*$/m)[1] ?? '';
+          const objects = section.split(/^\[/m)[0].split(/\r?\n/).filter((l) => l.trim() !== '').length;
+          return objects > 0 ? { ...b, objects } : null;
+        } catch {
+          return null;
+        }
+      })
+      .find((b) => b !== null);
+    const searchWord = installed ? (db.prepare('SELECT name FROM osu_files WHERE md5 = ?').get(installed.md5)?.name ?? '').split(/[^A-Za-z0-9]+/).find((w) => w.length > 3) : undefined;
+    const otherPlayer = db.prepare("SELECT id FROM declined_plays WHERE profile_id = ? AND reason = 'another-player' ORDER BY declined_at DESC LIMIT 1").get(active)?.id;
+    const arriving = { events: 'rank events still arriving', 'totals.events': 'the same' };
+
     return [
       { path: '/api/welcome' },
       { path: '/api/settings', body: { tagline: 'parity check', country: 'NZ' }, after: ['/api/settings'] },
@@ -364,6 +429,46 @@ function writeSteps(file, csData) {
       { path: '/api/profiles', body: { action: 'switch', id: 1.5 } },
       { path: '/api/profiles', body: { action: 'rename', id: nextProfile, name: '' } },
       { path: '/api/backfill', body: { since: monthAgo, confirm: true, sources: ['replays', 'unfinished', 'attempts'] }, after: [profile(0), { path: '/api/declined', ignore: turnedAway }] },
+
+      // Asked of osu! itself: one app at a time, so osu! is never asked twice as fast as one app asks.
+      { path: '/api/identity', body: { action: 'lookup', query: '%E0%A4%A' } },
+      { path: '/api/identity', body: { action: 'lookup', query: 'x'.repeat(40) } },
+      ...(linked
+        ? [
+            { path: '/api/identity', body: { action: 'lookup', query: linked }, sequential: true },
+            {
+              path: '/api/identity',
+              body: { action: 'import', query: linked, favorites: true, medals: true, bestPerformances: true, pinnedScores: true },
+              sequential: true,
+              // Recent's rank events arrive when osu! answers each app's watcher; the table is compared at the end.
+              after: [{ path: profile(0), ignore: arriving }, { path: profile(3), ignore: arriving }, { path: `${profile(0)}&favorites=10000`, ignore: arriving }, '/api/settings'],
+            },
+            { path: '/api/favorites', body: { action: 'remove', beatmapsetId: 1 } },
+            { path: '/api/favorites', body: { action: 'add', beatmapsetId: 1.5 } },
+          ]
+        : []),
+      ...(onlineScore
+        ? [
+            { path: '/api/score-link/check', body: { link: `https://osu.ppy.sh/scores/${onlineScore}` }, sequential: true },
+            { path: '/api/score-link', body: { link: `https://osu.ppy.sh/scores/${onlineScore}` }, sequential: true, after: [profile(0)] },
+          ]
+        : []),
+      { path: '/api/score-link/check', body: { link: 'https://example.com/scores/1' } },
+      ...(installed
+        ? [
+            { path: `/api/beatmaps/search?q=${encodeURIComponent(searchWord ?? 'a')}`, method: 'GET' },
+            { path: '/api/beatmaps/find', body: { md5: installed.md5 } },
+            { path: '/api/beatmaps/find', body: { link: String(installed.beatmap_id) } },
+            { path: '/api/manual-score', body: { md5: installed.md5, mode: 9 } },
+            { path: '/api/manual-score', body: { md5: installed.md5, mode: 0, counts: { c300: installed.objects + 1 }, maxCombo: 1, mods: 'HD', playedAt: monthAgo } },
+            { path: '/api/manual-score', body: { md5: installed.md5, mode: 0, counts: { c300: installed.objects }, maxCombo: 1, mods: 'EZHR', playedAt: monthAgo } },
+            { path: '/api/manual-score', body: { md5: installed.md5, mode: 0, counts: { c300: installed.objects }, maxCombo: 99999, mods: 'HD', playedAt: monthAgo } },
+            { path: '/api/manual-score', body: { md5: installed.md5, mode: 0, counts: { c300: installed.objects }, maxCombo: 1, mods: 'HD', playedAt: monthAgo }, after: [profile(0)] },
+            { path: '/api/manual-score', body: { md5: installed.md5, mode: 0, counts: { c300: installed.objects }, maxCombo: 1, mods: 'HD', playedAt: monthAgo } },
+          ]
+        : []),
+      { path: '/api/beatmaps/find', body: { link: 'nonsense' } },
+      { path: '/api/manual-score', body: {} },
       ...(upload
         ? [
             { path: '/api/replays?applyFilter=0', raw: fs.readFileSync(upload), after: [profile(0)] },
@@ -381,6 +486,9 @@ function writeSteps(file, csData) {
       { path: '/api/profiles', body: { action: 'switch', id: active }, ignore: created },
       { path: '/api/profiles', body: { action: 'delete', id: nextProfile } },
       { path: '/api/profiles', body: { action: 'delete', id: nextProfile, confirm: true }, after: [{ path: '/api/state', ignore: created }] },
+      ...(otherPlayer ? [{ path: '/api/declined', body: { action: 'its-me', id: otherPlayer }, sequential: true }] : []),
+      { path: '/api/declined', body: { action: 'its-me', id: 99_999_999 } },
+      { path: '/api/recompute', body: { confirm: true, all: true }, sequential: true, after: [profile(0)] },
       { path: '/api/tracking', body: { enabled: true } },
     ];
   } finally {
@@ -581,7 +689,9 @@ async function main() {
       const body = step.raw ?? (step.body === undefined ? undefined : JSON.stringify(step.body));
       const init = method === 'GET' ? undefined : { method, body };
       const label = `${method} ${step.path} ${step.raw !== undefined ? (Buffer.isBuffer(step.raw) ? `(${step.raw.length} bytes)` : step.raw) : (body ?? '')}`.slice(0, 110);
-      const [a, b] = await Promise.all([ask(nodePort, step.path, init), ask(csPort, step.path, init)]);
+      const [a, b] = step.sequential
+        ? [await ask(nodePort, step.path, init), await ask(csPort, step.path, init)]
+        : await Promise.all([ask(nodePort, step.path, init), ask(csPort, step.path, init)]);
       const problems = compareMeta(a, b);
       try {
         problems.push(...differences(JSON.parse(a.body.toString('utf8')), JSON.parse(b.body.toString('utf8')), '', step.ignore ?? {}));
@@ -590,7 +700,8 @@ async function main() {
       }
       report(label, problems, a);
       for (const after of step.after ?? []) {
-        const { path: pathname, ignore = {} } = typeof after === 'string' ? { path: after } : after;
+        const { path: pathname, ignore: own = {} } = typeof after === 'string' ? { path: after } : after;
+        const ignore = { ...AFTER_IGNORED, ...own };
         const [x, y] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
         const changed = compareMeta(x, y);
         if (pathname.startsWith('/api/image/')) {
@@ -608,7 +719,8 @@ async function main() {
     const told = feeds.map(({ events }) => {
       const last = new Map();
       for (const e of events) if (PROGRESS_EVENTS.has(e.name)) last.set(e.name, e);
-      return [...events.filter((e) => !PROGRESS_EVENTS.has(e.name)), ...[...last.values()].sort((x, y) => x.name.localeCompare(y.name))];
+      const kept = events.filter((e) => !(e.name === 'scores' && Object.hasOwn(EVENTS_SKIPPED, e.data?.action)));
+      return [...kept.filter((e) => !PROGRESS_EVENTS.has(e.name)), ...[...last.values()].sort((x, y) => x.name.localeCompare(y.name))];
     });
     const feedProblems = [];
     if (told[0].length !== told[1].length) {
@@ -635,6 +747,7 @@ async function main() {
       report(`table ${name}`, problems, { status: 200, body: Buffer.from(rows.join('\n')) });
     }
     for (const [name, why] of Object.entries(TABLES_SKIPPED)) console.log(`  skipped  table ${name}: ${why}`);
+    for (const [name, why] of Object.entries(EVENTS_SKIPPED)) console.log(`  skipped  event scores/${name}: ${why}`);
     // config.json, but for the port each copy was given.
     const configs = [nodeRoot, csRoot].map((root) => {
       const config = JSON.parse(fs.readFileSync(path.join(root, 'data', 'config.json'), 'utf8'));

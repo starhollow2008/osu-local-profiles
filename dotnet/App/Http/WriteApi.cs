@@ -313,7 +313,7 @@ internal static partial class Server
         }
         if (IsTrue(body, "all"))
         {
-            await Json(context, new { error = "POST /api/recompute for every profile is not ported yet" }, 501);
+            await RecomputeEveryProfile(context, opts, tracker);
             return;
         }
         RecomputeResult result;
@@ -439,8 +439,14 @@ internal static partial class Server
                     });
                     return;
                 }
-                case "lookup" or "link" or "import":
-                    await Json(context, new { error = $"POST /api/identity {action} is not ported yet" }, 501);
+                case "lookup":
+                    await IdentityLookup(context, opts, body);
+                    return;
+                case "link":
+                    await IdentityLink(context, opts, id, body);
+                    return;
+                case "import":
+                    await IdentityImport(context, opts, id, body);
                     return;
                 case "unlink":
                     SettingsStore.Update(opts.Db, id, JsonText.From(new { linkedUserId = 0, linkedUsername = "" }), fallbacks);
@@ -544,7 +550,7 @@ internal static partial class Server
         }
         if (action == "its-me")
         {
-            await Json(context, new { error = "POST /api/declined its-me is not ported yet" }, 501);
+            await ItsMe(context, opts, tracker, body);
             return;
         }
         if (action != "track")

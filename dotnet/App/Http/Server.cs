@@ -59,6 +59,9 @@ internal sealed class ServerOptions
     /// </summary>
     public Action? OnRestart { get; init; }
 
+    /// <summary>Asks osu! for the profile's rank events, made with the server when it has a tracker.</summary>
+    internal RankEventWatcher? RankEvents { get; set; }
+
     /// <summary>The cache behind /api/profile, made with the server.</summary>
     internal ProfileCache? Cache { get; set; }
 }
@@ -97,7 +100,21 @@ internal static partial class Server
             kestrel.Limits.MaxRequestBodySize = null;
         });
         opts.Cache ??= new ProfileCache(opts.Db);
-        if (opts.Tracker is { } tracker) opts.Events.Follow(tracker);
+        if (opts.Tracker is { } tracker)
+        {
+            opts.Events.Follow(tracker);
+            /*
+             * Where the profile's plays placed on osu!'s leaderboards: asked once now, and a while after
+             * each play osu! could rank. Nothing at all without a linked account of the player's own,
+             * and every request waits its turn at the gate.
+             */
+            var db = opts.Db;
+            var rank = new RankEventWatcher(db, () => Profiles.ActiveId(db), () => tracker.PlayerIdentity, opts.Osu,
+                _ => opts.Events.Broadcast("scores", new { action = "rank-events" }));
+            opts.RankEvents = rank;
+            tracker.Score += score => rank.Played(score.Client, score.Grade);
+            _ = rank.CatchUp();
+        }
         var app = builder.Build();
         app.Run(context => Handle(context, opts));
         return app;
@@ -387,6 +404,40 @@ internal static partial class Server
         if (pathname == "/api/replays" && method == "POST")
         {
             if (await TrackerOrRefuse() is { } t) await PostReplay(context, opts, t);
+            return;
+        }
+
+        if (pathname == "/api/score-link/check" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await ScoreLinkCheck(context, opts, t, Current());
+            return;
+        }
+
+        if (pathname == "/api/score-link" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await ScoreLink(context, opts, t, Current());
+            return;
+        }
+
+        if (pathname == "/api/beatmaps/search" && method == "GET")
+        {
+            if (await TrackerOrRefuse() is { } t)
+            {
+                var q = request.Query.TryGetValue("q", out var asked) && asked.Count > 0 ? asked[0] ?? "" : "";
+                await Json(context, new { beatmaps = ScoreEntry.Search(EntryFor(opts, t, Current()), q) });
+            }
+            return;
+        }
+
+        if (pathname == "/api/beatmaps/find" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await BeatmapFind(context, opts, t, Current());
+            return;
+        }
+
+        if (pathname == "/api/manual-score" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await ManualScore(context, opts, t, Current());
             return;
         }
 

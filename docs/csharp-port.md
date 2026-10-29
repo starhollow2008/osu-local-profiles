@@ -257,26 +257,25 @@ Done, each proven by the parity script's write stage (below) and ported tests:
 - [x] Found on the way: Microsoft.Data.Sqlite refuses to bind NaN, where SQLite and node:sqlite
       make it NULL (`Number(body.id)` of a missing id); and the C# file times rounded the last
       digit of `mtimeMs` differently, so lazer's `online.db` stamp differed (`Js.MtimeMs`).
+- [x] **osu!'s website** (`Clients/OsuWeb.cs`): every request through one gate, one a second,
+      waiting as long as osu! asks on a 429. Built on it: `/api/favorites` POST, `/api/identity`
+      `lookup`, `link` and `import` (`Tracker/OnlineImport.cs`: best performances, pins,
+      standing, medals), `/api/declined` `its-me`, `/api/score-link` and its `/check`,
+      `/api/beatmaps/search` and `/find`, `/api/manual-score` (`ScoreEntry.cs`), the imported
+      scores priced here at startup and by `/api/recompute`'s `all`, and the rank event watcher
+      (`RankEvents.cs`). The parity script imports the owner's own account into a profile made for
+      it, one app at a time.
+- [x] Found on the way: osu-web.ts read a status, mode or image type through `in` or a plain
+      index, so `constructor` was a value; fixed in Node first (`Object.hasOwn`). lazer's block in
+      a built replay is compressed as lzma-js compresses it: SharpCompress's encoder with
+      lzma-js's mode 1 (64 KB dictionary, BT2, an end marker) and Java's text encoding gives the
+      same bytes (`ReplayWriter.LazerBlock`, pinned by `BuiltReplayTests`).
 
-Waiting, each answering 501 until its step: `/api/recompute` with `all` and `/api/declined`
-`its-me` and `/api/identity` `lookup`, `link`, `import` (step 4), and from step 3,
-`applyPendingRestore` (with backup, step 5), the `RankEventWatcher` (step 4: it asks osu!) and
-`pruneUpdateLeftovers` (step 7).
+Waiting, from step 3: `applyPendingRestore` (with backup, step 5) and `pruneUpdateLeftovers`
+(step 7).
 
 **Next, in this order.** Every handler is in `src/http/server.ts`.
 
-4. **osu!'s web API** (`src/clients/osu-web.ts`, `src/clients/request-gate.ts`). Then, built on
-   it:
-   - `/api/favorites` POST;
-   - `/api/identity` actions `lookup`, `link` and `import`;
-   - `/api/score-link` and its `/check`, `/api/beatmaps/search` and `/find`,
-     `/api/manual-score` (port `src/score-entry.ts`, `src/built-replays.ts`, `lazerBlock` from
-     `src/replay-writer.ts`, and online-import's `importMode`);
-   - `convertImportedScores` at startup (see `Startup.AfterIndex`), and `/api/recompute`'s
-     `all`, which runs it first;
-   - `/api/declined` `its-me`;
-   - the `RankEventWatcher` (`src/rank-events.ts`), then take `rank_events` out of the parity
-     script's `TABLES_SKIPPED`.
 5. **Backup and restore:** `/api/backup`, `/api/restore` PUT, DELETE and apply
    (`src/backup.ts`), and `applyPendingRestore` then `markRunning` at startup.
 6. **Screenshots:** `/api/screenshot` and a score card's `/screenshot`, through Chrome over CDP

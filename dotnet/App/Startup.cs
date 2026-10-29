@@ -129,7 +129,26 @@ internal static class Startup
             Console.WriteLine($"  score repair failed: {e.Message}");
         }
 
-        // Scores imported from osu! are priced from their own numbers when the score entry is ported (phase 5).
+        /*
+         * Best performances imported from osu! and still on osu!'s own figures: each built into a replay
+         * and priced here, so a pp rework reprices them with everything else. Only on installed
+         * beatmaps: a launch never goes online, so the rest wait for Recalculate every score or the
+         * next import.
+         */
+        var converted = 0;
+        foreach (var profile in Profiles.List(db))
+        {
+            try
+            {
+                converted += (await ScoreEntry.ConvertImported(EntryDeps.Of(tracker, db, dataDir, profile.Id, OsuWeb.Shared), profile.Id, download: false)).Converted;
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                /* as the Node app's: that profile converts nothing this launch */
+            }
+        }
+        if (converted > 0) Console.WriteLine($"  Priced {converted} score(s) imported from osu! here, from their own numbers\n");
+        // Uploaded and built replays nothing points at any more.
         UploadedReplays.Prune(db, dataDir);
 
         var official = tracker.Calculator;
