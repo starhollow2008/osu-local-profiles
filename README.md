@@ -7,9 +7,11 @@
 [![pp version](https://img.shields.io/badge/pp%20version-July%202026-ff66ab)](https://github.com/ppy/osu/releases)
 [![Last updated](https://img.shields.io/github/release-date/jonathant09/osu-local-profiles?label=last%20updated)](https://github.com/jonathant09/osu-local-profiles/releases/latest)
 
-App that tracks local, offline osu! profiles in a browser page, made to look like an official osu! profile. Inspired by [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) and [Kariyu's video](https://youtu.be/5wVU4kYC3So).
+App that tracks local, offline osu! profiles in a browser page, made to look like an official osu! profile. 
 
-[Preview profile](https://jonathant09.github.io/osu-local-profiles/) · [r/osugame post](https://www.reddit.com/r/osugame/comments/1wphvn7/osu_local_profiles_app_stable_lazer_4_gamemodes/)
+Inspired by [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) and [Kariyu's video](https://youtu.be/5wVU4kYC3So).
+
+[Preview profile](https://jonathant09.github.io/osu-local-profiles/) | [r/osugame post](https://www.reddit.com/r/osugame/comments/1wphvn7/osu_local_profiles_app_stable_lazer_4_gamemodes/)
 
 **Features**
 
@@ -37,11 +39,15 @@ App that tracks local, offline osu! profiles in a browser page, made to look lik
 - **pp:** [osu! 2026.916.0](https://github.com/ppy/osu/releases/tag/2026.916.0), July 2026 pp rework
 - **Global rank estimate:** [September 2026](https://data.ppy.sh/)
 
+<br>
+
 ## Screenshots
 
 ![Profile page](docs/images/profile.png)
 
 ![Scores](docs/images/scores.png)
+
+<br>
 
 ## Installation
 
@@ -58,6 +64,8 @@ App that tracks local, offline osu! profiles in a browser page, made to look lik
 
 **Mac users:** To allow the app to run, go to **System Settings -> Privacy & Security -> Open Anyway**, or run `xattr -dr com.apple.quarantine .` in the folder from Terminal.
 
+<br>
+
 ## Building from source
 
 ```
@@ -70,17 +78,23 @@ npm run check:port                # runs the C# tests
 Open <http://localhost:7272>. 
 Go is only needed to build the tray launcher. Node.js 24 runs the packaging scripts and the old app's tests.
 
+<br>
+
 ## Warnings for osu!stable
 
 - **Unranked maps will always count for pp** if lazer isn't installed, since stable doesn't record ranked status
 - Scores are only tracked once you exit the results screen
 - Incomplete plays (fail, quit, retry) are not tracked
 
+<br>
+
 ## Warnings for McOsu
 
 - McOsu-only mods (Nightmare and experimental mods) show as one **MC** mod
 - Incomplete plays (fail, quit, retry) are not tracked
 - pp may differ between McOsu and this app
+
+<br>
 
 ## Technologies Used
 
@@ -94,6 +108,8 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 | Go + `fyne.io/systray`             | tray and menu bar launcher     |
 | GitHub Actions                     | CI and cross-platform releases |
 
+<br>
+
 ## Online fetches (optional)
 
 | host            | assets fetched                                                |
@@ -103,6 +119,8 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 | `osu.ppy.sh`    | import existing profile details, scores, beatmaps             |
 | `b.ppy.sh`      | song audio previews                                           |
 | `github.com`    | check for new app updates                                     |
+
+<br>
 
 ## Play tracking flow for completed plays
 
@@ -125,6 +143,8 @@ App watches for a new `.osr` replay file:
 
 Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
 
+<br>
+
 ## Incomplete plays (fail, quit, retry) - *lazer only*
 
 App reads from lazer's session log to track incomplete plays:
@@ -140,6 +160,8 @@ App reads from lazer's session log to track incomplete plays:
                    an unfinished play: counted, with no score attached
 ```
 
+<br>
+
 ## Limitations
 
 - Require manual updates:
@@ -148,9 +170,13 @@ App reads from lazer's session log to track incomplete plays:
 - Country rank not supported (small sample size)
 - Incomplete plays (fail, quit, retry) not supported in stable and McOsu.
 
+<br>
+
 ## Contributing
 
 Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+<br>
 
 ## Credits
 
@@ -166,7 +192,7 @@ Thank you to [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) a
 
 Full license details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-## 
+<br>
 
 ## License
 
