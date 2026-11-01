@@ -7,64 +7,54 @@
 [![pp version](https://img.shields.io/badge/pp%20version-July%202026-ff66ab)](https://github.com/ppy/osu/releases)
 [![Last updated](https://img.shields.io/github/release-date/jonathant09/osu-local-profiles?label=last%20updated)](https://github.com/jonathant09/osu-local-profiles/releases/latest)
 
-App that tracks local / offline profiles in a browser profile page that resembles the official osu! site. App watches for plays while it is running, then calculates pp and records to profile. Inspired by [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's YouTube video](https://youtu.be/5wVU4kYC3So), and McOsu.
+App that tracks local, offline osu! profiles in a browser page, made to look like an official osu! profile. Inspired by [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) and [Kariyu's video](https://youtu.be/5wVU4kYC3So).
 
-Preview sample profile: https://jonathant09.github.io/osu-local-profiles/
+[Preview profile](https://jonathant09.github.io/osu-local-profiles/) · [r/osugame post](https://www.reddit.com/r/osugame/comments/1wphvn7/osu_local_profiles_app_stable_lazer_4_gamemodes/)
 
-Reddit Post: https://www.reddit.com/r/osugame/comments/1wphvn7/osu_local_profiles_app_stable_lazer_4_gamemodes/
+**Features**
 
-Good for:
-- Creating multiple profiles to track pp without multiaccounting
-- Alternative playstyles - e.g. using non-dominant hand, mouse/tablet, touchscreen
-- Tracking only certain plays - e.g. unranked maps, old maps, EZ mod only, etc.
-- Speedrun or restriction challenges - e.g. "How fast can I reach 5 digit", "Reaching 5 digit with no misses", "Who can get the most pp before the time runs out"
-- Players with no internet connection or unstable connections as this app works fully offline
+- Fully offline, no API key needed
+- Unranked and loved pp, plus unranked mods in lazer
+- Import an existing osu! profile: name, scores, avatar, etc.
+- Filter which plays are tracked: ranked status, mods, mapper, etc.
+- Remove scores
+- pp recalculated automatically for pp reworks
 
-Supports:
-- osu!stable, osu!lazer and McOsu
-- All 4 gamemodes: standard, mania, catch, taiko
-- Windows, Mac, Linux
-- 16 languages
+**Useful for**
 
-Features:
-- Works fully offline  (no API key needed)
-  - Internet connection is optionally used to fetch beatmap cover arts, song audio previews, or import existing profile details.
-- Switching between multiple profiles
-- Default gamemode on launch is automatically determined by last played gamemode
-- Edit or import profile details, such as Name, Avatar, Banner, me! section, scores, etc.
-- pp for unranked maps and mods
-- Import previous plays instead of starting a profile fresh
-- Play tracking filter - only track scores that meet specified criteria, e.g. mapper (guest difficulties included), title, artist, mods, difficulty, ranked date
-- Option to remove scores from profile
-- Automatically detects updates and installs with one click
-- Recalculates pp automatically for scores on each pp rework
+- Multiple profiles without multi-accounting
+- Alternative playstyles: mouse, tablet, etc.
+- Rank speedruns and restriction challenges
 
+**Supports**
 
-Last Updated:
-- **pp:** osu!'s official calculator from [osu! 2026.916.0](https://github.com/ppy/osu/releases/tag/2026.916.0), which includes the July 2026 pp rework
-- **Global rank estimate:** osu!'s ranking data from [September 2026](https://data.ppy.sh/)
+| Clients              | Game modes                    | Platforms             | Languages |
+| -------------------- | ----------------------------- | --------------------- | --------- |
+| stable, lazer, McOsu | standard, taiko, catch, mania | Windows, macOS, Linux | 16        |
+
+**Last updated**
+
+- **pp:** [osu! 2026.916.0](https://github.com/ppy/osu/releases/tag/2026.916.0), July 2026 pp rework
+- **Global rank estimate:** [September 2026](https://data.ppy.sh/)
 
 ## Screenshots
 
-| | |
-|---|---|
-| ![Profile page](docs/images/profile.webp) | ![Historical](docs/images/historical.webp) |
-| ![Scores](docs/images/scores.webp) | ![Beatmaps and medals](docs/images/beatmaps-and-medals.webp) |
+![Profile page](docs/images/profile.png)
+
+![Scores](docs/images/scores.png)
 
 ## Installation
 
 1. [Download the latest release](https://github.com/jonathant09/osu-local-profiles/releases/latest) for your OS and unzip the folder.
 2. Run the app as follows:
 
-| Platform | Start | Location when running |
-| -------- | ------------- | ---------------------------- |
-| Windows | run `osu! local profiles.exe` | system tray |
-| macOS | run `osu! local profiles` | menu bar |
-| Linux | run `./osu-local-profiles` or `./start.sh` | system tray |
+| Platform | Start                                      | Location when running |
+| -------- | ------------------------------------------ | --------------------- |
+| Windows  | run `osu! local profiles.exe`              | system tray           |
+| macOS    | run `osu! local profiles`                  | menu bar              |
+| Linux    | run `./osu-local-profiles` or `./start.sh` | system tray           |
 
 3. Open http://localhost:7272 in your browser.
-
-**Note:** There is no console window. Console outputs are read to `data/logs/app.log`. To exit, click **Quit** on the top-right of the page or close the app.
 
 **Mac users:** To allow the app to run, go to **System Settings -> Privacy & Security -> Open Anyway**, or run `xattr -dr com.apple.quarantine .` in the folder from Terminal.
 
@@ -80,45 +70,39 @@ npm run check:port                # runs the C# tests
 Open <http://localhost:7272>. 
 Go is only needed to build the tray launcher. Node.js 24 runs the packaging scripts and the old app's tests.
 
-## Warnings for stable
+## Warnings for osu!stable
 
-Stable users only:
 - **Unranked maps will always count for pp** if lazer isn't installed, since stable doesn't record ranked status
 - Scores are only tracked once you exit the results screen
-- Incomplete plays (fail, quit, retry) are not tracked in Recent Plays or for playcount, including failed multiplayer plays
+- Incomplete plays (fail, quit, retry) are not tracked
 
 ## Warnings for McOsu
 
-McOsu users only:
-- Only finished, passed plays are tracked: McOsu keeps no record of fails, quits or retries,
-  so they don't count in Recent Plays or for playcount
-- pp comes from osu!'s current pp system, so it can differ from the pp McOsu shows
-- McOsu doesn't save replays, so McOsu plays have no replay to download
-- McOsu-only mods (Nightmare and experimental mods) show as one **MC** mod, and count toward
-  pp only while unranked mods are counted (the default)
+- McOsu-only mods (Nightmare and experimental mods) show as one **MC** mod
+- Incomplete plays (fail, quit, retry) are not tracked
+- pp may differ between McOsu and this app
 
 ## Technologies Used
 
-| Technology | Used for |
-|---|---|
-| C# / .NET 10 | app, as one self-contained program |
-| ASP.NET Core (Kestrel) | the local web server |
-| Microsoft.Data.Sqlite | profiles database |
-| Vanilla DOM, ES modules and CSS | profile page |
-| Official `ppy.osu.Game.Rulesets.*` | official pp calculator, built in |
-| Go + `fyne.io/systray` | tray and menu bar launcher |
-| GitHub Actions | CI and cross-platform releases |
+| Technology                         | Used for                       |
+| ---------------------------------- | ------------------------------ |
+| C# / .NET 10                       | app, self-contained            |
+| ASP.NET Core (Kestrel)             | the local web server           |
+| Microsoft.Data.Sqlite              | profiles database              |
+| Vanilla DOM, ES modules and CSS    | profile page                   |
+| Official `ppy.osu.Game.Rulesets.*` | official pp calculator         |
+| Go + `fyne.io/systray`             | tray and menu bar launcher     |
+| GitHub Actions                     | CI and cross-platform releases |
 
 ## Online fetches (optional)
 
-| host | assets fetched |
-|---|---|
-| `assets.ppy.sh` | beatmap cover art and medal icons |
-| `data.ppy.sh` | rank-curve dumps when manually running `npm run rank:refresh` |
-| `osu.ppy.sh` | import existing profile details, scores, beatmaps|
-| `b.ppy.sh` | song audio previews |
-| `github.com` | check for new app updates |
-
+| host            | assets fetched                                                |
+| --------------- | ------------------------------------------------------------- |
+| `assets.ppy.sh` | beatmap cover art and medal icons                             |
+| `data.ppy.sh`   | rank-curve dumps when manually running `npm run rank:refresh` |
+| `osu.ppy.sh`    | import existing profile details, scores, beatmaps             |
+| `b.ppy.sh`      | song audio previews                                           |
+| `github.com`    | check for new app updates                                     |
 
 ## Play tracking flow for completed plays
 
@@ -139,7 +123,7 @@ App watches for a new `.osr` replay file:
                           store → recompute profile → live update
 ```
 
-Stable's `Songs` folder is watched too, so a beatmap downloaded while the app is open is found before the play.
+Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
 
 ## Incomplete plays (fail, quit, retry) - *lazer only*
 
@@ -156,68 +140,43 @@ App reads from lazer's session log to track incomplete plays:
                    an unfinished play: counted, with no score attached
 ```
 
-## Configuration
+## Limitations
 
-`data/config.json`
-
-| key | default | meaning |
-|---|---|---|
-| `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
-| `port` | `7272` | local web server port |
-| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Other settings -> Open in browser on start** |
-| `checkForUpdates` | `true` | ask GitHub at startup and once a day while running whether a newer release exists |
-| `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
-| `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
-| `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
-| `language` | `""` | the page's language, as one of osu!'s own codes (`de`, `pt-br`, `zh-tw`). Empty means never chosen, which is what lets the first launch ask |
-| `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Other settings** |
-| `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Other settings -> Font** |
-| `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Auto-update** |
-| `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
-
-## Known limitations
-
-- pp reworks require manual updates
-- Global rank is an estimate and requires manual refreshes. It is interpolated from a pp->rank curve built
-  from a monthly data.ppy.sh sample of the whole ladder, so it drifts as the playerbase
-  grows. Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
-- Country rank is not supported
-- No support for tracking incomplete plays for playcount in stable
-- A map's ranked status comes from osu!lazer's list of beatmaps, which osu!lazer updates about once a month, so a map ranked since then counts as unranked until the next update
+- Require manual updates:
+  - pp reworks
+  - Global rank (estimate based on curve from data.ppy.sh). Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
+- Country rank not supported (small sample size)
+- Incomplete plays (fail, quit, retry) not supported in stable and McOsu.
 
 ## Contributing
 
-Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and what a pull request needs.
+Pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 
+Thank you to [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) and [Kariyu's video](https://youtu.be/5wVU4kYC3So) for the project inspiration.
+
+- [FlareonGhh](https://github.com/starhollow2008/osu-local-profiles-ext-media) - Other icons provider: recent feed icons for level-ups and new bests (CC BY 4.0)
 - [ppy/osu](https://github.com/ppy/osu) - official rulesets and performance calculator
 - [ppy/osu-web](https://github.com/ppy/osu-web) - mod glyphs, grade badges, stable's grade letters, the guest avatar, default banner, mode icons, mod badge styling (AGPL-3.0-or-later, © ppy Pty Ltd), plus mod and medal definitions
 - [data.ppy.sh](https://data.ppy.sh) - public ladder dumps behind the pp-to-rank curves
 - [Twemoji](https://github.com/jdecked/twemoji) - country flag artwork
 - [fyne.io/systray](https://github.com/fyne-io/systray), [godbus/dbus](https://github.com/godbus/dbus) and [golang.org/x/sys](https://pkg.go.dev/golang.org/x/sys) for the tray launcher
-- [Sheppsu's osu-score-tracker](https://github.com/Sheppsu/osu-score-tracker), [Kariyu's video](https://youtu.be/5wVU4kYC3So) and McOsu for the idea
 - [Nunito](https://github.com/googlefonts/nunito) - the page's font (SIL Open Font License)
-- [FlareonGhh](https://github.com/starhollow2008/osu-local-profiles-ext-media) - Other icons provider: recent feed icons for level-ups and new bests (CC BY 4.0)
-
 
 Full license details in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-## AI Disclaimer
-
-This is an ai-assisted project written largely with Claude Code, which I have reviewed and tested before release. Note that pp calculation uses the official osu! pp calculator.
+## 
 
 ## License
 
-osu! local profiles is free software under the [GNU Affero General Public License v3.0 or later](LICENSE).
-Versions up to and including v1.22.0 were released under the MIT License and remain available under it.
+[AGPL-3.0](LICENSE)
 
 The page uses artwork and styling from [osu-web](https://github.com/ppy/osu-web) (© ppy Pty Ltd), under
-osu-web's own AGPL-3.0 licence. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) for that and for
-everything a release bundles. osu!'s Torus and Venera fonts are not included; if they are installed on
-your computer, the page uses them. Otherwise it uses Nunito, which is included under the SIL Open Font License.
+osu-web's own AGPL-3.0 licence. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+osu!'s Torus and Venera fonts are not included and are only used if already installed on your PC. Otherwise, Nunito font is used by the app.
 
 This app does **not** log in to osu!, use API credentials, submit anything to your account, or automate/assist gameplay in any way.
 
-"osu!" and "ppy" are trademarks of ppy Pty Ltd. This is an unofficial community project and is not
-affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.
+"osu!" and "ppy" are trademarks of ppy Pty Ltd. This is an unofficial community project and is not affiliated with, endorsed by, or associated with osu! or ppy Pty Ltd.

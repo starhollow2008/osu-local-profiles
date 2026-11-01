@@ -102,7 +102,8 @@ Measured on a real stable install, and not something the app can work around:
 
 - **A score arrives when you leave the results screen**, not when the play ends, because that's when
   stable writes the replay.
-- **Plays you quit, failed or retried aren't counted.** Stable writes no replay or log for them. Its
+- **Plays you quit, failed or retried aren't counted**, failed multiplayer plays included. Stable
+  writes no replay or log for them. Its
   only trace is one "last played" time per beatmap, which can't count retries or tell a fail from a
   pass.
 - **With osu!stable and no osu!lazer, every beatmap counts toward pp.** Only lazer ships the database
@@ -113,6 +114,15 @@ Measured on a real stable install, and not something the app can work around:
 
 The page says the first two once, wherever a stable install is found, with **Don't show again**.
 The evidence is in [roadmap.md](roadmap.md) under 5.12.
+
+## McOsu is different
+
+- **Only finished, passed plays are tracked.** McOsu keeps no record of fails, quits or retries, so
+  they don't count in Recent Plays or toward the play count.
+- **pp comes from osu!'s current pp system**, so it can differ from the pp McOsu shows.
+- **McOsu plays have no replay to download.** McOsu doesn't save one.
+- **McOsu-only mods (Nightmare and experimental mods) show as one MC mod.** Plays with it count
+  toward pp only while [unranked mods are counted](#include-pp-for-unranked-mods).
 
 ## The profile page
 
@@ -133,6 +143,8 @@ stretch may have gone.
 
 Global rank is an estimate (see [Known limitations](#known-limitations)). Country rank shows `-` on
 purpose.
+
+The page opens on the mode you played most recently.
 
 The flag in the top right switches the page's language, and the first launch asks.
 
@@ -590,6 +602,25 @@ needs git and the .NET 10 SDK.
 - It's all or nothing: a profile never mixes pp from two formulas. If your source won't build or
   start, nothing changes. If it won't start at a launch, no pp is stored until it does.
 
+## The config file
+
+`data/config.json` holds the settings that belong to this install rather than a profile.
+
+| key | default | meaning |
+|---|---|---|
+| `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
+| `port` | `7272` | local web server port |
+| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Other settings -> Open in browser on start** |
+| `checkForUpdates` | `true` | ask GitHub at startup and once a day while running whether a newer release exists |
+| `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
+| `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
+| `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
+| `language` | `""` | the page's language, as one of osu!'s own codes (`de`, `pt-br`, `zh-tw`). Empty means never chosen, which is what lets the first launch ask |
+| `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Other settings** |
+| `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Other settings -> Font** |
+| `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Auto-update** |
+| `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
+
 ## Sharing and backing up
 
 **Options -> Share & back up.**
@@ -680,6 +711,9 @@ as on osu!'s own site.
 - **Global rank is an estimate, and ages.** It comes from a pp-to-rank curve built from a data.ppy.sh
   sample, so it drifts as the playerbase grows. See
   [maintaining.md](maintaining.md#refreshing-the-rank-curves).
+- **A newly ranked map counts as unranked for a while.** Ranked status comes from osu!lazer's list of
+  beatmaps, which lazer downloads about once a month. Once a newer list has the map, its plays are
+  updated when the app next starts.
 - **Country rank isn't shown.** A 10,000-player sample over about 200 countries is far too thin.
 - **pp needs the beatmap.** A map you've never downloaded can't be priced offline, though a score
   imported from osu! downloads the one it needs.
