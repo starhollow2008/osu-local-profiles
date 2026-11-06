@@ -2,16 +2,17 @@
 # The weekly maintenance job (docs/automated-maintenance.md), run by osu-maintenance.service as
 # the VM's unprivileged job user. setup-vm.sh installs this file as ~/osu-maintenance/run.sh.
 #
-# Clones the repository fresh, asks tools/maintenance/check.mjs whether anything is due, and
-# only then starts Claude Code on the procedure in docs/automated-maintenance.md. Both of those
-# are read from the clone, so changing them on main changes the next run; this file only
-# changes when setup-vm.sh is run again.
+# Clones the repository fresh, asks tools/maintenance/check.mjs whether anything is due, prices
+# a new osu! version against the current one itself, and only then starts Claude Code on the
+# procedure in docs/automated-maintenance.md. Those are read from the clone, so changing them on
+# main changes the next run; this file only changes when setup-vm.sh is run again.
 #
 # Testing, by hand:
 #   OSU_MAINT_BRANCH=<branch>     clone that branch instead of main
 #   OSU_MAINT_DRY_RUN=1           do the work in the clone, publish nothing, open no issue
 #   OSU_MAINT_FORCE_DUMP=<date>   rebuild the rank curves from that dump even if it isn't new
 #   OSU_MAINT_FORCE_PP=1          price the current osu! version against itself as if it were new
+#                                 (identical, so the run ends here without the agent)
 #   OSU_MAINT_TEST_BAD_CLAUDE_TOKEN=1   use a token Claude Code refuses, to see the sign-in report
 set -euo pipefail
 
@@ -103,6 +104,33 @@ is_auth_error() {
   grep -qiE 'Failed to authenticate|Invalid bearer token|OAuth token|Not logged in|authentication_error' <<<"$1"
 }
 
+# A version priced and found to change no pp is skipped until a newer one appears.
+record_not_rework() {
+  jq --arg v "$1" '.ppNotRework = ((.ppNotRework + [$v]) | unique)' "$STATE_DIR/state.json" \
+    > "$STATE_DIR/state.json.new" && mv "$STATE_DIR/state.json.new" "$STATE_DIR/state.json"
+}
+
+# Step 2 of the procedure's comparison, without the agent: the current helper and one built at
+# osu! $1, asked the same questions. Returns 0 only when every answer is identical, so the new
+# version changes no pp. Anything else (pp differs, a build or helper fails, osu! moved to a newer
+# .NET) is the agent's to look into. Always leaves the clone as it found it.
+pp_unchanged() {
+  local latest=$1 csproj=tools/PpCalculator/PpCalculator.csproj built=0
+  rm -rf "$BASE/work/pp-old" "$BASE/work/pp-new"
+  npm ci --no-audit --no-fund --loglevel=error || return 2
+  node scripts/build-pp-helper.mjs "$BASE/work/pp-old" --full || return 2
+  sed -i -E "s|(Include=\"ppy\.osu\.Game[A-Za-z.]*\" Version=\")[^\"]*\"|\1$latest\"|" "$csproj"
+  if [ "$(grep -c "Version=\"$latest\"" "$csproj")" != 5 ]; then
+    echo "PpCalculator.csproj doesn't have the five osu! packages it should"
+    built=2
+  elif ! node scripts/build-pp-helper.mjs "$BASE/work/pp-new" --full; then
+    built=2
+  fi
+  git checkout -q -- "$csproj"
+  [ "$built" = 0 ] || return 2
+  node scripts/pp-parity.mjs "$BASE/work/pp-old" "$BASE/work/pp-new"
+}
+
 # Both tokens are checked every week, so one that stopped working is reported within a week, not
 # the month an update is next due. A dead GitHub token can't open an issue to say so; GitHub
 # itself emails the owner a week before a token expires.
@@ -141,6 +169,22 @@ if [ -n "$FORCE_DUMP" ]; then
 fi
 if [ "$FORCE_PP" = 1 ]; then
   check=$(jq '.pp.latest = .pp.current | .pp.due = true | .due = true' <<<"$check")
+fi
+# Most osu! versions change no pp, and finding that out needs no agent.
+if [ "$(jq -r .pp.due <<<"$check")" = true ]; then
+  pp_latest=$(jq -r .pp.latest <<<"$check")
+  echo "pricing osu! $pp_latest against $(jq -r .pp.current <<<"$check")"
+  if pp_unchanged "$pp_latest"; then
+    echo "osu! $pp_latest changes no pp"
+    if [ "$DRY_RUN" = 1 ]; then
+      echo "(dry run: $pp_latest not recorded)"
+    else
+      record_not_rework "$pp_latest"
+    fi
+    check=$(jq '.pp.due = false | .pp.knownNotRework = true | .due = (.release.due or .rank.due)' <<<"$check")
+  else
+    echo "osu! $pp_latest may change pp, or couldn't be compared here: the agent prices it"
+  fi
 fi
 if [ "$(jq -r .due <<<"$check")" != true ]; then
   echo "nothing new"
@@ -195,11 +239,9 @@ cat "$result"
 outcome=$(jq -r '.status // "missing"' "$result")
 summary=$(jq -r '.summary // "No summary."' "$result")
 
-# A version priced and found to change no pp is skipped until a newer one appears.
 not_rework=$(jq -r 'select(.ppRework == false) | .ppEvaluated // empty' "$result")
 if [ -n "$not_rework" ] && [ "$outcome" != failed ] && [ "$DRY_RUN" != 1 ]; then
-  jq --arg v "$not_rework" '.ppNotRework = ((.ppNotRework + [$v]) | unique)' "$STATE_DIR/state.json" \
-    > "$STATE_DIR/state.json.new" && mv "$STATE_DIR/state.json.new" "$STATE_DIR/state.json"
+  record_not_rework "$not_rework"
 fi
 
 case "$outcome" in

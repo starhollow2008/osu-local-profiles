@@ -20,10 +20,16 @@ with no sudo, holding a GitHub token for this repository only and a Claude Code 
    data.ppy.sh dump and the newest osu! NuGet packages with the checkout, and looks for a release
    an earlier run merged but never tagged. Nothing to do means it stops there, with no agent
    started.
-3. Otherwise it starts Claude Code in the clone with what the check found, and the agent follows
-   the procedure below: a branch, a pull request, every CI check passed, a rebase merge, a tag.
+3. A new osu! version is priced by `run.sh` itself, as step 2 of the procedure does: both
+   helpers built and `scripts/pp-parity.mjs` run on them. Most versions change no pp, and one
+   that answers every question identically is recorded as not a rework, so it isn't due again
+   and starts no agent. Anything else (an answer differs, a build or helper fails, osu! moved to
+   a newer .NET) is left due for the agent, which runs the comparison again itself.
+4. When something is still due, it starts Claude Code in the clone with what was found, and the
+   agent follows the procedure below: a branch, a pull request, every CI check passed, a rebase
+   merge, a tag.
    The tag's `release.yml` run builds and publishes the release as for any other.
-4. The agent writes a result file. A failure, or no result at all, opens an issue titled
+5. The agent writes a result file. A failure, or no result at all, opens an issue titled
    *Automated maintenance failed* (or comments on the open one), which GitHub emails the owner.
    An agent that stopped because it couldn't sign in opens the sign-in issue instead. A release
    is also emailed, through the VM's own alerts (`vm-alert`, from the owner's `oracle-vm` setup)
@@ -47,7 +53,8 @@ sudo systemctl disable --now osu-maintenance.timer
 A test run, as `osubot`: `OSU_MAINT_BRANCH=<branch> OSU_MAINT_DRY_RUN=1 ~/osu-maintenance/run.sh`
 does the work in a clone and publishes nothing. `OSU_MAINT_FORCE_DUMP=2026_09_01` makes the rank
 refresh due against a dump already used, which rewrites the same curves, and `OSU_MAINT_FORCE_PP=1`
-prices the current osu! version against itself, which must come out identical (not a rework).
+prices the current osu! version against itself, which must come out identical (not a rework), so
+`run.sh` stops there without starting the agent unless something else is due.
 
 Setting the VM up, or after changing `run.sh` or the units: `sudo bash
 tools/maintenance/setup-vm.sh`, then `sudo bash tools/maintenance/set-secrets.sh` for the tokens.
@@ -61,7 +68,9 @@ with what you found. A late release is fine. A wrong one goes to every user's up
 The prompt gives you the mode (`publish` or `dry-run`), the result file's path and the check's
 JSON: `release.due` with `release.version`, `rank.due` with `rank.latest` (a dump date such as
 `2026_10_01`), and `pp.due` with `pp.current` and `pp.latest` (osu! versions such as
-`2026.1020.0`).
+`2026.1020.0`). `run.sh` has already compared the two osu! versions: `pp.due` is true only when
+it didn't find them identical, and `pp.knownNotRework` when it did (or an earlier run did), so
+there's no pp step to do.
 
 ### Rules
 
