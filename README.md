@@ -37,7 +37,7 @@ Inspired by [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) an
 **Last updated**
 
 - **pp:** [osu! 2026.916.0](https://github.com/ppy/osu/releases/tag/2026.916.0), July 2026 pp rework
-- **Global rank estimate:** [September 2026](https://data.ppy.sh/)
+- **Global rank estimate:** [November 2026](https://data.ppy.sh/)
 
 ## Screenshots
 

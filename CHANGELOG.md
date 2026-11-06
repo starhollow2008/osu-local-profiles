@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.33.1
+
+- **Global rank estimates use osu!'s November 2026 ranking data.** The global rank on your profile
+  comes from data.ppy.sh's newest sample of the rankings, in all four modes.
+
 ## 1.33.0
 
 <!-- in full -->
