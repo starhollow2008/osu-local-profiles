@@ -20,6 +20,13 @@ with no sudo, holding a GitHub token for this repository only and a Claude Code 
    data.ppy.sh dump and the newest osu! NuGet packages with the checkout, and looks for a release
    an earlier run merged but never tagged. Nothing to do means it stops there, with no agent
    started.
+
+   A source that stops publishing, or renames what it publishes, would look like a quiet week
+   forever, so the check also dates each source's newest release from its name. Over 90 days
+   old (`OSU_MAINT_STALE_DAYS`), or nothing on the page recognised, opens the issue *Maintenance:
+   no new rank dump on data.ppy.sh* or *Maintenance: no new osu! version on NuGet*, once, and
+   the first run that finds something newer closes it. A source that can't be reached at all
+   fails the run, which opens the failure issue below.
 3. A new osu! version is priced by `run.sh` itself, as step 2 of the procedure does: both
    helpers built and `scripts/pp-parity.mjs` run on them. Most versions change no pp, and one
    that answers every question identically is recorded as not a rework, so it isn't due again

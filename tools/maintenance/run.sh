@@ -14,6 +14,7 @@
 #   OSU_MAINT_FORCE_PP=1          price the current osu! version against itself as if it were new
 #                                 (identical, so the run ends here without the agent)
 #   OSU_MAINT_TEST_BAD_CLAUDE_TOKEN=1   use a token Claude Code refuses, to see the sign-in report
+#   OSU_MAINT_STALE_DAYS=<days>   how old a source's newest release may get before an issue (90)
 set -euo pipefail
 
 REPO=jonathant09/osu-local-profiles
@@ -21,10 +22,13 @@ BRANCH=${OSU_MAINT_BRANCH:-main}
 DRY_RUN=${OSU_MAINT_DRY_RUN:-0}
 FORCE_DUMP=${OSU_MAINT_FORCE_DUMP:-}
 FORCE_PP=${OSU_MAINT_FORCE_PP:-0}
+STALE_DAYS=${OSU_MAINT_STALE_DAYS:-90}
 BASE=$HOME/osu-maintenance
 STATE_DIR=$HOME/.local/state/osu-maintenance
 ISSUE_TITLE="Automated maintenance failed"
 AUTH_TITLE="Maintenance: Claude Code can't sign in"
+RANK_STALE_TITLE="Maintenance: no new rank dump on data.ppy.sh"
+PP_STALE_TITLE="Maintenance: no new osu! version on NuGet"
 
 mkdir -p "$BASE/logs" "$BASE/work" "$STATE_DIR"
 [ -f "$STATE_DIR/state.json" ] || echo '{"ppNotRework":[]}' > "$STATE_DIR/state.json"
@@ -81,6 +85,33 @@ report_failure() {
   echo "FAILED: $summary"
   raise_issue "$ISSUE_TITLE" "$(printf '%s\n\nRun `%s` on the maintenance VM. Its log is `~/osu-maintenance/logs/%s.log`, and the clone it worked in is kept in `~/osu-maintenance/work/%s` for 60 days.\n\nThe job keeps running weekly. Close this issue once it is dealt with.' \
     "$summary" "$stamp" "$stamp" "$stamp")"
+}
+
+# A source that stops publishing, or renames what it publishes, looks like a quiet week to the
+# check, forever. Once its newest release is over $STALE_DAYS days old (or nothing it lists is
+# recognised), this opens an issue, once, and closes it when the source has something newer.
+watch_source() {
+  local key=$1 title=$2 body=$3 open
+  if [ "$(jq -r ".$key.stale" <<<"$check")" = true ]; then
+    echo "WARNING: $title ($(jq -r ".$key.latest // \"nothing recognised\"" <<<"$check"))"
+    [ "$DRY_RUN" = 1 ] && { echo "(dry run: no issue \"$title\")"; return 0; }
+    [ -n "$(open_issue_number "$title")" ] || gh issue create -R "$REPO" --title "$title" --body "$body" || true
+  elif [ "$DRY_RUN" != 1 ]; then
+    open=$(open_issue_number "$title")
+    [ -z "$open" ] || gh issue close "$open" -R "$REPO" --comment "The weekly check found $(jq -r ".$key.latest" <<<"$check") on $stamp." || true
+  fi
+}
+
+watch_sources() {
+  # What the check found: the newest release and its age, or that nothing matched.
+  local found='if .KEY.latest then "is \(.KEY.latest), over \($d) days old" else "is none: nothing listed matches the names it expects" end'
+  local rank_found pp_found
+  rank_found=$(jq -r --arg d "$STALE_DAYS" "${found//KEY/rank}" <<<"$check")
+  pp_found=$(jq -r --arg d "$STALE_DAYS" "${found//KEY/pp}" <<<"$check")
+  watch_source rank "$RANK_STALE_TITLE" "$(printf 'The newest complete rank dump the weekly check finds on https://data.ppy.sh/ %s. Dumps normally come monthly, so ppy may have renamed the files, moved them or stopped publishing them, and the rank curves will not be refreshed until this is looked at.\n\nThe check expects `<YYYY_MM_DD>_performance_<mode>_random_10000.tar.bz2` for all four modes (`latestCompleteDump` in `tools/maintenance/check.mjs`, and `scripts/build-rank-table.mjs`). This issue closes itself when a newer dump is found.' \
+    "$rank_found")"
+  watch_source pp "$PP_STALE_TITLE" "$(printf 'The newest stable osu! version the weekly check finds on NuGet, published for all five packages, %s. osu! normally releases far more often, so its packages may have been renamed or stopped, and pp reworks will not be followed until this is looked at.\n\nThe check reads `ppy.osu.Game` and its four `ppy.osu.Game.Rulesets.*` packages (`PACKAGES` in `tools/maintenance/check.mjs`, and `tools/PpCalculator/PpCalculator.csproj`). This issue closes itself when a newer version is found.' \
+    "$pp_found")"
 }
 
 report_claude_auth() {
@@ -162,8 +193,9 @@ trap 'report_failure "The job script stopped at line $LINENO before the work was
 git clone -q --branch "$BRANCH" "https://github.com/$REPO.git" "$clone"
 cd "$clone"
 
-check=$(node tools/maintenance/check.mjs --state "$STATE_DIR/state.json")
+check=$(node tools/maintenance/check.mjs --state "$STATE_DIR/state.json" --stale-days "$STALE_DAYS")
 echo "$check"
+watch_sources
 if [ -n "$FORCE_DUMP" ]; then
   check=$(jq --arg d "$FORCE_DUMP" '.rank.latest = $d | .rank.due = true | .due = true' <<<"$check")
 fi

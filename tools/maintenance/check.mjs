@@ -18,6 +18,11 @@
  *   merged it and stopped before tagging (a reboot, say), and the tag is all that's left. A
  *   release commit of the owner's own is theirs to tag, and never due here.
  *
+ * - **stale**: a source whose newest release is over `--stale-days` (90) old, or that lists
+ *   nothing the check recognises, is marked `stale`. One that stops publishing, or renames what
+ *   it publishes, would otherwise look like a quiet week forever; `run.sh` opens an issue. The
+ *   dates come from the names: a dump is `2026_11_05`, and osu! `2026.1026.0` is 26 October.
+ *
  * Prints one JSON object and exits 0 whether or not anything is due, 1 when a source can't be
  * read or this checkout isn't what the check expects.
  */
@@ -25,6 +30,28 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const DAY_MS = 86_400_000;
+const STALE_DAYS = 90;
+
+/** The day a data.ppy.sh dump such as `2026_11_05` was taken, as a UTC timestamp. */
+export function dumpDate(dump) {
+  const [y, m, d] = dump.split('_').map(Number);
+  return Date.UTC(y, m - 1, d);
+}
+
+/** The day osu! released a `YYYY.MDD.N` version: `2026.1026.0` is 26 October 2026. */
+export function versionDate(version) {
+  const [y, md] = version.split('.').map(Number);
+  return Date.UTC(y, Math.floor(md / 100) - 1, md % 100);
+}
+
+/** How old a source's newest release is, and whether it has gone quiet: null means none was found. */
+export function staleness(newest, now, days = STALE_DAYS) {
+  if (newest === null) return { ageDays: null, stale: true };
+  const ageDays = Math.floor((now - newest) / DAY_MS);
+  return { ageDays, stale: ageDays > days };
+}
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MODES = ['osu', 'taiko', 'catch', 'mania'];
@@ -125,7 +152,10 @@ function readState(file) {
 async function main() {
   const args = process.argv.slice(2);
   const stateFile = args.includes('--state') ? args[args.indexOf('--state') + 1] : null;
+  const staleDays = args.includes('--stale-days') ? Number(args[args.indexOf('--stale-days') + 1]) : STALE_DAYS;
+  if (!(staleDays > 0)) throw new Error('--stale-days needs a number of days');
   const state = readState(stateFile);
+  const now = Date.now();
 
   const dumps = currentDumps();
   const oldestDump = Object.values(dumps).sort()[0];
@@ -136,13 +166,27 @@ async function main() {
   const ppNewer = ppLatest !== null && compareVersions(ppLatest, ppCurrent) > 0;
   const ppSkipped = ppNewer && state.ppNotRework.includes(ppLatest);
 
-  const rank = { current: dumps, latest: latestDump, due: latestDump !== null && latestDump > oldestDump };
-  const pp = { current: ppCurrent, latest: ppLatest, due: ppNewer && !ppSkipped, knownNotRework: ppSkipped };
+  const rank = {
+    current: dumps,
+    latest: latestDump,
+    due: latestDump !== null && latestDump > oldestDump,
+    ...staleness(latestDump && dumpDate(latestDump), now, staleDays),
+  };
+  const pp = {
+    current: ppCurrent,
+    latest: ppLatest,
+    due: ppNewer && !ppSkipped,
+    knownNotRework: ppSkipped,
+    ...staleness(ppLatest && versionDate(ppLatest), now, staleDays),
+  };
   const release = await unfinishedRelease();
   console.log(JSON.stringify({ release, rank, pp, due: release.due || rank.due || pp.due }, null, 2));
 }
 
-main().catch((error) => {
-  console.error(`maintenance check failed: ${error.message}`);
-  process.exit(1);
-});
+// Run as a script; imported (by its tests), it only lends its date helpers.
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(`maintenance check failed: ${error.message}`);
+    process.exit(1);
+  });
+}
