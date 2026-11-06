@@ -1,27 +1,31 @@
 # Automated maintenance
 
 The two things this app has to keep up with, the rank curves and osu!'s pp, are followed by a
-weekly job on the owner's VM. It publishes a release when either changes, with nobody involved.
+daily job on the owner's VM. It publishes a release when either changes, with nobody involved.
 This page is how it works and, from [The procedure](#the-procedure) on, the instructions the
 job's agent follows. Doing either by hand is still in `docs/maintaining.md`.
 
 ## How it runs
 
-`osu-maintenance.timer` starts `osu-maintenance.service` every Monday at 14:00 UTC (and at the
+`osu-maintenance.timer` starts `osu-maintenance.service` every day at 14:00 UTC (and at the
 next boot when the VM was off then). That runs `tools/maintenance/run.sh` as `osubot`, a user
-with no sudo, holding a GitHub token for this repository only and a Claude Code token.
+with no sudo, holding a GitHub token for this repository only and a Claude Code token. Most runs
+find nothing new and take a few seconds. The VM runs other things, so the service yields to them:
+low CPU and disk priority, memory reclaimed from it first above 6GB and capped at 8GB (its
+biggest run, a rank refresh, peaked at 5GB), and the first thing killed if the VM runs out.
 
-1. `run.sh` checks both tokens every week, so one that stops working is reported within a week
-   rather than the month an update is next due. A refused Claude Code token opens the issue
-   *Maintenance: Claude Code can't sign in* with the steps to renew it, and the first check that
-   signs in again closes it. An expired GitHub token can't open an issue; GitHub emails the owner
-   a week before a token expires.
+1. `run.sh` checks both tokens, so one that stops working is reported within a week rather than
+   the month an update is next due: the GitHub token every run, and Claude Code's once a week,
+   since asking it costs a little each time (the owner's vm-ops tests it daily too). A refused
+   Claude Code token opens the issue *Maintenance: Claude Code can't sign in* with the steps to
+   renew it, and the check runs every day until it signs in again and closes it. An expired
+   GitHub token can't open an issue; GitHub emails the owner a week before a token expires.
 2. It clones `main` and runs `tools/maintenance/check.mjs`, which compares the newest
    data.ppy.sh dump and the newest osu! NuGet packages with the checkout, and looks for a release
    an earlier run merged but never tagged. Nothing to do means it stops there, with no agent
    started.
 
-   A source that stops publishing, or renames what it publishes, would look like a quiet week
+   A source that stops publishing, or renames what it publishes, would look like a quiet day
    forever, so the check also dates each source's newest release from its name. Over 90 days
    old (`OSU_MAINT_STALE_DAYS`), or nothing on the page recognised, opens the issue *Maintenance:
    no new rank dump on data.ppy.sh* or *Maintenance: no new osu! version on NuGet*, once, and
@@ -42,6 +46,10 @@ with no sudo, holding a GitHub token for this repository only and a Claude Code 
    is also emailed, through the VM's own alerts (`vm-alert`, from the owner's `oracle-vm` setup)
    when it has them.
 
+   After the agent fails, it isn't started again for a week while that issue is open, since the
+   same failure every day would cost a full agent run each time. Closing the issue lets the next
+   run try at once.
+
 The agent runs on the newest Opus at high effort (`--model opus --effort high`), and the token
 checks on the newest Sonnet at medium. Both names are aliases that move to each new release, and
 Claude Code's background calls are pointed at Sonnet (`ANTHROPIC_DEFAULT_HAIKU_MODEL=sonnet`), so
@@ -58,7 +66,8 @@ sudo systemctl disable --now osu-maintenance.timer
 ```
 
 A test run, as `osubot`: `OSU_MAINT_BRANCH=<branch> OSU_MAINT_DRY_RUN=1 ~/osu-maintenance/run.sh`
-does the work in a clone and publishes nothing. `OSU_MAINT_FORCE_DUMP=2026_09_01` makes the rank
+does the work in a clone and publishes nothing, and `OSU_MAINT_CHECK_ONLY=1` stops where the
+agent would start and says what for. `OSU_MAINT_FORCE_DUMP=2026_09_01` makes the rank
 refresh due against a dump already used, which rewrites the same curves, and `OSU_MAINT_FORCE_PP=1`
 prices the current osu! version against itself, which must come out identical (not a rework), so
 `run.sh` stops there without starting the agent unless something else is due.

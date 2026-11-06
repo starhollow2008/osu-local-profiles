@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The weekly maintenance job (docs/automated-maintenance.md), run by osu-maintenance.service as
+# The daily maintenance job (docs/automated-maintenance.md), run by osu-maintenance.service as
 # the VM's unprivileged job user. setup-vm.sh installs this file as ~/osu-maintenance/run.sh.
 #
 # Clones the repository fresh, asks tools/maintenance/check.mjs whether anything is due, prices
@@ -10,6 +10,7 @@
 # Testing, by hand:
 #   OSU_MAINT_BRANCH=<branch>     clone that branch instead of main
 #   OSU_MAINT_DRY_RUN=1           do the work in the clone, publish nothing, open no issue
+#   OSU_MAINT_CHECK_ONLY=1        stop where the agent would start, and say what it would do
 #   OSU_MAINT_FORCE_DUMP=<date>   rebuild the rank curves from that dump even if it isn't new
 #   OSU_MAINT_FORCE_PP=1          price the current osu! version against itself as if it were new
 #                                 (identical, so the run ends here without the agent)
@@ -22,6 +23,7 @@ BRANCH=${OSU_MAINT_BRANCH:-main}
 DRY_RUN=${OSU_MAINT_DRY_RUN:-0}
 FORCE_DUMP=${OSU_MAINT_FORCE_DUMP:-}
 FORCE_PP=${OSU_MAINT_FORCE_PP:-0}
+CHECK_ONLY=${OSU_MAINT_CHECK_ONLY:-0}
 STALE_DAYS=${OSU_MAINT_STALE_DAYS:-90}
 BASE=$HOME/osu-maintenance
 STATE_DIR=$HOME/.local/state/osu-maintenance
@@ -83,11 +85,18 @@ raise_issue() {
 report_failure() {
   local summary=$1
   echo "FAILED: $summary"
-  raise_issue "$ISSUE_TITLE" "$(printf '%s\n\nRun `%s` on the maintenance VM. Its log is `~/osu-maintenance/logs/%s.log`, and the clone it worked in is kept in `~/osu-maintenance/work/%s` for 60 days.\n\nThe job keeps running weekly. Close this issue once it is dealt with.' \
+  raise_issue "$ISSUE_TITLE" "$(printf '%s\n\nRun `%s` on the maintenance VM. Its log is `~/osu-maintenance/logs/%s.log`, and the clone it worked in is kept in `~/osu-maintenance/work/%s` for 60 days.\n\nThe job keeps checking daily. When it was the agent that failed, the agent is started again only a week later while this issue is open. Close it once it is dealt with, and the next run tries at once.' \
     "$summary" "$stamp" "$stamp" "$stamp")"
 }
 
-# A source that stops publishing, or renames what it publishes, looks like a quiet week to the
+# A failure of the agent's own, which a daily retry would most likely repeat at the cost of a
+# full agent run each day. While its issue is open, the agent waits a week (see below).
+report_agent_failure() {
+  report_failure "$1"
+  [ "$DRY_RUN" = 1 ] || touch "$STATE_DIR/agent-failed"
+}
+
+# A source that stops publishing, or renames what it publishes, looks like a quiet day to the
 # check, forever. Once its newest release is over $STALE_DAYS days old (or nothing it lists is
 # recognised), this opens an issue, once, and closes it when the source has something newer.
 watch_source() {
@@ -98,7 +107,7 @@ watch_source() {
     [ -n "$(open_issue_number "$title")" ] || gh issue create -R "$REPO" --title "$title" --body "$body" || true
   elif [ "$DRY_RUN" != 1 ]; then
     open=$(open_issue_number "$title")
-    [ -z "$open" ] || gh issue close "$open" -R "$REPO" --comment "The weekly check found $(jq -r ".$key.latest" <<<"$check") on $stamp." || true
+    [ -z "$open" ] || gh issue close "$open" -R "$REPO" --comment "The daily check found $(jq -r ".$key.latest" <<<"$check") on $stamp." || true
   fi
 }
 
@@ -108,16 +117,17 @@ watch_sources() {
   local rank_found pp_found
   rank_found=$(jq -r --arg d "$STALE_DAYS" "${found//KEY/rank}" <<<"$check")
   pp_found=$(jq -r --arg d "$STALE_DAYS" "${found//KEY/pp}" <<<"$check")
-  watch_source rank "$RANK_STALE_TITLE" "$(printf 'The newest complete rank dump the weekly check finds on https://data.ppy.sh/ %s. Dumps normally come monthly, so ppy may have renamed the files, moved them or stopped publishing them, and the rank curves will not be refreshed until this is looked at.\n\nThe check expects `<YYYY_MM_DD>_performance_<mode>_random_10000.tar.bz2` for all four modes (`latestCompleteDump` in `tools/maintenance/check.mjs`, and `scripts/build-rank-table.mjs`). This issue closes itself when a newer dump is found.' \
+  watch_source rank "$RANK_STALE_TITLE" "$(printf 'The newest complete rank dump the daily check finds on https://data.ppy.sh/ %s. Dumps normally come monthly, so ppy may have renamed the files, moved them or stopped publishing them, and the rank curves will not be refreshed until this is looked at.\n\nThe check expects `<YYYY_MM_DD>_performance_<mode>_random_10000.tar.bz2` for all four modes (`latestCompleteDump` in `tools/maintenance/check.mjs`, and `scripts/build-rank-table.mjs`). This issue closes itself when a newer dump is found.' \
     "$rank_found")"
-  watch_source pp "$PP_STALE_TITLE" "$(printf 'The newest stable osu! version the weekly check finds on NuGet, published for all five packages, %s. osu! normally releases far more often, so its packages may have been renamed or stopped, and pp reworks will not be followed until this is looked at.\n\nThe check reads `ppy.osu.Game` and its four `ppy.osu.Game.Rulesets.*` packages (`PACKAGES` in `tools/maintenance/check.mjs`, and `tools/PpCalculator/PpCalculator.csproj`). This issue closes itself when a newer version is found.' \
+  watch_source pp "$PP_STALE_TITLE" "$(printf 'The newest stable osu! version the daily check finds on NuGet, published for all five packages, %s. osu! normally releases far more often, so its packages may have been renamed or stopped, and pp reworks will not be followed until this is looked at.\n\nThe check reads `ppy.osu.Game` and its four `ppy.osu.Game.Rulesets.*` packages (`PACKAGES` in `tools/maintenance/check.mjs`, and `tools/PpCalculator/PpCalculator.csproj`). This issue closes itself when a newer version is found.' \
     "$pp_found")"
 }
 
 report_claude_auth() {
   local error=$1
   echo "FAILED: Claude Code can't sign in: $error"
-  raise_issue "$AUTH_TITLE" "$(printf 'The maintenance job'"'"'s Claude Code token was refused (`%s`), so updates can'"'"'t be made until it is renewed. On the VM:\n\n```\nsudo -iu osubot claude setup-token\ngit clone -q https://github.com/%s.git /tmp/olp && sudo bash /tmp/olp/tools/maintenance/set-secrets.sh; rm -rf /tmp/olp\n```\n\nAt the GitHub token prompt, press Enter to keep it, and paste the new Claude token. The next weekly check closes this issue when it can sign in again.' \
+  rm -f "$STATE_DIR/claude-ok"
+  raise_issue "$AUTH_TITLE" "$(printf 'The maintenance job'"'"'s Claude Code token was refused (`%s`), so updates can'"'"'t be made until it is renewed. On the VM:\n\n```\nsudo -iu osubot claude setup-token\ngit clone -q https://github.com/%s.git /tmp/olp && sudo bash /tmp/olp/tools/maintenance/set-secrets.sh; rm -rf /tmp/olp\n```\n\nAt the GitHub token prompt, press Enter to keep it, and paste the new Claude token. The next check closes this issue when it can sign in again.' \
     "$error" "$REPO")"
 }
 
@@ -162,31 +172,39 @@ pp_unchanged() {
   node scripts/pp-parity.mjs "$BASE/work/pp-old" "$BASE/work/pp-new"
 }
 
-# Both tokens are checked every week, so one that stopped working is reported within a week, not
-# the month an update is next due. A dead GitHub token can't open an issue to say so; GitHub
-# itself emails the owner a week before a token expires.
+# Both tokens are checked, so one that stopped working is reported within a week, not the month
+# an update is next due. A dead GitHub token can't open an issue to say so; GitHub itself emails
+# the owner a week before a token expires. The GitHub check is free and runs every time.
 if [ "$(gh api "repos/$REPO" --jq .permissions.push 2>/dev/null)" != true ]; then
   echo "FAILED: the GitHub token can't push to $REPO (expired or revoked?), so no issue can be opened"
   exit 1
 fi
-probe=$BASE/logs/$stamp.probe.jsonl
-(cd "$BASE" && timeout 180 claude -p "Reply with exactly: OK" "${CHECK_MODEL[@]}" --output-format stream-json --verbose \
-  > "$probe" 2>&1) || true
-probe_error=$(agent_error "$probe")
-if is_auth_error "$probe_error"; then
-  report_claude_auth "$probe_error"
-  exit 1
-elif [ -n "$probe_error" ] || ! has_result "$probe"; then
-  # Not a sign-in problem (an outage, say): carry on, and let a run with work report what fails.
-  echo "warning: the Claude Code check didn't answer: ${probe_error:-no result}"
+# Asking Claude Code costs a little each time, so it's asked once a week (and every run while it
+# isn't answering). vm-ops' daily health check tests the same token on the owner's VM.
+claude_ok=$STATE_DIR/claude-ok
+if [ -n "$(find "$claude_ok" -mtime -6 2>/dev/null)" ] && [ "${OSU_MAINT_TEST_BAD_CLAUDE_TOKEN:-0}" != 1 ]; then
+  echo "Claude Code token: signed in within the last 6 days"
 else
-  echo "Claude Code token: OK"
-  [ "$DRY_RUN" = 1 ] || {
-    signed_in=$(open_issue_number "$AUTH_TITLE")
-    [ -z "$signed_in" ] || gh issue close "$signed_in" -R "$REPO" --comment "The weekly check signed in again on $stamp." || true
-  }
+  probe=$BASE/logs/$stamp.probe.jsonl
+  (cd "$BASE" && timeout 180 claude -p "Reply with exactly: OK" "${CHECK_MODEL[@]}" --output-format stream-json --verbose \
+    > "$probe" 2>&1) || true
+  probe_error=$(agent_error "$probe")
+  if is_auth_error "$probe_error"; then
+    report_claude_auth "$probe_error"
+    exit 1
+  elif [ -n "$probe_error" ] || ! has_result "$probe"; then
+    # Not a sign-in problem (an outage, say): carry on, and let a run with work report what fails.
+    echo "warning: the Claude Code check didn't answer: ${probe_error:-no result}"
+  else
+    echo "Claude Code token: OK"
+    touch "$claude_ok"
+    [ "$DRY_RUN" = 1 ] || {
+      signed_in=$(open_issue_number "$AUTH_TITLE")
+      [ -z "$signed_in" ] || gh issue close "$signed_in" -R "$REPO" --comment "The check signed in again on $stamp." || true
+    }
+  fi
+  rm -f "$probe"
 fi
-rm -f "$probe"
 
 trap 'report_failure "The job script stopped at line $LINENO before the work was finished."' ERR
 
@@ -223,10 +241,26 @@ if [ "$(jq -r .due <<<"$check")" != true ]; then
   cd "$BASE" && rm -rf "$clone"
   exit 0
 fi
+# After the agent failed, it isn't started again for a week while that failure's issue is open:
+# the job checks daily, and the same failure every day would cost a full agent run each time.
+# Closing the issue lets the next run try at once.
+if [ "$DRY_RUN" != 1 ] && [ -n "$(find "$STATE_DIR/agent-failed" -mtime -7 2>/dev/null)" ]; then
+  failed_issue=$(open_issue_number "$ISSUE_TITLE")
+  if [ -n "$failed_issue" ]; then
+    echo "the agent failed less than a week ago and issue #$failed_issue is still open: not starting it again yet"
+    cd "$BASE" && rm -rf "$clone"
+    exit 0
+  fi
+fi
+if [ "$CHECK_ONLY" = 1 ]; then
+  echo "check only: the agent would start for $(jq -c '{release: .release.due, rank: .rank.due, pp: .pp.due}' <<<"$check")"
+  cd "$BASE" && rm -rf "$clone"
+  exit 0
+fi
 mode=publish
 [ "$DRY_RUN" = 1 ] && mode=dry-run
 
-prompt="You are this repository's weekly maintenance job, running unattended on the owner's VM.
+prompt="You are this repository's daily maintenance job, running unattended on the owner's VM.
 Nobody will answer questions: decide from the documents, or stop and report a failure.
 
 Follow docs/automated-maintenance.md exactly, from \"The procedure\" on. CLAUDE.md applies too.
@@ -262,7 +296,7 @@ if [ ! -s "$result" ]; then
   if is_auth_error "$last_error"; then
     report_claude_auth "$last_error"
   else
-    report_failure "The agent finished (exit $status) without writing its result file.${last_error:+ Its last error: \`$last_error\`}"
+    report_agent_failure "The agent finished (exit $status) without writing its result file.${last_error:+ Its last error: \`$last_error\`}"
   fi
   exit 1
 fi
@@ -286,7 +320,7 @@ case "$outcome" in
     [ "$DRY_RUN" = 1 ] || { cd "$BASE" && rm -rf "$clone"; }
     ;;
   *)
-    report_failure "$summary"
+    report_agent_failure "$summary"
     exit 1
     ;;
 esac

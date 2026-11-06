@@ -1,8 +1,8 @@
 [Unit]
-Description=Run osu! local profiles maintenance weekly
+Description=Run osu! local profiles maintenance daily
 
 [Timer]
-OnCalendar=Mon *-*-* 14:00:00 UTC
+OnCalendar=*-*-* 14:00:00 UTC
 RandomizedDelaySec=30min
 # A run missed while the VM was off happens when it next starts.
 Persistent=true

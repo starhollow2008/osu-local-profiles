@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Sets up the weekly maintenance job (docs/automated-maintenance.md) on an Ubuntu VM. Run as
+# Sets up the daily maintenance job (docs/automated-maintenance.md) on an Ubuntu VM. Run as
 # root from a checkout; running it again updates everything in place:
 #
 #   sudo bash tools/maintenance/setup-vm.sh [--git-identity "Name <email>"] [--enable-timer]

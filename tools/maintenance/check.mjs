@@ -1,10 +1,10 @@
 /**
- * Whether the weekly maintenance job has anything to do (docs/automated-maintenance.md).
+ * Whether the daily maintenance job has anything to do (docs/automated-maintenance.md).
  *
  *   node tools/maintenance/check.mjs [--state path/to/state.json]
  *
  * Asks the two sources the app follows and compares them with this checkout, with no agent
- * involved, so a week with nothing new costs two HTTP requests and nothing else:
+ * involved, so a run with nothing new costs two HTTP requests and nothing else:
  *
  * - **rank**: the newest data.ppy.sh dump that has all four modes' random samples, against
  *   the `dump` each of `src/calc/rank-tables/*.json` was built from.
@@ -20,7 +20,7 @@
  *
  * - **stale**: a source whose newest release is over `--stale-days` (90) old, or that lists
  *   nothing the check recognises, is marked `stale`. One that stops publishing, or renames what
- *   it publishes, would otherwise look like a quiet week forever; `run.sh` opens an issue. The
+ *   it publishes, would otherwise look like a quiet day forever; `run.sh` opens an issue. The
  *   dates come from the names: a dump is `2026_11_05`, and osu! `2026.1026.0` is 26 October.
  *
  * Prints one JSON object and exits 0 whether or not anything is due, 1 when a source can't be

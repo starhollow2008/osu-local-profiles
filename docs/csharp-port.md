@@ -45,7 +45,7 @@ dotnet/
   try something out, give it a folder of its own with `-- --root <dir>`.
 - `src/db/schema.sql` is embedded into the app from where it is, so there is one schema.
 - `web/` is served from the install root, as now.
-- The weekly maintenance job keeps updating `tools/PpCalculator/PpCalculator.csproj`. Phase 3
+- The daily maintenance job keeps updating `tools/PpCalculator/PpCalculator.csproj`. Phase 3
   moves the osu! package versions into one place both projects read, and changes
   `docs/automated-maintenance.md` in the same commit.
 
@@ -155,7 +155,7 @@ Done (2026-10-28):
   corpus requests identically, and `npm run build:pp:local`'s slim check passed.
 - **The osu! package versions stay in `tools/PpCalculator/PpCalculator.csproj` alone.** The app
   references that project instead of listing the packages again, so a pp rework is still a
-  version bump in one file and the weekly job's procedure is unchanged. (The plan was a shared
+  version bump in one file and the daily job's procedure is unchanged. (The plan was a shared
   `Directory.Packages.props`; referencing the project needs no change to the job at all.)
 - Every pp still carries its osu! release version: `/api/state`'s calculator version and
   outdated count, and a score's `calculator`, now match the Node app's.

@@ -1,5 +1,5 @@
 /**
- * Types for what `test/maintenance-check.test.ts` imports from the weekly job's check, which is
+ * Types for what `test/maintenance-check.test.ts` imports from the daily job's check, which is
  * plain JavaScript like `scripts/` (see `scripts/build-pp-helper.d.ts`).
  */
 declare module '*/maintenance/check.mjs' {

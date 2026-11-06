@@ -57,7 +57,7 @@ wherever Explorer decides.
 ## Keeping pp current
 
 Reimplementations of osu!'s algorithm lag its reworks, which is why pp comes from osu!'s own
-packages. The weekly maintenance job (`docs/automated-maintenance.md`) prices every new osu!
+packages. The daily maintenance job (`docs/automated-maintenance.md`) prices every new osu!
 version against the current one on generated plays and ships it only when pp changed. By hand,
 when osu! reworks pp:
 
@@ -90,7 +90,7 @@ The script streams each ~1GB archive through `bzip2` and `tar`, keeps only the u
 and deletes it once the curve is written. The result is about 3KB per mode. All four modes
 currently use the 2026_09_01 dump.
 
-It's a multi-gigabyte download, so nothing in the app runs it. The owner's weekly maintenance job
+It's a multi-gigabyte download, so nothing in the app runs it. The owner's daily maintenance job
 (`docs/automated-maintenance.md`) runs it when data.ppy.sh publishes a newer dump, and releases
 the result. By hand, run it when osu! reworks pp (the curve maps pp to rank, so a rework breaks it
 at once) and when a new dump is out, since the same pp slowly buys a worse rank. data.ppy.sh

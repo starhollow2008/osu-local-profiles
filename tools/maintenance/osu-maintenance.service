@@ -1,5 +1,5 @@
 [Unit]
-Description=osu! local profiles weekly maintenance (docs/automated-maintenance.md)
+Description=osu! local profiles daily maintenance (docs/automated-maintenance.md)
 Wants=network-online.target
 After=network-online.target
 
@@ -11,4 +11,13 @@ WorkingDirectory=/home/osubot
 ExecStart=/home/osubot/osu-maintenance/run.sh
 # A pp rework with a rank refresh and three rounds of CI fits well inside this.
 TimeoutStartSec=6h
+# The VM runs other things, and has no swap. This job yields to them: low CPU and disk
+# priority, memory reclaimed from it first above 6GB (its biggest run, a rank refresh with the
+# C# tests, peaked at 5GB with page cache), never more than 8GB, and the kernel's first choice
+# when the whole VM runs out of memory.
 Nice=5
+CPUWeight=20
+IOWeight=20
+MemoryHigh=6G
+MemoryMax=8G
+OOMScoreAdjust=500

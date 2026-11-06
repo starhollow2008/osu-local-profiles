@@ -102,7 +102,7 @@ The C# port (roadmap 5.82) is in `dotnet/` and ships nothing until its switch-ov
 rules and progress are in [`docs/csharp-port.md`](docs/csharp-port.md). A change to behaviour
 it already ports gets the same change there; `npm run check:port` runs its tests.
 
-Rank-curve refreshes and pp reworks are released by a weekly job on the owner's VM
+Rank-curve refreshes and pp reworks are released by a daily job on the owner's VM
 ([`docs/automated-maintenance.md`](docs/automated-maintenance.md)). Its agent follows that page.
 
 ## TS: strip-only, no runtime emit
