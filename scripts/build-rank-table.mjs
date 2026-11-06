@@ -41,7 +41,7 @@ const STATS_TABLE = {
   catch: 'osu_user_stats_fruits',
   mania: 'osu_user_stats_mania',
 };
-const DEFAULT_DUMP = '2026_09_01';
+const DEFAULT_DUMP = '2026_11_05';
 /** How many points to keep. The curve is smooth; this is far more than it needs. */
 const SAMPLES = 300;
 

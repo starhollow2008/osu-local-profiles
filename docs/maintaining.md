@@ -83,12 +83,12 @@ random sample of the whole ladder:
 ```
 npm run rank:refresh                                # all four modes, newest dump
 node scripts/build-rank-table.mjs osu --latest      # one mode
-node scripts/build-rank-table.mjs osu --dump 2026_09_01
+node scripts/build-rank-table.mjs osu --dump 2026_11_05
 ```
 
 The script streams each ~1GB archive through `bzip2` and `tar`, keeps only the user-stats table,
 and deletes it once the curve is written. The result is about 3KB per mode. All four modes
-currently use the 2026_09_01 dump.
+currently use the 2026_11_05 dump.
 
 It's a multi-gigabyte download, so nothing in the app runs it. The owner's daily maintenance job
 (`docs/automated-maintenance.md`) runs it when data.ppy.sh publishes a newer dump, and releases
