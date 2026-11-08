@@ -22,15 +22,21 @@ shouldn't be.
 ## Building a release
 
 ```
-npm run package
+npm run package -- --native
 ```
 
-This makes `dist/osu-local-profiles-<version>-<rid>/` and a zip beside it, holding Node, osu!'s pp
-calculator and the app. There's nothing to install, and since `data/` lives beside the app the
-folder can be moved anywhere.
+This makes `dist/osu-local-profiles-<version>-<rid>/` and a zip beside it, holding the C# app
+(self-contained, with osu!'s pp calculator inside it), the page and the tray launcher. There's
+nothing to install, and since `data/` lives beside the app the folder can be moved anywhere. Beside
+them go the stand-ins that let versions before 1.33.0 update to it: `node.exe` (`node` on macOS
+and Linux, the tray launcher again, which does the swap when an old version asks the old way), a
+placeholder `src/` and a placeholder `scripts/apply-update.mjs`. The update leaves all three out
+of the install. Without `--native` the script still builds the old Node app, which no release has
+used since 1.33.0.
 
-**A package has to be built on the system it's for.** The bundled Node is a copy of the one running
-the script, so building for another OS is refused. `--rid` can only pick another architecture.
+**A package has to be built on the system it's for.** The trimmed app ships only after it has run
+on that system and answered every parity request as the untrimmed one does, so building for
+another OS is refused. `--rid` can only pick another architecture.
 
 So releases are built by GitHub Actions (`.github/workflows/release.yml`): pushing a `v<version>`
 tag packages the app on each platform's runner and attaches the four zips to that release. Running
@@ -46,7 +52,8 @@ keeps both on its line, as `(#4)` and `@name`. The release page links both, and 
 
 Most of the packaging script is removal: osu!'s NuGet packages carry the whole game (fonts,
 textures, audio, ffmpeg, SDL), and the native BASS audio libraries are commercially licensed, so
-they're excluded. The pp helper ships slim only when it's proven to give identical answers (roadmap
+they're excluded. The app ships trimmed only when it answers every pp and API parity request
+exactly as the untrimmed one does (`buildCheckedApp` in `scripts/build-pp-helper.mjs`, roadmap
 5.60); full trimming breaks it (5.44).
 
 The script also starts the packaged app from an unrelated folder and refuses to finish unless it
