@@ -57,14 +57,6 @@
   background-position: center;
 }
 
-/* Keeps the name and the buttons legible over an arbitrary beatmap background. */
-.profile-info__bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.55));
-}
-
 /*
  * osu-web's `.profile-info__cover-toggle` (`profile-info.less`): a full-height box on the
  * details row's right edge with the circle centred in it, so the chevron sits on the name's
