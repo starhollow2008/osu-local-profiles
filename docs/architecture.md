@@ -512,6 +512,14 @@ so a score screenshot, rendered in a browser with no storage, agrees. Both pages
 drawn at all until it loads (`font-display: block`). A saved copy carries the font files, once per
 weight band.
 
+Other settings -> Show star rating on scores (`config.starRating`) adds `· 6.18★` after a score
+row's difficulty. It is off by default, as osu! shows none there, and an older `config.json`
+without the key reads as off too. Every earlier version showed them, so an install that already
+had a database when this one first started is told once, in a note under Scores
+(`src/star-rating-notice.ts`, `kv.starRatingNotice`: `pending`, then `done` when the note is closed
+or the setting changed). A new install is never told. A saved copy keeps the sharer's choice and
+never the note.
+
 **Section headings stay block-level.** As `inline-block` they flowed "Top Ranks" and "Best
 Performance" onto one line. `npm run ui` checks they stack.
 

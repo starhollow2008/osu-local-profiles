@@ -304,6 +304,14 @@ internal static partial class Server
             return;
         }
 
+        // The star rating note, closed or answered by changing the setting: either ends it.
+        if (pathname == "/api/star-rating-notice" && method == "POST")
+        {
+            ProfileData.DismissStarRatingNotice(db);
+            await Json(context, new { ok = true });
+            return;
+        }
+
         if (pathname == "/api/profile")
         {
             await Json(context, ProfileApi.Answer(request, opts, opts.Cache!, Current()));

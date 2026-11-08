@@ -381,6 +381,36 @@ public sealed class WriteApiTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, (await Post("/api/welcome", (string?)null)).Status);
     }
 
+    [Fact]
+    public async Task The_star_rating_note_is_for_installs_from_before_and_ends_for_good()
+    {
+        // Never seeded: nothing to say.
+        Assert.False((await client.GetFromJson("/api/state")).GetProperty("starRatingNotice").GetBoolean());
+        // A new install never saw star ratings; later starts change nothing.
+        ProfileData.SeedStarRatingNotice(data.Db, firstRun: true);
+        ProfileData.SeedStarRatingNotice(data.Db, firstRun: false);
+        Assert.False(ProfileData.StarRatingNoticePending(data.Db));
+
+        data.Db.Run("DELETE FROM kv WHERE key = ?", "starRatingNotice");
+        ProfileData.SeedStarRatingNotice(data.Db, firstRun: false);
+        ProfileData.SeedStarRatingNotice(data.Db, firstRun: false);
+        Assert.True((await client.GetFromJson("/api/state")).GetProperty("starRatingNotice").GetBoolean());
+        Assert.Equal(HttpStatusCode.OK, (await Post("/api/star-rating-notice", (string?)null)).Status);
+        Assert.False((await client.GetFromJson("/api/state")).GetProperty("starRatingNotice").GetBoolean());
+        ProfileData.SeedStarRatingNotice(data.Db, firstRun: false);
+        Assert.False(ProfileData.StarRatingNoticePending(data.Db));
+    }
+
+    [Fact]
+    public async Task Star_ratings_are_an_install_option_off_by_default()
+    {
+        Assert.False((await client.GetFromJson("/api/app-config")).GetProperty("config").GetProperty("starRating").GetBoolean());
+        Assert.True((await Post("/api/app-config", new { starRating = true })).Body.GetProperty("config").GetProperty("starRating").GetBoolean());
+        Assert.Equal("starRating must be true or false", Error((await Post("/api/app-config", new { starRating = "yes" })).Body));
+        using var saved = JsonDocument.Parse(File.ReadAllText(Path.Combine(DataDir, "config.json")));
+        Assert.True(saved.RootElement.GetProperty("starRating").GetBoolean());
+    }
+
     /// <summary>The smallest bytes that sniff as a PNG.</summary>
     private static byte[] Png() => [0x89, (byte)'P', (byte)'N', (byte)'G', 13, 10, 26, 10, 0, 0, 0, 13, 1, 2, 3];
 

@@ -2112,6 +2112,7 @@
 .export-mode #aboutActions,
 .export-mode .play-detail__menu,
 .export-mode .play-detail__grip,
+.export-mode #starRatingNotice,
 .export-mode [data-unfavorite],
 .export-mode [data-audio-play],
 .export-mode .beatmapset-panel__play-progress {
@@ -5886,7 +5887,7 @@ s.bbcode-editor__glyph {
 /* ======================================================================== */
 
 .static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #importNotice, #favoritesNote,
-  #aboutEdit, #aboutActions, #coverEdit, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
+  #starRatingNotice, #aboutEdit, #aboutActions, #coverEdit, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"]) {
   display: none !important;
 }

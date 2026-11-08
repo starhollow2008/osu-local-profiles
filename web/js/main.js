@@ -520,6 +520,34 @@ function renderCountingNote(next) {
 }
 
 /*
+ * The one-time note, on an install from before star ratings were hidden, that they are and
+ * where to turn them back on (src/star-rating-notice.ts). Closing it ends it for good, and
+ * so does changing the setting.
+ */
+function renderStarRatingNotice(pending) {
+  const note = $('starRatingNotice');
+  note.hidden = !pending;
+  note.innerHTML = pending
+    ? `<div class="counting-note__text">${escapeHtml(t('starRatingNotice.text'))}</div>
+    <div class="counting-note__actions">
+      <button type="button" class="counting-note__close" data-dismiss-note
+              aria-label="${escapeHtml(t('common.dontShowThisAgain'))}">&times;</button>
+    </div>`
+    : '';
+}
+
+function dismissStarRatingNotice() {
+  if ($('starRatingNotice').hidden) return;
+  renderStarRatingNotice(false);
+  // Hidden for this view either way; a failed save only means it returns next load.
+  postJson('/api/star-rating-notice', {}).catch(() => {});
+}
+
+$('starRatingNotice').onclick = (e) => {
+  if (e.target.closest('[data-dismiss-note]')) dismissStarRatingNotice();
+};
+
+/*
  * Both controls do the same thing, and permanently: the X is the affordance people reach
  * for, the wording is what makes the consequence explicit. Saved per profile, so it can be
  * turned back on from Settings.
@@ -668,10 +696,13 @@ async function loadProfile() {
   // terms of positions in this list.
   pinnedIds = (data.pinned ?? []).map((p) => p.id);
   $('pinnedCount').textContent = fmt(pinnedIds.length);
+  // Other settings -> Show star rating on scores, off unless the app says otherwise.
+  const starRating = app.config?.starRating === true;
   // Nothing pinned leaves the space empty, as osu! does, rather than explaining itself.
   $('pinnedPlays').innerHTML = playList(data.pinned, {
     actions: true,
     reorderable: true,
+    starRating,
     empty: '',
   });
 
@@ -681,6 +712,7 @@ async function loadProfile() {
     playList(data.top, {
       showWeight: true,
       actions: true,
+      starRating,
       empty:
         settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
           ? t('empty.noPpPlays')
@@ -702,6 +734,7 @@ async function loadProfile() {
   $('recentPlays').innerHTML =
     playList(data.recent, {
       actions: true,
+      starRating,
       empty: t('empty.goSetAPlay'),
     }) + showMore('recent', data.recent.length, shown.recent, recentTotal, settings.showMoreAll);
 
@@ -738,6 +771,7 @@ async function loadState() {
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
   welcomeOffered = Boolean(s.welcome);
+  renderStarRatingNotice(Boolean(s.starRatingNotice));
   refreshOpenProfiles();
 
   app = s.app ?? app;
@@ -2815,6 +2849,7 @@ function openSettings() {
   void loadPpSource();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   $('originalMetadataSetting').checked = preferOriginalMetadata();
+  $('starRatingSetting').checked = app.config?.starRating === true;
   $('fontSetting').value = pageFont();
   settingsHint(' ');
   $('settingsModal').hidden = false;
@@ -2884,6 +2919,15 @@ $('settingsSave').onclick = async () => {
       refreshLanguageButton();
       const c = await postJson('/api/app-config', { originalMetadata }, 'saving that failed');
       app = { ...app, config: c.config };
+    }
+
+    // Star ratings on score rows, install-level too. The reload below redraws the rows.
+    const starRating = $('starRatingSetting').checked;
+    if (starRating !== (app.config?.starRating === true)) {
+      const c = await postJson('/api/app-config', { starRating }, 'saving that failed');
+      app = { ...app, config: c.config };
+      // The note said where this is; changing it is as good as closing the note.
+      dismissStarRatingNotice();
     }
 
     // The typeface, install-level too. Switching it restyles the page at once.
@@ -4866,9 +4910,12 @@ on('settings', () => loadState());
 on('identity', () => loadState());
 // A second tab should read the install's options as they now are.
 on('app-config', (e) => {
+  const starRating = app.config?.starRating === true;
   app = { ...app, config: JSON.parse(e.data) };
   applyConfigFont(app.config);
   renderUpdate();
+  // Changed in another tab: redraw the score rows with or without it.
+  if ((app.config?.starRating === true) !== starRating) void loadProfile();
 });
 // Pin, unpin and remove all change what the page should be showing.
 // Another tab favouriting or unfavouriting changes this one's cards and menus.

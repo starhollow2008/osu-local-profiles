@@ -77,6 +77,7 @@ internal sealed class AppConfig
         ["language"] = JsonText.From(""),
         ["originalMetadata"] = JsonText.From(false),
         ["font"] = JsonText.From("nunito"),
+        ["starRating"] = JsonText.From(false),
         ["country"] = JsonText.From(""),
         ["tagline"] = JsonText.From(""),
         ["checkForUpdates"] = JsonText.From(true),
@@ -189,6 +190,7 @@ internal sealed class AppConfig
         ["originalMetadata"] = this["originalMetadata"],
         // A hand-edited value that is neither is Nunito, the default.
         ["font"] = Js.IsString(this["font"], out var font) && font == "system" ? "system" : "nunito",
+        ["starRating"] = this["starRating"] is { ValueKind: JsonValueKind.True },
         ["autoUpdate"] = this["autoUpdate"] is { ValueKind: JsonValueKind.True },
     };
 

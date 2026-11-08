@@ -208,7 +208,7 @@ const MORE_ICON =
  * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
  * accuracy, mods and pp stepping right.
  */
-export function playRow(play, { showWeight = false, actions = false, reorderable = false } = {}) {
+export function playRow(play, { showWeight = false, actions = false, reorderable = false, starRating = false } = {}) {
   const artist = playArtist(play);
   const title = maybeLink(
     beatmapHref(play),
@@ -227,7 +227,8 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
 
   const pp = ppCell(play);
 
-  const stars = play.stars != null ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
+  // Other settings -> Show star rating on scores. osu! shows none here, so off by default.
+  const stars = starRating && play.stars != null ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
 
   /*
    * One shared popover does the menu (see #playMenu), so a row only carries the button and

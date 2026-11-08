@@ -9,6 +9,7 @@ import type { OsuInstall } from '../clients/detect.ts';
 import { isLocale } from '../i18n.ts';
 import type { Ruleset } from '../osr.ts';
 import { dismissWelcome, welcomePending } from '../welcome.ts';
+import { dismissStarRatingNotice, starRatingNoticePending } from '../star-rating-notice.ts';
 import { backupFileName, createBackup, discardRestore, localDay, markRestoreReady, stageRestore } from '../backup.ts';
 import { scoresTable, workbookTables } from '../export/tables.ts';
 import { toCsv } from '../export/csv.ts';
@@ -265,6 +266,8 @@ export interface AppConfig {
   originalMetadata?: boolean;
   /** Other settings -> Font: Nunito, shipped with the app, or the system's own font. */
   font?: 'nunito' | 'system';
+  /** Other settings -> Show star rating on scores. Off by default, as on osu!. */
+  starRating?: boolean;
   /** Options -> Auto-update: download new versions and install them at quit or next start. */
   autoUpdate?: boolean;
 }
@@ -593,6 +596,8 @@ export function startServer(opts: ServerOptions): http.Server {
         ),
         // A brand-new install's one-time offer to import from an osu! account.
         welcome: welcomePending(opts.db),
+        // An install from before star ratings were hidden, not yet told (src/star-rating-notice.ts).
+        starRatingNotice: starRatingNoticePending(opts.db),
         installs: opts.installs.map((i) => ({
           kind: i.kind,
           // osu!'s development client, a lazer of its own beside release lazer.
@@ -609,6 +614,12 @@ export function startServer(opts: ServerOptions): http.Server {
      */
     if (url.pathname === '/api/welcome' && req.method === 'POST') {
       dismissWelcome(opts.db);
+      return json(res, { ok: true });
+    }
+
+    // The star rating note, closed or answered by changing the setting: either ends it.
+    if (url.pathname === '/api/star-rating-notice' && req.method === 'POST') {
+      dismissStarRatingNotice(opts.db);
       return json(res, { ok: true });
     }
 
@@ -790,7 +801,7 @@ export function startServer(opts: ServerOptions): http.Server {
 
       return readBody(req, res, (body) => {
         const patch: Partial<AppConfig> = {};
-        for (const key of ['openBrowser', 'sharedFavorites', 'originalMetadata', 'autoUpdate'] as const) {
+        for (const key of ['openBrowser', 'sharedFavorites', 'originalMetadata', 'starRating', 'autoUpdate'] as const) {
           if (!(key in body)) continue;
           if (typeof body[key] !== 'boolean') return json(res, { error: `${key} must be true or false` }, 400);
           patch[key] = body[key];

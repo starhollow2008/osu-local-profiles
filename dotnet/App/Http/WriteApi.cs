@@ -173,7 +173,7 @@ internal static partial class Server
         });
     }
 
-    private static readonly string[] AppConfigSwitches = ["openBrowser", "sharedFavorites", "originalMetadata", "autoUpdate"];
+    private static readonly string[] AppConfigSwitches = ["openBrowser", "sharedFavorites", "originalMetadata", "starRating", "autoUpdate"];
 
     /// <summary>
     /// The install's own options. Only these keys, each only to a value of the right type: this
@@ -257,7 +257,7 @@ internal static partial class Server
             current[key] = value;
             opts.Config[key] = value;
         }
-        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font" })
+        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating" })
         {
             if (patch.TryGetValue(key, out var value)) Set(key, value);
         }

@@ -16,3 +16,9 @@ export function countingNoteText(counting: {
   preferStrippedPp?: boolean;
   extraMapStatuses?: readonly number[];
 } | null | undefined): string;
+
+/** One score row, as osu-web's `.play-detail`. */
+export function playRow(
+  play: Record<string, unknown>,
+  options?: { showWeight?: boolean; actions?: boolean; reorderable?: boolean; starRating?: boolean },
+): string;

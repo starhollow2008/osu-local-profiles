@@ -264,6 +264,20 @@ internal static class ProfileData
     public static void OfferWelcome(Database db) => db.Run("INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)", "welcomePending", "1");
 
     /// <summary>
+    /// The one-time note that star ratings left the score rows (src/star-rating-notice.ts): decided
+    /// once per database, <c>pending</c> for an install that already existed, <c>done</c> for a new one.
+    /// </summary>
+    public static void SeedStarRatingNotice(Database db, bool firstRun) =>
+        db.Run("INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)", "starRatingNotice", firstRun ? "done" : "pending");
+
+    public static bool StarRatingNoticePending(Database db) =>
+        db.Exists("SELECT 1 AS hit FROM kv WHERE key = ? AND value = ?", "starRatingNotice", "pending");
+
+    /// <summary>The note, closed or answered by changing the setting: either ends it for good.</summary>
+    public static void DismissStarRatingNotice(Database db) =>
+        db.Run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value", "starRatingNotice", "done");
+
+    /// <summary>
     /// Every play erased and tracking restarted from now: scores, unfinished plays, deletions, the
     /// declined list, the standing and medals borrowed from osu!, and rank events.
     /// </summary>

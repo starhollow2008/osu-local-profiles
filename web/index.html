@@ -320,6 +320,7 @@
 
   <section class="page-extra" id="section-top_ranks">
     <h2 class="title" data-i18n="section.scores">Scores</h2>
+    <div class="counting-note" id="starRatingNotice" hidden></div>
     <h3 class="title title--sub title--sub-first"><span data-i18n="heading.pinnedScores">Pinned Scores</span><span class="title__count" id="pinnedCount">0</span></h3>
     <div id="pinnedPlays"></div>
     <h3 class="title title--sub"><span data-i18n="heading.bestPerformance">Best Performance</span><span class="title__count" id="topCount">0</span></h3>
@@ -746,6 +747,12 @@
         <label class="field">
           <span data-i18n="installSettings.originalLanguage">Show beatmap metadata in original language</span>
           <input type="checkbox" id="originalMetadataSetting">
+        </label>
+      </div>
+      <div class="setting">
+        <label class="field">
+          <span data-i18n="installSettings.starRating">Show star rating on scores</span>
+          <input type="checkbox" id="starRatingSetting">
         </label>
       </div>
       <div class="setting">

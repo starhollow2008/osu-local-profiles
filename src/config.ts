@@ -56,6 +56,13 @@ export interface Config {
    */
   font: 'nunito' | 'system';
   /**
+   * Other settings -> Show star rating on scores: the `· 6.18★` after each score's difficulty.
+   * Off by default, as on osu!, which shows none there. Install-level beside `font`, how this
+   * person reads the page. Installs from before it existed start off too, and are told once
+   * (src/star-rating-notice.ts).
+   */
+  starRating: boolean;
+  /**
    * Shown beside the profile name, the way osu! shows a country. Two-letter ISO code;
    * empty means the profile has no country, which is how a new profile starts.
    */
@@ -99,6 +106,7 @@ const DEFAULTS: Config = {
   language: '',
   originalMetadata: false,
   font: 'nunito',
+  starRating: false,
   country: '',
   tagline: '',
   checkForUpdates: true,

@@ -2,6 +2,7 @@ import { syncFavoriteSharing } from './favorites.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { offerWelcome } from './welcome.ts';
+import { seedStarRatingNotice } from './star-rating-notice.ts';
 import { appVersion, loadConfig, saveConfig, dataDir, installDir, type Config } from './config.ts';
 import { openBrowser } from './browser.ts';
 import { discoverInstalls, type DiscoveryResult } from './clients/discover.ts';
@@ -244,6 +245,7 @@ async function main(): Promise<void> {
   // or switching never has to round-trip through a config file.
   seedFirstProfile(db, config.profileName);
   if (firstRun) offerWelcome(db);
+  seedStarRatingNotice(db, firstRun);
   const active = getProfile(db, activeProfileId(db))!;
   const profileId = active.id;
   const profileName = active.name;
@@ -537,6 +539,7 @@ async function main(): Promise<void> {
         originalMetadata: config.originalMetadata,
         // A hand-edited value that is neither is Nunito, the default.
         font: config.font === 'system' ? 'system' : 'nunito',
+        starRating: config.starRating === true,
         autoUpdate: config.autoUpdate === true,
       }),
       set: (patch) => {
@@ -547,6 +550,7 @@ async function main(): Promise<void> {
           current.originalMetadata = config.originalMetadata = patch.originalMetadata;
         }
         if (patch.font !== undefined) current.font = config.font = patch.font;
+        if (patch.starRating !== undefined) current.starRating = config.starRating = patch.starRating;
         if (patch.sharedFavorites !== undefined) {
           current.sharedFavorites = config.sharedFavorites = patch.sharedFavorites;
           // Merge or copy the lists now, so the next request already reads the right one.

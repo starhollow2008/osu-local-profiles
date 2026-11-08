@@ -179,6 +179,8 @@ internal static class StateApi
             modesWithPlays = Stats.ModesWithPlays(db, profileId, Eligibility.Of(settings, opts.StatusKnown)),
             // A brand-new install's one-time offer to import from an osu! account.
             welcome = db.Exists("SELECT 1 AS hit FROM kv WHERE key = ?", "welcomePending"),
+            // An install from before star ratings were hidden, not yet told.
+            starRatingNotice = ProfileData.StarRatingNoticePending(db),
             installs = opts.Installs.Select(i => new
             {
                 kind = i.Kind,

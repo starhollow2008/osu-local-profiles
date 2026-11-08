@@ -180,7 +180,13 @@ export async function buildInteractiveHtml(progress = () => {}) {
       indexing: { ...(state.indexing ?? {}), active: false },
       importing: { ...(state.importing ?? {}), active: false },
       sharing: { canScreenshot: false },
-      app: { version: state.app?.version ?? null, update: null, config: {} },
+      starRatingNotice: false,
+      // Star ratings as the sharer sees them; nothing else of the install's options.
+      app: {
+        version: state.app?.version ?? null,
+        update: null,
+        config: { starRating: state.app?.config?.starRating === true },
+      },
     },
     profiles,
     scores,

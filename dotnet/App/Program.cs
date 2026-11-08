@@ -143,6 +143,7 @@ if (restored.Applied) OsuLocalProfiles.Tracker.CatchUp.MarkRunning(db);
 // config.json's profileName only names the very first profile; after that they are the page's.
 Profiles.SeedFirst(db, config.ProfileName);
 if (firstRun) ProfileData.OfferWelcome(db);
+ProfileData.SeedStarRatingNotice(db, firstRun);
 // Before any request is answered: the favourite lists must agree with the setting as it stands.
 Favorites.SyncSharing(db, config["sharedFavorites"] is not { ValueKind: System.Text.Json.JsonValueKind.False });
 var active = Profiles.Get(db, Profiles.ActiveId(db))!;
