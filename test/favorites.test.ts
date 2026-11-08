@@ -321,10 +321,11 @@ const cardWith = (over: Record<string, unknown>) =>
     ...over,
   });
 
-test('the play button plays osu!\'s preview, and an Explicit set gets none, as on osu!', () => {
+// osu! hides it from a viewer who has not allowed explicit content; this page has only its owner.
+test("the play button plays osu!'s preview, an Explicit set's too", () => {
   assert.ok(cardWith({}).includes('data-audio-play="9"'));
   assert.equal(previewUrl(9), 'https://b.ppy.sh/preview/9.mp3');
-  assert.ok(!cardWith({ nsfw: true }).includes('data-audio-play'));
+  assert.ok(cardWith({ nsfw: true }).includes('data-audio-play="9"'));
 });
 
 test('video and storyboard icons appear only for the sets that have them', () => {

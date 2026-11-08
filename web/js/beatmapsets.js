@@ -103,9 +103,9 @@ function playArea(card) {
       ? `<div class="beatmapset-panel__play-icon" title="This beatmap contains storyboard">${ICON.image}</div>`
       : '',
   ].join('');
-  const play = card.nsfw
-    ? ''
-    : `<button type="button" class="beatmapset-panel__play" data-audio-play="${card.id}"
+  // Every card can play, explicit ones too: osu! hides the button only from a viewer who has not
+  // allowed explicit content, and this page has only its owner.
+  const play = `<button type="button" class="beatmapset-panel__play" data-audio-play="${card.id}"
          title="Play preview" aria-label="Play the preview of ${escapeHtml(card.title)}">
          <span class="beatmapset-panel__play-face beatmapset-panel__play-face--play">${ICON.playTriangle}</span>
          <span class="beatmapset-panel__play-face beatmapset-panel__play-face--pause">${ICON.pause}</span>

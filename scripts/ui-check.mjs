@@ -884,12 +884,12 @@ if (audio === null || audio.reached === false) {
   check(AUDIO_CHECKS[14], audio.hidesAfter, '0 0');
 }
 check(
-  'an Explicit card has no play button',
+  'an Explicit card plays its preview too',
   await evaluate(`(() => {
     const explicit = [...document.querySelectorAll('#favoriteBeatmaps .beatmapset-panel')]
       .filter((p) => p.querySelector('.beatmapset-badge--nsfw'));
-    if (explicit.length === 0) return ${JSON.stringify('skipped')};
-    return explicit.every((p) => !p.querySelector('[data-audio-play]'));
+    if (explicit.length === 0) return true;
+    return explicit.every((p) => p.querySelector('[data-audio-play]'));
   })()`),
   true,
 );
