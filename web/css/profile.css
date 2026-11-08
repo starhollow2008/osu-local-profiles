@@ -745,6 +745,20 @@
     grid-template-columns: 1fr auto auto;
   }
 
+  /*
+   * The ranks, chart and numbers stretch to the stats box's height, the chart taking the
+   * extra, so the numbers under it line up with the bottom of the box.
+   */
+  .profile-detail-stats > :first-child {
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .profile-detail-stats__chart {
+    flex: 1 0 90px;
+  }
+
   .profile-detail-stats__chart-numbers {
     flex-direction: row;
     justify-content: space-between;
