@@ -2449,6 +2449,29 @@ check('Escape closes the profiles dialog', await shown('profilesModal'), 'none')
  */
 console.log('\nscore actions');
 check('the score menu is hidden on load', await shown('playMenu'), 'none');
+/*
+ * A row opens its score's card from anywhere but its own links and buttons, as a row on osu!
+ * opens the score. The title link is only as wide as its text, so the space beside it is the row.
+ */
+check(
+  'clicking a score row beside its title opens the score, and its title is only its text',
+  await evaluate(`(async () => {
+    const row = document.querySelector('.play-detail[data-score-id]');
+    if (!row) return true;
+    row.scrollIntoView({ block: 'center' });
+    const title = row.querySelector('.play-detail__title').getBoundingClientRect();
+    const column = row.querySelector('.play-detail__detail').getBoundingClientRect();
+    if (title.right >= column.right - 10) return true; // a title that fills its column leaves no gap to click
+    const beside = document.elementFromPoint(title.right + 8, title.top + title.height / 2);
+    if (beside.closest('a')) return 'the space beside the title is a link';
+    beside.click();
+    await new Promise((r) => setTimeout(r, 800));
+    const opened = !document.getElementById('scoreModal').hidden;
+    document.getElementById('scoreClose').click();
+    return opened;
+  })()`),
+  true,
+);
 check(
   'every score row offers one',
   await evaluate(`(() => {

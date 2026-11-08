@@ -1127,6 +1127,11 @@
   margin: 2px 0;
 }
 
+/* A score row opens its card when clicked (web/js/main.js), as osu-web's row links to the score. */
+.play-detail[data-score-id] {
+  cursor: pointer;
+}
+
 .play-detail__group {
   padding: 10px 20px;
   position: relative;
@@ -1163,9 +1168,11 @@
   flex-direction: column;
 }
 
+/* As wide as its text, as in osu-web: the rest of the row opens the score. */
 .play-detail__title {
   font-size: var(--fs-title-small);
   display: block;
+  align-self: flex-start;
   max-width: 100%;
   color: #fff;
 }

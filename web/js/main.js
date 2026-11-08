@@ -3222,6 +3222,18 @@ $('scoreModal').querySelector('.score-modal').addEventListener('scroll', () => {
   if (!$('playMenu').hidden) closePlayMenu();
 });
 
+/*
+ * A click anywhere on a score row opens its card, as a row on osu! opens the score's page. The
+ * row's own links and buttons keep their jobs, and a drag that selected text is not a click.
+ */
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('.play-detail[data-score-id]');
+  if (!row || e.defaultPrevented) return;
+  if (e.target.closest('a, button, input, [data-play-menu], .play-detail__grip')) return;
+  if (window.getSelection()?.toString()) return;
+  void openScoreCard(Number(row.dataset.scoreId));
+});
+
 document.addEventListener('click', (e) => {
   const link = e.target.closest('[data-replay-download]');
   if (!link) return;
