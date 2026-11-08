@@ -844,7 +844,7 @@
 .profile-stats {
   font-size: var(--fs-normal);
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr 1fr;
   gap: 4px 20px;
   align-self: center;
   background-color: hsl(var(--hsl-b4));
@@ -864,12 +864,12 @@
 .profile-stats__value {
   color: hsl(var(--hsl-c2));
   font-weight: 700;
-  text-align: right;
 }
 
+/* osu-web's `profile-stats`: each column as wide as its text, values starting 20px after the keys. */
 @media (min-width: 900px) {
   .profile-stats {
-    min-width: 300px;
+    grid-template-columns: auto auto;
   }
 }
 
