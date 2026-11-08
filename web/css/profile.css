@@ -1004,14 +1004,15 @@
   gap: 20px;
 }
 
+/* osu-web's `page-mode-link--profile-page`: its default link colours, l2 and l1 on hover. */
 .page-mode__item {
   line-height: 1;
   white-space: nowrap;
-  color: #ccc;
+  color: hsl(var(--hsl-l2));
 }
 
 .page-mode__item:hover {
-  color: #fff;
+  color: hsl(var(--hsl-l1));
   text-decoration: none;
 }
 
