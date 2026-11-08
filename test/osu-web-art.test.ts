@@ -62,7 +62,8 @@ test('nothing is vendored that the licence does not cover', () => {
     }
   };
   walk(artDir);
-  assert.deepEqual(files.filter((f) => /logo|pippi|font|\.(?:otf|ttf|woff2?)$/i.test(f)), []);
+  // The one font is the app's own, of the four ruleset glyphs alone (checked below).
+  assert.deepEqual(files.filter((f) => f !== 'modes/modes.ttf' && /logo|pippi|font|\.(?:otf|ttf|woff2?)$/i.test(f)), []);
   const folders = new Set(files.map((f) => f.split('/')[0]));
   assert.deepEqual([...folders].sort(), ['README.md', 'covers', 'grades', 'layout', 'modes', 'mods', 'scores']);
   // The default banner is osu-web's own c3, from its repository. osu!'s newer cover presets live
@@ -72,22 +73,37 @@ test('nothing is vendored that the licence does not cover', () => {
 
 /*
  * The ruleset icons (roadmap 5.72) are the one set not copied as files: osu-web keeps them only
- * as glyphs of its icon font, and that font also holds the osu! logo. So the four are written out
- * one glyph each, and this holds the line -- exactly those four, each a single outline, and
- * nothing else of the font.
+ * as glyphs of its icon font, and that font also holds the osu! logo (U+E805). So the four are
+ * written into a font of the app's own, and this holds the line -- exactly those four glyphs,
+ * nothing at the logo's code point, and nothing else of osu-web's font.
  */
 test('the ruleset icons are the four mode glyphs alone, never the font or its logo', () => {
   const modes = path.join(artDir, 'modes');
-  assert.deepEqual(fs.readdirSync(modes).sort(), ['mode-fruits.svg', 'mode-mania.svg', 'mode-osu.svg', 'mode-taiko.svg']);
-  for (const file of fs.readdirSync(modes)) {
-    const svg = fs.readFileSync(path.join(modes, file), 'utf8');
-    assert.equal((svg.match(/<path /g) ?? []).length, 1, `${file} is one outline`);
-    assert.ok(!/<font|<glyph|unicode=/.test(svg), `${file} carries nothing of the font`);
+  assert.deepEqual(fs.readdirSync(modes), ['modes.ttf']);
+  const font = fs.readFileSync(path.join(modes, 'modes.ttf'));
+  const table = (tag: string) => {
+    for (let i = 0; i < font.readUInt16BE(4); i++) {
+      const at = 12 + i * 16;
+      if (font.toString('latin1', at, at + 4) === tag) return font.subarray(font.readUInt32BE(at + 8));
+    }
+    throw new Error(`no ${tag} table`);
+  };
+  assert.equal(table('maxp').readUInt16BE(4), 5, '.notdef and the four mode glyphs');
+  // Every code point the font maps, from its one format 4 subtable.
+  const cmap = table('cmap');
+  const sub = cmap.subarray(cmap.readUInt32BE(8));
+  const segs = sub.readUInt16BE(6) / 2;
+  const mapped: number[] = [];
+  for (let i = 0; i < segs; i++) {
+    const end = sub.readUInt16BE(14 + i * 2);
+    const start = sub.readUInt16BE(16 + segs * 2 + i * 2);
+    if (start !== 0xffff) for (let c = start; c <= end; c++) mapped.push(c);
   }
+  assert.equal(mapped.length, 4);
+  assert.ok(!mapped.includes(0xe805), "nothing at the osu! logo's code point");
   for (const ruleset of ['osu', 'taiko', 'fruits', 'mania']) {
-    assert.ok(
-      css.includes(`.mode-icon--${ruleset} { -webkit-mask-image: url("../osu-web/modes/mode-${ruleset}.svg")`),
-      `.mode-icon--${ruleset} draws its glyph`,
-    );
+    const code = new RegExp(`\\.mode-icon--${ruleset}::before \\{ content: "\\\\([0-9a-f]+)"; \\}`).exec(css)?.[1];
+    assert.ok(code && mapped.includes(Number.parseInt(code, 16)), `.mode-icon--${ruleset} draws one of the four glyphs`);
   }
+  assert.match(css, /font-family: "osu-web modes";\s+src: url\("\.\.\/osu-web\/modes\/modes\.ttf"\)/);
 });

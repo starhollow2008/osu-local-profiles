@@ -38,7 +38,7 @@ Porting the file beats measuring it.
 |---|---|---|---|
 | LESS, TSX markup, colours, metrics | osu-web `resources/` | AGPL-3.0-or-later | **yes**, ported with its source named |
 | mod glyphs and blanks, grade badges, stable's grade letters, guest avatar, default banner | osu-web `public/images/`, `resources/images/` | AGPL-3.0-or-later | **yes**, vendored by `build-osu-web-art.mjs` |
-| ruleset icons (the mode switcher) | osu-web `resources/fonts/extra/` (its own icon font) | AGPL-3.0-or-later | **yes**, the four mode glyphs only, each written out as an SVG; never the font, which also holds the osu! logo |
+| ruleset icons (the mode switcher) | osu-web `resources/fonts/extra/` (its own icon font) | AGPL-3.0-or-later | **yes**, the four mode glyphs only, written into a font of their own (`modes.ttf`); never osu-web's font, which also holds the osu! logo |
 | mod names, types, setting labels | osu-web `database/mods.json` | facts about the game | **yes**, via `scripts/build-mod-table.mjs` |
 | country flags | [Twemoji](https://github.com/jdecked/twemoji) | CC-BY 4.0 | **yes**, vendored by `scripts/build-flags.mjs` |
 | medal art | `assets.ppy.sh`, not in the osu-web repo | not granted | loaded at runtime over a drawn placeholder, never shipped |

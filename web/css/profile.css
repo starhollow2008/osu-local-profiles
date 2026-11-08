@@ -646,18 +646,21 @@
   color: #fff;
 }
 
-/* A ruleset's icon from osu-web's own icon font (osu-web-art.css), drawn in the link's colour. */
+/*
+ * A ruleset's icon: a glyph of osu-web's icon font (osu-web-art.css), drawn as text in the link's
+ * colour, as osu-web draws it. Regular only, so a bold parent cannot smear it.
+ */
 .mode-icon {
   display: block;
   width: 1em;
   height: 1em;
-  background-color: currentColor;
-  -webkit-mask-size: contain;
-  mask-size: contain;
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-position: center;
-  mask-position: center;
+  font-family: "osu-web modes";
+  font-style: normal;
+  font-weight: 400;
+  font-synthesis: none;
+  font-variation-settings: normal;
+  line-height: 1;
+  text-align: center;
 }
 
 /* A mode with no tracked plays is still selectable, just visibly idle. */

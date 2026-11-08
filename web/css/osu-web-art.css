@@ -107,7 +107,13 @@
 /* osu-web's default profile banner, for a profile with none of its own. */
 .cover-default { background-image: url("../osu-web/covers/c3.jpg"); }
 
-.mode-icon--osu { -webkit-mask-image: url("../osu-web/modes/mode-osu.svg"); mask-image: url("../osu-web/modes/mode-osu.svg"); }
-.mode-icon--taiko { -webkit-mask-image: url("../osu-web/modes/mode-taiko.svg"); mask-image: url("../osu-web/modes/mode-taiko.svg"); }
-.mode-icon--fruits { -webkit-mask-image: url("../osu-web/modes/mode-fruits.svg"); mask-image: url("../osu-web/modes/mode-fruits.svg"); }
-.mode-icon--mania { -webkit-mask-image: url("../osu-web/modes/mode-mania.svg"); mask-image: url("../osu-web/modes/mode-mania.svg"); }
+/* osu-web's ruleset icons, drawn as text as osu-web draws them. */
+@font-face {
+  font-family: "osu-web modes";
+  src: url("../osu-web/modes/modes.ttf") format("truetype");
+  font-display: block;
+}
+.mode-icon--osu::before { content: "\e800"; }
+.mode-icon--taiko::before { content: "\e803"; }
+.mode-icon--fruits::before { content: "\e801"; }
+.mode-icon--mania::before { content: "\e802"; }

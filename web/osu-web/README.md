@@ -20,9 +20,9 @@ by ppy.
 | `modes/` | `resources/fonts/extra/extra.svg`, glyphs mode-osu, mode-taiko, mode-ctb, mode-mania | the mode switcher's ruleset icons |
 
 `modes/` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
-glyphs of its icon font, so each glyph's outline is written out as an SVG of its own, unchanged
-but for the flip from the font's upward y axis to an image's downward one. The font itself is
-not taken: it also holds the osu! logo.
+glyphs of its icon font, so those four outlines are written, unchanged and at the same code
+points, into a font of their own, `modes.ttf`. osu-web's font itself is not taken: it also
+holds the osu! logo.
 
 `covers/` is the one folder from another commit: osu-web's built-in profile banners were
 removed from the repository in 6b22ecb, when cover presets moved to a database table, so the

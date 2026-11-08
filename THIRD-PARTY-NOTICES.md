@@ -35,7 +35,7 @@ computed from an anonymous sample.
 |---|---|---|
 | osu-web's mod glyphs and badge blanks, grade badges, stable's grade letters, guest avatar | `web/osu-web/`, copied unmodified by `scripts/build-osu-web-art.mjs`; the commit is in `web/osu-web/README.md` | **AGPL-3.0-or-later**, © ppy Pty Ltd |
 | osu-web's default profile banner (`c3.jpg`) | `web/osu-web/covers/`, copied unmodified by `scripts/build-osu-web-art.mjs` from the last osu-web commit that still had its built-in banners (`770e5d4`, before they moved to a database table in `6b22ecb`) | **AGPL-3.0-or-later**, © ppy Pty Ltd |
-| osu-web's four ruleset icons (the mode switcher) | `web/osu-web/modes/`, each glyph's outline taken from osu-web's icon font `resources/fonts/extra/extra.svg` by `scripts/build-osu-web-art.mjs` and written as its own SVG; the font itself, which also holds the osu! logo, is not taken | **AGPL-3.0-or-later**, © ppy Pty Ltd |
+| osu-web's four ruleset icons (the mode switcher) | `web/osu-web/modes/`, each glyph's outline taken from osu-web's icon font `resources/fonts/extra/extra.svg` by `scripts/build-osu-web-art.mjs` and written, unchanged, into a font of its own (`modes.ttf`, by `scripts/truetype.mjs`); osu-web's font itself, which also holds the osu! logo, is not taken | **AGPL-3.0-or-later**, © ppy Pty Ltd |
 | styling ported from osu-web's LESS, TSX and CoffeeScript (`mod.less`, `score-rank.less`, `legacy-rank.less`, `mod.tsx`, `game-mode.less`, `game-mode-link.less`, `playmode-tabs.tsx`, `tooltip-default.less`, `tooltip-default.coffee`) | `web/css/profile.css`, `web/css/osu-web-art.css`, `web/js/badges.js`; each port names its source file | **AGPL-3.0-or-later**, © ppy Pty Ltd |
 | [Nunito](https://github.com/googlefonts/nunito) typeface, the page's font | `web/fonts/nunito/`, the variable font's Latin, Latin Extended, Cyrillic and Vietnamese subsets as Google Fonts serves them, with `OFL.txt` | **SIL Open Font License 1.1**, © 2014 The Nunito Project Authors |
 | The Recent feed's "new best" and "level up" icons | `web/feed-icons/`, copied unmodified by `scripts/build-feed-icons.mjs` from [starhollow2008/osu-local-profiles-ext-media](https://github.com/starhollow2008/osu-local-profiles-ext-media); the commit is in `web/feed-icons/README.md` | **CC BY 4.0**, © 2026 FlareonGhh |
@@ -51,7 +51,7 @@ is not.
 **osu-web's files are used under its own licence.** osu-web's README grants its code, design and
 artwork to any project that credits it and is released under the AGPL, as this one is. Its images
 are copied byte for byte into `web/osu-web/` and never edited (the ruleset icons, which osu-web has
-only as icon-font glyphs, are each written out unchanged as an SVG), and code taken from it names
+only as icon-font glyphs, are written unchanged into a font of their own), and code taken from it names
 the osu-web file it came from. `docs/osu-web-fidelity.md` sets out what may and may not be taken.
 
 **Not covered by osu-web's licence, and not used here:** the "osu!" and "ppy" names and logos as

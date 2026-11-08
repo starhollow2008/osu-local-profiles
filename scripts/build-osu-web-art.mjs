@@ -7,8 +7,8 @@
  * grade badges, stable's big grade letters, the guest avatar, the default profile banner and the
  * four ruleset icons. They are copied byte for byte and never edited, from one osu-web commit,
  * which `web/osu-web/README.md` records -- all but the ruleset icons, which osu-web keeps only as
- * glyphs of an icon font, and are each written out as an SVG of its own (see `MODE_GLYPHS`),
- * and the banner, which osu-web no longer has (see `COVERS_COMMIT`).
+ * glyphs of an icon font, and are written into a font of their own (see `MODE_GLYPHS`), and the
+ * banner, which osu-web no longer has (see `COVERS_COMMIT`).
  * THIRD-PARTY-NOTICES.md credits them.
  *
  * Which glyph belongs to which acronym is read out of osu-web's own `mod.less`, so a mod
@@ -26,6 +26,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { buildTrueType } from './truetype.mjs';
 
 const REPO = 'ppy/osu-web';
 
@@ -143,9 +144,10 @@ contents.push(['covers/c3.jpg', await read(DEFAULT_COVER, COVERS_COMMIT), DEFAUL
 /*
  * The ruleset icons osu-web's mode switcher shows (`playmode-tabs.tsx`): not image files there
  * but four glyphs of its own icon font, `resources/fonts/extra`, which `icons.less` names
- * `fa-extra-mode-*`. Each is taken out of the font's SVG form and written as an SVG of its own:
- * the outline exactly as drawn, turned from the font's upward y axis to an image's downward
- * one, so the page can show it the way it shows a mod glyph, as a mask in the text's colour.
+ * `fa-extra-mode-*`. They are taken out of the font's SVG form and written, outlines unchanged
+ * and at the same code points, into a font of their own (scripts/truetype.mjs), so the page draws
+ * them as text the way osu-web does. Drawn as a CSS mask instead, the same outlines came out
+ * thinner and rougher than osu!'s, with no ClearType, on a screen scaled to 125%.
  *
  * The font itself is never taken: it also carries the osu! logo (`osu`, U+E805), which osu-web's
  * README keeps out of its AGPL grant as a trademark. Only the four glyphs named here are read.
@@ -160,16 +162,29 @@ const fontAdvance = attributes(/<font\b[^>]*>/.exec(extraFont)?.[0] ?? '')['hori
 const em = Number(face['units-per-em']);
 const ascent = Number(face.ascent);
 if (!Number.isFinite(em) || !Number.isFinite(ascent)) throw new Error(`${EXTRA_FONT} has no usable <font-face>; its layout probably changed`);
+const descent = Number(face.descent);
+if (!Number.isFinite(descent)) throw new Error(`${EXTRA_FONT} has no descent; its layout probably changed`);
 const glyphTags = [...extraFont.matchAll(/<glyph\b[^>]*>/g)].map((m) => attributes(m[0]));
-for (const [ruleset, name] of Object.entries(MODE_GLYPHS)) {
+const modeGlyphs = Object.entries(MODE_GLYPHS).map(([ruleset, name]) => {
   const glyph = glyphTags.find((g) => g['glyph-name'] === name);
   if (!glyph?.d) throw new Error(`${EXTRA_FONT} has no glyph ${name}; the mode switcher's icons moved`);
-  const advance = Number(glyph['horiz-adv-x'] ?? fontAdvance ?? em);
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${advance} ${em}">` +
-    `<path transform="matrix(1 0 0 -1 0 ${ascent})" d="${glyph.d}"/></svg>\n`;
-  contents.push([`modes/mode-${ruleset}.svg`, Buffer.from(svg, 'utf8'), `${EXTRA_FONT}#${name}`]);
-}
+  const codePoint = Number.parseInt(/^&#x([0-9a-f]+);$/i.exec(glyph.unicode ?? '')?.[1] ?? '', 16);
+  if (!Number.isFinite(codePoint)) throw new Error(`${EXTRA_FONT}'s glyph ${name} has no code point`);
+  return { ruleset, codePoint, advance: Number(glyph['horiz-adv-x'] ?? fontAdvance ?? em), d: glyph.d };
+});
+const MODES_FONT = 'modes/modes.ttf';
+contents.push([
+  MODES_FONT,
+  buildTrueType({
+    family: 'osu-web modes',
+    copyright: 'Copyright (c) ppy Pty Ltd. AGPL-3.0-or-later. From osu-web resources/fonts/extra.',
+    unitsPerEm: em,
+    ascent,
+    descent,
+    glyphs: modeGlyphs,
+  }),
+  `${EXTRA_FONT}#${Object.values(MODE_GLYPHS).join(',')}`,
+]);
 
 fs.rmSync(outDir, { recursive: true, force: true });
 let bytes = 0;
@@ -206,9 +221,9 @@ by ppy.
 | \`modes/\` | \`${EXTRA_FONT}\`, glyphs ${Object.values(MODE_GLYPHS).join(', ')} | the mode switcher's ruleset icons |
 
 \`modes/\` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
-glyphs of its icon font, so each glyph's outline is written out as an SVG of its own, unchanged
-but for the flip from the font's upward y axis to an image's downward one. The font itself is
-not taken: it also holds the osu! logo.
+glyphs of its icon font, so those four outlines are written, unchanged and at the same code
+points, into a font of their own, \`modes.ttf\`. osu-web's font itself is not taken: it also
+holds the osu! logo.
 
 \`covers/\` is the one folder from another commit: osu-web's built-in profile banners were
 removed from the repository in 6b22ecb, when cover presets moved to a database table, so the
@@ -246,7 +261,13 @@ ${LEGACY.map((rank) => `.legacy-rank--${rank} { background-image: ${url(`scores/
 /* osu-web's default profile banner, for a profile with none of its own. */
 .cover-default { background-image: ${url('covers/c3.jpg')}; }
 
-${Object.keys(MODE_GLYPHS).map((ruleset) => `.mode-icon--${ruleset} { ${mask(`modes/mode-${ruleset}.svg`)} }`).join('\n')}
+/* osu-web's ruleset icons, drawn as text as osu-web draws them. */
+@font-face {
+  font-family: "osu-web modes";
+  src: ${url(MODES_FONT)} format("truetype");
+  font-display: block;
+}
+${modeGlyphs.map(({ ruleset, codePoint }) => `.mode-icon--${ruleset}::before { content: "\\${codePoint.toString(16)}"; }`).join('\n')}
 `;
 
 fs.writeFileSync(cssFile, css);

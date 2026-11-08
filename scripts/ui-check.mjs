@@ -3194,11 +3194,17 @@ check('four game modes', await evaluate("document.querySelectorAll('#modes a').l
 // osu-web's ruleset icons, as osu!'s own profile page shows them: the icon alone, named on hover.
 check(
   'each mode is its icon, named for a screen reader',
-  await evaluate(`[...document.querySelectorAll('#modes a')].map((a) => {
-    const icon = a.querySelector('.mode-icon');
-    const mask = icon && getComputedStyle(icon).webkitMaskImage;
-    return a.getAttribute('aria-label') + ':' + (a.textContent.trim() === '' && /modes\\/mode-/.test(mask ?? ''));
-  }).join()`),
+  // Drawn as a glyph of the mode font (osu-web-art.css), and the font has loaded.
+  await evaluate(`(async () => {
+    await document.fonts.load('20px "osu-web modes"', '\\ue800');
+    return [...document.querySelectorAll('#modes a')].map((a) => {
+      const icon = a.querySelector('.mode-icon');
+      const glyph = icon && getComputedStyle(icon, '::before');
+      const drawn = glyph && /^"[\\ue000-\\uf8ff]"$/.test(glyph.content) && glyph.fontFamily.includes('osu-web modes')
+        && document.fonts.check('20px "osu-web modes"', JSON.parse(glyph.content));
+      return a.getAttribute('aria-label') + ':' + (a.textContent.trim() === '' && Boolean(drawn));
+    }).join();
+  })()`),
   'osu!:true,osu!taiko:true,osu!catch:true,osu!mania:true',
 );
 check(

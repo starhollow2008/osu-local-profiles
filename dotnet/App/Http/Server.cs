@@ -707,6 +707,8 @@ internal static partial class Server
         [".webp"] = "image/webp",
         [".ico"] = "image/x-icon",
         [".woff2"] = "font/woff2",
+        // osu-web's ruleset icons (web/osu-web/modes/).
+        [".ttf"] = "font/ttf",
         // The translations in web/i18n/, fetched by the page one language at a time.
         [".json"] = "application/json; charset=utf-8",
     };
