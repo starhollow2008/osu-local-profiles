@@ -812,6 +812,7 @@
   "status.qualified": "Qualified",
   "status.ranked": "Ranked",
   "status.wip": "WIP",
+  "tabTitle": "{name} · lokaal profiel | osu!",
   "time.dayAgo": "{n} dag geleden",
   "time.daysAgo": "{n} dagen geleden",
   "time.dShort": "{n} d",

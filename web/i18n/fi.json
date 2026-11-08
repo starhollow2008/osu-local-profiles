@@ -812,6 +812,7 @@
   "status.qualified": "Qualified",
   "status.ranked": "Ranked",
   "status.wip": "WIP",
+  "tabTitle": "{name} · paikallinen profiili | osu!",
   "time.dayAgo": "{n} päivä sitten",
   "time.daysAgo": "{n} päivää sitten",
   "time.dShort": "{n} pv",

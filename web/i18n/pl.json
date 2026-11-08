@@ -823,6 +823,7 @@
   "status.qualified": "Qualified",
   "status.ranked": "Ranked",
   "status.wip": "WIP",
+  "tabTitle": "{name} · profil lokalny | osu!",
   "time.dayAgo": "{n} dzień temu",
   "time.daysAgo": "{n} dni temu",
   "time.dShort": "{n} d",

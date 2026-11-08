@@ -202,7 +202,7 @@ export async function buildInteractiveHtml(progress = () => {}) {
     const uri = await fetchDataUri(icon[1]).catch(() => null);
     html = html.replace(icon[0], () => (uri ? icon[0].replace(icon[1], uri) : ''));
   }
-  html = html.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(state.profile.name)} - osu! local profiles</title>`);
+  html = html.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(t('tabTitle', { name: state.profile.name }))}</title>`);
 
   // This file writes its closing script tags in two halves, so that bundled into a copy it
   // contains none that could end the copy's own script early.

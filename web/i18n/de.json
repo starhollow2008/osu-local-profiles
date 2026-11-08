@@ -812,6 +812,7 @@
   "status.qualified": "Qualified",
   "status.ranked": "Ranked",
   "status.wip": "WIP",
+  "tabTitle": "{name} · lokales Profil | osu!",
   "time.dayAgo": "vor {n} Tag",
   "time.daysAgo": "vor {n} Tagen",
   "time.dShort": "{n} T",

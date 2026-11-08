@@ -269,6 +269,8 @@ function renderIdentity() {
   if (!profile) return;
 
   $('pname').textContent = profile.name;
+  // As osu!'s "<name> · player info | osu!".
+  document.title = t('tabTitle', { name: profile.name });
 
   $('avatar').innerHTML = profile.hasAvatar
     ? `<img src="${assetUrl('/api/image/avatar')}" alt="${escapeHtml(profile.name)}">`
