@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "每次游玩命中数",
   "stats.maximumCombo": "最大连击",
   "stats.playCount": "游玩次数",
+  "stats.replaysWatched": "回放被观看次数",
   "stats.ppTitle": "来自最佳游玩的 {pp}pp，{bonus}",
   "stats.rankedScore": "计入排名的分数",
   "stats.totalHits": "总命中数",

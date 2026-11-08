@@ -812,6 +812,7 @@
   "stats.hitsPerPlay": "Trafień na podejście",
   "stats.maximumCombo": "Maksymalne combo",
   "stats.playCount": "Liczba podejść",
+  "stats.replaysWatched": "Powtórki obejrzane przez innych",
   "stats.ppTitle": "{pp}pp z najlepszych podejść, {bonus}",
   "stats.rankedScore": "Punkty rankingowe",
   "stats.totalHits": "Łączna liczba trafień",

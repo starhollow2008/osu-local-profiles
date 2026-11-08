@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "1プレイあたりのヒット数",
   "stats.maximumCombo": "最大コンボ",
   "stats.playCount": "プレイ回数",
+  "stats.replaysWatched": "リプレイが再生された回数",
   "stats.ppTitle": "上位プレイから {pp}pp、{bonus}",
   "stats.rankedScore": "ランクスコア",
   "stats.totalHits": "総ヒット数",

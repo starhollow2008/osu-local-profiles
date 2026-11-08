@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Treffer pro Spiel",
   "stats.maximumCombo": "Maximale Kombo",
   "stats.playCount": "Spielzahl",
+  "stats.replaysWatched": "Von anderen angesehene Replays",
   "stats.ppTitle": "{pp}pp aus den besten Spielen, {bonus}",
   "stats.rankedScore": "Gerankter Score",
   "stats.totalHits": "Treffer gesamt",

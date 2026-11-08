@@ -3229,7 +3229,7 @@ check(
 check(
   'stats box filled in',
   await evaluate("document.querySelectorAll('#profileStats .profile-stats__entry').length"),
-  7,
+  8,
 );
 /*
  * Named rather than counted, so adding a section is a deliberate edit here -- but compared

@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Træffere pr. forsøg",
   "stats.maximumCombo": "Største combo",
   "stats.playCount": "Antal forsøg",
+  "stats.replaysWatched": "Replays set af andre",
   "stats.ppTitle": "{pp}pp fra de bedste forsøg, {bonus}",
   "stats.rankedScore": "Ranket score",
   "stats.totalHits": "Træffere i alt",

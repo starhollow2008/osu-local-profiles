@@ -433,8 +433,8 @@ function renderStats(next, medalTotal, imported) {
     </div>`,
   ).join('');
 
-  // osu-web's v1 stats box, minus play time (which it also omits) and replays watched
-  // (which does not apply to a local profile).
+  // osu-web's v1 stats box, minus play time (which it also omits). Replays watched is a dash
+  // for now, there to give the box osu!'s width.
   const entries = [
     [t('stats.rankedScore'), fmt(stats.rankedScore)],
     [t('stats.hitAccuracy'), pct(stats.accuracy)],
@@ -443,6 +443,7 @@ function renderStats(next, medalTotal, imported) {
     [t('stats.totalHits'), fmt(stats.totalHits)],
     [t('stats.hitsPerPlay'), fmt(stats.hitsPerPlay)],
     [t('stats.maximumCombo'), `${fmt(stats.maxCombo)}x`],
+    [t('stats.replaysWatched'), '-'],
   ];
   $('profileStats').innerHTML = entries
     .map(

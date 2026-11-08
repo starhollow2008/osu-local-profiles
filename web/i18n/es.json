@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Notas por partida",
   "stats.maximumCombo": "Combo máximo",
   "stats.playCount": "Partidas jugadas",
+  "stats.replaysWatched": "Repeticiones vistas por otros",
   "stats.ppTitle": "{pp}pp de las mejores partidas, {bonus}",
   "stats.rankedScore": "Puntuación rankeada",
   "stats.totalHits": "Notas totales",

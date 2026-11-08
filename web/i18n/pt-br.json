@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Acertos por jogada",
   "stats.maximumCombo": "Combo máximo",
   "stats.playCount": "Jogadas",
+  "stats.replaysWatched": "Replays assistidos por outros",
   "stats.ppTitle": "{pp}pp das melhores jogadas, {bonus}",
   "stats.rankedScore": "Pontuação ranqueada",
   "stats.totalHits": "Acertos totais",

@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Treffers per poging",
   "stats.maximumCombo": "Maximale combo",
   "stats.playCount": "Aantal pogingen",
+  "stats.replaysWatched": "Replays bekeken door anderen",
   "stats.ppTitle": "{pp}pp uit de beste pogingen, {bonus}",
   "stats.rankedScore": "Ranked score",
   "stats.totalHits": "Totaal aantal treffers",

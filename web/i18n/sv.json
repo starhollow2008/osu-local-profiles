@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Träffar per omgång",
   "stats.maximumCombo": "Högsta combo",
   "stats.playCount": "Antal omgångar",
+  "stats.replaysWatched": "Repriser sedda av andra",
   "stats.ppTitle": "{pp}pp från de bästa omgångarna, {bonus}",
   "stats.rankedScore": "Rankad poäng",
   "stats.totalHits": "Totalt antal träffar",

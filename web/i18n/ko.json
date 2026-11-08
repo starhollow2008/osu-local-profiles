@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "플레이당 타격 수",
   "stats.maximumCombo": "최대 콤보",
   "stats.playCount": "플레이 횟수",
+  "stats.replaysWatched": "리플레이가 재생된 횟수",
   "stats.ppTitle": "상위 플레이에서 {pp}pp, {bonus}",
   "stats.rankedScore": "랭크된 점수",
   "stats.totalHits": "총 타격 수",

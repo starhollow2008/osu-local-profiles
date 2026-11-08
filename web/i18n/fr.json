@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Notes par partie",
   "stats.maximumCombo": "Combo maximal",
   "stats.playCount": "Nombre de parties",
+  "stats.replaysWatched": "Replays regardés par les autres",
   "stats.ppTitle": "{pp}pp des meilleures parties, {bonus}",
   "stats.rankedScore": "Score classé",
   "stats.totalHits": "Notes totales",

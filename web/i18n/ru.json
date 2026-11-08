@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Попаданий за игру",
   "stats.maximumCombo": "Максимальное комбо",
   "stats.playCount": "Число игр",
+  "stats.replaysWatched": "Просмотров записей игр другими",
   "stats.ppTitle": "{pp}pp из лучших игр, {bonus}",
   "stats.rankedScore": "Рейтинговые очки",
   "stats.totalHits": "Всего попаданий",

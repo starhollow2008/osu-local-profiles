@@ -817,6 +817,7 @@
   "stats.hitsPerPlay": "Hits per Play",
   "stats.maximumCombo": "Maximum Combo",
   "stats.playCount": "Play Count",
+  "stats.replaysWatched": "Replays Watched by Others",
   "stats.ppTitle": "{pp}pp from the top plays, {bonus}",
   "stats.rankedScore": "Ranked Score",
   "stats.totalHits": "Total Hits",

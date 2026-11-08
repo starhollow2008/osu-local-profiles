@@ -801,6 +801,7 @@
   "stats.hitsPerPlay": "Osumia suoritusta kohden",
   "stats.maximumCombo": "Suurin combo",
   "stats.playCount": "Suoritusten määrä",
+  "stats.replaysWatched": "Muiden katsomat uusinnat",
   "stats.ppTitle": "{pp}pp parhaista suorituksista, {bonus}",
   "stats.rankedScore": "Rankattu pistemäärä",
   "stats.totalHits": "Osumia yhteensä",
