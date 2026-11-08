@@ -5,7 +5,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
-import { buildLauncher, launcherSource } from '../scripts/build-launcher.mjs';
+import { buildLauncher, buildWindowsStandIn, launcherSource } from '../scripts/build-launcher.mjs';
 import { defaultRid } from '../scripts/build-pp-helper.mjs';
 import { trayLauncherFor } from '../scripts/package-files.mjs';
 
@@ -244,8 +244,10 @@ test('an app that only knows the Node swapper still installs one, through the la
   const { install, staged, launcher } = stagedSwap();
   try {
     // The stand-in phase 7 ships: the launcher under the runtime's name, asked as the runtime is.
+    // Windows builds it again without the icon, as scripts/package.mjs does.
     const standIn = path.join(staged, path.basename(process.execPath));
-    fs.copyFileSync(launcher, standIn);
+    if (process.platform === 'win32') buildWindowsStandIn(standIn, defaultRid(), 'test');
+    else fs.copyFileSync(launcher, standIn);
     fs.chmodSync(standIn, 0o755);
     const script = path.join(staged, 'scripts', 'apply-update.mjs');
     const args = [script, '--install', install, '--staged', staged, '--pid', String(exitedPid()), '--no-relaunch'];

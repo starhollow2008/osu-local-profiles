@@ -24,7 +24,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildCheckedApp, buildCheckedPpHelper, defaultRid } from './build-pp-helper.mjs';
 import { launcherFor, readmeFor } from './package-files.mjs';
-import { buildLauncher } from './build-launcher.mjs';
+import { buildLauncher, buildWindowsStandIn } from './build-launcher.mjs';
 import { notesJson, tagDates } from './release-notes.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -231,7 +231,9 @@ fs.writeFileSync(path.join(out, 'README.txt'), readmeFor(hostOs, native));
  */
 if (native) {
   const standIn = path.join(out, nodeBinary);
-  fs.copyFileSync(trayExecutable, standIn);
+  // On Windows, built again without the app's icon, so the folder shows only one program to open.
+  if (hostOs === 'win') buildWindowsStandIn(standIn, target, pkg.version);
+  else fs.copyFileSync(trayExecutable, standIn);
   fs.chmodSync(standIn, 0o755);
   if (hostOs === 'osx') {
     // Out of its bundle, the copy is signed on its own: Apple silicon runs nothing unsigned.

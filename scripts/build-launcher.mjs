@@ -71,18 +71,9 @@ function go(args, env) {
   return result.stdout;
 }
 
-/**
- * Build the launcher for `rid` into `outDir`, under the name its package gives it. Returns the
- * path of the executable itself -- inside the bundle, on macOS.
- */
-export function buildLauncher(outDir, rid = defaultRid(), version = 'dev') {
-  const hostOs = rid.split('-')[0];
+/** Compile the launcher to `executable`, with its Windows resource as `resource` describes. */
+function compile(executable, rid, version, resource) {
   const { goos, goarch } = goTarget(rid);
-  const tray = trayLauncherFor(hostOs);
-  const executable = path.join(outDir, ...tray.executable.split('/'));
-  fs.rmSync(path.join(outDir, tray.name), { recursive: true, force: true });
-  fs.mkdirSync(path.dirname(executable), { recursive: true });
-
   const env = { GOOS: goos, GOARCH: goarch, CGO_ENABLED: goos === 'darwin' ? '1' : '0' };
   const ldflags = `-s -w -X main.version=${version}${goos === 'windows' ? ' -H windowsgui' : ''}`;
 
@@ -96,10 +87,10 @@ export function buildLauncher(outDir, rid = defaultRid(), version = 'dev') {
           '--arch', goarch,
           '--out', 'rsrc',
           '--manifest', 'gui',
-          '--icon', 'icon/app.png',
+          ...(resource.icon ? ['--icon', 'icon/app.png'] : []),
           '--product-name', 'osu! local profiles',
-          '--file-description', 'osu! local profiles',
-          '--original-filename', tray.name,
+          '--file-description', resource.description,
+          '--original-filename', resource.originalFilename,
           // A Windows version resource wants numbers only; a development build has none.
           ...(/^\d+\.\d+\.\d+$/.test(version) ? ['--product-version', version, '--file-version', version] : []),
         ],
@@ -110,6 +101,39 @@ export function buildLauncher(outDir, rid = defaultRid(), version = 'dev') {
   } finally {
     for (const name of resources()) fs.rmSync(path.join(launcherSource, name), { force: true });
   }
+}
+
+/**
+ * The launcher again, as the `node.exe` a Windows package without Node carries for installs
+ * before 1.33.0 (scripts/package.mjs). It has no icon, so it isn't mistaken for the app.
+ */
+export function buildWindowsStandIn(executable, rid, version = 'dev') {
+  if (goTarget(rid).goos !== 'windows') throw new Error(`the icon-less stand-in is for Windows, not ${rid}`);
+  compile(executable, rid, version, {
+    icon: false,
+    description: 'Used by versions before 1.33.0 to update',
+    originalFilename: path.basename(executable),
+  });
+  return executable;
+}
+
+/**
+ * Build the launcher for `rid` into `outDir`, under the name its package gives it. Returns the
+ * path of the executable itself -- inside the bundle, on macOS.
+ */
+export function buildLauncher(outDir, rid = defaultRid(), version = 'dev') {
+  const hostOs = rid.split('-')[0];
+  const { goos, goarch } = goTarget(rid);
+  const tray = trayLauncherFor(hostOs);
+  const executable = path.join(outDir, ...tray.executable.split('/'));
+  fs.rmSync(path.join(outDir, tray.name), { recursive: true, force: true });
+  fs.mkdirSync(path.dirname(executable), { recursive: true });
+
+  compile(executable, rid, version, {
+    icon: true,
+    description: 'osu! local profiles',
+    originalFilename: tray.name,
+  });
 
   if (goos === 'darwin') {
     const bundle = path.join(outDir, tray.name);

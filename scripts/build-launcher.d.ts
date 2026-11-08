@@ -12,4 +12,7 @@ declare module '*/build-launcher.mjs' {
 
   /** Build for `rid` into `outDir`; returns the path of the executable (inside the bundle on macOS). */
   export function buildLauncher(outDir: string, rid?: string, version?: string): string;
+
+  /** The launcher without the app's icon, at `executable`: the Windows package's stand-in node.exe. */
+  export function buildWindowsStandIn(executable: string, rid: string, version?: string): string;
 }
