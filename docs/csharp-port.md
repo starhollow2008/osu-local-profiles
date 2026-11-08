@@ -539,7 +539,8 @@ builds come from a worktree of `main` with `package.json`'s version and reposito
       address is their own.
 - [x] **Released** (2026-10-29): `v1.33.0`, built by `release.yml` on all four platforms, each
       trimmed, with its changes in full on the page and in the patch notes (`<!-- in full -->`).
-- [ ] Delete the test repository `jonathant09/osu-local-profiles-switchover-test`.
+- [x] Delete the test repository `jonathant09/osu-local-profiles-switchover-test` (gone by
+      2026-11-08).
 
 ### 9. Removing the Node app
 
@@ -548,6 +549,34 @@ Node rules in `CLAUDE.md`. `package.json` stays as the version file if nothing b
 chosen in phase 7. `docs/architecture.md` is updated as each phase lands, not here.
 `start-csharp.bat`, which runs the C# app from a checkout beside `start.bat`'s Node one, becomes
 `start.bat`.
+
+**What `src/` still does for the C# release (surveyed 2026-11-08, nothing removed yet).** Deleting
+it as it stands breaks the release build and the daily job:
+
+- **The C# app embeds three files from it** (`dotnet/App/App.csproj`): `src/db/schema.sql`,
+  `src/calc/medal-definitions.json` and `src/calc/rank-tables/*.json`. Move them beside the app
+  first, with `build-medal-table.mjs`, `build-rank-table.mjs` and docs/automated-maintenance.md.
+- **The trimmed app's check builds its requests with the Node app's code.** `buildCheckedApp`
+  runs `scripts/pp-parity.mjs`, which builds the requests the app makes from `src/osr.ts`,
+  `src/calc/pp.ts` (`scorePricing`, `scoreMods`, `strippableMods`) and `src/clients/beatmaps.ts`,
+  and `pp-parity-corpus.mjs` builds its McOsu replays with `src/clients/mcosu.ts`. That pulls in
+  24 more files. Port both to `--dev` commands of the C# app (it already has `parse-replays` and
+  `mcosu`, which reads a scores.db, not generated scores) before deleting them.
+- **Small helpers to move into `scripts/`:** `src/calc/helper-prune.ts` (`build-pp-helper.mjs`),
+  `src/http/screenshot.ts`'s `findBrowser` (`build-icons.mjs`, `ui-check.mjs`) and
+  `src/update/zip.ts` (`api-parity.mjs`, which `buildCheckedApp` still runs app against app).
+- **The daily job** (docs/automated-maintenance.md) writes `src/calc/rank-tables/` and runs
+  `node src/main.ts --check-only`; CI runs it too (`ci.yml`), and `pp-helper.yml` triggers on
+  `src/` paths.
+- **Keep, or port, the tests that guard old installs' updates:** `test/launcher.test.ts`,
+  `test/package-files.test.ts`, `test/relaunch.test.ts` and `test/update.test.ts`, with
+  `package.mjs`, `package-files.mjs`, `build-launcher.mjs`, the Go launcher and `rehearsal.yml`.
+  The stand-ins (`node.exe`, the placeholder `src/` and `scripts/apply-update.mjs`) are written by
+  `package.mjs`, never copied from `src/`, so removing `src/` itself does not stop an old install
+  updating. The tests of `web/` modules stay as they are.
+- **Node-only, to delete:** `port-checks.mjs`, `reingest.mjs` (the C# app's `--dev ingest ...
+  plain` re-ingests; update CLAUDE.md's rule about it), `check-replays.mjs`, the `dev` and
+  `check:app` npm scripts, and `lzma-js-simple-v2` once nothing imports `src/osr.ts`.
 
 ## JavaScript in C#
 
