@@ -1528,38 +1528,75 @@
 /* Most played beatmaps                                                     */
 /* ======================================================================== */
 
+/*
+ * The row and its cover are osu-web's `beatmap-playcount.less` (c) ppy Pty Ltd,
+ * AGPL-3.0-or-later, ported: the cover sits under the card's rounded left end, and the detail
+ * card overlaps it by its own radius, so the picture runs into the curve. The text is this
+ * app's own, `Title by Artist` over the difficulty.
+ */
 .beatmap-playcount {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background-color: hsl(var(--hsl-b3));
+  --border-radius: var(--radius-large) 0 0 var(--radius-large);
+  color: #fff;
+  background-color: #000;
   border-radius: var(--radius-large);
-  margin: 2px 0;
-  padding: 5px 10px;
-  min-height: 50px;
-}
-
-.beatmap-playcount:hover {
-  background-color: hsl(var(--hsl-b2));
+  display: flex;
+  margin-bottom: 2px;
+  line-height: normal;
 }
 
 .beatmap-playcount__cover {
   flex: none;
-  width: 60px;
-  height: 40px;
-  border-radius: var(--radius-base);
+  width: 70px;
+  height: 60px;
+  position: relative;
+}
+
+.beatmap-playcount__cover .beatmapset-cover {
+  border-radius: var(--border-radius);
   overflow: hidden;
-  background-color: hsl(var(--hsl-b5));
-  background-size: cover;
-  background-position: center;
+}
+
+/* The count over the cover, on a narrow page where the right side has no room for it. */
+.beatmap-playcount__cover-count {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-right: var(--radius-large);
+  background-color: rgba(0, 0, 0, 0.75);
+  border-radius: var(--border-radius);
 }
 
 .beatmap-playcount__detail {
   flex: 1;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: hsl(var(--hsl-b3));
+  border-radius: var(--radius-large);
+  margin-left: calc(-1 * var(--radius-large));
+  padding: 0 10px;
+  position: relative;
+}
+
+.beatmap-playcount:hover .beatmap-playcount__detail {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.beatmap-playcount__detail-count {
+  display: none;
+  align-items: center;
+}
+
+.beatmap-playcount__info {
+  min-width: 0;
+  flex: 1;
 }
 
 .beatmap-playcount__title {
+  display: block;
   font-size: var(--fs-title-small);
   color: #fff;
 }
@@ -1576,14 +1613,28 @@
 }
 
 .beatmap-playcount__count {
-  flex: none;
-  font-size: var(--fs-title-small);
-  color: hsl(var(--hsl-c2));
-  white-space: nowrap;
+  color: var(--yellow);
+  font-size: var(--fs-large);
+  display: flex;
+  align-items: center;
 }
 
-.beatmap-playcount__count b {
-  font-weight: 700;
+.beatmap-playcount__count-icon {
+  flex: none;
+  width: 0.45em;
+  height: 0.55em;
+  margin-right: 5px;
+  fill: currentColor;
+}
+
+@media (min-width: 900px) {
+  .beatmap-playcount__cover-count {
+    display: none;
+  }
+
+  .beatmap-playcount__detail-count {
+    display: flex;
+  }
 }
 
 /* ======================================================================== */

@@ -384,39 +384,72 @@ export function playList(plays, options = {}) {
     .join('')}</div>`;
 }
 
+/** osu-web's ruleset names, as its beatmap links take them. */
+const RULESET_SLUGS = ['osu', 'taiko', 'fruits', 'mania'];
+
 /**
- * A most-played row. The cover is the one place the page reaches for the network: it is
- * set as a background so a failed request simply leaves the placeholder colour behind.
+ * osu-web's `beatmapUrl`: the difficulty on its set's page, under the mode it was played in
+ * (a convert opens on the converted mode), or the short link when the set is unknown.
  */
-export function beatmapPlaycountRow(item) {
-  const cover = coverUrl(item.beatmapsetId);
-  const style = cover ? ` style="background-image: url('${cover}')"` : '';
+function difficultyHref(item, mode) {
+  if (!onlineId(item.beatmapId)) return null;
+  const slug = RULESET_SLUGS[mode] ?? 'osu';
+  return onlineId(item.beatmapsetId)
+    ? `https://osu.ppy.sh/beatmapsets/${item.beatmapsetId}#${slug}/${item.beatmapId}`
+    : `https://osu.ppy.sh/b/${item.beatmapId}`;
+}
+
+// A beatmap never submitted to osu! carries 0 or -1 where an id would be.
+const onlineId = (id) => Number.isInteger(id) && id > 0;
+
+// osu-web's `fa-play`, drawn here as there is no icon font.
+const PLAY_ICON =
+  '<svg class="beatmap-playcount__count-icon" viewBox="0 0 12 14" aria-hidden="true"><path d="M1.5 1.2v11.6c0 .8.9 1.3 1.6.9l9-5.8c.6-.4.6-1.3 0-1.7l-9-5.8c-.7-.5-1.6 0-1.6.8z"/></svg>';
+
+/**
+ * A most-played row. The cover and the play count are osu-web's `beatmap-playcount.tsx`: the
+ * cover running into the card's rounded left edge, the count on the right (over the cover, on
+ * a narrow page). The text is this app's own: `Title by Artist`, the difficulty under it.
+ *
+ * The cover is the one place the page reaches for the network. A failed request leaves the
+ * placeholder colour behind.
+ */
+export function beatmapPlaycountRow(item, mode = 0) {
+  const href = difficultyHref(item, mode);
+  const link = (className, inner, extra = '') =>
+    href
+      ? `<a class="${className}" href="${href}" target="_blank" rel="noreferrer noopener"${extra}>${inner}</a>`
+      : `<span class="${className}"${extra}>${inner}</span>`;
+
+  const cover = onlineId(item.beatmapsetId) ? coverUrl(item.beatmapsetId, 'list') : null;
+  const coverStyle = cover
+    ? ` style="--bg: url('${cover}'); --bg-2x: url('${coverUrl(item.beatmapsetId, 'list@2x')}')"`
+    : '';
+
   const artist = beatmapArtist(item);
-  const by = artist ? ` <span class="beatmap-playcount__artist">by ${escapeHtml(artist)}</span>` : '';
+  const by = artist ? ` <span class="beatmap-playcount__artist">${t('beatmap.by', { artist: escapeHtml(artist) })}</span>` : '';
+
+  const count = `<div class="beatmap-playcount__count" title="${escapeHtml(t('stats.playCount'))}">${PLAY_ICON}${fmt(item.count)}</div>`;
 
   return `<div class="beatmap-playcount">
-  <div class="beatmap-playcount__cover"${style}></div>
+  ${link('beatmap-playcount__cover', `<div class="beatmapset-cover beatmapset-cover--full"${coverStyle}></div>
+    <div class="beatmap-playcount__cover-count">${count}</div>`, ' tabindex="-1" aria-hidden="true"')}
   <div class="beatmap-playcount__detail">
-    ${maybeLink(
-      beatmapHref(item),
-      `${escapeHtml(beatmapTitle(item) ?? titleOf(item))}${by}`,
-      'beatmap-playcount__title u-ellipsis',
-    )}
-    <div class="beatmap-playcount__version u-ellipsis">${escapeHtml(item.version ?? '')}</div>
+    <div class="beatmap-playcount__info">
+      ${link('beatmap-playcount__title u-ellipsis', `${escapeHtml(beatmapTitle(item) ?? titleOf(item))}${by}`)}
+      <div class="beatmap-playcount__version u-ellipsis">${escapeHtml(item.version ?? '')}</div>
+    </div>
+    <div class="beatmap-playcount__detail-count">${count}</div>
   </div>
-  <div class="beatmap-playcount__count"><b>${fmt(item.count)}</b> play${item.count === 1 ? '' : 's'}</div>
 </div>`;
 }
 
-export function beatmapPlaycountList(items) {
+export function beatmapPlaycountList(items, mode = 0) {
   if (!items || items.length === 0) {
     return '<div class="u-empty">No beatmaps played yet.</div>';
   }
-  return items.map(beatmapPlaycountRow).join('');
+  return items.map((item) => beatmapPlaycountRow(item, mode)).join('');
 }
-
-/** osu-web's ruleset names, as its beatmap links take them. */
-const RULESET_SLUGS = ['osu', 'taiko', 'fruits', 'mania'];
 
 /** `html` as a link to the page at `osu.ppy.sh/<path>`, or as it is with no path to link to. */
 const osuLink = (path, html) =>

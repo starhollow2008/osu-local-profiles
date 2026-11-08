@@ -726,7 +726,7 @@ async function loadProfile() {
   const mostPlayedTotal = totalFor('mostPlayed', data.mostPlayed);
   $('mostPlayedCount').textContent = fmt(mostPlayedTotal);
   $('mostPlayed').innerHTML =
-    beatmapPlaycountList(data.mostPlayed) +
+    beatmapPlaycountList(data.mostPlayed, mode) +
     showMore('mostPlayed', data.mostPlayed.length, shown.mostPlayed, mostPlayedTotal, settings.showMoreAll);
 
   const recentTotal = totalFor('recent', data.recent);
