@@ -199,6 +199,11 @@ export function sourceTag(play) {
   return '';
 }
 
+// The row menu's three vertical dots, as on osu!.
+const MORE_ICON =
+  '<svg class="play-detail__menu-icon" viewBox="0 0 128 512" aria-hidden="true">' +
+  '<circle cx="64" cy="64" r="56"/><circle cx="64" cy="256" r="56"/><circle cx="64" cy="448" r="56"/></svg>';
+
 /**
  * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
  * accuracy, mods and pp stepping right.
@@ -233,7 +238,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
     ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="score"
          data-id="${play.id}" data-pinned="${play.pinned ? 1 : 0}" data-set="${play.beatmapsetId ?? ''}"
          data-replay="${play.hasReplay ? 1 : 0}" data-osu-url="${escapeHtml(play.osuUrl ?? '')}"
-         aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}" title="${escapeHtml(t('score.options'))}">&#8943;</button>`
+         aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}" title="${escapeHtml(t('score.options'))}">${MORE_ICON}</button>`
     : '';
 
   // The drag handle is a convenience; the menu's Move up / Move down do the same job for
@@ -325,7 +330,7 @@ export function incompleteRow(play, { actions = false } = {}) {
         ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="incomplete"
              data-id="${play.id}" data-ids="${(play.ids ?? [play.id]).join(',')}"
              data-set="${play.beatmapsetId ?? ''}"
-             aria-haspopup="true" aria-label="Options for this play" title="Options">&#8943;</button>`
+             aria-haspopup="true" aria-label="Options for this play" title="Options">${MORE_ICON}</button>`
         : ''
     }
   </div>

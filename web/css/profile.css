@@ -1011,9 +1011,10 @@
 }
 
 .page-extra {
+  --inner-gutter: 8px;
   position: relative;
   box-shadow: var(--box-shadow);
-  padding: 20px 8px;
+  padding: 20px var(--inner-gutter);
   margin: 0 2px;
   position: relative;
   background-color: hsl(var(--hsl-b4));
@@ -1034,7 +1035,7 @@
 
 @media (min-width: 900px) {
   .page-extra {
-    padding: 20px 40px;
+    --inner-gutter: 40px;
     margin: 0 10px;
   }
 }
@@ -2864,17 +2865,48 @@
 .play-detail__menu {
   flex: none;
   align-self: center;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   margin-left: 8px;
-  padding: 2px 8px;
+  padding: 6px 10px;
   border-radius: var(--radius-base);
   color: hsl(var(--hsl-l1));
-  font-size: var(--fs-title-small-3);
+  font-size: var(--fs-title-small);
   line-height: 1;
 }
 
 .play-detail__menu:hover {
   background-color: hsla(var(--hsl-b6), 0.5);
   color: hsl(var(--hsl-c1));
+}
+
+.play-detail__menu-icon {
+  display: block;
+  width: 0.25em;
+  height: 1em;
+  fill: currentColor;
+}
+
+/*
+ * osu-web's `play-detail__more`: on a wide page the button leaves the row and fills the
+ * section's right padding, so the row runs as close to the right edge as to the left.
+ */
+@media (min-width: 900px) {
+  .play-detail__menu {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    width: var(--inner-gutter);
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .play-detail__menu:hover {
+    background-color: transparent;
+  }
 }
 
 .play-detail--reorderable {
