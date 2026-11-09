@@ -52,9 +52,9 @@ doesn't pull in plays from your normal playstyle. See
 | **Linux** | Tested and packaged on CI, but nobody has run it against a real osu! install yet. |
 | **macOS** | The same, with Apple silicon and Intel builds. |
 
-On Linux or macOS, `node src/main.ts --check-only` reports whether osu! was found and whether the
-pp calculator starts. If osu! isn't found, point `installRoots` in `data/config.json` at it, and
-please open an issue with the path.
+On Linux or macOS, `./app/osu-local-profiles-app --check-only`, run in the app's folder, reports
+whether osu! was found and whether the pp calculator starts. If osu! isn't found, point
+`installRoots` in `data/config.json` at it, and please open an issue with the path.
 
 **osu!stable on macOS and Linux** runs under Wine, with no single layout. Wineskin bundles, plain
 `~/.wine` prefixes, CrossOver bottles and osu-winello are all checked. Anything else needs
@@ -646,7 +646,7 @@ needs git and the .NET 10 SDK.
 - **Export this profile's scores (JSON)** is for other tools. It isn't a backup and can't be
   restored from.
 
-Replays on disk are the real source of truth (`node scripts/reingest.mjs` rebuilds everything from
+Replays on disk are the real source of truth (Recalculate every score reprices everything from
 them), but these exports outlive the app.
 
 ### Putting it online

@@ -6,14 +6,15 @@ reasoning behind each rule is in `docs/architecture.md`.
 ## Development
 
 ```
-npm run check        # typecheck and the full test suite
+npm start            # builds and runs the app on this checkout's data/ (start.bat does the same)
+npm run check:port   # the app's tests
+npm run check        # typecheck, and the tests of the page, the packaging and the launcher
 npm run ui           # drives the running app in headless Chrome
-node src/main.ts --check-only   # is osu! found, and does the pp calculator start?
+dotnet run --project dotnet/App -c Release -- --check-only   # is osu! found, and does the pp calculator load?
 ```
 
-After changing `tools/PpCalculator/Program.cs`, run `npm run build:pp:local`, not
-`npm run build:pp`. The app prefers the build in `tools/pp/`, and a stale one there doesn't fail:
-it answers the old protocol and quietly returns old values.
+To try something on a copy rather than the real `data/`, give the app a folder of its own:
+`dotnet run --project dotnet/App -- --root <dir>`.
 
 The page has no build step, so edit `web/` and reload. `npm run ui` exists because some bugs only
 show up in computed style, like a mistyped custom property or a dialog that's visible when it
@@ -22,7 +23,7 @@ shouldn't be.
 ## Building a release
 
 ```
-npm run package -- --native
+npm run package
 ```
 
 This makes `dist/osu-local-profiles-<version>-<rid>/` and a zip beside it, holding the C# app
@@ -31,8 +32,7 @@ nothing to install, and since `data/` lives beside the app the folder can be mov
 them go the stand-ins that let versions before 1.33.0 update to it: `node.exe` (`node` on macOS
 and Linux, the tray launcher again, which does the swap when an old version asks the old way), a
 placeholder `src/` and a placeholder `scripts/apply-update.mjs`. The update leaves all three out
-of the install. Without `--native` the script still builds the old Node app, which no release has
-used since 1.33.0.
+of the install.
 
 **A package has to be built on the system it's for.** The trimmed app ships only after it has run
 on that system and answered every parity request as the untrimmed one does, so building for
@@ -70,16 +70,17 @@ when osu! reworks pp:
 
 1. Bump the package versions in `tools/PpCalculator/PpCalculator.csproj`. Check which .NET the new
    release targets (`NU1202 ... supports: net10.0` means it moved). If it moved, the helper's
-   `TargetFramework`, `setup-dotnet` in all three workflows, the `bin/Release/<tfm>` fallback in
-   `src/calc/official.ts` and THIRD-PARTY-NOTICES all move with it.
-2. Close the app (it holds `tools/pp` open) and run `npm run build:pp:local`. It builds beside
-   `tools/pp` and swaps only on success.
+   `TargetFramework`, `dotnet/Directory.Build.props`, `setup-dotnet` in all three workflows and
+   THIRD-PARTY-NOTICES all move with it.
+2. Show what changed: build the full helper at both versions
+   (`node scripts/build-pp-helper.mjs <dir>`) and compare them with
+   `node scripts/pp-parity.mjs <old> <new>`, as the daily job does.
 3. Read the diff of `osu.Game.Rulesets.*/Difficulty` between the two releases and price a few real
    scores with both before calling it a rework. 2026.916.0 changed eleven difficulty files and not
    one pp value.
 4. Ship it. Every install recalculates what the old release priced on its first launch after
-   updating, and Recalculate every score does the same on demand. Locally, restart the app, or run
-   `node scripts/reingest.mjs` with it stopped.
+   updating, and Recalculate every score does the same on demand, which is how to reprice a local
+   checkout.
 5. Refresh the rank curves in the same pass.
 
 ## Refreshing the rank curves
@@ -106,15 +107,13 @@ takes roughly 15-30 minutes per mode, mostly download.
 
 ## Recalculating
 
-Replays on disk are the source of truth, so any calculation fix can be applied to old scores. To
-rebuild every score from its replay, stop the app and run:
+Replays on disk are the source of truth, so any calculation fix can be applied to old scores:
+Options -> Other settings -> Recalculate every score, with the app running, reprices every score
+from its replay and keeps its row.
 
-```
-node scripts/reingest.mjs
-```
-
-It must not pass a play tracking filter. To fill in values without replacing rows (keeping their
-ids), use Options -> Other settings -> Recalculate every score, with the app running.
+The app can also re-ingest replays from scratch, as tracking would but with no play tracking
+filter (`--dev ingest <db> <installs.json> <list> plain`, `dotnet/App/DevCommands.cs`), into a
+database's first profile. It must not pass a filter. Use it on a copy.
 
 ## README screenshots
 

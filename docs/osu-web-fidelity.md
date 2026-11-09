@@ -104,7 +104,7 @@ Everyone else gets Nunito, which ships with the app (`web/css/fonts.css`).
 | mod badges | `modPill()` in `web/js/badges.js`, `.mod` in `profile.css` | `components/mod.tsx`, `bem/mod.less`, `bem/mods.less`, `public/images/badges/mods/` |
 | a stable score's big letter | `legacyRank()` in `web/js/score-card.js` | `bem/legacy-rank.less`, `resources/images/scores/legacy-ranking-*.png` |
 | avatar with no picture | `guestAvatar()` in `web/js/badges.js` | `bem/avatar.less` (`avatar--guest`), `public/images/layout/avatar-guest.png` |
-| which score a row shows | `scoreColumn()` in `src/calc/eligibility.ts` | `utils/score-helper.ts` (`totalScore`: legacy, then classic, then standardised) |
+| which score a row shows | `ScoreColumn` in `dotnet/App/Calc/Eligibility.cs` | `utils/score-helper.ts` (`totalScore`: legacy, then classic, then standardised) |
 | most played | `.beatmap-playcount` | `profile-page/beatmap-playcount.tsx`, `bem/beatmap-playcount.less` |
 | play history chart | `#playcountChart`, `.line-chart` | `profile-page/chart.tsx`, `profile-page/historical.tsx`, `charts/line-chart.ts`, `bem/line-chart.less`, `bem/page-extra.less` |
 | medals | `.medals` | `profile-page/medals.tsx`, `bem/profile-badges.less` |
@@ -156,7 +156,7 @@ Regenerate after an osu-web change. Each fails loudly rather than writing a part
 node scripts/build-osu-web-art.mjs # web/osu-web/, web/css/osu-web-art.css
 node scripts/build-mod-table.mjs   # web/js/mod-definitions.js (--source reads the local checkout)
 node scripts/build-flags.mjs       # web/flags/<cc>.svg
-node scripts/build-medal-table.mjs # src/calc/medal-definitions.json
+node scripts/build-medal-table.mjs # dotnet/App/Calc/medal-definitions.json
 ```
 
 ## Working on fidelity

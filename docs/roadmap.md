@@ -93,7 +93,7 @@ does not have to make it again.
 | 5.79 | Ranks achieved on beatmaps, in Recent                     | done   |
 | 5.80 | Recent, named and placed as on osu!                       | done   |
 | 5.81 | An import's progress, and Import without Check           | done   |
-| 5.82 | One .NET app in place of Node                             | in progress |
+| 5.82 | One .NET app in place of Node                             | done   |
 
 ## Constraints on every item
 
@@ -1601,7 +1601,7 @@ way to tell whether it was still running.
 
 ## 5.82 - One .NET app in place of Node
 
-**Status:** in progress (nothing ships until the switch-over)
+**Status:** done. 1.33.0 is the C# app, and the Node app was removed from the repository after it (phase 9).
 
 The server, tracker and pp in one .NET process, replacing Node and the JSON pipe to the pp
 helper: about half the download (62 MB to about 31 MB zipped, measured on 1.32.0), with the

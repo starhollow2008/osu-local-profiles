@@ -116,7 +116,6 @@ name both versions in the summary.
 ```
 git switch -c bot/maintenance-<today>
 npm ci
-npm run build:pp
 ```
 
 ### 2. pp, when `pp.due`
@@ -127,13 +126,13 @@ helpers the same questions:
 Runs never overlap, so the two helpers go in fixed folders beside the clone:
 
 1. `rm -rf ~/osu-maintenance/work/pp-old ~/osu-maintenance/work/pp-new`, then
-   `node scripts/build-pp-helper.mjs ~/osu-maintenance/work/pp-old --full` builds the current
+   `node scripts/build-pp-helper.mjs ~/osu-maintenance/work/pp-old` builds the current
    version.
 2. Set all five `PackageReference` versions in `tools/PpCalculator/PpCalculator.csproj` to
    `pp.latest`. If the build reports `NU1202 ... supports: net<N>`, osu! moved to a newer .NET:
    install it with `~/dotnet-install.sh --channel <N>.0 --install-dir ~/.dotnet` and make every
    change step 1 of *Keeping pp current* in `docs/maintaining.md` lists.
-3. `node scripts/build-pp-helper.mjs ~/osu-maintenance/work/pp-new --full` builds the new one.
+3. `node scripts/build-pp-helper.mjs ~/osu-maintenance/work/pp-new` builds the new one.
 4. `node scripts/pp-parity.mjs ~/osu-maintenance/work/pp-old ~/osu-maintenance/work/pp-new`.
    It prints that the two versions differ and leaves out the `version` field every answer
    carries; everything else must match exactly.
@@ -158,7 +157,7 @@ node scripts/build-rank-table.mjs all --dump <rank.latest>
 ```
 
 This streams roughly 1GB per mode and takes a while. Afterwards, each of
-`src/calc/rank-tables/*.json` must name the new dump, with about as many points as before and
+`dotnet/App/Calc/rank-tables/*.json` must name the new dump, with about as many points as before and
 rank falling as pp rises. Set `DEFAULT_DUMP` in `scripts/build-rank-table.mjs` and the dump named
 in `docs/maintaining.md` (the examples and "All four modes currently use ...") to it. Nothing of
 the download may be left behind: check that `git status` shows only those files changed.
@@ -198,14 +197,12 @@ Commits, each ending in a `Co-Authored-By:` trailer for the model you are, as ea
 - `docs: README and changelog for <version>`
 - `npm version <version> --no-git-tag-version`, committed as `chore: release v<version>`
 
-After a rework, `npm run build:pp` again, so the tests use the new helper. Then `npm run check`
-and `npm run check:port` must pass, and both `node src/main.ts --check-only` and
+Then `npm run check` and `npm run check:port` must pass, and
 `dotnet run --project dotnet/App -c Release -- --check-only` must print
-`No osu! installation found` and `pp: osu!'s official calculator` (this VM has no osu!). Since
-1.33.0 the release is the C# app (`dotnet/`, docs/csharp-port.md), which prices plays with the
-same `tools/PpCalculator/` code in-process; the Node app's checks stay until it is removed. If
-any fails because of this run's changes, fix it once; otherwise, or if that fails too, stop and
-report a failure.
+`No osu! installation found` and `pp: osu!'s official calculator` (this VM has no osu!). The
+app prices plays with the same `tools/PpCalculator/` code in-process, so the version bump is
+all a rework needs. If any fails because of this run's changes, fix it once; otherwise, or if
+that fails too, stop and report a failure.
 
 ### 6. Publish
 

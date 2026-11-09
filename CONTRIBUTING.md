@@ -5,30 +5,29 @@ project's rules are written down.
 
 ## Setting up
 
-You need Node.js 22.5 or newer and the .NET 10 SDK. Go is optional: without it the tray launcher's
-tests skip.
+You need the .NET 10 SDK and Node.js 22.5 or newer. The app is C# (`dotnet/`); Node runs the
+build scripts and the tests of the page and the packaging. Go is optional: without it the tray
+launcher's tests skip.
 
 ```
 npm install
-npm run build:pp     # builds osu!'s pp calculator
-npm run dev          # starts the app at http://localhost:7272
+npm start            # builds and starts the app at http://localhost:7272
 ```
 
 The page has no build step, so edit `web/` and reload. The app needs an osu! installation (stable,
-lazer or McOsu) to start. `npm run check:app` says whether it found one and whether the pp
-calculator starts.
+lazer or McOsu) to start. `dotnet run --project dotnet/App -- --check-only` says whether it found
+one and whether the pp calculator starts.
 
 ## Before you open a pull request
 
-- **`npm run check` passes.** It's the typecheck and the full test suite. Tests that need a real
-  osu! installation skip themselves. CI runs the same on Windows, macOS and Linux.
+- **`npm run check:port` and `npm run check` pass.** The first is the app's tests, the second the
+  typecheck and the tests of the page, the packaging and the tray launcher. CI runs both on
+  Windows, macOS and Linux.
 - **`npm run ui` passes** if you changed the page. It drives the running app in headless Chrome,
   so start the app first.
 - **Commits follow [Conventional Commits](https://www.conventionalcommits.org/)**: `feat:`,
   `fix:`, `docs:`, `chore:`, `test:`, `refactor:`, `perf:` or `style:`.
 - **History stays linear.** Rebase your branch onto `main` rather than merging `main` into it.
-- **After changing `tools/PpCalculator/Program.cs`**, run `npm run build:pp:local`. A stale helper
-  in `tools/pp/` keeps answering the old protocol without failing.
 
 ## Changelog
 
@@ -53,9 +52,8 @@ You'll be credited on the entry, so there's no need to add that yourself.
 
 A few worth knowing before you start:
 
-- TypeScript runs through Node's type stripping, so no `enum`, `namespace`, decorators or
-  constructor parameter properties.
-- The Node process loads no native modules.
+- Where the app has to answer as the Node app did, [`docs/csharp-port.md`](docs/csharp-port.md)
+  lists the JavaScript behaviour it keeps (*JavaScript in C#*).
 - The app never polls osu!'s API and works with no credentials or network.
 
 ## UI text

@@ -1,8 +1,11 @@
 # Porting the app to C# (roadmap 5.82)
 
-The plan for replacing the Node app with one .NET app, and the record of where the port has got
-to. Nothing here ships until the switch-over release in phase 8: until then every release is
-the Node app, built and tested exactly as before.
+The plan for replacing the Node app with one .NET app, and the record of how it went. Done:
+1.33.0 is the C# app (phase 8), and the Node app is gone from the repository (phase 9). What
+stays useful is *JavaScript in C#* below: the JavaScript behaviour the app keeps on purpose.
+
+The Node app's source is in git up to `v1.33.1` (`git show v1.33.1:src/osr.ts`). A C# comment
+that names a `src/...ts` file names the module it was ported from.
 
 ## What changes and what doesn't
 
@@ -27,29 +30,30 @@ the Node app, built and tested exactly as before.
 
 ## Where it lives
 
-`dotnet/` on `main`, beside the Node app, and not in any package until phase 7.
+`dotnet/` on `main`. Until phase 9 it sat beside the Node app in `src/`.
 
 ```
 dotnet/
   OsuLocalProfiles.slnx
   Directory.Build.props       shared project settings
   App/                        the app (assembly osu-local-profiles-app)
-  App.Tests/                  xUnit tests, mirroring test/*.test.ts
+  App.Tests/                  xUnit tests
 ```
 
 - `npm run check:port` runs the C# tests (CI's `port` job runs them on all three systems).
-  `npm run parity:api` starts both apps on copies of `data/` and compares every ported answer;
-  it needs an osu! installation, so it runs on a player's machine, not in CI.
-- `dotnet run --project dotnet/App` runs the app on this checkout's `data/`, writing to it as
-  the Node app does. While a Node app answers on the same port it only opens that one's page. To
+  `npm run parity:api -- --reference <published app>` starts two builds on copies of `data/`
+  and compares every answer (until phase 9 it compared the Node app with the C# one).
+- `dotnet run --project dotnet/App` runs the app on this checkout's `data/`, writing to it. To
   try something out, give it a folder of its own with `-- --root <dir>`.
-- `src/db/schema.sql` is embedded into the app from where it is, so there is one schema.
+- `dotnet/App/Db/schema.sql` is the schema, embedded into the app (in `src/db/` until phase 9).
 - `web/` is served from the install root, as now.
 - The daily maintenance job keeps updating `tools/PpCalculator/PpCalculator.csproj`. Phase 3
   moves the osu! package versions into one place both projects read, and changes
   `docs/automated-maintenance.md` in the same commit.
 
-## Rules while both apps exist
+## Rules while both apps existed
+
+Until phase 9. Rule 4's list of differences lives on as *JavaScript in C#*.
 
 1. **The Node app is the product.** Fixes and features land there first, as now. Anything that
    changes behaviour the C# app already ports gets the same change there, in the same commit
@@ -80,7 +84,7 @@ dotnet/
 | 6   | Updater bridge (Node release) | built; not released on its own (phase 8) |
 | 7   | Packaging                     | done        |
 | 8   | Switch-over release           | done (1.33.0) |
-| 9   | Removing the Node app         | not started |
+| 9   | Removing the Node app         | done        |
 
 ### 1. Foundations
 
@@ -304,7 +308,8 @@ Each proven by the parity script's write stage (below) and ported tests:
 
 Pushed to `main`. Phase 5 is done: the last parity run matched every answer. Phase 7
 (packaging) is done: built and checked on all three platforms, listening on the loopbacks only.
-Phase 8 is done: 1.33.0 is the C# release. Next is phase 9, removing the Node app.
+Phase 8 is done: 1.33.0 is the C# release. The commands below are as they were then; phase 9's
+hand-off has today's.
 
 **Pitfalls met this session:**
 
@@ -550,33 +555,75 @@ chosen in phase 7. `docs/architecture.md` is updated as each phase lands, not he
 `start-csharp.bat`, which runs the C# app from a checkout beside `start.bat`'s Node one, becomes
 `start.bat`.
 
-**What `src/` still does for the C# release (surveyed 2026-11-08, nothing removed yet).** Deleting
-it as it stands breaks the release build and the daily job:
+#### Where phase 9 stands (2026-11-09): done
 
-- **The C# app embeds three files from it** (`dotnet/App/App.csproj`): `src/db/schema.sql`,
-  `src/calc/medal-definitions.json` and `src/calc/rank-tables/*.json`. Move them beside the app
-  first, with `build-medal-table.mjs`, `build-rank-table.mjs` and docs/automated-maintenance.md.
-- **The trimmed app's check builds its requests with the Node app's code.** `buildCheckedApp`
-  runs `scripts/pp-parity.mjs`, which builds the requests the app makes from `src/osr.ts`,
-  `src/calc/pp.ts` (`scorePricing`, `scoreMods`, `strippableMods`) and `src/clients/beatmaps.ts`,
-  and `pp-parity-corpus.mjs` builds its McOsu replays with `src/clients/mcosu.ts`. That pulls in
-  24 more files. Port both to `--dev` commands of the C# app (it already has `parse-replays` and
-  `mcosu`, which reads a scores.db, not generated scores) before deleting them.
-- **Small helpers to move into `scripts/`:** `src/calc/helper-prune.ts` (`build-pp-helper.mjs`),
-  `src/http/screenshot.ts`'s `findBrowser` (`build-icons.mjs`, `ui-check.mjs`) and
-  `src/update/zip.ts` (`api-parity.mjs`, which `buildCheckedApp` still runs app against app).
-- **The daily job** (docs/automated-maintenance.md) writes `src/calc/rank-tables/` and runs
-  `node src/main.ts --check-only`; CI runs it too (`ci.yml`), and `pp-helper.yml` triggers on
-  `src/` paths.
-- **Keep, or port, the tests that guard old installs' updates:** `test/launcher.test.ts`,
-  `test/package-files.test.ts`, `test/relaunch.test.ts` and `test/update.test.ts`, with
-  `package.mjs`, `package-files.mjs`, `build-launcher.mjs`, the Go launcher and `rehearsal.yml`.
-  The stand-ins (`node.exe`, the placeholder `src/` and `scripts/apply-update.mjs`) are written by
-  `package.mjs`, never copied from `src/`, so removing `src/` itself does not stop an old install
-  updating. The tests of `web/` modules stay as they are.
-- **Node-only, to delete:** `port-checks.mjs`, `reingest.mjs` (the C# app's `--dev ingest ...
-  plain` re-ingests; update CLAUDE.md's rule about it), `check-replays.mjs`, the `dev` and
-  `check:app` npm scripts, and `lzma-js-simple-v2` once nothing imports `src/osr.ts`.
+`src/` is gone, with the 57 test files that tested it and the Node-only scripts. What the C#
+release still took from it was moved or ported first (the survey of 2026-11-08 listed it), and
+each step was checked against what the Node code did:
+
+- [x] **The embedded files moved beside the app:** `dotnet/App/Db/schema.sql`,
+      `dotnet/App/Calc/medal-definitions.json` and `dotnet/App/Calc/rank-tables/`, with
+      `build-medal-table.mjs`, `build-rank-table.mjs`, `tools/maintenance/check.mjs` and the docs.
+- [x] **The pp parity check builds its requests with the app's own code.** New `--dev` commands:
+      `pp-requests` (the priced, stripped and ranked requests the tracker makes for a replay) and
+      `mcosu-replays` (generated McOsu plays built into replays), run through
+      `scripts/dev-app.mjs`, which builds the app from the checkout once per run. `--live` uses
+      the existing `discover`, `parse-replays` and `mcosu`. Checked against the Node code before
+      it was deleted: all 1,820 generated requests identical as text, every generated file
+      identical byte for byte, and with `--live` all 7,022 requests the same (the six McOsu plays'
+      replays identical, under the app's own file names).
+- [x] **Small helpers moved into `scripts/`:** `find-browser.mjs`, `zip.mjs` (the reading half),
+      and the prune lists into `build-pp-helper.mjs`, where `test/pp-helper.test.ts` now pins
+      them to `SourceHelper.cs`'s copy.
+- [x] **`api-parity.mjs` compares two builds of the app:** `--reference <published app>`
+      against `--app <published app>` or a build of this checkout. Answers are labelled
+      `reference` and `app`.
+- [x] **Packaging is the C# app only.** `npm run package` builds it (`--native` is accepted and
+      changes nothing); the Node package, the slim pp helper (`buildCheckedPpHelper`, `tools/pp/`)
+      and `pp-helper.yml` went, since only the Node release shipped them. The full helper stays as
+      the reference the app is checked against, and the daily job's old-against-new comparison.
+- [x] **CI** runs the app's `--check-only` (`dotnet run`) where it ran Node's, and no longer
+      builds a helper for Node tests. Job names are unchanged.
+- [x] **Tests:** the ones that guard old installs' updates stay, turned to the app's layout
+      (`package-files`, `mac-launcher`, `relaunch`; `launcher` was already the launcher's own).
+      `relaunchPlan`'s cases were already ported to `swap_test.go` (phase 6), so
+      `scripts/apply-update.mjs` went with its tests. Tests that checked the page or a script
+      against the Node app now check them against the app: the locale list against `I18n.cs`, the
+      export's words against `Export/*.cs`, the section-order pin against `DatabaseTests`' orders,
+      and the release job's output through new `--dev release-notes` and `release-page`. The
+      page-only tests in mixed files moved to `beatmapset-card.test.ts` and `score-card.test.ts`.
+      `I18nTests.cs` is new (a stored language code is checked against the list). 143 Node tests
+      and 303 C# tests pass.
+- [x] **Deleted:** `src/`, `port-checks.mjs`, `reingest.mjs`, `check-replays.mjs`,
+      `apply-update.mjs`, the `dev`, `check:app`, `build:pp` and `build:pp:local` scripts.
+      `lzma-js-simple-v2` is a dev dependency now: the corpus still writes lazer's block with it.
+      `npm start` runs the app; `start-csharp.bat` became `start.bat`.
+- [x] **Docs:** `CLAUDE.md`'s Node rules became the app's, and `docs/architecture.md`,
+      `docs/maintaining.md`, `docs/automated-maintenance.md`, CONTRIBUTING and the third-party
+      notices (which still listed Node.js and lzma-js as shipped) name the C# files.
+- [x] **The release build, end to end** (Windows, `npm run package`): the app answered 1,820 of
+      1,820 pp requests as the full helper, the trimmed app 1,820 of 1,820 and all 213 API
+      answers as the untrimmed one, and the package came out at 37 MB as 1.33.0's did.
+
+**Left as it was, on purpose:** the C# comments that name the `src/...ts` file a module was
+ported from (see the top of this page); the Go launcher's Node mode (`appCommand` running Node on
+`src/main.ts`), which nothing ships any more but is tested and harmless; and the `--dev` commands
+only `port-checks.mjs` used (`index-beatmaps`, `resolve`, `backfill`, `ingest ... judged`).
+`reingest.mjs` deleted a profile's scores and rebuilt them from its replays; nothing does that
+now. Recalculate every score reprices from the replays, and `--dev ingest ... plain` re-ingests a
+list into a database's first profile.
+
+#### Hand-off (2026-11-09)
+
+**Commands:**
+
+- `npm run check:port`: the app's tests. `npm run check`: the typecheck and the Node tests of the
+  page, the packaging, the launcher and the scripts. Run both before every commit.
+- `npm run package`: a release package, with every check a release gets (about 10 minutes).
+- `node scripts/pp-parity.mjs <reference> <candidate> [--live]`: two helpers or apps, every pp
+  answer.
+- `node scripts/api-parity.mjs [data folder] --reference <published app> [--app <published app>]`:
+  every API answer of two builds, on copies of `data/`.
 
 ## JavaScript in C#
 

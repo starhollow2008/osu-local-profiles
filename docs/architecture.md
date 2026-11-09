@@ -4,6 +4,10 @@ Why the code is the way it is. Each section records what was measured or decided
 change doesn't undo it by accident. Roadmap numbers (5.xx) point to the fuller history in
 `docs/roadmap.md`.
 
+The app is C# in `dotnet/App/` since 1.33.0 (roadmap 5.82), ported from a Node app whose reasons
+these are. A function named here in camelCase is the Node one, which the C# mostly keeps under
+the same name in PascalCase; the scripts' and the Go launcher's are their own.
+
 ## osu! files
 
 Verified against a corpus of about 2,400 real replays.
@@ -16,10 +20,10 @@ replays have no block. About a third of a typical lazer store is stable-format i
 
 **lazer's accuracy isn't stable's formula.** It counts slider tails (150) and large ticks (30):
 `sum(statistics × value) / sum(maximum_statistics × value)`, with the values in `HIT_VALUES`
-(`src/calc/grade.ts`).
+(`dotnet/App/Calc/Grade.cs`).
 
 **lazer stores files by SHA-256, not by beatmap MD5.** A score names its beatmap by MD5, so the
-app builds an MD5 index in `osu_files` (`src/clients/beatmaps.ts`) by reading every file in the
+app builds an MD5 index in `osu_files` (`dotnet/App/Clients/Beatmaps.cs`) by reading every file in the
 store once: about 63k files, 9s warm and 140s cold. Entries never change, so they're never re-read.
 Stable's `Songs` is filtered by the `.osu` extension instead.
 
@@ -47,8 +51,10 @@ and filed 23 beatmaps under the wrong mode (roadmap 5.45).
 
 ## pp: osu!'s own code
 
-`tools/PpCalculator/Program.cs` references the official `ppy.osu.Game.Rulesets.*` NuGet packages
-and is driven over a JSON-lines pipe from `src/calc/official.ts`.
+`tools/PpCalculator/Program.cs` references the official `ppy.osu.Game.Rulesets.*` NuGet packages.
+The app references that project and calls it in-process with JSON requests
+(`dotnet/App/Calc/Official.cs`); built alone it is the pp helper, a separate process answering the
+same requests one a line, which the app is checked against. "The helper" below is either.
 
 **Hand the helper the replay file, not a reconstructed ScoreInfo.** `LegacyScoreDecoder` sets
 `IsLegacyScore` from the replay version, adds the Classic mod to legacy scores (which selects
@@ -60,7 +66,7 @@ block. McOsu keeps no replay, so the app builds one (see McOsu below).
 `pp_nomod`/`stars_nomod`), and `unrankedModPp` picks one.
 
 **pp is calculated for every score, not just ranked ones.** Whether a score counts is decided at
-query time (`src/calc/eligibility.ts`), never stored. `scores` holds facts (`map_status`,
+query time (`dotnet/App/Calc/Eligibility.cs`), never stored. `scores` holds facts (`map_status`,
 `mods_ranked`, `mods_countable`, both pp values), and `countsSql()` turns settings into the
 predicate. There's one definition of "counts"; never write `ranked = 1` in a new query.
 
@@ -81,10 +87,6 @@ level bar too.
 to `deleted_scores` first, and ingest and Import past plays refuse any key listed there
 (`wasDeleted`). Never delete a score row any other way.
 
-**`tools/pp/` shadows the plain build.** `src/calc/official.ts` prefers it, and a stale copy
-answers the old protocol silently. After changing `Program.cs`, run `npm run build:pp:local`, not
-just `npm run build:pp`.
-
 **Every pp value carries its osu! release.** The helper reports the `ppy.osu.Game` version on its
 ready line and on every answer, with a `breakdown`. Both are stored (`scores.pp_version`,
 `pp_parts`, `pp_nomod_parts`), and the parts must belong to the pp beside them.
@@ -94,30 +96,32 @@ reworks. When the helper is down, no pp is stored and the app says so. The only 
 is the same helper built from the player's own osu! source (below), which replaces the release
 for the whole app and never stands in for it.
 
-**The helper ships slim only when proven identical, on each platform, for each build** (roadmap
-5.60). Full `PublishTrimmed` (113MB to 36MB) breaks inside osu!'s own graph (5.44). The slim
-helper is `TrimMode=partial`, which trims only .NET's own libraries, plus the natives in
-`SLIM_PRUNE_NATIVES`: 58MB against 121MB on Windows. `buildCheckedPpHelper` builds both and runs
-`scripts/pp-parity.mjs` over generated plays (`scripts/pp-parity-corpus.mjs`): beatmaps for all
+**The app ships trimmed only when proven identical, on each platform, for each build** (roadmap
+5.60, docs/csharp-port.md phase 7). Full `PublishTrimmed` (113MB to 36MB) breaks inside osu!'s own
+graph (5.44). The trimmed app is `TrimMode=partial`, which trims only .NET's own libraries, plus
+the natives in `SLIM_PRUNE_NATIVES`: 70MB against 149MB on Windows. `buildCheckedApp` first checks
+the untrimmed app against the full helper, and fails the build on any difference, then the trimmed
+app against the untrimmed one, with `scripts/pp-parity.mjs` over generated plays (`scripts/pp-parity-corpus.mjs`): beatmaps for all
 four rulesets built to reach every slider curve, BPM change, spinner, drumroll, juice stream and
 hold, with stable, lazer and McOsu replays, every mod per ruleset, the ranked-mods question and
-ten error paths. About 1,800 requests in under 30 seconds, the same on every machine, with
-nothing private and nothing to download. A fully trimmed helper fails it. Slim ships only if every
-answer matches; otherwise the full helper ships with the reason, and the build never fails for
-it. The `pp helper` workflow runs this with `--require-slim` on all four platforms whenever an
-answer could change. `--live` adds this machine's own replays. Only compare a platform's helpers
-with each other. Unseeded Random and Target Practice are never sent, since osu! prices them
+ten error paths, and then `scripts/api-parity.mjs` on data the untrimmed app made by importing
+them. About 1,800 pp requests in under 30 seconds, the same on every machine, with nothing
+private and nothing to download; the app's own requests are built by its own code
+(`--dev pp-requests`). A fully trimmed build fails it. The trimmed app ships only if every answer
+matches; otherwise the untrimmed one ships with the reason. CI's `package-native` job builds it on
+all four platforms on every push. `--live` adds this machine's own replays. Only compare a
+platform's builds with each other. Unseeded Random and Target Practice are never sent, since osu! prices them
 differently on every run.
 
-**After a pp rework,** bump the package versions in `PpCalculator.csproj` and run
-`npm run build:pp:local`. Installs reprice themselves (below).
+**After a pp rework,** bump the package versions in `PpCalculator.csproj`: the app and the helper
+both build from it. Installs reprice themselves (below).
 
-**pp from the player's own osu! source** (roadmap 5.70; `src/calc/source-helper.ts`,
-`src/pp-source.ts`). The same `Program.cs` is built against a clone of ppy/osu: a generated
+**pp from the player's own osu! source** (roadmap 5.70; `dotnet/App/Calc/SourceHelper.cs`,
+`dotnet/App/PpSource.cs`). The same `Program.cs` is built against a clone of ppy/osu: a generated
 project in `data/pp-source/project/` with `ProjectReference`s to the clone's `osu.Game` and
 rulesets in place of the NuGet packages (what osu-tools' UseLocalOsu does), published
 framework-dependent for this machine into `data/pp-source/<version>/` and pruned by the shipped
-helper's own lists (`src/calc/helper-prune.ts`). It's 49MB, where unpruned it was 649MB twice
+helper's own lists (`scripts/build-pp-helper.mjs`). It's 49MB, where unpruned it was 649MB twice
 over. It needs the .NET SDK, which anyone building osu! has. A source build reports osu!'s
 placeholder `0.0.0`, so its version is `source <commit>` plus `+<hash>` of every change git sees
 (`git diff HEAD --binary` and untracked files): an uncommitted formula edit must change the
@@ -191,7 +195,7 @@ name against `osu_files.name`, which is lazer's own `Artist - Title (Creator) [V
 from each `.osu`, unique matches only. On 20 real logs it matched 59 of 59 attempts, with no
 `online.db` needed.
 
-**Import past plays reads the logs too** (`src/tracker/log-backfill.ts`). Counted unfinished plays
+**Import past plays reads the logs too** (`dotnet/App/Tracker/Incomplete.cs`). Counted unfinished plays
 and unsubmitted attempts are separate sources beside replays, and preview and import share
 `checkIncompletePlay`/`checkUnsubmittedAttempt`, so the preview's numbers are the import's.
 
@@ -289,7 +293,7 @@ sends the unmodded rating, so an HR or DT play stores none rather than a wrong o
 
 The same play can arrive from osu!'s record and from its replay, and the two share no key: a
 replay knows its hash, osu! knows its score id. So both go through `findExistingScore`
-(`src/tracker/online-import.ts`):
+(`dotnet/App/Tracker/OnlineImport.cs`):
 
 1. **An online id**, which is conclusive. lazer and stable number scores differently, an imported
    row keeps both (`online_score_id`, `legacy_score_id`), and a replay carries whichever its client
@@ -305,7 +309,7 @@ worse record leaves it alone. A re-import only updates rows still on osu!'s figu
 reworks pp and re-ranks beatmaps.
 
 **Replays are looked for right after an import** (`Tracker.attachLocalReplays`,
-`src/tracker/replay-search.ts`). An import from osu! and a score link search every install's replay
+`dotnet/App/Tracker/Backfill.cs`). An import from osu! and a score link search every install's replay
 folder for the replays of the plays they brought in, and ingest each one found in its row's place.
 Only for rows with no replay osu! wrote (never one entered by hand), and only their own replays,
 never "everything in the range". No filter or owner check, since the play is already in the
@@ -367,7 +371,7 @@ Decides whether a play is **written**. A declined play is never a row of `scores
   default, re-ticked every time the dialog opens) can run one import against
   `defaultTrackingFilter()`, which permits everything. `applyFilter` is absent-means-true on the API.
   Preview and import get the same answer.
-- `scripts/reingest.mjs` must not pass a filter.
+- A re-ingest (`--dev ingest ... plain`) must not pass a filter.
 - **Date added is the file's creation time, never mtime.** lazer imports keep mtimes from 2019-2021
   and were created in 2025; mtime is the beatmap's own age. With no creation time, mtime stands in.
 - Star rating and length are judged as played, mods included. Beatmap dates and length are filled
@@ -379,7 +383,7 @@ Decides whether a play is **written**. A declined play is never a row of `scores
 The filter's first criterion (roadmap 5.74): a play is tracked if its beatmap matches **any**
 rule, and a rule matches when **all** its conditions do. A condition is a field, a test
 (*contains*, *is*, *doesn't contain*) and one or more values, any of which will do. Every test
-ignores case; values are stored as typed. `rulesMatch` in `src/tracking-filter.ts` is the only
+ignores case; values are stored as typed. `rulesMatch` in `dotnet/App/Settings/TrackingFilter.cs` is the only
 definition.
 
 - **Mapper** is osu!'s own record of who mapped that difficulty: `online.db`'s `beatmap_owners`,
@@ -407,7 +411,7 @@ definition.
 
 A toast reaches only a visible tab, the launcher hides the console, the count resets at launch, and
 an import declines hundreds of plays at once, so "why is my play missing?" had no answer a day
-later. `src/tracker/declined.ts` keeps what the app announces: plays the filter declined, replays
+later. `dotnet/App/Tracker/Declined.cs` keeps what the app announces: plays the filter declined, replays
 another player set, and replays that couldn't be read, from live tracking, Import past plays and the
 launch catch-up (`source`). Skips that are the app working as meant (duplicate, deleted for good,
 before the cutoff) aren't kept.
@@ -436,7 +440,7 @@ declined. The page asks twice before tracking someone else's play.
 
 osu!'s server rule (`PlayValidityHelper.GetPlayLength`): per play,
 `min(beatmap total_length / rate, ended_at - started_at)`, failed plays included. In
-`src/calc/play-time.ts`, a finished score (which has no start time) uses length over rate, which is
+`dotnet/App/Calc/PlayTime.cs`, a finished score (which has no start time) uses length over rate, which is
 the smaller side for a completed map anyway. An incomplete play uses token time to submission,
 capped at the map's length. Rows from before `started_at` existed count nothing. Beatmap lengths
 are read lazily into `beatmaps.length_ms` (0 means unreadable).
@@ -445,7 +449,7 @@ are read lazily into `beatmaps.length_ms` (0 means unreadable).
 
 One request per favourite: `osu.ppy.sh/beatmapsets/<id>` embeds the whole set as
 `<script id="json-beatmapset">`, cached in `beatmapset_details`. Offline, `localCard` in
-`src/favorites.ts` builds the card from `online.db`, the beatmap cache and the profile's own
+`dotnet/App/Favorites.cs` builds the card from `online.db`, the beatmap cache and the profile's own
 scores. Favourites survive a reset and are never written to osu!.
 
 Shared by default (`config.sharedFavorites`). `FavoriteScope` picks the table, and
@@ -456,7 +460,7 @@ Shared by default (`config.sharedFavorites`). `FavoriteScope` picks the table, a
 
 `osu.ppy.sh/users/<name>` redirects to the numeric id and embeds the public user object as
 `data-initial-data`, the same data as the API's `/users/{user}`, with no OAuth. It may change, so
-`src/clients/osu-web.ts` fails loudly rather than returning an empty user. One request per button
+`dotnet/App/Clients/OsuWeb.cs` fails loudly rather than returning an empty user. One request per button
 press, copied into `data/`, nothing on a timer.
 
 ## Server: localhost only, checked on every request
@@ -516,7 +520,7 @@ Other settings -> Show star rating on scores (`config.starRating`) adds `· 6.18
 row's difficulty. It is off by default, as osu! shows none there, and an older `config.json`
 without the key reads as off too. Every earlier version showed them, so an install that already
 had a database when this one first started is told once, in a note under Scores
-(`src/star-rating-notice.ts`, `kv.starRatingNotice`: `pending`, then `done` when the note is closed
+(`dotnet/App/ProfileWrites.cs`, `kv.starRatingNotice`: `pending`, then `done` when the note is closed
 or the setting changed). A new install is never told. A saved copy keeps the sharer's choice and
 never the note.
 
@@ -593,7 +597,7 @@ Generated files: `web/js/mod-definitions.js` (`npm run build:mods`), `web/flags/
 
 ## Medals: osu!'s definitions, not symmetric
 
-`src/calc/medal-definitions.json` is generated by `scripts/build-medal-table.mjs` from osu!'s
+`dotnet/App/Calc/medal-definitions.json` is generated by `scripts/build-medal-table.mjs` from osu!'s
 profile-page payload. Don't hand-edit it.
 
 - Combo and play-count medals exist for osu!standard only. taiko, catch and mania have hit-count
@@ -612,7 +616,7 @@ shared `#medalTooltip` positioned in window coordinates. The header's medal figu
 (`dated: false`).
 
 Medals are derived from scores on every request and never stored, except what an Import from osu!
-with Medals ticked copies (`imported_medals`, `src/imported-medals.ts`): only slugs `isAppMedal`
+with Medals ticked copies (`imported_medals`, `dotnet/App/Calc/Medals.cs`): only slugs `isAppMedal`
 knows, replaced whole per import, cleared by a reset. `computeMedals` takes whichever of derived
 and imported is earlier and marks imported ones `fromOsu`. The server broadcasts `medals` before any
 other event of that import, so pages don't toast dozens of old medals. A full combo needs
@@ -621,7 +625,7 @@ unknown, never guessed.
 
 ## Global rank: estimated from a sampled curve
 
-Rank comes from `src/calc/rank-tables/<mode>.json`, built by `scripts/build-rank-table.mjs` from
+Rank comes from `dotnet/App/Calc/rank-tables/<mode>.json`, built by `scripts/build-rank-table.mjs` from
 data.ppy.sh's `performance_<mode>_random_10000` dump: a random sample across the whole ladder in
 which every user carries their real rank, so nothing needs modelling. Interpolation is linear in
 log rank (6 orders of magnitude, against 3 for pp). It's labelled as an estimate. It's allowed where
@@ -631,24 +635,23 @@ a second pp calculator isn't, because a stale curve degrades gradually. Refresh 
 **Country rank is deliberately not shown.** 10,000 sampled users over about 200 countries is far
 too thin, and a made-up number would be worse than a dash.
 
-## `fs.watch`: never pass an unresolved path
+## Watchers: never pass an unresolved path
 
-On Windows, libuv compares the filename from `ReadDirectoryChangesW` against the path it was given
-and **aborts the process** on a mismatch: a junction, a drive substitution or an 8.3 short name does
-it. CI runners hit it (`C:\Users\RUNNER~1\...`). `watchablePath` in `src/tracker/watcher.ts`
-resolves the folder, and paths are reported against the configured folder so nothing downstream
-sees two spellings.
+On Windows, Node's `fs.watch` compared the filename from `ReadDirectoryChangesW` against the path it
+was given and **aborted the process** on a mismatch: a junction, a drive substitution or an 8.3 short
+name did it. CI runners hit it (`C:\Users\RUNNER~1\...`). The app still resolves a folder before
+watching it (`WatchablePath` in `dotnet/App/Tracker/Watchers.cs`), and paths are reported against
+the configured folder so nothing downstream sees two spellings.
 
 **Watcher tests must let the watch come up before the first write.** macOS starts its FSEvents
-thread at the first `fs.watch`, and a write during startup isn't reported. `await sleep(SETTLED_MS)`
-after `start()`.
+thread at the first watch, and a write during startup isn't reported.
 
 ## osu!stable specifics
 
 Verified on a real install.
 
 - **The Songs folder can be moved.** Stable writes its path to `BeatmapDirectory` in
-  `osu!.<user>.cfg`, which `stableSongs` (`src/clients/detect.ts`) reads. A relative value resolves
+  `osu!.<user>.cfg`, which `stableSongs` (`dotnet/App/Clients/Detect.cs`) reads. A relative value resolves
   against the install; a stale one falls back to `<root>/Songs`.
 - **The signed-in username** is in the cfg only if "remember" was ticked. Otherwise
   `detectLocalSessions` finds nothing and the page falls back to typing a name.
@@ -657,7 +660,7 @@ Verified on a real install.
   `countsSql` counts unresolved beatmaps too. The Scores note says so and the beatmap-status
   settings are dimmed. It isn't a setting: it follows what the machine knows.
 - **A beatmap downloaded mid-session** (osu!direct, every multiplayer pick you lacked) lands in a new
-  `Songs` folder the replay watcher doesn't see. `SongsWatcher` (`src/tracker/songs-watcher.ts`)
+  `Songs` folder the replay watcher doesn't see. `SongsWatcher` (`dotnet/App/Tracker/Watchers.cs`)
   watches `Songs` itself, non-recursively (a recursive watch is an inotify watch per set folder on
   Linux), and indexes each new set's `.osu` files. A lookup that finds nothing calls
   `BeatmapResolver.onMiss` to flush first. A cached miss is never final: `resolve` looks again once
@@ -679,7 +682,7 @@ replay anywhere, 175.697pp on osu! and 175.6969 here; a lazer score, 338.837 and
 So these follow McOsu's arrangement rather than storing and re-fetching osu!'s pp: the user wanted
 every score repriced here, offline, by one calculator.
 
-- **Built replays** (`src/built-replays.ts`, written by `src/replay-writer.ts`, shared with McOsu): a
+- **Built replays** (`dotnet/App/ScoreEntry.cs`, written by `dotnet/App/Replays/ReplayWriter.cs`, shared with McOsu): a
   stable score from its link as a stable replay with its legacy id and stable's total; a lazer one
   as a lazer replay with its statistics, mods and settings in lazer's own block; a hand entry as a
   stable replay of the judgements typed. An app block (`osu-local-profiles:built`) records `origin`
@@ -749,32 +752,31 @@ macOS and Linux are written and covered by CI, but have never run against a real
 Releases have carried `osx-arm64` and `linux-x64` zips since 1.10.0 and `osx-x64` since 1.21.0.
 
 1. Behaviour that varies by platform sits behind a pure function that takes the platform.
-   `src/clients/detect.ts` takes a `DetectEnvironment` and never reads `process` directly.
+   `dotnet/App/Clients/Detect.cs` takes a `DetectEnvironment` and never reads `process` directly.
 2. A platform-specific list must fail loudly when it matches nothing. The pp helper's pruning
    matches by base name across `.dll`/`.dylib`/`.so` and warns when nothing is pruned.
 
-**The launcher runs the runtime beside it**, by absolute path (`tools/launcher/launcher.go`). The
+**The launcher runs the app beside it**, by absolute path (`tools/launcher/launcher.go`). The
 old `.bat` needed `.\node.exe`, because `cmd` searches PATH for a bare name when
 `NoDefaultCurrentDirectoryInExePath` is set (Claude Code's shell sets it). The root `start.bat` is
 for development only. Test a `.bat` as `.\x.bat`.
 
-**`cmd` spawns need `windowsVerbatimArguments`.** Node quotes by C runtime rules and `cmd` doesn't
-unescape, so `start ""` arrives as `start "\"\""`. `src/browser.ts` builds the line as a pure
-function.
+**A `cmd` line is passed as written.** Quoted by the C runtime's rules, as Node did, `start ""`
+arrives as `start "\"\""`, since `cmd` doesn't unescape. `Instance.Command` builds the line as a
+pure function, with `&` and `^` escaped.
 
 **macOS: one approval, then the launcher lifts quarantine.** Browsers and Archive Utility quarantine
-every unpacked file, and Gatekeeper refuses each unsigned one as it loads: `node` is notarized, but
-`osu-pp` and its native libraries are ad-hoc signed. After the `.app` is approved once (macOS 15:
-Privacy & Security -> Open Anyway), it runs `xattr -dr com.apple.quarantine <folder>` when `node` or
-`osu-pp` still carries the attribute. Updates never carry quarantine, since the app downloads them
-with `fetch`. The real fix is Developer ID signing and notarization ($99 a year), not done.
+every unpacked file, and Gatekeeper refuses each unsigned one as it loads: the app and its native
+libraries are ad-hoc signed. After the `.app` is approved once (macOS 15: Privacy & Security -> Open
+Anyway), it runs `xattr -dr com.apple.quarantine <folder>` when the app still carries the
+attribute. Updates never carry quarantine, since the app downloads them itself. The real fix is Developer ID signing and notarization ($99 a year), not done.
 
 `config.installRoots` is the escape hatch for layouts nobody anticipated (stable under unusual Wine
 wrappers, say).
 
 ## Updater: rewrites the app's own folder
 
-`src/update/` and `scripts/apply-update.mjs`.
+`dotnet/App/Update/`, and the swap in `tools/launcher/swap.go`.
 
 **Four safety properties:**
 
@@ -784,11 +786,12 @@ wrappers, say).
    from a bad release is to download the previous one.
 3. **Nothing is swapped until the new build is verified**: download size, unpacked tree shape, and
    the version in its `package.json`.
-4. **A source checkout refuses** (`start.bat` runs `node src/main.ts`). Both `.git` and a missing
-   bundled runtime are checked.
+4. **A source checkout refuses** (`start.bat` runs `dotnet run`). Both `.git` and a missing
+   `app/osu-local-profiles-app` are checked.
 
-**The swap runs from the staged build using its own runtime**, because the running `node.exe` is
-locked on Windows. That's why `scripts/apply-update.mjs` ships in every package.
+**The swap runs from the staged build, by its own launcher** (`--apply-update`), because the
+running app is locked on Windows. Node releases ran the staged `scripts/apply-update.mjs` with the
+staged runtime, which is why a package still carries stand-ins for those (below).
 
 **Relaunch only somewhere the app can be stopped from, or not at all.** A copy started with nothing
 to stop it keeps tracking and holds the port, findable only in a process list. Up to 1.13.2 it came
@@ -804,7 +807,7 @@ back exactly so on macOS and Linux.
   swept by `pruneUpdateLeftovers`.
 - **`start.sh` with no desktop** keeps a terminal loop: `OSU_LOCAL_PROFILES_LAUNCHER=restarts`, wait
   for the pid, run itself again.
-- **Otherwise the swapper relaunches, per `relaunchPlan`** (pure, in `scripts/apply-update.mjs`).
+- **Otherwise the swapper relaunches, per `relaunchPlan`** (pure, in `tools/launcher/plan.go`).
   Windows: the launcher exe. macOS: `open -n` on the bundle (without `-n`, a launcher still exiting
   is only brought forward). Linux: the launcher when `DISPLAY` or `WAYLAND_DISPLAY` is set, else no
   relaunch, noted in `data/update.log`. Never the runtime directly. This is reached only from
@@ -813,7 +816,7 @@ back exactly so on macOS and Linux.
   restart by running `./<own name>` again, so `start.sh` and `Start osu! local profiles.command`
   keep those names and start the tray launcher.
 - `verifyStaged` requires the tray launcher in a downloaded build, since the relaunch depends on it.
-- **A release without Node** (roadmap 5.82, the C# port) is marked by its app,
+- **A release without Node** (roadmap 5.82: every release since 1.33.0) is marked by its app,
   `app/osu-local-profiles-app`, not by a missing `node.exe`: a Node release that lost its runtime
   to antivirus is still refused. It has no runtime to run the script with, so `swapperFor` starts
   its tray launcher with `--apply-update` and the same arguments (`tools/launcher/swap.go`, the
@@ -822,7 +825,7 @@ back exactly so on macOS and Linux.
   release can carry it under the runtime's name; the swap leaves that stand-in, and a placeholder
   `src/` and `scripts/`, out of the install. `test/launcher.test.ts` runs both.
 
-**The zip reader is our own** (`src/update/zip.ts`), which avoids a dependency and Windows-only
+**The zip reader is our own** (`dotnet/App/Zip.cs`), which avoids a dependency and Windows-only
 `tar.exe`. It refuses zip64 and path traversal, handles the backslash separators our packager
 writes, and restores Unix permission bits.
 
@@ -857,18 +860,18 @@ failed check shows nothing.
   `{"metered":...}` on change. Auto-update never downloads on a metered connection; a download the
   user asks for does.
 - **`--no-relaunch` is permanent.** An older app hands the swap to the new release's swapper, so
-  every later `apply-update.mjs` must keep understanding it.
+  every later swapper (`tools/launcher/swap.go`) must keep understanding it.
 - **Patch notes.** Before an update: each release page's own lines, which `releaseNotes` writes from
   the CHANGELOG, including `<!-- important -->` (`notesFromBody`), fetched in one API request per new
   version found (`fetchRecentReleases`). After one: `release-notes.json` in the package
-  (`notesJson`), shown since `kv.lastSeenVersion` (`src/update/whats-new.ts`). `nudgeFor` shows the
+  (`notesJson`), shown since `kv.lastSeenVersion` (`dotnet/App/Update/Notes.cs`). `nudgeFor` shows the
   notice at the foot of the page for an important version, or once the oldest missing one is 14 days
   old; dismissed, it stays away 7 days unless something important comes out.
 
 ## Asking osu!
 
 Everything the app itself asks of an osu! domain goes through `fetchWithTimeout` in
-`src/clients/osu-web.ts`, and so through one `RequestGate` (`src/clients/request-gate.ts`, roadmap
+`dotnet/App/Clients/OsuWeb.cs`, and so through one `RequestGate` (roadmap
 5.78): turns start a second apart, in order, which is osu!'s own ask ("no more than 60 requests per
 minute", osu.ppy.sh/docs). A 429 holds the whole gate for its `Retry-After` (1 s to 5 min, a minute
 without one), is retried twice, then fails as `SlowDown`, which every caller lets through rather than
@@ -876,7 +879,7 @@ calling it unreachable. The 10 s timeout starts with the request, not the wait. 
 they have got over SSE (`osu-progress`): favourites read, the mode being read, beatmaps downloaded.
 The browser's own loads (covers, previews, me! images) don't pass through it.
 
-**Rank events** (`src/rank-events.ts`, roadmap 5.79) are the one network read that isn't a button
+**Rank events** (`dotnet/App/RankEvents.cs`, roadmap 5.79) are the one network read that isn't a button
 press: `/users/<id>/recent_activity?limit=100` (public JSON; osu! serves at most the newest 100) once
 at start, once after linking, and `ASK_AFTER_PLAY_MS` after the last of a run of plays osu! could rank
 (not McOsu, not a fail). Never on a timer. Only for the linked account when it's the player's own
@@ -889,8 +892,9 @@ within `MATCH_WINDOW_MS`, joined by `dedupe_key` so a reingest keeps it.
 `osu! local profiles.app` or `osu-local-profiles`. Built by `scripts/build-launcher.mjs`, so a
 package needs Go.
 
-**Why Go:** one codebase gives a small native binary for all three systems, the Node process stays
-free of native modules, and no GUI toolkit or webview ships. Windows and Linux need no cgo; macOS
+**Why Go:** one codebase gives a small native binary for all three systems, the app stays a plain
+console program (which is how it was kept free of native modules while it was Node), and no GUI
+toolkit or webview ships. Windows and Linux need no cgo; macOS
 does (Cocoa), so like the rest of a package it builds only on a Mac.
 
 **It's the app's off switch, so it must never lose the app:**
@@ -905,15 +909,15 @@ does (Cocoa), so like the rest of a package it builds only on a Mac.
 **Finding it again:** a second start finds the instance lock taken (a named mutex per folder on
 Windows, `flock` on `data/launcher.lock` elsewhere, both released however the process ends) and
 opens the first copy's page once `/api/app` answers. A start that finds `/api/app` answering on the
-port (another folder, or `npm run dev`) opens that page. `node src/main.ts` makes the same check
-(`runningInstance`).
+port (another folder, or `npm start`) opens that page. The app makes the same check when started
+on its own (`dotnet/App/Instance.cs`).
 
 **No console:** output goes to `data/logs/app.log`, and the previous run's to `app.previous.log`.
 
 **Per platform:**
 
 - **Windows:** GUI subsystem (`-H windowsgui`), and the app runs with `CREATE_NO_WINDOW`, which its
-  children (the pp helper, `cmd` for the browser) share. go-winres embeds the icon, version and a
+  children (the source helper, `cmd` for the browser) share. go-winres embeds the icon, version and a
   DPI-aware manifest. Unsigned, so SmartScreen asks once.
 - **macOS:** a bundle with `LSUIElement` (no Dock icon), plus `setActivationPolicy:Accessory` for a
   bare binary, and a template icon. Signed ad hoc as a bundle, since an unsigned one downloaded on
@@ -924,7 +928,7 @@ port (another folder, or `npm run dev`) opens that page. `node src/main.ts` make
   without the AppIndicator extension) it runs without an icon and says so with `notify-send`.
   `start.sh` with no desktop runs the app in its terminal.
 
-**Starting with the computer** (`src/startup.ts`, roadmap 5.77) registers the launcher, never the
+**Starting with the computer** (`dotnet/App/StartWithComputer.cs`, roadmap 5.77) registers the launcher, never the
 runtime, with `--startup`: a Run value in `HKCU` on Windows, a LaunchAgent running `open -a` on macOS,
 an XDG autostart entry on Linux. The entry is the only record of the setting, so it can't disagree
 with what happens at sign-in, and it counts as on only when it starts this copy's launcher. Windows'
@@ -953,12 +957,12 @@ taken. me! can be imported from anyone's profile, so the text is treated as host
 - Every argument is validated: colours by pattern, sizes as numbers, links and images by scheme.
 - A failed or unclosed tag stays visible as text.
 
-Pasted images go in `data/about-images/<profile>/`, named by content (`src/about-images.ts`), and
+Pasted images go in `data/about-images/<profile>/`, named by content (`dotnet/App/ProfileWrites.cs`), and
 `[img]` accepts only that exact local shape.
 
 ## Export to a spreadsheet
 
-`src/export/tables.ts` turns the profile into tables of cells: scores (every mode, pp descending,
+`dotnet/App/Export/Tables.cs` turns the profile into tables of cells: scores (every mode, pp descending,
 no pp last), per-mode scores, Summary, Most played, Favorite beatmaps and Medals. Every query is the
 page's own (`visibleSql`, `countsSql`, `ppColumn`, `scoreColumn`, `names`), so the export is what the
 profile shows.
@@ -968,14 +972,14 @@ profile shows.
 - `xlsx.ts` writes SpreadsheetML by hand through `writeZip`: inline strings only (never evaluated),
   dates as serial days, a frozen bold header, an autofilter with `_xlnm._FilterDatabase`, and column
   widths. No library: the minimal part set opened cleanly in Excel 16 and openpyxl.
-- It's in the page's language: the page sends `?lang=`, and `src/export/words.ts` reads the page's
+- It's in the page's language: the page sends `?lang=`, and `dotnet/App/I18n.cs` reads the page's
   own `web/i18n/*.json` (English for a missing key). Keys are literal, and `scripts/build-i18n.mjs`
-  scans `src/export/` for them. osu!'s own names (modes, clients, grades, judgements, medals) stay as
+  scans `dotnet/App/Export/` for them. osu!'s own names (modes, clients, grades, judgements, medals) stay as
   osu! writes them.
 
 ## Backup and restore
 
-`src/backup.ts`. A backup is `profiles.db` (a `VACUUM INTO` snapshot, since in WAL mode the file
+`dotnet/App/Backup.cs`. A backup is `profiles.db` (a `VACUUM INTO` snapshot, since in WAL mode the file
 alone can miss writes), the pictures and `about-images/`, under their `data/` names. `isProfileFile`
 is the one list of what that is, and a restore writes nothing else, whatever the zip holds.
 `config.json` is left out: install settings are wrong on another machine.
@@ -1000,17 +1004,17 @@ scale. Both come from osu!'s code through the helper (`GetDisplayScore(Standardi
 `GetDisplayScore(Classic)`, `LegacyTotalScore`) and are stored in `scores.score_standard` and
 `score_classic`. Classic shows `legacyTotalScore ?? classicScore`, osu-web's own rule.
 
-`scoreColumn(e)` in `src/calc/eligibility.ts` is the only place a query names a score column. Don't
+`scoreColumn(e)` in `dotnet/App/Calc/Eligibility.cs` is the only place a query names a score column. Don't
 write `s.total_score` in a new query (it's the raw replay number, a fallback only).
 
 **Stable scores are listed with CL.** osu! adds Classic to every legacy score before scoring it, so
-`withClassicMod` (`src/calc/pp.ts`) adds it when building rows and cards. `mods_json` keeps what the
+`withClassicMod` (`dotnet/App/Calc/Pp.cs`) adds it when building rows and cards. `mods_json` keeps what the
 player chose.
 
 **The wide INSERT and UPDATE are generated from the row.** Ingest's INSERT and recompute's UPDATE take
 their column lists from the row object, so no value can be bound to the wrong column. What pricing a
 replay decides (pp, stars, status, the ranked flags, pp parts) is one definition, `pricedColumns` in
-`src/tracker/pricing.ts`; `BEATMAP_PRICED` is the part a recompute keeps when the `.osu` is gone.
+`dotnet/App/Tracker/Pricing.cs`; `BEATMAP_PRICED` is the part a recompute keeps when the `.osu` is gone.
 Hand-aligned placeholders once let a recompute "update" 45 rows and write nothing (roadmap 5.40).
 
 ## Beatmap names in their original language
@@ -1020,7 +1024,7 @@ from the `.osu`'s `ArtistUnicode` and `TitleUnicode`; `''` means looked and ther
 never looked. `backfillOriginalMetadata` fills the NULLs in one sliced pass after the beatmap index,
 with no transaction of its own because the connection is shared.
 
-`src/calc/metadata.ts` is the only definition: `NAME_COLUMNS` for what a naming query selects,
+`dotnet/App/Calc/Metadata.cs` is the only definition: `NAME_COLUMNS` for what a naming query selects,
 `names()` for a row, and `beatmapName`/`beatmapNameOriginal` for the joined `artist - title` that
 Recent, medals and Removed scores carry. Don't build `artist - title` by hand in a new query.
 
