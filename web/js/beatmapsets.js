@@ -61,14 +61,15 @@ const svg = (body, viewBox = '0 0 16 16') =>
   `<svg class="icon" viewBox="${viewBox}" aria-hidden="true">${body}</svg>`;
 
 /*
- * The four rulesets, drawn plainly: a hit circle, a drum face, falling fruit, and columns.
- * Not osu!'s own ruleset glyphs, which are its artwork.
+ * The four rulesets as osu! draws them: its own glyphs, the same as the mode switcher's
+ * (`.mode-icon`, osu-web-art.css), sized by the font size around them.
  */
+const modeIcon = (ruleset) => `<span class="mode-icon mode-icon--${ruleset}" aria-hidden="true"></span>`;
 export const MODE_ICON = {
-  osu: svg('<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/>'),
-  taiko: svg('<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 2.5v11" stroke="currentColor" stroke-width="2"/>'),
-  fruits: svg('<circle cx="5" cy="5.5" r="2.4" fill="currentColor"/><circle cx="11" cy="5.5" r="2.4" fill="currentColor"/><circle cx="8" cy="11" r="2.4" fill="currentColor"/>'),
-  mania: svg('<rect x="2" y="2" width="3" height="12" rx="1" fill="currentColor"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/>'),
+  osu: modeIcon('osu'),
+  taiko: modeIcon('taiko'),
+  fruits: modeIcon('fruits'),
+  mania: modeIcon('mania'),
 };
 
 export const MODE_NAME = { osu: 'osu!', taiko: 'osu!taiko', fruits: 'osu!catch', mania: 'osu!mania' };

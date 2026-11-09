@@ -4316,6 +4316,7 @@
   width: 14px;
   height: 14px;
   margin-right: 2px;
+  font-size: 14px;
 }
 
 .beatmapset-panel__beatmap-dot {
@@ -4514,6 +4515,7 @@ a.beatmapset-badge--spotlight:hover {
   flex: none;
   width: 14px;
   height: 14px;
+  font-size: 14px;
 }
 
 .beatmaps-popup-item .icon {
@@ -4649,11 +4651,6 @@ a.beatmapset-badge--spotlight:hover {
   place-items: center;
   font-size: 1.25em;
   width: 1em;
-}
-
-.beatmap-list-item__col--icon .icon {
-  width: 1em;
-  height: 1em;
 }
 
 .beatmap-list-item__col--main {
