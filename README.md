@@ -70,7 +70,7 @@ npm run check:port                # runs the C# tests
 ```
 
 Open <http://localhost:7272>. 
-Go is only needed to build the tray launcher. Node.js 24 runs the packaging scripts and the old app's tests.
+Go is only needed to build the tray launcher. Node.js 24 runs the packaging scripts and the tests of the page, the packaging and the launcher.
 
 ## Warnings for osu!stable
 
