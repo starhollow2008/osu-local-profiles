@@ -41,9 +41,11 @@ test('Nunito covers every weight, drawing all but the light ones heavier', () =>
     assert.equal(bands[0]?.lo, 100, url);
     assert.equal(bands.at(-1)?.hi, 1000, url);
     for (let i = 1; i < bands.length; i++) assert.equal(bands[i]?.lo, (bands[i - 1]?.hi ?? 0) + 1, url);
-    // 300 is drawn as asked; osu-web's 400 and 600/700 are drawn heavier than asked.
+    // 300 is drawn as asked; osu-web's 400 and 600 are drawn heavier than asked, and 700, which
+    // shares 600's band, no lighter.
     assert.equal(at(300)?.drawn, null, url);
-    for (const asked of [400, 600, 700]) assert.ok((at(asked)?.drawn ?? 0) > asked, `${url} at ${asked}`);
+    for (const asked of [400, 600]) assert.ok((at(asked)?.drawn ?? 0) > asked, `${url} at ${asked}`);
+    assert.ok((at(700)?.drawn ?? 0) >= 700, `${url} at 700`);
   }
 });
 

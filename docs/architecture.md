@@ -503,8 +503,9 @@ against osu.ppy.sh in the same browser: at 200px the two have the same stem at w
 12-16px, where most of the page's text is, Torus snaps its stems to whole pixels and Nunito's blur
 to grey, so Nunito at the same weight puts down about a fifth less ink and reads skinny. So each
 `@font-face` band draws Nunito heavier than the weight asked for (`font-variation-settings`):
-400 as 600, 600/700 as 750 (osu! only loads Torus up to SemiBold, so its 600 and 700 are the same
-face), 800+ as 850, and 300, the big light figures, as asked, since it already matches. The CSS
+400 as 600, 600/700 as 700 (osu! only loads Torus up to SemiBold, so its 600 and 700 are the same
+face), 800+ as 800, and 300, the big light figures, as asked, since it already matches. The bold
+bands were 750 and 850 until the owner found them a little too heavy (2026-11-09). The CSS
 everywhere else keeps osu-web's own weights. The one trade-off is large 400 text, like the 24px
 name, which comes out a little heavier than osu!'s.
 
