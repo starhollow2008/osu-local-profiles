@@ -7,7 +7,7 @@
  * involved, so a run with nothing new costs two HTTP requests and nothing else:
  *
  * - **rank**: the newest data.ppy.sh dump that has all four modes' random samples, against
- *   the `dump` each of `src/calc/rank-tables/*.json` was built from.
+ *   the `dump` each of `dotnet/App/Calc/rank-tables/*.json` was built from.
  * - **pp**: the newest stable `ppy.osu.Game` on NuGet, with all four ruleset packages at the
  *   same version, against `tools/PpCalculator/PpCalculator.csproj`. A version the job already
  *   priced and found to change no pp is listed in the state file's `ppNotRework` and isn't due
@@ -83,7 +83,7 @@ async function text(url) {
 function currentDumps() {
   return Object.fromEntries(
     MODES.map((mode) => {
-      const file = path.join(root, 'src', 'calc', 'rank-tables', `${mode}.json`);
+      const file = path.join(root, 'dotnet', 'App', 'Calc', 'rank-tables', `${mode}.json`);
       return [mode, JSON.parse(fs.readFileSync(file, 'utf8')).dump];
     }),
   );

@@ -19,20 +19,20 @@ import (
 var errSwapUsage = errors.New("usage: --apply-update --install <dir> --staged <dir> --pid <n> [--archive <zip>] [--launcher-restarts] [--no-relaunch]")
 
 const (
-	// The id /api/app answers with (APP_ID in src/instance.ts).
+	// The id /api/app answers with (Server.AppId in dotnet/App/Http/Server.cs).
 	appID = "osu-local-profiles"
-	// What the app is told started it (LAUNCHER_ENV in src/update/index.ts). "tray" also means
+	// What the app is told started it (Instance.LauncherEnv in dotnet/App/Instance.cs). "tray" also means
 	// "restarts": the app exits with restartExitCode for an update and leaves the rest to us.
 	launcherEnv   = "OSU_LOCAL_PROFILES_LAUNCHER"
 	launcherValue = "tray"
-	// RESTART_EXIT_CODE and SWAPPER_PID_FILE in src/update/index.ts.
+	// Updater.RestartExitCode and Updater.SwapperPidFile in dotnet/App/Update/Updater.cs.
 	restartExitCode = 75
 	swapperPidFile  = "swapper.pid"
 	// Run with no tray icon: a desktop with no tray, or the tests.
 	noTrayEnv   = "OSU_LOCAL_PROFILES_NO_TRAY"
 	defaultPort = 7272
-	// What the computer's startup entry passes (STARTUP_ARG in src/startup.ts), and what the app
-	// is told when it started that way (STARTUP_ENV), so it opens no page.
+	// What the computer's startup entry passes (StartWithComputer.StartupArg), and what the app
+	// is told when it started that way (Instance.StartupEnv), so it opens no page.
 	startupArg = "--startup"
 	startupEnv = "OSU_LOCAL_PROFILES_STARTUP"
 )
@@ -163,8 +163,8 @@ type appInfo struct {
 	App      string `json:"app"`
 	Version  string `json:"version"`
 	Tracking bool   `json:"tracking"`
-	// The newer release the app's daily check found, or empty (offeredVersion in
-	// src/update/index.ts). An app from before 1.27 never sends it.
+	// The newer release the app's daily check found, or empty (Updater.OfferedVersion). An app
+	// from before 1.27 never sends it.
 	Update string `json:"update"`
 	// Downloading and installing it now: Update to ... and restart, from here or the page.
 	Updating bool `json:"updating"`
@@ -271,8 +271,8 @@ func tooltipText(v trayView, port int) string {
 	return text
 }
 
-// The lines the launcher writes down the app's stdin, as stopWhenLauncherCloses in
-// src/instance.ts reads them: one JSON object a line.
+// The lines the launcher writes down the app's stdin, as Instance.StopWhenLauncherCloses
+// reads them: one JSON object a line.
 const quitLine = "{\"quit\":true}\n"
 
 func meteredLine(metered, known bool) string {
@@ -367,8 +367,8 @@ func logFiles(root string) (current, previous string) {
 /* ------------------------------------------------------------------------- the swap */
 
 // swapArg asks the launcher to install a staged update instead of starting the app: the job
-// scripts/apply-update.mjs does with Node, done here for a build that has no Node (roadmap 5.82,
-// docs/csharp-port.md phase 6).
+// scripts/apply-update.mjs did for Node releases, done here for a build that has no Node (roadmap
+// 5.82, docs/csharp-port.md phase 6).
 const swapArg = "--apply-update"
 
 // swapOptions are apply-update.mjs's arguments, which every swapper keeps understanding: an
@@ -445,8 +445,8 @@ type relaunchStep struct {
 	args    []string
 }
 
-// relaunchPlan is relaunchPlan in scripts/apply-update.mjs: the app comes back somewhere it can
-// be stopped from, or not at all. Never the runtime directly.
+// relaunchPlan is what relaunchPlan in the Node releases' scripts/apply-update.mjs decided: the
+// app comes back somewhere it can be stopped from, or not at all. Never the app directly.
 func relaunchPlan(goos, installDir string, launcherRestarts, noRelaunch bool, exists func(string) bool, getenv func(string) string) relaunchStep {
 	if noRelaunch {
 		return relaunchStep{skip: "installed as the app was quit, so it stays closed until it is started"}
@@ -485,7 +485,7 @@ func replaceable(names []string) []string {
 	return out
 }
 
-// rollbackStamp names a rollback folder as apply-update.mjs does: the ISO time to the second,
+// rollbackStamp names a rollback folder as apply-update.mjs did: the ISO time to the second,
 // with ':' and '.' made '-' so it is a valid file name everywhere.
 func rollbackStamp(t time.Time) string {
 	return strings.NewReplacer(":", "-", ".", "-").Replace(t.UTC().Format("2006-01-02T15:04:05.000Z"))[:19]
@@ -495,7 +495,7 @@ func rollbackStamp(t time.Time) string {
 func logStamp(t time.Time) string { return t.UTC().Format("2006-01-02T15:04:05.000Z") }
 
 // nativeApp is the app a release without Node carries, relative to the release's folder
-// (nativeAppFor in src/update/index.ts). Its presence is what marks such a release.
+// (Updater.NativeAppFor). Its presence is what marks such a release.
 func nativeApp(goos string) string {
 	if goos == "windows" {
 		return join(goos, "app", "osu-local-profiles-app.exe")

@@ -5,22 +5,31 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { generateCorpus } from '../scripts/pp-parity-corpus.mjs';
-import { beatmapMode } from '../src/clients/beatmaps.ts';
-import { parseReplay } from '../src/osr.ts';
+import { canBuildApp, devApp, writeList } from '../scripts/dev-app.mjs';
 
 /*
  * The plays the pp parity check runs on (roadmap 5.60). What the check proves depends on them
  * reaching every ruleset and both replay formats, and on being the same wherever it runs, so
- * those are pinned here -- without a helper, so this costs milliseconds. Whether osu! can read
- * them is `pp-parity.mjs --errors`' job: only its `error:` requests may fail.
+ * those are pinned here -- without a helper. The McOsu plays are built, and every replay read
+ * back, by the app's own code (`--dev`), so this needs the .NET SDK. Whether osu! can read them
+ * is `pp-parity.mjs --errors`' job: only its `error:` requests may fail.
  */
+
+const skip = canBuildApp() ? false : 'needs the .NET SDK to build the app';
 
 function generate() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-corpus-'));
   return { dir, corpus: generateCorpus(dir) };
 }
 
-test('the corpus is the same on every run, byte for byte', (t) => {
+/** The `Mode:` in a beatmap's [General] section, which ends at the next line beginning with `[`. */
+function generalMode(file: string): number {
+  const text = fs.readFileSync(file, 'utf8');
+  const general = /^\[General\]\r?\n([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(text)?.[1] ?? '';
+  return Number(/^Mode:\s*(\d+)/m.exec(general)?.[1] ?? 0);
+}
+
+test('the corpus is the same on every run, byte for byte', { skip }, (t) => {
   const a = generate();
   const b = generate();
   t.after(() => {
@@ -33,29 +42,39 @@ test('the corpus is the same on every run, byte for byte', (t) => {
   assert.equal(digest(all(a.corpus)), digest(all(b.corpus)));
 });
 
-test('it has beatmaps of every ruleset, each filed under the ruleset it is', (t) => {
+test('it has beatmaps of every ruleset, each filed under the ruleset it is', { skip }, (t) => {
   const { dir, corpus } = generate();
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   for (const ruleset of [0, 1, 2, 3] as const) {
     assert.ok(corpus.maps[ruleset].length > 0, `no ruleset ${ruleset} beatmaps`);
-    for (const map of corpus.maps[ruleset]) assert.equal(beatmapMode(map.file), ruleset);
+    for (const map of corpus.maps[ruleset]) assert.equal(generalMode(map.file), ruleset);
   }
 });
 
-test('it has lazer replays in every ruleset, McOsu plays, and each on its own beatmap', async (t) => {
+interface Parsed {
+  path: string;
+  score?: { beatmapMD5: string; client: string; mode: number; extras?: { statistics?: unknown } | null };
+  error?: string;
+}
+
+test('it has lazer replays in every ruleset, McOsu plays, and each on its own beatmap', { skip }, (t) => {
   const { dir, corpus } = generate();
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const md5s = new Map(Object.values(corpus.maps).flat().map((m) => [m.file, m.md5]));
+  const beatmapOf = new Map(corpus.replays.map((r) => [r.file, r.beatmap]));
+  const list = writeList(path.join(dir, 'replays.txt'), corpus.replays.map((r) => r.file));
+  const parsed = devApp('parse-replays', list) as Parsed[];
+  assert.equal(parsed.length, corpus.replays.length);
   const clients = new Set<string>();
   const lazerRulesets = new Set<number>();
-  for (const { file, beatmap } of corpus.replays) {
-    const replay = await parseReplay(fs.readFileSync(file));
-    assert.equal(replay.beatmapMD5, md5s.get(beatmap), `${path.basename(file)} is on the wrong beatmap`);
-    clients.add(replay.client);
-    if (replay.client === 'lazer') {
+  for (const { path: file, score, error } of parsed) {
+    assert.ok(score, `${path.basename(file)} could not be read: ${error}`);
+    assert.equal(score.beatmapMD5, md5s.get(beatmapOf.get(file)!), `${path.basename(file)} is on the wrong beatmap`);
+    clients.add(score.client);
+    if (score.client === 'lazer') {
       // The LZMA block lazer appends is read back, mods and statistics included.
-      assert.ok(replay.extras?.statistics, `${path.basename(file)} lost its lazer block`);
-      lazerRulesets.add(replay.mode);
+      assert.ok(score.extras?.statistics, `${path.basename(file)} lost its lazer block`);
+      lazerRulesets.add(score.mode);
     }
   }
   assert.deepEqual([...clients].sort(), ['lazer', 'mcosu']);

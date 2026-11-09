@@ -26,7 +26,7 @@ internal sealed record MedalSummary(List<Medal> Medals, int Earned, int Total, i
 
 /// <summary>
 /// The medals a profile has earned, derived from its scores every time and never stored:
-/// src/calc/medals.ts. osu!'s own definitions (src/calc/medal-definitions.json, embedded) plus
+/// src/calc/medals.ts. osu!'s own definitions (dotnet/App/Calc/medal-definitions.json, embedded) plus
 /// Mod Introduction, and nothing else.
 /// </summary>
 internal static class Medals

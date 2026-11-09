@@ -13,7 +13,7 @@
  *   two criteria that cannot judge an unfinished play, and the three that need osu!lazer's
  *   `online.db` and so cannot work on an osu!stable-only machine.
  *
- * `src/tracking-filter.ts` is the authority on the shape and on what matches; this file only
+ * `dotnet/App/Settings/TrackingFilter.cs` is the authority on the shape and on what matches; this file only
  * edits the object and posts it back. Nothing here re-implements the matching rule.
  */
 import { escapeHtml, MODE_NAMES } from './format.js';
@@ -25,7 +25,7 @@ import { plural, t, tOwn } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 
-/** Matches `OSU_EPOCH` in src/tracking-filter.ts: the day osu!'s beatmap listing begins. */
+/** Matches `OSU_EPOCH` in dotnet/App/Settings/TrackingFilter.cs: the day osu!'s beatmap listing begins. */
 const OSU_EPOCH = Date.UTC(2007, 9, 6);
 const DAY = 86_400_000;
 
@@ -34,7 +34,7 @@ const MAX_LENGTH_SECONDS = 3600;
 
 /**
  * Autoplay and Cinema are left out of the grid on purpose: no setting in this app can make
- * either count (`NEVER_COUNTABLE` in src/calc/pp.ts), so offering them as a choice would be
+ * either count (`NEVER_COUNTABLE` in dotnet/App/Calc/Pp.cs), so offering them as a choice would be
  * a control that cannot do anything. ScoreV2 is not a mod a player picks at all.
  */
 const HIDDEN_MODS = new Set(['AT', 'CN', 'SV2']);
@@ -76,7 +76,7 @@ const CATEGORY_LABELS = [
 ];
 
 /**
- * What a beatmap rule's condition can look at, and how, as `src/tracking-filter.ts` defines
+ * What a beatmap rule's condition can look at, and how, as `dotnet/App/Settings/TrackingFilter.cs` defines
  * them (`RULE_FIELDS`, `RULE_TESTS`). Labels are fetched when drawn, by a literal `t()` each.
  */
 const RULE_FIELDS = [
@@ -96,7 +96,7 @@ const RULE_TESTS = [
   ['notContains', () => t('filter.testNotContains')],
 ];
 
-/** Matches `MAX_RULES` and `MAX_CONDITIONS` in src/tracking-filter.ts. */
+/** Matches `MAX_RULES` and `MAX_CONDITIONS` in dotnet/App/Settings/TrackingFilter.cs. */
 const MAX_RULES = 20;
 const MAX_CONDITIONS = 10;
 

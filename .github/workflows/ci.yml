@@ -38,29 +38,21 @@ jobs:
 
       - run: npm ci
 
-      # pp comes from osu!'s own code, so the calculator has to exist before the tests
-      # that assert pp against known-correct values can mean anything.
-      - name: Build the pp calculator
-        run: npm run build:pp
-
       - run: npm run typecheck
 
-      # Several tests need a real osu! installation and a replay corpus, which a CI runner
-      # does not have; those skip themselves. What still runs everywhere is the part that
-      # can silently rot: accuracy, level, pp weighting, the rank curves' shape, profile
-      # lifecycle, the backfill cutoff logic, and -- the reason this runs on three
-      # platforms -- where each of them keeps osu!.
+      # The page's modules, the packaging text, the tray launcher, the pp parity corpus (built
+      # with the app's own code) and the build scripts' rules, on each system.
       - name: Test
         run: npm test
 
       # The app refuses to start without an osu! installation, which a runner has none of,
-      # so this only proves it gets that far: modules load, the schema applies, and the pp
-      # helper is found. Those are the parts that break on a platform nobody ran them on.
+      # so this only proves it gets that far: it starts, the schema applies, and osu!'s
+      # calculator loads. Those are the parts that break on a platform nobody ran them on.
       - name: Start far enough to need osu!
         shell: bash
         run: |
           set -o pipefail
-          output=$(node src/main.ts --check-only 2>&1) && status=0 || status=$?
+          output=$(dotnet run --project dotnet/App -c Release -- --check-only 2>&1) && status=0 || status=$?
           echo "$output"
           # Exit 1 with that banner is the expected outcome on a machine with no osu!.
           if [ "$status" -ne 0 ] && ! echo "$output" | grep -q 'No osu! installation found'; then
@@ -72,8 +64,7 @@ jobs:
             exit 1
           fi
 
-  # The C# port (docs/csharp-port.md). Not in any package yet, so a failure here never blocks a
-  # release; it runs on all three systems because the port has to work on each before it can ship.
+  # The app's own tests (dotnet/App.Tests), on all three systems.
   port:
     strategy:
       fail-fast: false
@@ -89,13 +80,13 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      - name: Test the C# port
+      - name: Test the app
         run: dotnet test dotnet/OsuLocalProfiles.slnx --nologo
 
-  # The C# port's package (docs/csharp-port.md, phase 7): the app published self-contained, its
-  # pp checked against the full helper on every parity request, the stand-ins older installs
-  # update through, and the packaged app started from another folder. Built on each system, as a
-  # release would be, but never released: every release is the Node app until the switch-over.
+  # The package (docs/csharp-port.md, phase 7): the app published self-contained, its pp checked
+  # against the full helper on every parity request, trimmed only where it answers as the
+  # untrimmed app does, the stand-ins older installs update through, and the packaged app started
+  # from another folder. Built on each system as release.yml builds it, and never released.
   package-native:
     strategy:
       fail-fast: false
@@ -133,12 +124,11 @@ jobs:
 
       # Linux and Windows take under 10 minutes. A stuck build fails here with its log kept,
       # where a runner that dies keeps none.
-      - name: Package the C# app
+      - name: Package the app
         timeout-minutes: 25
-        run: npm run package -- --native --rid ${{ matrix.rid }}
+        run: npm run package -- --rid ${{ matrix.rid }}
 
-      # For trying a build by hand, and for phase 8's rehearsal. Kept a short while, and never
-      # attached to a release.
+      # For trying a build by hand. Kept a short while, and never attached to a release.
       - uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.rid }}

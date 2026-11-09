@@ -80,7 +80,7 @@ const $ = (id) => document.getElementById(id);
 /*
  * The sections, in their default order: Recent -- osu!'s feed of medals, bests, levels and the
  * ranks osu! reports -- under me!, as on osu!, and Recent Plays under Historical (roadmap 5.80).
- * A profile from before 1.31.0 keeps the order it had (`pinSectionOrder` in src/db/index.ts).
+ * A profile from before 1.31.0 keeps the order it had (`pinSectionOrder` in dotnet/App/Db/Database.cs).
  */
 const SECTIONS = [
   ['me', () => t('section.me')],
@@ -100,7 +100,7 @@ const GRADE_ORDER = ['XH', 'X', 'SH', 'S', 'A'];
 
 /**
  * The Other settings dialog is generated from this list, so adding a setting is one entry here
- * plus one entry in `DEFS` in src/settings.ts. `key` matches the setting name exactly --
+ * plus one entry in `DEFS` in dotnet/App/Settings/. `key` matches the setting name exactly --
  * the dialog posts the whole field set as a patch and the server ignores anything it does
  * not recognise.
  */
@@ -214,7 +214,7 @@ const SETTINGS_FIELDS = [
  */
 const PAGE_FIRST = 5;
 const PAGE_STEP = 25;
-/** What "All at once" asks for, and the most the server gives: MAX_PAGE_ROWS in src/settings.ts. */
+/** What "All at once" asks for, and the most the server gives: MAX_PAGE_ROWS in dotnet/App/Settings/. */
 const PAGE_ALL = 10_000;
 
 /*
@@ -243,12 +243,12 @@ let stats = null;
 let settings = {};
 let counting = null;
 let staleScores = 0;
-/** A brand-new install's one-time offer to import from an osu! account (src/welcome.ts). */
+/** A brand-new install's one-time offer to import from an osu! account (dotnet/App/ProfileWrites.cs). */
 let welcomeOffered = false;
 /** Which osu! release prices scores, and how many of this profile's another one priced. */
 let ppCalculator = { version: null, outdated: 0 };
 let hiddenScoreCount = 0;
-/** Plays the app turned away and kept, for Settings' Plays not tracked (src/tracker/declined.ts). */
+/** Plays the app turned away and kept, for Settings' Plays not tracked (dotnet/App/Tracker/Declined.cs). */
 let declinedPlayCount = 0;
 /** Whether the play tracking filter can turn a play away, and how many it has. */
 let filterNarrowing = false;
@@ -521,7 +521,7 @@ function renderCountingNote(next) {
 
 /*
  * The one-time note, on an install from before star ratings were hidden, that they are and
- * where to turn them back on (src/star-rating-notice.ts). Closing it ends it for good, and
+ * where to turn them back on (dotnet/App/ProfileWrites.cs). Closing it ends it for good, and
  * so does changing the setting.
  */
 function renderStarRatingNotice(pending) {
@@ -1081,7 +1081,7 @@ const MAX_NOTE_LINES = 12;
 const ISSUES_URL = 'https://github.com/jonathant09/osu-local-profiles/issues/';
 
 /**
- * A version's changes, a line each, newest version first (src/update/notes.ts). The lines are
+ * A version's changes, a line each, newest version first (dotnet/App/Update/Notes.cs). The lines are
  * the CHANGELOG's own, escaped; only its `code` spans, and the issues it names as `(#4)`, become
  * markup.
  */
@@ -1228,7 +1228,7 @@ $('optAutoUpdate').onclick = async () => {
 
 /*
  * Options -> Launch on startup, beside Auto-update: install-level, off by default (roadmap 5.77).
- * The system's own entry is the answer (src/startup.ts), so it is asked each time the menu opens:
+ * The system's own entry is the answer (dotnet/App/StartWithComputer.cs), so it is asked each time the menu opens:
  * Task Manager can turn it off too. Hidden where there is no tray launcher to start.
  */
 async function loadStartup() {
@@ -2116,7 +2116,7 @@ $('identityFile').onchange = async () => {
  * Profiles -> Import from osu!: look an account up, then copy what was chosen from it. Nothing
  * happens until a button is pressed. It was once never a prompt at start-up, at the user's
  * request; later, at the user's request, a brand-new install shows this section once by itself
- * as the welcome (src/welcome.ts), and closing that in any way ends it for good.
+ * as the welcome (dotnet/App/ProfileWrites.cs), and closing that in any way ends it for good.
  * Avatar, banner, flag and me! are ticked by default; favorites are not, because they add
  * to a list rather than replacing one thing.
  */
@@ -3685,7 +3685,7 @@ $('openDataFolder').onclick = async () => {
 /*
  * Restore, in two steps: the file is uploaded and checked, the page says which profiles it
  * holds, and only a yes applies it. Applying restarts the app, because the backup is swapped
- * in before the database opens (src/backup.ts), and this page reloads once it is back.
+ * in before the database opens (dotnet/App/Backup.cs), and this page reloads once it is back.
  */
 $('shareRestore').onclick = () => {
   $('restoreFile').value = '';
@@ -4664,7 +4664,7 @@ $('manualAdd').onclick = async () => {
  * The marker matters more than it looks: the filter is the one setting whose effect cannot be
  * undone later, so a profile that has one on must be able to see that from the menu rather
  * than by wondering where a play went. `filterNarrowing` comes from the server, which asks
- * src/tracking-filter.ts -- the page does not decide that for itself.
+ * dotnet/App/Settings/TrackingFilter.cs -- the page does not decide that for itself.
  */
 function renderFilterMenu() {
   const button = $('optFilter');
@@ -4943,7 +4943,7 @@ on('scores', () => {
 });
 /*
  * How far a long exchange with osu! has got: an import from it, or the beatmaps Recalculate
- * every score downloads. osu! is asked once a second at most (src/clients/request-gate.ts), so
+ * every score downloads. osu! is asked once a second at most (dotnet/App/Clients/OsuWeb.cs), so
  * a big one takes minutes. Said in the import's own hint while that runs, otherwise as a toast
  * every few seconds.
  */

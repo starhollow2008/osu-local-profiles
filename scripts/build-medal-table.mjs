@@ -1,10 +1,10 @@
 /**
- * Rebuild `src/calc/medal-definitions.json` from osu!'s own achievement list.
+ * Rebuild `dotnet/App/Calc/medal-definitions.json` from osu!'s own achievement list.
  *
  *   node scripts/build-medal-table.mjs [username-or-id]
  *
  * osu! publishes every medal's name, description and icon in the payload it renders a
- * profile page from -- the same `data-initial-data` attribute `src/clients/osu-web.ts`
+ * profile page from -- the same `data-initial-data` attribute `dotnet/App/Clients/OsuWeb.cs`
  * reads. Taking the definitions from there rather than typing them out is the difference
  * between medals that say what osu! says and medals that say what someone remembered.
  *
@@ -25,7 +25,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const out = path.join(root, 'src', 'calc', 'medal-definitions.json');
+const out = path.join(root, 'dotnet', 'App', 'Calc', 'medal-definitions.json');
 
 /** Any public profile carries the whole medal list; whose it is does not matter. */
 const who = process.argv[2] ?? 'peppy';

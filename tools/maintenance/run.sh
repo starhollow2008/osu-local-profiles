@@ -159,12 +159,12 @@ pp_unchanged() {
   local latest=$1 csproj=tools/PpCalculator/PpCalculator.csproj built=0
   rm -rf "$BASE/work/pp-old" "$BASE/work/pp-new"
   npm ci --no-audit --no-fund --loglevel=error || return 2
-  node scripts/build-pp-helper.mjs "$BASE/work/pp-old" --full || return 2
+  node scripts/build-pp-helper.mjs "$BASE/work/pp-old" || return 2
   sed -i -E "s|(Include=\"ppy\.osu\.Game[A-Za-z.]*\" Version=\")[^\"]*\"|\1$latest\"|" "$csproj"
   if [ "$(grep -c "Version=\"$latest\"" "$csproj")" != 5 ]; then
     echo "PpCalculator.csproj doesn't have the five osu! packages it should"
     built=2
-  elif ! node scripts/build-pp-helper.mjs "$BASE/work/pp-new" --full; then
+  elif ! node scripts/build-pp-helper.mjs "$BASE/work/pp-new"; then
     built=2
   fi
   git checkout -q -- "$csproj"

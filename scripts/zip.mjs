@@ -1,0 +1,171 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import zlib from 'node:zlib';
+
+/**
+ * Just enough ZIP to read an archive: what scripts/api-parity.mjs reads out of a backup or a
+ * spreadsheet export to compare two apps' files. The app's own reader is dotnet/App/Zip.cs.
+ *
+ * ZIP is read back to front. The End of Central Directory record at the tail points at the
+ * central directory, which is the authoritative list of what is in the file; each entry
+ * then points at its own local header, and the bytes follow that.
+ */
+
+const EOCD_SIGNATURE = 0x06054b50;
+const CENTRAL_SIGNATURE = 0x02014b50;
+const LOCAL_SIGNATURE = 0x04034b50;
+const ZIP64_LOCATOR_SIGNATURE = 0x07064b50;
+
+/** Stored and deflated. Nothing else has ever come out of the packager. */
+const STORED = 0;
+const DEFLATED = 8;
+
+/** "Version made by" names the host in its high byte; 3 is Unix, where the attributes are a mode. */
+const UNIX_HOST = 3;
+
+function findEndOfCentralDirectory(buf) {
+  // The record is 22 bytes plus a comment of up to 64KB, so this is the whole search space.
+  const earliest = Math.max(0, buf.length - 22 - 0xffff);
+  for (let i = buf.length - 22; i >= earliest; i -= 1) {
+    if (buf.readUInt32LE(i) === EOCD_SIGNATURE) return i;
+  }
+  return -1;
+}
+
+/**
+ * Normalise a name out of the archive, and refuse anything that points outside the target.
+ *
+ * This runs on a file downloaded over the network, so it is a security check rather than a
+ * tidiness one: an entry named `..\..\Windows\System32\...` would otherwise be written
+ * exactly where it asked to be. Backslashes are normalised because Windows' own zipping
+ * writes them, where the ZIP spec says forward slashes.
+ */
+function safeName(raw) {
+  const name = raw.replace(/\\/g, '/').replace(/^\/+/, '');
+  if (name === '') return null;
+  if (/^[a-zA-Z]:/.test(name)) return null;
+  if (name.split('/').some((part) => part === '..')) return null;
+  return name;
+}
+
+/** Read the central directory. Throws rather than guessing if the archive is not one we read. */
+export function readZipEntries(buf) {
+  const eocd = findEndOfCentralDirectory(buf);
+  if (eocd < 0) throw new Error('not a zip file (no end-of-central-directory record)');
+
+  /*
+   * Zip64 is refused rather than half-supported. The counts and offsets in a plain EOCD are
+   * 16- and 32-bit, so an archive that needed zip64 would silently read as a truncated one
+   * -- a partial extraction that looks like a success is the worst outcome for something
+   * that then replaces an install.
+   */
+  const locator = eocd - 20;
+  if (locator >= 0 && buf.readUInt32LE(locator) === ZIP64_LOCATOR_SIGNATURE) {
+    throw new Error('zip64 archives are not supported');
+  }
+
+  const count = buf.readUInt16LE(eocd + 10);
+  let offset = buf.readUInt32LE(eocd + 16);
+  if (count === 0xffff || offset === 0xffffffff) {
+    throw new Error('zip64 archives are not supported');
+  }
+
+  const entries = [];
+  for (let i = 0; i < count; i += 1) {
+    if (offset + 46 > buf.length || buf.readUInt32LE(offset) !== CENTRAL_SIGNATURE) {
+      throw new Error(`corrupt central directory at entry ${i + 1} of ${count}`);
+    }
+
+    const madeBy = buf.readUInt16LE(offset + 4) >> 8;
+    const method = buf.readUInt16LE(offset + 10);
+    const compressedSize = buf.readUInt32LE(offset + 20);
+    const size = buf.readUInt32LE(offset + 24);
+    const nameLength = buf.readUInt16LE(offset + 28);
+    const extraLength = buf.readUInt16LE(offset + 30);
+    const commentLength = buf.readUInt16LE(offset + 32);
+    const external = buf.readUInt32LE(offset + 38);
+    const localHeaderOffset = buf.readUInt32LE(offset + 42);
+    const raw = buf.toString('utf8', offset + 46, offset + 46 + nameLength);
+
+    const name = safeName(raw);
+    if (name === null) throw new Error(`refusing entry with an unsafe path: ${raw}`);
+
+    entries.push({
+      name,
+      isDirectory: name.endsWith('/'),
+      method,
+      compressedSize,
+      size,
+      localHeaderOffset,
+      // The mode sits in the top 16 bits; only the permission bits are taken from it.
+      mode: madeBy === UNIX_HOST && external >>> 16 !== 0 ? (external >>> 16) & 0o777 : null,
+    });
+
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+
+  return entries;
+}
+
+/** The bytes of one entry, decompressed. */
+export function entryData(buf, entry) {
+  const header = entry.localHeaderOffset;
+  if (buf.readUInt32LE(header) !== LOCAL_SIGNATURE) {
+    throw new Error(`corrupt local header for ${entry.name}`);
+  }
+
+  // The local header repeats the name and carries its own extra field, which is frequently
+  // a different length from the central directory's -- so the data start has to be computed
+  // from *this* header, not from the central one.
+  const nameLength = buf.readUInt16LE(header + 26);
+  const extraLength = buf.readUInt16LE(header + 28);
+  const start = header + 30 + nameLength + extraLength;
+  const raw = buf.subarray(start, start + entry.compressedSize);
+
+  if (entry.method === STORED) return Buffer.from(raw);
+  if (entry.method === DEFLATED) return zlib.inflateRawSync(raw);
+  throw new Error(`${entry.name} uses unsupported compression method ${entry.method}`);
+}
+
+/**
+ * Extract `file` into `dest`, dropping `stripComponents` leading path segments.
+ *
+ * A release archive wraps everything in one `osu-local-profiles-<version>-<target>/` folder,
+ * so extracting it usefully means stripping that. Returns how many files were written, so
+ * the caller can refuse a suspiciously empty result rather than swapping in nothing.
+ */
+export function extractZip(file, dest, stripComponents = 0) {
+  const buf = fs.readFileSync(file);
+  const entries = readZipEntries(buf);
+
+  let written = 0;
+  for (const entry of entries) {
+    const parts = entry.name.split('/').slice(stripComponents);
+    const relative = parts.join('/');
+    if (relative === '') continue;
+
+    const target = path.join(dest, ...parts);
+    // Belt and braces: `safeName` already refused traversal, but the target is what matters.
+    const resolvedDest = path.resolve(dest);
+    if (!path.resolve(target).startsWith(resolvedDest)) {
+      throw new Error(`refusing to write outside the target: ${entry.name}`);
+    }
+
+    if (entry.isDirectory) {
+      fs.mkdirSync(target, { recursive: true });
+      continue;
+    }
+
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const data = entryData(buf, entry);
+    if (data.length !== entry.size) {
+      throw new Error(`${entry.name} unpacked to ${data.length} bytes, expected ${entry.size}`);
+    }
+    fs.writeFileSync(target, data);
+    // Windows has no execute bit to set, and a Windows-built archive carries no mode anyway.
+    if (entry.mode !== null && process.platform !== 'win32') fs.chmodSync(target, entry.mode);
+    written += 1;
+  }
+
+  return written;
+}

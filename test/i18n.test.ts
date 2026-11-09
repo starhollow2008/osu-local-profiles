@@ -4,8 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LOCALES, availableLocales, formatMessage, knownLocale, listedLocale, matchLocale } from '../web/js/i18n.js';
-import { DEFAULT_LOCALE, LOCALE_CODES, isLocale, resolveLocale } from '../src/i18n.ts';
-import { check, keysFromJs, localesFromJs, stringsFromHtml } from '../scripts/build-i18n.mjs';
+import { check, keysFromCs, keysFromJs, localesFromJs, stringsFromHtml } from '../scripts/build-i18n.mjs';
 
 /*
  * The page in every language osu! is offered in.
@@ -24,14 +23,23 @@ const localeFile = (code: string): Record<string, string> =>
 
 const english = localeFile('en');
 
+/** The app's own list (`I18n` in dotnet/App/I18n.cs), which a stored language is checked against. */
+const appI18n = fs.readFileSync(path.join(root, 'dotnet', 'App', 'I18n.cs'), 'utf8');
+const LOCALE_CODES = keysOf(/LocaleCodes =\s*\[([\s\S]*?)\];/.exec(appI18n)?.[1] ?? '');
+const DEFAULT_LOCALE = /DefaultLocale = "([\w-]+)"/.exec(appI18n)?.[1];
+
+function keysOf(list: string): string[] {
+  return [...list.matchAll(/"([\w-]+)"/g)].map((m) => m[1]!);
+}
+
 /* ------------------------------------------------------------- the list */
 
 /**
- * The list exists twice -- `src/i18n.ts` for the server's validation, `web/js/i18n.js` for
- * the page -- because the page has no build step and cannot import a `.ts` file. This is
- * what stops them drifting.
+ * The list exists twice -- `dotnet/App/I18n.cs` for the app's validation, `web/js/i18n.js` for
+ * the page -- because the page has no build step. This is what stops them drifting.
  */
-test('the server and the page offer exactly the same languages, in the same order', () => {
+test('the app and the page offer exactly the same languages, in the same order', () => {
+  assert.equal(DEFAULT_LOCALE, 'en');
   assert.deepEqual(
     LOCALES.map((l) => l.code),
     [...LOCALE_CODES],
@@ -54,19 +62,6 @@ test('the two right-to-left languages say so, and nothing else does', () => {
   assert.deepEqual(rtl, ['ar', 'he']);
 });
 
-test('a language code is checked against the list before it is stored', () => {
-  assert.equal(isLocale('pt-br'), true);
-  assert.equal(isLocale('PT-BR'), false, 'osu!’s codes are lower case');
-  assert.equal(isLocale('xx'), false);
-  assert.equal(isLocale(''), false);
-  assert.equal(isLocale(null), false);
-  // The server validates against the whole list, translated or not: which locales ship a
-  // file is the page's business, and a stored code starts working the day one lands.
-  assert.equal(isLocale('vi'), true);
-  // Empty means "never chosen", which resolves to English without becoming it in config.
-  assert.equal(resolveLocale(''), DEFAULT_LOCALE);
-  assert.equal(resolveLocale('de'), 'de');
-});
 
 /**
  * The page draws a line the server does not: `listedLocale` is "one of osu!'s", and
@@ -161,6 +156,8 @@ test('only a literal key is collected, because only a literal one can be checked
   // A key built at runtime would pass this check and fail on somebody's screen, so the page
   // does not build any -- and this is the line that would notice if it started.
   assert.deepEqual(keysFromJs('t(key); t(`a.${b}`);'), []);
+  // The export's own words, in the app's C#.
+  assert.deepEqual(keysFromCs('T("export.silver"); T( "status.ranked" ); T(key); T($"a.{b}");'), ['export.silver', 'status.ranked']);
 });
 
 /* ---------------------------------------------------------- translations */

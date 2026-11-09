@@ -344,11 +344,11 @@ internal static partial class SourceHelper
         }
     }
 
-    /// <summary>Managed assemblies safe to drop (src/calc/helper-prune.ts): fonts, textures and audio samples, 125MB.</summary>
+    /// <summary>Managed assemblies safe to drop (scripts/build-pp-helper.mjs, which tests that the two match): fonts, textures and audio samples, 125MB.</summary>
     private static readonly string[] PruneAssemblies = ["osu.Game.Resources.dll"];
 
     /// <summary>
-    /// Native libraries the calculator never calls, by base name (src/calc/helper-prune.ts). BASS is
+    /// Native libraries the calculator never calls, by base name (scripts/build-pp-helper.mjs, which tests that the two match). BASS is
     /// un4seen's commercial library, not freely redistributable, and this app never plays a sound, so
     /// the pattern has to catch it on every platform. The managed wrapper <c>ppy.ManagedBass.dll</c>
     /// must stay, which is why these match a whole filename and never a substring.

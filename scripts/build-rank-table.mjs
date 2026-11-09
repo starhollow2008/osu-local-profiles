@@ -1,5 +1,5 @@
 /**
- * Build the pp -> global rank curve that `src/calc/rank.ts` interpolates.
+ * Build the pp -> global rank curve that `dotnet/App/Calc/Rank.cs` interpolates.
  *
  * osu!'s rankings API only exposes the top 10,000, which is useless for a new profile
  * sitting near the bottom of the ladder. data.ppy.sh instead publishes
@@ -46,7 +46,7 @@ const DEFAULT_DUMP = '2026_11_05';
 const SAMPLES = 300;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const outDir = path.join(here, '..', 'src', 'calc', 'rank-tables');
+const outDir = path.join(here, '..', 'dotnet', 'App', 'Calc', 'rank-tables');
 
 function usage(message) {
   console.error(

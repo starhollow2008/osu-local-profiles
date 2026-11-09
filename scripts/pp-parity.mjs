@@ -3,19 +3,21 @@
  *
  *   node scripts/pp-parity.mjs <reference dir> <candidate dir> [--live] [--wsl] [--modules]
  *
- * The guard a slimmer helper has to pass before it ships (roadmap 5.60). A helper that has
- * lost something osu!'s code needed does not always crash: a converter that fails to build
- * gives different mods, and different mods give a different number, silently, in the one part
- * of the app that is never allowed to be approximately right. So this does not test that the
- * candidate *works*; it tests that it answers every request byte for byte as the reference
- * does -- values, errors and all. scripts/build-pp-helper.mjs runs it on every build, and
- * ships the slim helper only when it passes.
+ * Either may be a helper or a published app, which answers the helper's protocol through
+ * `--dev pp-helper`. The guard a package's app has to pass before it ships (roadmap 5.60,
+ * docs/csharp-port.md phase 7): against the full helper, and trimmed against untrimmed. An app
+ * that has lost something osu!'s code needed does not always crash: a converter that fails to
+ * build gives different mods, and different mods give a different number, silently, in the one
+ * part of the app that is never allowed to be approximately right. So this does not test that
+ * the candidate *works*; it tests that it answers every request byte for byte as the reference
+ * does -- values, errors and all. scripts/build-pp-helper.mjs runs it on every package build.
  *
  * The plays are generated (scripts/pp-parity-corpus.mjs): beatmaps of all four rulesets built
- * to reach every path a slimmed helper could have lost, with osu!stable, lazer and McOsu
+ * to reach every path a trimmed app could have lost, with osu!stable, lazer and McOsu
  * replays on them. The same on every machine, nothing private, and seconds to run -- so any
  * contributor, CI runner or agent can check a helper, on any platform. For each: the requests
- * the app itself makes, built by the app's own code; the beatmaps priced as stable replays
+ * the app itself makes, built by the app's own code (`--dev pp-requests` of this checkout,
+ * through scripts/dev-app.mjs, so it needs the .NET SDK); the beatmaps priced as stable replays
  * under a spread of mod bitmasks and under every mod osu! offers the ruleset, alone and with
  * the settings the app sends; osu!'s ranked-mods answer for all of them; and requests that
  * must fail.
@@ -47,12 +49,8 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
-import { looksLikeReplay, parseReplay } from '../src/osr.ts';
-import { scoreMods, scorePricing, strippableMods } from '../src/calc/pp.ts';
-import { beatmapMode } from '../src/clients/beatmaps.ts';
-import { discoverInstalls } from '../src/clients/discover.ts';
-import { buildMcosuReplay, mcosuScoreFiles, parseMcosuScores } from '../src/clients/mcosu.ts';
 import { MOD_DEFINITIONS } from '../web/js/mod-definitions.js';
+import { devApp, writeList } from './dev-app.mjs';
 import { generateCorpus, stableReplay } from './pp-parity-corpus.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -75,9 +73,24 @@ function headOf(file) {
   }
 }
 
-/** Every replay this machine has, with the beatmap it was set on, through the app's own index. */
-async function liveReplays(scratch) {
-  const dbFile = path.join(root, 'data', 'profiles.db');
+/**
+ * The replay signature the app's watchers check (`Osr.LooksLikeReplay`): a ruleset, then a
+ * stable (20210520) or lazer (300000xx) version. lazer's store holds every kind of file.
+ */
+function looksLikeReplay(head) {
+  if (head.length < 5 || head[0] > 3) return false;
+  const version = head.readInt32LE(1);
+  return version >= 20000000 && version <= 40000000;
+}
+
+/**
+ * Every replay this machine has, with the beatmap it was set on, through the app's own index
+ * and its own code: the installs it finds from `data/config.json`, its replay parser, and the
+ * replays it builds from McOsu's scores.
+ */
+function liveReplays(scratch) {
+  const dataDir = path.join(root, 'data');
+  const dbFile = path.join(dataDir, 'profiles.db');
   if (!fs.existsSync(dbFile)) {
     console.log(`  --live: no beatmap index at ${dbFile} (run the app once); generated plays only`);
     return [];
@@ -85,7 +98,7 @@ async function liveReplays(scratch) {
   const db = new DatabaseSync(dbFile, { readOnly: true });
   const beatmapPath = db.prepare('SELECT path FROM osu_files WHERE md5 = ? LIMIT 1');
   const osuFor = (md5) => beatmapPath.get(md5)?.path ?? null;
-  const installs = (await discoverInstalls({ noSearch: true })).installs;
+  const { installs } = devApp('discover', dataDir)[0];
 
   const replays = [];
   const candidates = [
@@ -93,33 +106,27 @@ async function liveReplays(scratch) {
     ...installs
       .filter((i) => i.kind === 'stable')
       .flatMap((i) => (fs.existsSync(i.replayDir) ? fs.readdirSync(i.replayDir).map((f) => path.join(i.replayDir, f)) : [])),
-  ];
-  for (const file of candidates) {
+  ].filter((file) => {
     const h = headOf(file);
-    if (!h || !looksLikeReplay(h)) continue;
-    let score;
-    try {
-      score = await parseReplay(fs.readFileSync(file));
-    } catch {
-      continue;
-    }
+    return h !== null && looksLikeReplay(h);
+  });
+  for (const { path: file, score } of devApp('parse-replays', writeList(path.join(scratch, 'live-replays.txt'), candidates))) {
+    if (!score) continue;
     const beatmap = osuFor(score.beatmapMD5);
     if (beatmap && fs.existsSync(beatmap)) replays.push({ file, beatmap });
   }
-  for (const install of installs.filter((i) => i.kind === 'mcosu')) {
-    for (const file of mcosuScoreFiles(install.root)) {
-      let scores = [];
-      try {
-        scores = parseMcosuScores(fs.readFileSync(file));
-      } catch {
-        continue;
-      }
-      for (const score of scores.filter((s) => !s.importedLegacy)) {
+  const scoreFiles = installs
+    .filter((i) => i.kind === 'mcosu')
+    .flatMap((i) => ['scores.db', 'scoresvr.db'].map((name) => path.join(i.root, name)))
+    .filter((file) => fs.existsSync(file));
+  if (scoreFiles.length > 0) {
+    // Built where the app keeps them, named by beatmap and second (`Mcosu.BuiltReplayPath`).
+    const built = path.join(scratch, 'live-mcosu');
+    for (const { scores } of devApp('mcosu', writeList(path.join(scratch, 'live-mcosu.txt'), scoreFiles), built)) {
+      for (const score of (scores ?? []).filter((s) => !s.importedLegacy)) {
         const beatmap = osuFor(score.beatmapMD5);
         if (!beatmap) continue;
-        const built = path.join(scratch, `live-mcosu-${score.beatmapMD5}-${score.playedAt}.osr`);
-        fs.writeFileSync(built, buildMcosuReplay(score));
-        replays.push({ file: built, beatmap });
+        replays.push({ file: path.join(built, `${score.beatmapMD5}-${Math.floor(score.playedAt / 1000)}.osr`), beatmap });
       }
     }
   }
@@ -177,30 +184,12 @@ async function buildRequests({ replays, maps }, scratch) {
   const counts = { replays: 0, synthetic: 0, pairs: 0 };
 
   // Exactly the requests the app makes for a replay: ingest, the stripped price, the ranked question.
-  for (const { file, beatmap } of replays) {
-    let score;
-    try {
-      score = await parseReplay(fs.readFileSync(file));
-    } catch {
-      continue;
-    }
+  // Built by the app's own code (`--dev pp-requests`); a file it cannot read as a replay is left out.
+  const list = writeList(path.join(scratch, 'replays.jsonl'), replays.map(({ file, beatmap }) => ({ file, beatmap })));
+  for (const { file, requests: made } of devApp('pp-requests', list)) {
+    if (!made) continue;
     counts.replays++;
-    const label = `replay ${path.basename(file)}`;
-    const pricing = scorePricing(score, beatmap);
-    const base = {
-      replayPath: file,
-      beatmapPath: beatmap,
-      ...(pricing.mods ? { mods: pricing.mods } : {}),
-      ...(pricing.ignoreLegacyTotalScore ? { ignoreLegacyTotalScore: true } : {}),
-    };
-    if (!pricing.unpriceable) add(`${label} priced`, base);
-    const strip = strippableMods(scoreMods(score, beatmap));
-    if (strip.length > 0 && !pricing.unpriceable) add(`${label} stripped`, { ...base, stripMods: strip });
-    const mods = score.mcosu ? scoreMods(score, beatmap) : score.extras?.mods;
-    add(
-      `${label} ranked`,
-      mods ? { type: 'ranked', ruleset: score.mode, mods } : { type: 'ranked', ruleset: score.mode, legacyMods: score.legacyMods },
-    );
+    for (const { label, request } of made) add(`replay ${path.basename(file)} ${label}`, request);
   }
 
   // Every beatmap each ruleset can play -- its own, and osu!'s converted -- under every mod.

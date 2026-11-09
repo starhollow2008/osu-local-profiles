@@ -1,11 +1,46 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { MAX_HIGHLIGHTS, MAX_NOTE_LINE, assetsFor, changelogSection, headline, notesJson, releaseNotes } from '../scripts/release-notes.mjs';
-import { notesFromBody } from '../src/update/notes.ts';
-import { assetNameFor } from '../src/update/github.ts';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  IMPORTANT_MARK,
+  MAX_HIGHLIGHTS,
+  MAX_NOTE_LINE,
+  assetsFor,
+  changelogSection,
+  headline,
+  notesJson,
+  releaseNotes,
+} from '../scripts/release-notes.mjs';
+import { canBuildApp, devApp } from '../scripts/dev-app.mjs';
 
 const CHANGELOG = '# Changelog\r\n\r\n## 1.10.0\r\n\r\n- new\r\n\r\n## 1.9.0\r\n\r\n- old\r\n';
+
+/*
+ * What the release job writes, read back by the app's own code (`Update.Notes`, through
+ * `--dev`): a release page, which an install reads before it updates, and a package's
+ * release-notes.json, which it reads after. Those checks need the .NET SDK to build the app.
+ */
+const noApp = canBuildApp() ? false : 'needs the .NET SDK to build the app';
+
+interface Notes {
+  version: string;
+  date: string | null;
+  important: boolean;
+  highlights: string[];
+}
+
+function appReads(command: 'release-notes' | 'release-page', text: string, ...args: string[]): Notes[] {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-notes-'));
+  try {
+    const file = path.join(dir, 'notes');
+    fs.writeFileSync(file, text);
+    return devApp(command, file, ...args)[0] as Notes[];
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 test("a version's notes are its own CHANGELOG section and nothing after it", () => {
   assert.equal(changelogSection(CHANGELOG, '1.10.0'), '- new');
@@ -20,12 +55,13 @@ test('a version with no CHANGELOG section is not released with empty notes', () 
 
 test('the release builds are named as each platform\'s updater looks for them', () => {
   // The workflow attaches what the packager builds; the notes name it; the updater finds it
-  // by name. A mismatch would leave that platform's app unable to update.
+  // by name. A mismatch would leave that platform's app unable to update. The app's own
+  // `Updater.AssetNameFor` is pinned to the same names (UpdaterTests).
   const assets = assetsFor('1.10.0');
-  assert.equal(assets.windows, assetNameFor('1.10.0', 'win32', 'x64'));
-  assert.equal(assets.macos, assetNameFor('1.10.0', 'darwin', 'arm64'));
-  assert.equal(assets.macosIntel, assetNameFor('1.10.0', 'darwin', 'x64'));
-  assert.equal(assets.linux, assetNameFor('1.10.0', 'linux', 'x64'));
+  assert.equal(assets.windows, 'osu-local-profiles-1.10.0-win-x64.zip');
+  assert.equal(assets.macos, 'osu-local-profiles-1.10.0-osx-arm64.zip');
+  assert.equal(assets.macosIntel, 'osu-local-profiles-1.10.0-osx-x64.zip');
+  assert.equal(assets.linux, 'osu-local-profiles-1.10.0-linux-x64.zip');
 });
 
 test('the current version has release notes, short, with the CHANGELOG a link away', () => {
@@ -154,6 +190,39 @@ test('a version marked in full carries every entry whole, in lines no installed 
   assert.ok(!changelogSection(changelog, '2.0.0')!.includes('<!-- in full -->'));
   assert.deepEqual(notesJson(changelog).versions[1]!.highlights, ['Old.']);
   // An install reading the release page before it updates gets the same lines, whole.
+  if (noApp) return;
   const body = releaseNotes(changelog, '2.0.0');
-  assert.deepEqual(notesFromBody(body, '2.0.0', null)[0]!.highlights, lines);
+  assert.deepEqual(appReads('release-page', body, '2.0.0')[0]!.highlights, lines);
+});
+
+/* ------------------------------------------------- important versions */
+
+test('the release job marks an important version, and the notes carry it', () => {
+  const changelog = `# Changelog\n\n## 1.28.0\n\n${IMPORTANT_MARK}\n\n- **Fixes lost plays.**\n\n## 1.27.0\n\n- **Faster.**\n`;
+  const notes = notesJson(changelog, { '1.27.0': '2026-09-27' });
+  assert.deepEqual(notes.versions, [
+    { version: '1.28.0', date: null, important: true, highlights: ['Fixes lost plays.'] },
+    { version: '1.27.0', date: '2026-09-27', important: false, highlights: ['Faster.'] },
+  ]);
+  // Invisible in the section the release page is written from.
+  assert.equal(changelogSection(changelog, '1.28.0'), '- **Fixes lost plays.**');
+});
+
+test('the CHANGELOG itself makes notes the app can read', { skip: noApp }, () => {
+  const changelog = fs.readFileSync(path.join(import.meta.dirname, '..', 'CHANGELOG.md'), 'utf8');
+  const parsed = appReads('release-notes', JSON.stringify(notesJson(changelog)));
+  assert.ok(parsed.length > 20);
+  assert.ok(parsed.every((n) => n.highlights.length > 0), 'every version says what it changed');
+});
+
+test('an important version says so on its release page, and the app reads it back', { skip: noApp }, () => {
+  const changelog = `# Changelog\n\n## 1.28.0\n\n${IMPORTANT_MARK}\n\n- **Fixes lost plays.**\n\n## 1.27.0\n\n- **Faster.**\n`;
+  const important = releaseNotes(changelog, '1.28.0');
+  assert.ok(important.startsWith(IMPORTANT_MARK), 'the mark heads the page, where GitHub shows nothing');
+  const read = appReads('release-page', important, '1.28.0', '2026-10-01T12:00:00Z');
+  assert.deepEqual(read, [{ version: '1.28.0', date: '2026-10-01', important: true, highlights: ['Fixes lost plays.'] }]);
+
+  const ordinary = releaseNotes(changelog, '1.27.0');
+  assert.ok(!ordinary.includes(IMPORTANT_MARK));
+  assert.equal(appReads('release-page', ordinary, '1.27.0')[0]?.important, false);
 });

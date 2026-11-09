@@ -139,14 +139,19 @@ function collect() {
       if (!js.has(key)) js.set(key, file);
     }
   }
-  // The server's one user of these files: a spreadsheet export's headers, in the page's language.
-  const exportDir = path.join(root, 'src', 'export');
-  for (const file of fs.readdirSync(exportDir).filter((f) => f.endsWith('.ts'))) {
-    for (const key of keysFromJs(fs.readFileSync(path.join(exportDir, file), 'utf8'))) {
-      if (!js.has(key)) js.set(key, `src/export/${file}`);
+  // The app's one user of these files: a spreadsheet export's headers, in the page's language.
+  const exportDir = path.join(root, 'dotnet', 'App', 'Export');
+  for (const file of fs.readdirSync(exportDir).filter((f) => f.endsWith('.cs'))) {
+    for (const key of keysFromCs(fs.readFileSync(path.join(exportDir, file), 'utf8'))) {
+      if (!js.has(key)) js.set(key, `dotnet/App/Export/${file}`);
     }
   }
   return { html, js };
+}
+
+/** Every key the export asks its translator for: a literal `T("key")`, as on the page. */
+export function keysFromCs(source) {
+  return [...source.matchAll(/\bT\(\s*"([\w.-]+)"/g)].map((m) => m[1]);
 }
 
 export function check() {

@@ -154,7 +154,7 @@ function dot(d) {
     : '<div class="beatmapset-panel__beatmap-dot beatmapset-panel__beatmap-dot--unknown"></div>';
 }
 
-/** One card. `card` is a FavoriteCard from src/favorites.ts. */
+/** One card. `card` is a FavoriteCard from dotnet/App/Favorites.cs. */
 export function beatmapsetCard(card) {
   const url = setUrl(card.id);
   const cover = (size) =>

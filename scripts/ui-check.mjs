@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { findBrowser } from '../src/http/screenshot.ts';
+import { findBrowser } from './find-browser.mjs';
 
 const URL_UNDER_TEST = process.argv[2] ?? 'http://localhost:7272/';
 const PORT = 9333;
@@ -2321,7 +2321,7 @@ if (await evaluate('Number(document.getElementById("removedCount")?.textContent 
 }
 
 /*
- * Plays not tracked (src/tracker/declined.ts), laid out as Removed scores is. Like the delete
+ * Plays not tracked (dotnet/App/Tracker/Declined.cs), laid out as Removed scores is. Like the delete
  * buttons above, nothing here is pressed twice: Track anyway on another player's replay, the
  * red minus and Delete all permanently only ask on the first press, and the second would be
  * real on a real profile.

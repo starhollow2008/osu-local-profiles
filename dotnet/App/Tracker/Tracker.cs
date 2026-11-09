@@ -542,7 +542,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
 
     public Task<RecomputeResult> RecomputeAll(bool onlyMissing, Action<int, int>? onProgress = null) => Enqueue(async () =>
     {
-        var current = calculator ?? throw new InvalidOperationException("the pp calculator is not available -- run: npm run build:pp");
+        var current = calculator ?? throw new InvalidOperationException("the pp calculator is not available");
         return await Recompute.Scores(db, resolver, profile, current, onlyMissing, null, onProgress);
     });
 
@@ -556,7 +556,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     public Task<RecomputeResult> Recalculate(bool outdatedOnly)
     {
         var current = calculator;
-        if (current is null) return Task.FromException<RecomputeResult>(new InvalidOperationException("the pp calculator is not available -- run: npm run build:pp"));
+        if (current is null) return Task.FromException<RecomputeResult>(new InvalidOperationException("the pp calculator is not available"));
         lock (gate)
         {
             if (recalculation is not null) return Task.FromException<RecomputeResult>(new InvalidOperationException("scores are already being recalculated"));

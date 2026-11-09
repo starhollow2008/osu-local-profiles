@@ -1,22 +1,19 @@
 /**
- * Do the Node app and its C# port answer the same? (docs/csharp-port.md, rule 3)
+ * Do two builds of the app answer the same? (docs/csharp-port.md, rule 3 and phase 7)
  *
- *   node scripts/api-parity.mjs [data folder] [--keep] [--app <folder>] [--reference <folder>]
+ *   node scripts/api-parity.mjs [data folder] --reference <folder> [--app <folder>] [--keep]
  *
- * `--app` compares a C# app already published, such as a package's app/ folder, in place of a
- * build of this checkout: how a trimmed build is shown to answer as the Node app does.
- * `--reference` puts another published C# app where the Node app is, so two builds can be
- * compared on a machine with no osu! (with data from scripts/parity-data.mjs): how a package
- * shows its trimmed app answers as its untrimmed one, on every platform (docs/csharp-port.md,
- * phase 7). The answers are still labelled node and cs.
+ * `--reference` is a published app, such as a package's app/ folder or a release's; `--app` is
+ * another, and without it a build of this checkout. How a package shows its trimmed app answers
+ * as its untrimmed one, on every platform, with data from scripts/parity-data.mjs so no osu! is
+ * needed; and, on a player's own data, how a change is shown to alter no answer it should not.
  *
  * Starts both apps on copies of one `data/` folder (default: this checkout's), asks each the
  * same questions, and compares the answers: JSON as parsed values, files byte for byte, plus
- * status and headers. Exit 0 when every answer matches, 1 when any differs.
+ * status and headers. Exit 0 when every answer matches, 1 when any differs, 2 on misuse.
  *
  * Nothing is written to the data folder given: the database is copied with VACUUM INTO, which
- * reads a consistent snapshot even while the app is running on it. The Node app still needs an
- * osu! installation to start, so this runs on a player's machine, not in CI.
+ * reads a consistent snapshot even while the app is running on it.
  *
  * Each endpoint the port answers goes in ENDPOINTS, and each write in `writeSteps`, which ends
  * the run by sending both apps the same writes and comparing their answers, live feeds and
@@ -33,7 +30,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
-import { entryData, extractZip, readZipEntries } from '../src/update/zip.ts';
+import { entryData, extractZip, readZipEntries } from './zip.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -55,7 +52,7 @@ const ENDPOINTS = [
     { path: `/api/profile?mode=${mode}` },
     { path: `/api/profile?mode=${mode}&top=100&recent=10000&mostPlayed=10000&favorites=10000&events=10000` },
   ]),
-  // What the page never sends, read as the Node app reads it.
+  // What the page never sends.
   { path: '/api/profile?mode=abc&top=0&recent=-3&events=2.9' },
 ];
 
@@ -186,12 +183,12 @@ function ignored(ignore, dotted) {
   });
 }
 
-/** Every difference between two parsed values, as `path: node | cs` lines. Key order is not one. */
+/** Every difference between two parsed values, as `path: reference | app` lines. Key order is not one. */
 function differences(a, b, at = '', ignore = {}) {
   if (ignored(ignore, at.slice(1))) return [];
   if (isDeepStrictEqual(a, b)) return [];
   const bothObjects = a && b && typeof a === 'object' && typeof b === 'object' && Array.isArray(a) === Array.isArray(b);
-  if (!bothObjects) return [`${at.slice(1) || '(whole answer)'}: node ${JSON.stringify(a)} | cs ${JSON.stringify(b)}`];
+  if (!bothObjects) return [`${at.slice(1) || '(whole answer)'}: reference ${JSON.stringify(a)} | app ${JSON.stringify(b)}`];
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   return [...keys].flatMap((key) => differences(a[key], b[key], `${at}.${key}`, ignore));
 }
@@ -588,44 +585,36 @@ async function main() {
     const [nodePort, csPort] = [await freePort(), await freePort()];
 
     const bin = publishedApp ?? path.join(work, 'cs-bin');
+    console.log(`  the reference app in ${referenceApp}`);
     if (publishedApp) {
-      console.log(`  the C# app in ${publishedApp}`);
+      console.log(`  the app in ${publishedApp}`);
     } else {
-      console.log('  building the C# app');
+      console.log('  building the app from this checkout');
       const build = spawnSync('dotnet', ['build', path.join(repo, 'dotnet', 'App', 'App.csproj'), '-c', 'Release', '-o', bin, '--nologo', '-v', 'q'], { stdio: 'inherit' });
-      if (build.status !== 0) throw new Error('the C# build failed');
+      if (build.status !== 0) throw new Error('the build failed');
     }
 
-    // The Node app finds data/ beside its own src/, so it gets a folder of its own; a reference C#
-    // app is given its folder, as the other is.
-    const nodeRoot = path.join(work, 'node');
+    // Each app is given a folder of its own (`--root`), with this checkout's page in it.
+    const nodeRoot = path.join(work, 'reference');
     fs.mkdirSync(nodeRoot);
     fs.copyFileSync(path.join(repo, 'package.json'), path.join(nodeRoot, 'package.json'));
-    if (referenceApp) {
-      console.log(`  the reference C# app in ${referenceApp}`);
-      link(path.join(repo, 'web'), path.join(nodeRoot, 'web'));
-    } else {
-      fs.cpSync(path.join(repo, 'src'), path.join(nodeRoot, 'src'), { recursive: true });
-      for (const shared of ['web', 'node_modules', 'tools']) link(path.join(repo, shared), path.join(nodeRoot, shared));
-    }
+    link(path.join(repo, 'web'), path.join(nodeRoot, 'web'));
     copyData(path.join(nodeRoot, 'data'), nodePort);
 
-    const csRoot = path.join(work, 'cs');
+    const csRoot = path.join(work, 'app');
     fs.mkdirSync(csRoot);
     fs.copyFileSync(path.join(repo, 'package.json'), path.join(csRoot, 'package.json'));
     link(path.join(repo, 'web'), path.join(csRoot, 'web'));
     copyData(path.join(csRoot, 'data'), csPort);
 
     const log = (name) => fs.openSync(path.join(work, `${name}.log`), 'w');
-    const nodeApp = referenceApp
-      ? spawn(path.join(referenceApp, `osu-local-profiles-app${exe}`), ['--root', nodeRoot], { stdio: ['pipe', log('node'), log('node-err')] })
-      : spawn(process.execPath, ['src/main.ts'], { cwd: nodeRoot, stdio: ['pipe', log('node'), log('node-err')] });
-    // Writable, as the Node app is: both track, each on its own copy.
-    const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot], { stdio: ['pipe', log('cs'), log('cs-err')] });
+    // Both track and write, each on its own copy.
+    const nodeApp = spawn(path.join(referenceApp, `osu-local-profiles-app${exe}`), ['--root', nodeRoot], { stdio: ['pipe', log('reference'), log('reference-err')] });
+    const csApp = spawn(path.join(bin, `osu-local-profiles-app${exe}`), ['--root', csRoot], { stdio: ['pipe', log('app'), log('app-err')] });
     children.push(nodeApp, csApp);
 
     console.log(`  starting both apps (logs in ${work})`);
-    await Promise.all([waitFor(nodePort, nodeApp, 'the Node app'), waitFor(csPort, csApp, 'the C# app')]);
+    await Promise.all([waitFor(nodePort, nodeApp, 'the reference app'), waitFor(csPort, csApp, 'the app')]);
     await Promise.all([settled(nodePort), settled(csPort)]);
 
     let failed = 0;
@@ -640,8 +629,8 @@ async function main() {
       for (const p of problems) console.log(`             ${p}`);
     };
     const compareMeta = (a, b) => [
-      ...(a.status === b.status ? [] : [`status: node ${a.status} | cs ${b.status}`]),
-      ...HEADERS.filter((h) => a.headers[h] !== b.headers[h]).map((h) => `${h}: node ${a.headers[h]} | cs ${b.headers[h]}`),
+      ...(a.status === b.status ? [] : [`status: reference ${a.status} | app ${b.status}`]),
+      ...HEADERS.filter((h) => a.headers[h] !== b.headers[h]).map((h) => `${h}: reference ${a.headers[h]} | app ${b.headers[h]}`),
     ];
 
     const compareJson = async (endpoints, label = '') => {
@@ -684,17 +673,17 @@ async function main() {
     ]) {
       const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
       const problems = compareMeta(a, b);
-      if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
+      if (!a.body.equals(b.body)) problems.push(`body: reference ${a.body.length} bytes | app ${b.body.length} bytes, different`);
       report(pathname, problems, a);
     }
 
-    // The exports. The JSON's own timestamp is the moment each app answered; a workbook is a zip
-    // whose compressed bytes differ between Node's zlib and .NET's, so the files inside it are compared.
+    // The exports. The JSON's own timestamp is the moment each app answered; a workbook is a zip,
+    // whose files are compared rather than its compressed bytes.
     await compareJson([{ path: '/api/export', ignore: { exportedAt: 'the moment each app answered' } }]);
     for (const pathname of ['/api/export/scores.csv', '/api/export/scores.csv?lang=de', '/api/export/scores.csv?lang=xx']) {
       const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
       const problems = compareMeta(a, b);
-      if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
+      if (!a.body.equals(b.body)) problems.push(`body: reference ${a.body.length} bytes | app ${b.body.length} bytes, different`);
       report(pathname, problems, a);
     }
     for (const pathname of ['/api/export/profile.xlsx', '/api/export/profile.xlsx?lang=ja']) {
@@ -708,7 +697,7 @@ async function main() {
         try {
           extractZip(file, dir);
         } catch (e) {
-          problems.push(`${i === 0 ? 'node' : 'cs'}: not a zip (${e.message})`);
+          problems.push(`${i === 0 ? 'reference' : 'app'}: not a zip (${e.message})`);
           return new Map();
         }
         const files = new Map();
@@ -723,7 +712,7 @@ async function main() {
       });
       for (const name of new Set([...unpacked[0].keys(), ...unpacked[1].keys()])) {
         const [x, y] = [unpacked[0].get(name), unpacked[1].get(name)];
-        if (!x || !y || !x.equals(y)) problems.push(`${name}: node ${x?.length ?? 'missing'} bytes | cs ${y?.length ?? 'missing'} bytes, different`);
+        if (!x || !y || !x.equals(y)) problems.push(`${name}: reference ${x?.length ?? 'missing'} bytes | app ${y?.length ?? 'missing'} bytes, different`);
       }
       report(pathname, problems, a);
     }
@@ -753,7 +742,7 @@ async function main() {
     for (const pathname of STATIC) {
       const [a, b] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
       const problems = compareMeta(a, b);
-      if (!a.body.equals(b.body)) problems.push(`body: node ${a.body.length} bytes | cs ${b.body.length} bytes, different`);
+      if (!a.body.equals(b.body)) problems.push(`body: reference ${a.body.length} bytes | app ${b.body.length} bytes, different`);
       report(pathname, problems, a);
     }
 
@@ -779,7 +768,7 @@ async function main() {
     const realReplays = path.join(source, 'replays');
     const replaysBefore = listing(realReplays);
     const feeds = [listen(nodePort), listen(csPort)];
-    /** The last backup the Node app made, which the restore steps send to both. */
+    /** The last backup the reference app made, which the restore steps send to both. */
     let lastBackup = null;
     await new Promise((resolve) => setTimeout(resolve, 500));
     for (const step of writeSteps(copies[0], path.join(csRoot, 'data'))) {
@@ -795,13 +784,13 @@ async function main() {
         // Rendered twice, a moment apart, so the pixels may differ ("3 minutes ago"); the
         // picture's kind and size may not.
         const size = (png) => (png.length > 24 && png.subarray(1, 4).toString('latin1') === 'PNG' ? `${png.readUInt32BE(16)}x${png.readUInt32BE(20)}` : 'not a PNG');
-        if (a.status === 200 && size(a.body) !== size(b.body)) problems.push(`picture: node ${size(a.body)} | cs ${size(b.body)}`);
+        if (a.status === 200 && size(a.body) !== size(b.body)) problems.push(`picture: reference ${size(a.body)} | app ${size(b.body)}`);
         report(`${label} (${a.status === 200 ? size(a.body) : 'none'})`, problems, a);
         continue;
       }
       if (step.zip) {
-        // A zip's compressed bytes differ between Node's zlib and .NET's: its files are compared,
-        // the database in it table by table, as the copies' own are.
+        // A zip's files are compared, rather than its compressed bytes, and the database in it
+        // table by table, as the copies' own are.
         lastBackup = a.body;
         const unpack = (answer) => {
           const entries = readZipEntries(answer.body);
@@ -821,7 +810,7 @@ async function main() {
               if (rows.length !== other.length || rows.some((r, i) => r !== other[i])) problems.push(`profiles.db table ${table} differs`);
             }
           } else if (!x.get(name)?.equals(y.get(name) ?? Buffer.alloc(0))) {
-            problems.push(`${name}: node ${x.get(name)?.length ?? 'missing'} bytes | cs ${y.get(name)?.length ?? 'missing'} bytes`);
+            problems.push(`${name}: reference ${x.get(name)?.length ?? 'missing'} bytes | app ${y.get(name)?.length ?? 'missing'} bytes`);
           }
         }
         report(`${label} (${x.size} files)`, problems, a);
@@ -839,7 +828,7 @@ async function main() {
         const [x, y] = await Promise.all([ask(nodePort, pathname), ask(csPort, pathname)]);
         const changed = compareMeta(x, y);
         if (pathname.startsWith('/api/image/')) {
-          if (!x.body.equals(y.body)) changed.push(`body: node ${x.body.length} bytes | cs ${y.body.length} bytes, different`);
+          if (!x.body.equals(y.body)) changed.push(`body: reference ${x.body.length} bytes | app ${y.body.length} bytes, different`);
         } else {
           changed.push(...differences(JSON.parse(x.body.toString('utf8')), JSON.parse(y.body.toString('utf8')), '', ignore));
         }
@@ -858,11 +847,11 @@ async function main() {
     });
     const feedProblems = [];
     if (told[0].length !== told[1].length) {
-      feedProblems.push(`count: node ${told[0].length} (${told[0].map((e) => e.name).join(', ')}) | cs ${told[1].length} (${told[1].map((e) => e.name).join(', ')})`);
+      feedProblems.push(`count: reference ${told[0].length} (${told[0].map((e) => e.name).join(', ')}) | app ${told[1].length} (${told[1].map((e) => e.name).join(', ')})`);
     }
     for (let i = 0; i < Math.min(told[0].length, told[1].length); i++) {
       const [x, y] = [told[0][i], told[1][i]];
-      if (x.name !== y.name) feedProblems.push(`${i}: node ${x.name} | cs ${y.name}`);
+      if (x.name !== y.name) feedProblems.push(`${i}: reference ${x.name} | app ${y.name}`);
       else feedProblems.push(...differences(x.data, y.data, '', { at: 'the moment each app said it', trackingSince: 'the same', checkedAt: 'the same' }).map((d) => `${i} ${x.name}: ${d}`));
     }
     report('/api/events (the writes above)', feedProblems, { status: 200, body: Buffer.from(JSON.stringify(told[0])) });
@@ -874,9 +863,9 @@ async function main() {
       const extra = rows.filter((r) => !other.includes(r));
       const missing = other.filter((r) => !rows.includes(r));
       const problems = [
-        ...(rows.length === other.length ? [] : [`rows: node ${rows.length} | cs ${other.length}`]),
-        ...extra.slice(0, 3).map((r) => `only node: ${r.slice(0, 300)}`),
-        ...missing.slice(0, 3).map((r) => `only cs:   ${r.slice(0, 300)}`),
+        ...(rows.length === other.length ? [] : [`rows: reference ${rows.length} | app ${other.length}`]),
+        ...extra.slice(0, 3).map((r) => `only reference: ${r.slice(0, 300)}`),
+        ...missing.slice(0, 3).map((r) => `only app:       ${r.slice(0, 300)}`),
       ];
       report(`table ${name}`, problems, { status: 200, body: Buffer.from(rows.join('\n')) });
     }
@@ -930,7 +919,12 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error(`\n  ${e.message}`);
+if (referenceApp === null) {
+  console.error('usage: node scripts/api-parity.mjs [data folder] --reference <published app> [--app <published app>] [--keep]');
   process.exitCode = 2;
-});
+} else {
+  main().catch((e) => {
+    console.error(`\n  ${e.message}`);
+    process.exitCode = 2;
+  });
+}

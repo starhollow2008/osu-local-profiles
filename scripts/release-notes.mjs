@@ -55,7 +55,7 @@ export function isInFull(changelog, version) {
 
 /**
  * Past this, every version of the app cuts a patch-notes line short (MAX_LINE in
- * src/update/notes.ts), the ones already installed included.
+ * dotnet/App/Update/Notes.cs), the ones already installed included.
  */
 export const MAX_NOTE_LINE = 200;
 
@@ -260,7 +260,7 @@ export function releaseNotes(changelog, version, assets = Object.values(assetsFo
     .map(([rid, name]) => `${name} \`${rid}\``);
 
   // Marked on the page itself, where the app reads it before an update (notesFromBody in
-  // src/update/notes.ts). An HTML comment, so GitHub shows nothing.
+  // dotnet/App/Update/Notes.cs). An HTML comment, so GitHub shows nothing.
   const mark = isImportant(changelog, version) ? `${IMPORTANT_MARK}\n\n` : '';
 
   return `${mark}${opening ? `${opening}\n\n` : ''}${shown.join('\n')}

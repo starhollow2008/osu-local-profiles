@@ -465,8 +465,8 @@ const feedIcon = (file) =>
 
 /**
  * The Recent section. osu! fills this with account events (medals, rank milestones); a
- * local profile has its own equivalents, derived in src/calc/history.ts, plus the ranks osu!
- * itself reports (src/rank-events.ts).
+ * local profile has its own equivalents, derived in dotnet/App/Calc/History.cs, plus the ranks osu!
+ * itself reports (dotnet/App/RankEvents.cs).
  */
 export function activityRow(event) {
   let text;
@@ -493,7 +493,7 @@ export function activityRow(event) {
       text = t('activity.level', { level: fmt(event.level) });
       break;
     case 'rank': {
-      // osu!'s `events.rank`, read from the linked account (src/rank-events.ts), drawn as
+      // osu!'s `events.rank`, read from the linked account (dotnet/App/RankEvents.cs), drawn as
       // osu-web's `parse-event.tsx` does: the account and the beatmap link to their osu! pages, a
       // top-50 rank is bold, and the grade sits in the icon column.
       const map =

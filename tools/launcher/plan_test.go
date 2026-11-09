@@ -109,14 +109,14 @@ func TestParseAppInfoOnlyRecognisesTheApp(t *testing.T) {
 	}
 }
 
-// The codes the app exits with are its half of the contract: RESTART_EXIT_CODE in
-// src/update/index.ts, and 0 for every deliberate stop.
+// The codes the app exits with are its half of the contract: Updater.RestartExitCode in
+// dotnet/App/Update/Updater.cs, and 0 for every deliberate stop.
 func TestAfterExit(t *testing.T) {
 	if afterExit(0) != actionQuit || afterExit(restartExitCode) != actionUpdate || afterExit(1) != actionFailed {
 		t.Error("exit codes mapped wrongly")
 	}
 	if restartExitCode != 75 {
-		t.Error("RESTART_EXIT_CODE is 75 in src/update/index.ts")
+		t.Error("Updater.RestartExitCode is 75 in dotnet/App/Update/Updater.cs")
 	}
 }
 
@@ -178,7 +178,7 @@ func TestUpdateOfferedOnlyWhileRunning(t *testing.T) {
 	}
 }
 
-// The app reads these (stopWhenLauncherCloses in src/instance.ts): one JSON object a line.
+// The app reads these (Instance.StopWhenLauncherCloses): one JSON object a line.
 func TestLinesForTheApp(t *testing.T) {
 	for line, want := range map[string]map[string]any{
 		quitLine:                  {"quit": true},

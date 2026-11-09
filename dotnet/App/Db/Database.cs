@@ -7,7 +7,7 @@ using Microsoft.Data.Sqlite;
 namespace OsuLocalProfiles.Db;
 
 /// <summary>
-/// The profile database: src/db/index.ts. Same file, same schema (src/db/schema.sql, embedded),
+/// The profile database: src/db/index.ts. Same file, same schema (dotnet/App/Db/schema.sql, embedded),
 /// same migrations, so either app can open what the other wrote.
 /// </summary>
 /// <remarks>
@@ -274,44 +274,75 @@ internal sealed partial class Database : IDisposable
 
     /// <summary>
     /// schema.sql only uses CREATE TABLE IF NOT EXISTS, so columns added later never reach an
-    /// existing database. Each entry is applied once if its column is missing. The reasons for
-    /// each are beside ADDED_COLUMNS in src/db/index.ts; this list must match it exactly.
+    /// existing database. Each entry is applied once if its column is missing, in this order.
     /// </summary>
     private static readonly (string Table, string Column, string Definition)[] AddedColumns =
     [
         ("scores", "max_statistics_json", "TEXT"),
         ("scores", "replay_path", "TEXT"),
+        // Added with the unranked-mods setting. These stay NULL on rows ingested before it,
+        // which is why every query that reads them falls back to `ranked`; `/api/recompute`
+        // fills them in from the replays.
         ("scores", "pp_nomod", "REAL"),
         ("scores", "stars_nomod", "REAL"),
         ("scores", "beatmap_max_combo", "INTEGER"),
         ("scores", "map_status", "INTEGER"),
         ("scores", "mods_ranked", "INTEGER"),
         ("scores", "mods_countable", "INTEGER"),
+        // Added with pinning and removing scores.
         ("scores", "hidden_at", "INTEGER"),
         ("scores", "pinned_at", "INTEGER"),
         ("scores", "pin_order", "INTEGER"),
+        // Added with Total Play Time. Both stay NULL on older rows: a beatmap's length is filled
+        // in lazily from its .osu file, and an incomplete play from before this column simply has
+        // no start time to measure from (Calc/PlayTime.cs).
         ("beatmaps", "length_ms", "INTEGER"),
         ("incomplete_plays", "started_at", "INTEGER"),
+        // NULL marks rows indexed by an older version and makes the index backfill them once.
         ("osu_files", "beatmap_id", "INTEGER"),
+        // Added with the pp breakdown and the calculator version. NULL on older rows until the
+        // score is recalculated: opening its details does that for one score, Settings for all.
         ("scores", "score_standard", "INTEGER"),
         ("scores", "score_classic", "INTEGER"),
         ("scores", "pp_parts", "TEXT"),
         ("scores", "pp_nomod_parts", "TEXT"),
         ("scores", "pp_version", "TEXT"),
+        // Added with the play tracking filter. Filled lazily like length_ms above, so a beatmap
+        // cached before the filter existed needs no migration pass over osu!'s store.
         ("beatmaps", "added_at", "INTEGER"),
         ("beatmaps", "submitted_at", "INTEGER"),
         ("beatmaps", "ranked_at", "INTEGER"),
+        // Added with the filter's beatmap rules (roadmap 5.74), filled lazily the same way.
         ("beatmaps", "tags", "TEXT"),
         ("beatmaps", "source", "TEXT"),
+        // Added with attempts osu! could not submit. NULL marks rows indexed before names were read,
+        // which the index backfills once, in the same pass as beatmap_id above for anyone upgrading
+        // from a release that had neither.
         ("osu_files", "name", "TEXT"),
         ("incomplete_plays", "unsubmitted", "INTEGER NOT NULL DEFAULT 0"),
+        // Added when osu! itself began deciding which mods are ranked. NULL marks a mods_ranked from
+        // the old hand-kept list, or one the helper could not answer, and makes the score stale.
         ("scores", "mods_ranked_by", "TEXT"),
+        // Added with importing best performances from osu!. Both stay NULL on every score that came
+        // from a replay, which is what tells the two apart.
+        //   legacy_score_id  osu!stable's own id for the play, when osu! recorded one. Kept beside
+        //                    online_score_id rather than in it because the two are different
+        //                    numbering schemes, and a replay may carry either (Tracker/OnlineImport.cs).
+        //   imported_at      when this row was taken from osu.ppy.sh. Also the marker that there is
+        //                    no replay behind it, so a recompute must leave it alone.
         ("scores", "legacy_score_id", "TEXT"),
         ("scores", "imported_at", "INTEGER"),
+        // Added when replays set by other players stopped being tracked as your own. NULL on every
+        // row tracked before it, which the one-off clean-up reads from the replay file instead.
         ("scores", "player_name", "TEXT"),
         ("scores", "player_id", "INTEGER"),
+        // Added with beatmap metadata in its original language. NULL marks a beatmap cached before
+        // the columns existed; the original-metadata backfill re-reads each one's .osu file once and
+        // writes '' where the file has no original-language variant, so nothing is read twice.
         ("beatmaps", "artist_unicode", "TEXT"),
         ("beatmaps", "title_unicode", "TEXT"),
+        // Added with scores imported from their osu! link and entered by hand. NULL on every score
+        // tracked from a replay osu! wrote, which is every row before it.
         ("scores", "origin", "TEXT"),
     ];
 

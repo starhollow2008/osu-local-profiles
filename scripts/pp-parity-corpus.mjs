@@ -10,15 +10,16 @@
  * drumrolls and swells in taiko; fruit, juice and bananas in catch; chords, jacks and holds at
  * 4K and 7K in mania -- and osu! maps converted to all three. The replays are osu!stable ones,
  * lazer ones with the LZMA block lazer appends (the path full trimming broke in 5.44), and
- * McOsu plays built exactly as the app builds them.
+ * McOsu plays built by the app itself (`--dev mcosu-replays`, so generating needs the .NET SDK).
  *
  * Deliberately short: a few hundred objects a map, so the whole check takes seconds.
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { buildMcosuReplay } from '../src/clients/mcosu.ts';
+import { devApp, writeList } from './dev-app.mjs';
 
 const require = createRequire(import.meta.url);
 const LZMA = require('lzma-js-simple-v2');
@@ -447,7 +448,8 @@ export function generateCorpus(dir) {
       });
     }
   }
-  // McOsu plays on each osu! beatmap.
+  // McOsu plays on each osu! beatmap, built into replays by the app.
+  const mcosu = [];
   for (const map of maps[0]) {
     MCOSU_PLAYS.forEach((play, i) => {
       const base = { cs: 4, ar: 9, od: 8, hp: 5 };
@@ -476,8 +478,16 @@ export function generateCorpus(dir) {
           experimental: play.experimental ?? [],
         },
       };
-      replays.push({ file: write(`mcosu-${map.md5}-${i}.osr`, buildMcosuReplay(score)), beatmap: map.file });
+      const file = path.join(dir, `mcosu-${map.md5}-${i}.osr`);
+      mcosu.push({ file, score });
+      replays.push({ file, beatmap: map.file });
     });
+  }
+  const lists = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-corpus-'));
+  try {
+    devApp('mcosu-replays', writeList(path.join(lists, 'mcosu.jsonl'), mcosu));
+  } finally {
+    fs.rmSync(lists, { recursive: true, force: true });
   }
   return { replays, maps };
 }

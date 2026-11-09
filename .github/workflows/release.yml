@@ -6,7 +6,7 @@ name: Release
 # Each package is the C# app (docs/csharp-port.md, phase 8), built and checked on a runner of
 # its own system: the app is checked there against osu!'s calculators, trimmed only where it
 # answers as the untrimmed one does, and started from another folder before it ships. Every
-# updater since 1.7 looks for exactly these names (assetNameFor in src/update/github.ts), and
+# updater since 1.7 looks for exactly these names (`Updater.AssetNameFor` now), and
 # finds the stand-ins it checks for beside the app (scripts/package.mjs).
 
 on:
@@ -81,9 +81,9 @@ jobs:
       # only if the trimmed one answers every pp and API parity request as the untrimmed one
       # does on this runner; then starts it from an unrelated directory to prove it finds osu!'s
       # calculators, and zips it. The step has a limit: a macOS runner has frozen whole before.
-      - name: Package the C# app
+      - name: Package the app
         timeout-minutes: 30
-        run: npm run package -- --native --rid ${{ matrix.rid }}
+        run: npm run package -- --rid ${{ matrix.rid }}
 
       - uses: actions/upload-artifact@v4
         with:

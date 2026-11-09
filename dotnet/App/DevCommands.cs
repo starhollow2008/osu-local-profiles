@@ -3,8 +3,8 @@ using OsuLocalProfiles.Replays;
 namespace OsuLocalProfiles;
 
 /// <summary>
-/// Checks the parity scripts run against the Node app's own code, one JSON answer per line on
-/// stdout: <c>osu-local-profiles-app --dev &lt;command&gt; ...</c>. Never used by the running app.
+/// The app's own code, run by the checking scripts (scripts/dev-app.mjs), one JSON answer per line
+/// on stdout: <c>osu-local-profiles-app --dev &lt;command&gt; ...</c>. Never used by the running app.
 /// </summary>
 internal static class DevCommands
 {
@@ -103,14 +103,91 @@ internal static class DevCommands
                     Console.WriteLine(JsonText.Stringify(answer));
                 }
                 return 0;
+            case "mcosu-replays" when args.Length == 2:
+                // Each play in the list (one JSON object a line: `file`, and the `score` as scores.db holds it) built into its replay at `file`.
+                foreach (var line in File.ReadAllLines(args[1]).Where(l => l.Length > 0))
+                {
+                    var play = System.Text.Json.JsonSerializer.Deserialize<McosuPlay>(line, JsonText.Options)!;
+                    File.WriteAllBytes(play.File, Clients.Mcosu.BuildReplay(play.Score));
+                }
+                return 0;
+            case "pp-requests" when args.Length == 2:
+                /*
+                 * What the app asks osu!'s calculator about each replay in the list (one JSON object a
+                 * line: `file` and its `beatmap`): the play's price, its price without the assistance
+                 * mods, and whether osu! ranks its mods. scripts/pp-parity.mjs asks two helpers each.
+                 */
+                foreach (var line in File.ReadAllLines(args[1]).Where(l => l.Length > 0))
+                {
+                    var replay = System.Text.Json.JsonSerializer.Deserialize<ReplayOnBeatmap>(line, JsonText.Options)!;
+                    ReplayScore score;
+                    try
+                    {
+                        score = Osr.Parse(File.ReadAllBytes(replay.File));
+                    }
+                    catch (Exception e)
+                    {
+                        // Not a replay this app can read: the check leaves it out.
+                        Console.WriteLine(JsonText.Stringify(new { replay.File, error = e.GetType().Name }));
+                        continue;
+                    }
+                    Console.WriteLine(JsonText.Stringify(new { replay.File, requests = PpRequests(replay.File, replay.Beatmap, score) }));
+                }
+                return 0;
+            case "release-notes" when args.Length == 2:
+            {
+                // A package's release-notes.json, read as the app reads it (scripts/release-notes.mjs writes it).
+                JsonText.TryParse(File.ReadAllText(args[1]), out var notes);
+                Console.WriteLine(JsonText.Stringify(Update.Notes.ParseNotes(notes)));
+                return 0;
+            }
+            case "release-page" when args.Length is 3 or 4:
+                // A release page's text, read as an install reads it before updating: the file, the version, and when it was published.
+                Console.WriteLine(JsonText.Stringify(Update.Notes.FromBody(File.ReadAllText(args[1]), args[2], args.Length == 4 ? args[3] : null)));
+                return 0;
             case "backfill" when args.Length == 3:
                 return BackfillAll(args[1], args[2]).GetAwaiter().GetResult();
             case "ingest" when args.Length == 5 && args[4] is "plain" or "judged":
                 return IngestAll(args[1], args[2], args[3], judged: args[4] == "judged").GetAwaiter().GetResult();
             default:
-                Console.Error.WriteLine("usage: --dev parse-replays <list> | discover <data folder> [force] | index-beatmaps <db> <roots.json> | resolve <db> <installs.json> <md5 list> | ingest <db> <installs.json> <list> plain|judged");
+                Console.Error.WriteLine("usage: --dev pp-helper | pp-requests <list> | parse-replays <list> | discover <data folder> [force] | mcosu <list> <folder> | mcosu-replays <list> | release-notes <file> | release-page <file> <version> [<published>] | index-beatmaps <db> <roots.json> | resolve <db> <installs.json> <md5 list> | backfill <db> <installs.json> | ingest <db> <installs.json> <list> plain|judged");
                 return 2;
         }
+    }
+
+    private sealed record McosuPlay(string File, Clients.McosuScore Score);
+
+    private sealed record ReplayOnBeatmap(string File, string Beatmap);
+
+    /// <summary>
+    /// The requests the tracker makes for a replay, labelled: priced as ingest prices it, priced again
+    /// with Relax or Autopilot stripped when it has either, and osu!'s ranked-mods question.
+    /// </summary>
+    private static List<object> PpRequests(string file, string beatmap, ReplayScore score)
+    {
+        var requests = new List<object>();
+        var pricing = Calc.Mods.ScorePricing(score, beatmap);
+        var priced = new Dictionary<string, object?> { ["replayPath"] = file, ["beatmapPath"] = beatmap };
+        if (pricing.Mods is not null) priced["mods"] = pricing.Mods;
+        if (pricing.IgnoreLegacyTotalScore) priced["ignoreLegacyTotalScore"] = true;
+        if (!pricing.Unpriceable) requests.Add(new { label = "priced", request = priced });
+        var strip = Calc.Mods.Strippable(Calc.Mods.ScoreMods(score, beatmap));
+        if (strip.Length > 0 && !pricing.Unpriceable)
+        {
+            requests.Add(new { label = "stripped", request = new Dictionary<string, object?>(priced) { ["stripMods"] = strip } });
+        }
+        // A McOsu play's mods are worked out from the map; a lazer replay carries its own; a stable one has bits.
+        var mods = score.Mcosu is not null
+            ? Calc.Mods.ScoreMods(score, beatmap)
+            : Js.Get(score.Extras, "mods") is { ValueKind: System.Text.Json.JsonValueKind.Array } list ? [.. list.EnumerateArray()] : null;
+        requests.Add(new
+        {
+            label = "ranked",
+            request = mods is not null
+                ? new Dictionary<string, object?> { ["type"] = "ranked", ["ruleset"] = score.Mode, ["mods"] = mods }
+                : new Dictionary<string, object?> { ["type"] = "ranked", ["ruleset"] = score.Mode, ["legacyMods"] = score.LegacyMods },
+        });
+        return requests;
     }
 
     /// <summary>
@@ -175,7 +252,7 @@ internal static class DevCommands
             ? [.. list.EnumerateArray().Where(e => e.ValueKind == System.Text.Json.JsonValueKind.String).Select(e => e.GetString()!)]
             : [];
 
-    /// <summary>A parsed replay as scripts/port-checks.mjs writes the Node parser's: dates as ms, ids as text.</summary>
+    /// <summary>A parsed replay, as the Node parser's was written to be compared: dates as ms, ids as text.</summary>
     private static object ReplayJson(ReplayScore s) => new
     {
         s.Client, s.Mode, s.Version, s.BeatmapMD5, s.Username, s.ReplayMD5,

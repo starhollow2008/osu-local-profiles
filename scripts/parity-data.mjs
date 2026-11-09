@@ -36,7 +36,7 @@ function freePort() {
   });
 }
 
-/** The stand-in install: what `stableInstall` (src/clients/detect.ts) takes for osu!stable. */
+/** The stand-in install: what `Detect.StableInstall` (dotnet/App/Clients/Detect.cs) takes for osu!stable. */
 export function writeStableInstall(dir) {
   const corpus = path.join(dir, 'corpus');
   const { replays, maps } = generateCorpus(corpus);

@@ -11,7 +11,7 @@ internal sealed record RankEstimate(long Rank, string Dump);
 
 /// <summary>
 /// Estimating the global rank a profile's pp would put it at: src/calc/rank.ts. The tables are
-/// src/calc/rank-tables/*.json, embedded when the app is built; the weekly job refreshes them.
+/// dotnet/App/Calc/rank-tables/*.json, embedded when the app is built; the weekly job refreshes them.
 /// </summary>
 internal static class Ranks
 {

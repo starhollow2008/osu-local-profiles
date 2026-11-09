@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { SLIM_PUBLISH_ARGS, defaultRid, shouldPrune } from '../scripts/build-pp-helper.mjs';
+import { PRUNE_ASSEMBLIES, PRUNE_NATIVES, SLIM_PUBLISH_ARGS, defaultRid, shouldPrune } from '../scripts/build-pp-helper.mjs';
 
 /*
- * Which files the shipped pp helper drops.
+ * Which files the shipped app, and the pp helper it is checked against, drop.
  *
  * Worth testing rather than eyeballing because getting it wrong is quiet in both
- * directions. Prune too much and the helper dies at startup -- and `official.ts` falls back
- * to the plain build output, so that failure once hid behind passing pp tests. Prune too
+ * directions. Prune too much and the app dies at startup -- and that failure once hid
+ * behind passing pp tests, when the Node app fell back to the plain build output. Prune too
  * little and a macOS or Linux build silently ships 160MB of natives it cannot use, BASS
  * among them, which is not ours to redistribute.
  */
@@ -130,31 +130,29 @@ test('the managed assemblies the helper cannot start without are kept', () => {
 });
 
 /*
- * The strongest check available without publishing again: run the patterns over a helper
- * that was actually built and pruned. Nothing left in it may match, or the next build on
- * any platform would remove a file this one needed.
+ * The helper the app builds from a player's own osu! source (roadmap 5.70) is pruned by the
+ * app itself, with its own copy of the full lists. A file one drops and the other keeps would
+ * make the two helpers differ for no reason, so the copies are pinned to each other.
  */
-test('nothing in an already-pruned helper is matched', (t) => {
-  const dir = path.join(process.cwd(), 'tools', 'pp');
-  if (!fs.existsSync(dir)) return t.skip('no built helper -- run npm run build:pp:local');
-
-  const files = fs.readdirSync(dir).filter((f) => !fs.statSync(path.join(dir, f)).isDirectory());
-  assert.ok(files.length > 50, 'expected a real published helper');
-
-  // A full helper (a `--full` build, or one the parity check turned down) keeps what only the
-  // slim one drops; either way nothing its own kind prunes may be left in it.
-  const slim = !files.some((f) => shouldPrune(f, true) && !shouldPrune(f, false));
-  const matched = files.filter((f) => shouldPrune(f, slim));
-  assert.deepEqual(matched, [], 'these would be removed from a working helper');
+test("the app's source helper prunes exactly what the full helper does", () => {
+  const source = fs.readFileSync(path.join(process.cwd(), 'dotnet', 'App', 'Calc', 'SourceHelper.cs'), 'utf8');
+  const listed = (name: string) => {
+    const body = new RegExp(`${name}\\s*=\\s*\\[([\\s\\S]*?)\\];`).exec(source)?.[1];
+    assert.ok(body, `SourceHelper.cs has no ${name}`);
+    return [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  };
+  assert.deepEqual(listed('PruneAssemblies'), [...PRUNE_ASSEMBLIES]);
+  assert.deepEqual(listed('PruneNatives'), [...PRUNE_NATIVES]);
 });
 
 /*
- * The slim helper's extra pruning is its alone. The full helper is the parity check's reference
- * and what ships when the check fails, so it must keep everything it has always had.
+ * The trimmed app's extra pruning is its alone. The untrimmed app and the full helper are the
+ * parity checks' references, and the untrimmed app is what ships when a check fails, so they
+ * must keep everything they have always had.
  */
-test('only the slim helper drops the natives 5.60 found unused', () => {
+test('only the trimmed app drops the natives 5.60 found unused', () => {
   for (const file of ['realm-wrappers.dll', 'libe_sqlite3.so', 'msquic.dll', 'mscordbi.dll', 'libclrgc.dylib']) {
-    assert.equal(shouldPrune(file, true), true, `${file} goes from the slim helper`);
+    assert.equal(shouldPrune(file, true), true, `${file} goes from the trimmed app`);
     assert.equal(shouldPrune(file, false), false, `${file} stays in the full helper`);
   }
   // What was always pruned stays pruned in both.
@@ -173,16 +171,19 @@ test('the runtime identifier follows the machine, not Windows', () => {
 /*
  * Full trimming breaks inside osu!'s own libraries (roadmap 5.44): not a crash but wrong mods,
  * and so wrong pp. Partial trimming leaves every library but .NET's own whole, and is what
- * passed the parity check (5.60). The slim build trims partially, and the project file trims
+ * passed the parity check (5.60). The trimmed build trims partially, and the project files trim
  * nothing, so no publish is ever trimmed without the check that decides whether it ships.
  */
-test('the helper is trimmed only by the checked slim build, and only partially', () => {
+test('the app is trimmed only by the checked build, and only partially', () => {
   assert.ok(SLIM_PUBLISH_ARGS.includes('-p:PublishTrimmed=true'));
   assert.ok(SLIM_PUBLISH_ARGS.includes('-p:TrimMode=partial'));
   assert.ok(!SLIM_PUBLISH_ARGS.some((a) => /TrimMode=(full|link)/i.test(a)));
-  const csproj = fs.readFileSync(
-    path.join(process.cwd(), 'tools', 'PpCalculator', 'PpCalculator.csproj'),
-    'utf8',
-  );
-  assert.doesNotMatch(csproj, /<PublishTrimmed>|<TrimMode>/, 'a trim setting here would trim every publish, checked or not');
+  for (const project of [
+    ['tools', 'PpCalculator', 'PpCalculator.csproj'],
+    ['dotnet', 'App', 'App.csproj'],
+    ['dotnet', 'Directory.Build.props'],
+  ]) {
+    const text = fs.readFileSync(path.join(process.cwd(), ...project), 'utf8');
+    assert.doesNotMatch(text, /<PublishTrimmed>|<TrimMode>/, `a trim setting in ${project.at(-1)} would trim every publish, checked or not`);
+  }
 });

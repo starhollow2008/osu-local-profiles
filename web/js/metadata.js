@@ -2,7 +2,7 @@
  * Beatmap names, in the script the song was written in.
  *
  * osu! offers "prefer metadata in original language", and this is the page's half of it: the
- * server sends both names with every beatmap (see `src/calc/metadata.ts`) and everything that
+ * server sends both names with every beatmap (see `dotnet/App/Calc/Metadata.cs`) and everything that
  * draws one asks here which to use. So switching it redraws the page from what it already
  * has, with no request and no reload -- the same instant switch the language picker makes,
  * and the reason the checkbox can sit in that menu at all.

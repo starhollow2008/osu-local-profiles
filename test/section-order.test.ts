@@ -95,53 +95,22 @@ test('Recent sits under me! and Recent Plays under Historical, by default', () =
   assert.deepEqual(reconcileSectionOrder([], DEFAULT_131, RETIRED), DEFAULT_131);
 });
 
-test('a profile from before 1.31.0 keeps the order it showed, however it was saved', async () => {
-  const fs = await import('node:fs');
-  const os = await import('node:os');
-  const path = await import('node:path');
-  const { openDb, getOrCreateProfile } = await import('../src/db/index.ts');
-  const { getSettings, updateSettings } = await import('../src/settings.ts');
-
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-order-'));
-  const file = path.join(tmp, 'test.db');
-  try {
-    // Profiles as 1.30.0 left them: nothing saved, an old default, rearranged before Recent
-    // Plays existed, rearranged since, and an order with ids that are gone.
-    const saved: (string[] | null)[] = [
-      null,
-      RETIRED[1]!,
-      ['medals', 'me', 'recent', 'top_ranks', 'historical'],
-      ['me', 'medals', 'recent', 'top_ranks', 'historical', 'beatmaps', 'recent_plays'],
-      ['gone', 'historical', 'me'],
-    ];
-    let db = openDb(file);
-    const ids = saved.map((order, i) => {
-      const id = getOrCreateProfile(db, `p${i}`);
-      if (order !== null) updateSettings(db, id, { sectionOrder: order });
-      return id;
-    });
-    // As if this database were last opened by 1.30.0, before the pin existed.
-    db.prepare("DELETE FROM kv WHERE key = 'sectionOrderPinned'").run();
-    db.close();
-
-    db = openDb(file);
-    saved.forEach((order, i) => {
-      const shown = reconcileSectionOrder(order ?? [], DEFAULT_110, RETIRED);
-      const pinned = getSettings(db, ids[i]!).sectionOrder;
-      assert.deepEqual(pinned, shown, `profile ${i}: written down whole`);
-      // And the page, with today's default, shows exactly that.
-      assert.deepEqual(reconcileSectionOrder(pinned, DEFAULT_131, RETIRED), shown);
-    });
-
-    // A profile made afterwards has nothing saved, so it gets today's default.
-    const fresh = getOrCreateProfile(db, 'new');
-    assert.deepEqual(getSettings(db, fresh).sectionOrder, []);
-    db.close();
-    // And the pin happens once: reopening leaves the new profile alone.
-    db = openDb(file);
-    assert.deepEqual(getSettings(db, fresh).sectionOrder, []);
-    db.close();
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+/*
+ * The app writes the order down once, when it first opens a database from before 1.31.0
+ * (`PinSectionOrder` in dotnet/App/Db/Database.cs). Its test, DatabaseTests'
+ * An_existing_profiles_section_order_is_written_down_as_the_page_showed_it, expects these
+ * orders for these saved ones: the page must have shown exactly them, and must go on showing
+ * them under today's default.
+ */
+test('a profile from before 1.31.0 keeps the order it showed, however it was saved', () => {
+  const pinned: [string[], string[]][] = [
+    // A pre-1.10 default reads as never arranged: the order until 1.31.
+    [['me', 'recent', 'top_ranks', 'medals', 'historical'], DEFAULT_110],
+    // Unknown ids go, and each missing section joins after the one it followed by default.
+    [['medals', 'me', 'nonsense'], ['medals', 'me', 'recent_plays', 'top_ranks', 'historical', 'recent', 'beatmaps']],
+  ];
+  for (const [saved, written] of pinned) {
+    assert.deepEqual(reconcileSectionOrder(saved, DEFAULT_110, RETIRED), written, `${saved}: written down as shown`);
+    assert.deepEqual(reconcileSectionOrder(written, DEFAULT_131, RETIRED), written, `${saved}: shown the same today`);
   }
 });

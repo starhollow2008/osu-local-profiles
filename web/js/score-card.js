@@ -431,7 +431,7 @@ function breakdown(score, calculator) {
 }
 
 /**
- * The whole card. `score` is a ScoreDetail from src/scores.ts; `who` is the profile as the
+ * The whole card. `score` is a ScoreDetail from dotnet/App/Scores.cs; `who` is the profile as the
  * header shows it: { name, avatar (markup), country, countryName, cover, tracking }; and
  * `calculator` is the osu! release pricing scores now, to mark a breakdown from another.
  */

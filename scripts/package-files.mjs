@@ -16,15 +16,15 @@
  */
 const RELEASES_URL = 'https://github.com/jonathant09/osu-local-profiles/releases';
 
-/** The C# app in a release without Node (nativeAppFor in src/update/index.ts), on macOS and Linux. */
-const NATIVE_APP = 'app/osu-local-profiles-app';
+/** The app, on macOS and Linux (`Updater.NativeAppFor` in dotnet/App/Update/Updater.cs). */
+const APP = 'app/osu-local-profiles-app';
 
 /**
  * The tray launcher each package carries (tools/launcher, built by scripts/build-launcher.mjs):
  * what the user opens, and where its executable is inside that.
  *
- * `scripts/apply-update.mjs` names the same files in `launcherName`, because it is copied into
- * packages alone and cannot import this; `test/relaunch.test.ts` pins that the two agree.
+ * The app looks for the same files when it hands an update to the launcher
+ * (`Updater.LauncherExecutableFor`); `test/relaunch.test.ts` pins that the two agree.
  */
 export function trayLauncherFor(hostOs) {
   if (hostOs === 'win') return { name: 'osu! local profiles.exe', executable: 'osu! local profiles.exe' };
@@ -51,16 +51,13 @@ export function trayLauncherFor(hostOs) {
  * whatever directory the file manager felt like, and the app would look for its `data/`
  * somewhere else entirely and silently start from scratch.
  */
-export function launcherFor(hostOs, nodeBinary, native = false) {
+export function launcherFor(hostOs) {
   if (hostOs === 'win') return null;
 
   const tray = trayLauncherFor(hostOs);
   const quote = (p) => `"./${p}"`;
-  // What runs the app: the C# app in a release without Node (docs/csharp-port.md, phase 7), whose
-  // runtime-named file is only a stand-in for older installs; otherwise Node on src/main.ts.
-  const runtime = native ? NATIVE_APP : nodeBinary;
-  const complete = native ? `[ ! -f ./${runtime} ]` : `[ ! -f ./${runtime} ] || [ ! -f src/main.ts ]`;
-  const executables = native ? `./${runtime}` : `./${runtime} tools/pp/osu-pp`;
+  // What runs the app. The runtime-named file beside it is only a stand-in for older installs.
+  const runtime = APP;
 
   return {
     name: hostOs === 'osx' ? 'Start osu! local profiles.command' : 'start.sh',
@@ -75,7 +72,7 @@ export function launcherFor(hostOs, nodeBinary, native = false) {
        * runtime. A zip extracted by a tool that drops permissions is the other case, leaving
        * the runtime present and unrunnable, which `sh` reports only as "Permission denied".
        */
-      `if ${complete} || [ ! -e ${quote(tray.name)} ]; then`,
+      `if [ ! -f ./${runtime} ] || [ ! -e ${quote(tray.name)} ]; then`,
       '  echo ""',
       '  echo "  osu! local profiles cannot start: this folder is incomplete."',
       '  echo ""',
@@ -92,12 +89,12 @@ export function launcherFor(hostOs, nodeBinary, native = false) {
       '  echo ""',
       '  echo "  The bundled programs are not executable. Some unzip tools drop that."',
       '  echo ""',
-      `  echo "  Restore them from this folder with:  chmod +x ${executables} '${tray.executable}'"`,
+      `  echo "  Restore them from this folder with:  chmod +x ./${runtime} '${tray.executable}'"`,
       '  echo ""',
       '  exit 1',
       'fi',
       '',
-      ...(hostOs === 'osx' ? macStart(runtime, tray, native) : linuxStart(runtime, tray, native)),
+      ...(hostOs === 'osx' ? macStart(runtime, tray) : linuxStart(runtime, tray)),
     ].join('\n'),
     // Without this the archive carries a launcher nobody can run, and `chmod +x` is not an
     // obvious fix for someone who has just downloaded a zip.
@@ -105,19 +102,17 @@ export function launcherFor(hostOs, nodeBinary, native = false) {
   };
 }
 
-function macStart(runtime, tray, native) {
+function macStart(runtime, tray) {
   return [
     /*
      * macOS quarantines everything unpacked from a browser download, and refuses each unsigned
-     * file separately as it loads: the pp helper, then its native libraries one by one. The
+     * file separately as it loads: the app, then its native libraries one by one. The
      * tray launcher lifts the quarantine itself once it runs; doing it here first also spares
      * the bundle App Translocation, which runs a quarantined app from a random read-only copy.
      * Approving this script is the user deciding to trust this folder, and removing the
      * attribute from files the user owns needs no password.
      */
-    native
-      ? `if xattr -p com.apple.quarantine ./${runtime} >/dev/null 2>&1; then`
-      : `if xattr -p com.apple.quarantine ./${runtime} >/dev/null 2>&1 || xattr -p com.apple.quarantine tools/pp/osu-pp >/dev/null 2>&1; then`,
+    `if xattr -p com.apple.quarantine ./${runtime} >/dev/null 2>&1; then`,
     '  xattr -dr com.apple.quarantine . 2>/dev/null',
     '  echo "  Allowed the rest of this folder to run: macOS had quarantined the download."',
     'fi',
@@ -129,7 +124,7 @@ function macStart(runtime, tray, native) {
   ];
 }
 
-function linuxStart(runtime, tray, native) {
+function linuxStart(runtime, tray) {
   return [
     // With a desktop, the tray launcher runs the app, and this terminal can be closed.
     'if [ -n "$DISPLAY" ] || [ -n "$WAYLAND_DISPLAY" ]; then',
@@ -147,13 +142,13 @@ function linuxStart(runtime, tray, native) {
      *
      * Run, not `exec`ed, so this shell is still here when the app exits for an update. It
      * then waits for the swap and runs the new launcher, and the app comes back in this
-     * terminal. The variable, the code and the pid file are src/update/index.ts's
-     * LAUNCHER_ENV, RESTART_EXIT_CODE and SWAPPER_PID_FILE.
+     * terminal. The variable, the code and the pid file are the app's `Instance.LauncherEnv`,
+     * `Updater.RestartExitCode` and `Updater.SwapperPidFile`.
      *
      * The swap replaces this file while it runs. The shell reads on from the file it
      * opened, which the swap has moved aside, not from the new one.
      */
-    `OSU_LOCAL_PROFILES_LAUNCHER=restarts ./${runtime}${native ? '' : ' src/main.ts'}`,
+    `OSU_LOCAL_PROFILES_LAUNCHER=restarts ./${runtime}`,
     'status=$?',
     '[ "$status" -eq 75 ] || exit "$status"',
     '',
@@ -179,7 +174,7 @@ function linuxStart(runtime, tray, native) {
  * met with a warning rather than an app. Saying so here, with the way round it, is the honest
  * option; leaving it out would have them assume the build is broken.
  */
-function howToStart(hostOs, native) {
+function howToStart(hostOs) {
   if (hostOs === 'win') {
     return [
       'Double-click "osu! local profiles.exe".',
@@ -233,16 +228,16 @@ function howToStart(hostOs, native) {
     '',
     'If it will not run, the executable bit was lost in transit. Restore it with:',
     '',
-    native ? '    chmod +x start.sh osu-local-profiles app/osu-local-profiles-app' : '    chmod +x start.sh node osu-local-profiles tools/pp/osu-pp',
+    `    chmod +x start.sh osu-local-profiles ${APP}`,
   ];
 }
 
-export function readmeFor(hostOs, native = false) {
+export function readmeFor(hostOs) {
   return [
     'osu! local profiles',
     '===================',
     '',
-    ...howToStart(hostOs, native),
+    ...howToStart(hostOs),
     '',
     'Your browser opens at http://localhost:7272 and tracking begins.',
     '',
@@ -251,15 +246,11 @@ export function readmeFor(hostOs, native = false) {
     'To stop it, press Quit on its icon, or Quit at the top of the page. Starting it again while',
     'it runs opens the page, so that is also how to find the page again.',
     '',
-    ...(native
-      ? [
-          "Nothing needs installing. osu!'s pp calculator is included.",
-          '',
-          // The stand-ins (scripts/package.mjs), which look like part of the app and are not.
-          `${hostOs === 'win' ? 'node.exe' : 'node'}, src and scripts are only there so that versions before 1.33.0 can`,
-          'update to this one. You can ignore them. They go after the next update.',
-        ]
-      : ['Nothing needs installing. Node and osu!\'s pp calculator are both included.']),
+    "Nothing needs installing. osu!'s pp calculator is included.",
+    '',
+    // The stand-ins (scripts/package.mjs), which look like part of the app and are not.
+    `${hostOs === 'win' ? 'node.exe' : 'node'}, src and scripts are only there so that versions before 1.33.0 can`,
+    'update to this one. You can ignore them. They go after the next update.',
     '',
     'Everything this app records lives in the "data" folder next to this file, so you can',
     'move or copy the whole folder and your profiles come with it. Deleting "data" resets',

@@ -2,7 +2,7 @@
  * McOsu's own mods, which osu! has no equivalent of: its Nightmare mod and its experimental
  * mods. Filed under one badge, MC, rather than twenty-odd of their own, so the mod lists here
  * stay osu!'s. A play's MC carries which of them were on as settings, and the tooltip names
- * them. See src/clients/mcosu.ts.
+ * them. See dotnet/App/Clients/Mcosu.cs.
  *
  * Not in mod-definitions.js, which is generated from osu-web and never edited.
  */

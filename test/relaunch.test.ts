@@ -4,14 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { launcherName, relaunchPlan } from '../scripts/apply-update.mjs';
 import { launcherFor, trayLauncherFor } from '../scripts/package-files.mjs';
-import {
-  LAUNCHER_ENV,
-  RESTART_EXIT_CODE,
-  SWAPPER_PID_FILE,
-  launcherRestarts,
-} from '../src/update/index.ts';
 
 /*
  * How the app comes back after an update.
@@ -22,141 +15,59 @@ import {
  * launchers restart the app in their own terminal. The tray launcher (roadmap 5.48) does the
  * same on every platform: it waits for the swap and starts the new launcher, whose icon and the
  * page's Quit are how it is stopped. The swapper starts a launcher only for releases that do not
- * restart the app, and never the runtime. test/launcher.test.ts runs the real tray launcher.
+ * restart the app, and never the runtime: that decision is the tray launcher's `relaunchPlan`,
+ * tested in tools/launcher/swap_test.go, and test/launcher.test.ts runs the real launcher.
+ *
+ * What is left here is what a package carries and the app must agree with: the launcher's
+ * names, and start.sh, which still runs the app in its terminal when there is no desktop.
  */
 
-const exists = (...present: string[]) => (file: string) => present.includes(file);
+const root = process.cwd();
+const csharp = (...file: string[]) => fs.readFileSync(path.join(root, 'dotnet', 'App', ...file), 'utf8');
 
-/* ------------------------------------------------------------ the swapper */
+/** A `const` the app declares, read from its source: `public const int RestartExitCode = 75;`. */
+function constant(source: string, name: string): string {
+  const value = new RegExp(`const \\w+ ${name} = "?([^";]+)"?;`).exec(source)?.[1];
+  assert.ok(value, `the app declares no ${name}`);
+  return value;
+}
 
-test('a launcher that restarts the app is left to do it', () => {
-  for (const platform of ['win32', 'darwin', 'linux']) {
-    const plan = relaunchPlan({
-      platform,
-      installDir: '/opt/olp',
-      launcherRestarts: true,
-      exists: () => true,
-      env: { DISPLAY: ':0' },
-    });
-    assert.ok('skip' in plan, `${platform}: a second copy would race the launcher's for the port`);
+test('the app looks for the launcher each package actually ships', () => {
+  const updater = csharp('Update', 'Updater.cs');
+  for (const [platform, os] of [['"win32"', 'win'], ['"darwin"', 'osx'], ['_', 'linux']] as const) {
+    assert.match(updater, new RegExp(`${platform} => "${trayLauncherFor(os).name.replace(/[.!]/g, '\\$&')}"`), os);
   }
+  // On macOS the executable is inside the bundle.
+  const mac = trayLauncherFor('osx').executable.split('/').map((part) => `"${part}"`).join(', ');
+  assert.ok(updater.includes(`Path.Combine(${mac})`), `LauncherExecutableFor names ${trayLauncherFor('osx').executable}`);
 });
 
-test('an update installed as the app was quit starts nothing afterwards', () => {
-  // Roadmap 5.66: the app was stopped on purpose, so it stays stopped -- whatever started it.
-  for (const platform of ['win32', 'darwin', 'linux']) {
-    for (const launcherRestarts of [true, false]) {
-      const plan = relaunchPlan({
-        platform,
-        installDir: '/opt/olp',
-        launcherRestarts,
-        noRelaunch: true,
-        exists: () => true,
-        env: { DISPLAY: ':0' },
-      });
-      assert.ok('skip' in plan, `${platform}: relaunched after a quit`);
-    }
-  }
-});
-
-test('Windows starts the tray launcher itself, which has no console to lose', () => {
-  const exe = 'C:\\Program Files (x86)\\olp\\osu! local profiles.exe';
-  const plan = relaunchPlan({
-    platform: 'win32',
-    installDir: 'C:\\Program Files (x86)\\olp',
-    launcherRestarts: false,
-    exists: exists(exe),
-    env: {},
-  });
-  assert.ok(!('skip' in plan));
-  assert.deepEqual([plan.command, plan.args], [exe, []]);
-  assert.equal(plan.options.detached, true);
-});
-
-test('macOS opens a new copy of the bundle, as a double-click does', () => {
-  const bundle = '/Applications/olp/osu! local profiles.app';
-  const plan = relaunchPlan({
-    platform: 'darwin',
-    installDir: '/Applications/olp',
-    launcherRestarts: false,
-    exists: exists(bundle),
-    env: {},
-  });
-  assert.ok(!('skip' in plan));
-  // -n: the launcher that ran the app may not be gone yet, and open would only bring it forward.
-  assert.deepEqual([plan.command, plan.args], ['open', ['-n', bundle]]);
-});
-
-test('Linux starts the tray launcher when there is a desktop for its icon', () => {
-  const plan = relaunchPlan({
-    platform: 'linux',
-    installDir: '/home/me/olp',
-    launcherRestarts: false,
-    exists: exists('/home/me/olp/osu-local-profiles'),
-    env: { WAYLAND_DISPLAY: 'wayland-0' },
-  });
-  assert.ok(!('skip' in plan));
-  assert.deepEqual([plan.command, plan.args], ['/home/me/olp/osu-local-profiles', []]);
-});
-
-/* The old behaviour was exactly the fallback: run the launcher anyway, with nowhere to show it. */
-test('Linux does not start an invisible copy when it has no desktop', () => {
-  const plan = relaunchPlan({
-    platform: 'linux',
-    installDir: '/home/me/olp',
-    launcherRestarts: false,
-    exists: exists('/home/me/olp/osu-local-profiles'),
-    env: {},
-  });
-  assert.ok('skip' in plan);
-  assert.match(plan.skip, /\.\/start\.sh/);
-});
-
-test('with no launcher the runtime is never started directly', () => {
-  for (const platform of ['win32', 'darwin', 'linux']) {
-    const plan = relaunchPlan({
-      platform,
-      installDir: '/opt/olp',
-      launcherRestarts: false,
-      exists: () => false,
-      env: { DISPLAY: ':0' },
-    });
-    assert.ok('skip' in plan, `${platform}: a runtime started detached has nothing to stop it`);
-  }
-});
-
-test('the swapper looks for the launcher each package actually ships', () => {
-  assert.equal(launcherName('win32'), trayLauncherFor('win').name);
-  assert.equal(launcherName('darwin'), trayLauncherFor('osx').name);
-  assert.equal(launcherName('linux'), trayLauncherFor('linux').name);
-});
-
-/* ----------------------------------------------- start.sh, with no desktop */
+const LAUNCHER_ENV = constant(csharp('Instance.cs'), 'LauncherEnv');
+const RESTART_EXIT_CODE = constant(csharp('Update', 'Updater.cs'), 'RestartExitCode');
+const SWAPPER_PID_FILE = constant(csharp('Update', 'Updater.cs'), 'SwapperPidFile');
 
 test('start.sh and the app agree on the variable, the exit code and the pid file', () => {
-  const { content } = launcherFor('linux', 'node')!;
-  assert.match(content, new RegExp(`^${LAUNCHER_ENV}=restarts \\./node src/main\\.ts$`, 'm'));
+  const { content } = launcherFor('linux')!;
+  assert.match(content, new RegExp(`^${LAUNCHER_ENV}=restarts \\./app/osu-local-profiles-app$`, 'm'));
   assert.match(content, new RegExp(`-eq ${RESTART_EXIT_CODE} \\]`));
   assert.ok(content.includes(`data/update/${SWAPPER_PID_FILE}`));
-  assert.doesNotMatch(content, /exec \.\/node/, 'an exec leaves no shell to start the app again');
-  assert.equal(launcherRestarts({ [LAUNCHER_ENV]: 'restarts' }), true);
-  assert.equal(launcherRestarts({ [LAUNCHER_ENV]: 'tray' }), true);
-  assert.equal(launcherRestarts({}), false);
+  assert.doesNotMatch(content, /exec \.\/app/, 'an exec leaves no shell to start the app again');
+  // "restarts" is one of the two values that tell the app its launcher will start it again.
+  assert.match(csharp('Instance.cs'), /getenv\(LauncherEnv\) is "restarts" or "tray"/);
 });
 
 /*
- * The script itself, run by `sh` against a stand-in runtime and a stand-in tray launcher. Git
+ * The script itself, run by `sh` against a stand-in app and a stand-in tray launcher. Git
  * Bash provides `sh` on Windows, and CI runs macOS and Linux.
  */
 const hasSh = spawnSync('sh', ['-c', 'exit 0']).status === 0;
 
-function launcherFolder(runtime: string): string {
+function launcherFolder(app: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'olp-launcher-'));
-  fs.mkdirSync(path.join(dir, 'src'));
-  fs.writeFileSync(path.join(dir, 'src', 'main.ts'), '');
-  fs.writeFileSync(path.join(dir, 'node'), runtime, { mode: 0o755 });
+  fs.mkdirSync(path.join(dir, 'app'));
+  fs.writeFileSync(path.join(dir, 'app', 'osu-local-profiles-app'), app, { mode: 0o755 });
   fs.writeFileSync(path.join(dir, 'osu-local-profiles'), '#!/bin/sh\necho "tray launcher started" >> events.log\n', { mode: 0o755 });
-  fs.writeFileSync(path.join(dir, 'start.sh'), launcherFor('linux', 'node')!.content, { mode: 0o755 });
+  fs.writeFileSync(path.join(dir, 'start.sh'), launcherFor('linux')!.content, { mode: 0o755 });
   return dir;
 }
 

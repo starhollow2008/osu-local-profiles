@@ -167,7 +167,7 @@ func TestASwapReplacesEverythingButData(t *testing.T) {
 		t.Errorf("rollback left behind: %v", matches)
 	}
 
-	// The log starts as updatedToFromLog in src/update/notes.ts reads it.
+	// The log starts as Notes.UpdatedToFromLog in dotnet/App/Update/Notes.cs reads it.
 	log := read(filepath.Join(install, "data", "update.log"))
 	if !strings.HasPrefix(log, "OK: updated to 2.0.0\n\n") || !strings.Contains(log, "removed the rollback copy; the update is complete") {
 		t.Errorf("log:\n%s", log)

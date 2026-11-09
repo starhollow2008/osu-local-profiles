@@ -11,11 +11,15 @@ import { launcherFor, readmeFor, trayLauncherFor } from '../scripts/package-file
  * release runs again, the executable bit, and the line that moves to the app's own folder --
  * without which the app looks for `data/` wherever the file manager started it and appears
  * to have lost every score.
+ *
+ * A package's `node` is a stand-in for older installs to update through and its src/ a
+ * placeholder (scripts/package.mjs), so the scripts check and run the app itself: a missing
+ * app must never be covered by the stand-in being there.
  */
 
 const unix = ['osx', 'linux'] as const;
 const script = (os: 'osx' | 'linux') => {
-  const launcher = launcherFor(os, 'node');
+  const launcher = launcherFor(os);
   assert.ok(launcher, `${os} has a script`);
   return launcher;
 };
@@ -34,7 +38,7 @@ test('each platform gets the tray launcher its file manager opens', () => {
  * first update to it ends with nothing started.
  */
 test("the unix scripts keep the names earlier releases' launchers run again after an update", () => {
-  assert.equal(launcherFor('win', 'node.exe'), null);
+  assert.equal(launcherFor('win'), null);
   assert.equal(script('osx').name, 'Start osu! local profiles.command');
   assert.equal(script('linux').name, 'start.sh');
   for (const os of unix) assert.equal(script(os).mode, 0o755);
@@ -53,9 +57,13 @@ test('the scripts start the tray launcher beside them, never one from PATH', () 
 test('with no desktop, start.sh runs the app in its terminal and restarts it after an update', () => {
   const { content } = script('linux');
   assert.match(content, /if \[ -n "\$DISPLAY" \] \|\| \[ -n "\$WAYLAND_DISPLAY" \]; then/);
-  assert.match(content, /^OSU_LOCAL_PROFILES_LAUNCHER=restarts \.\/node src\/main\.ts$/m);
+  assert.match(content, /^OSU_LOCAL_PROFILES_LAUNCHER=restarts \.\/app\/osu-local-profiles-app$/m);
   // macOS always has a menu bar, so its script never runs the app itself.
-  assert.doesNotMatch(script('osx').content, /\.\/node src\/main\.ts/);
+  assert.doesNotMatch(script('osx').content, /OSU_LOCAL_PROFILES_LAUNCHER=/);
+});
+
+test('the scripts check and run the app, never the stand-ins older installs update through', () => {
+  for (const os of unix) assert.doesNotMatch(script(os).content, /\.\/node\b|src\/main\.ts|tools\/pp/);
 });
 
 /* ------------------------------------------------- the incomplete-folder guard */
@@ -63,15 +71,15 @@ test('with no desktop, start.sh runs the app in its terminal and restarts it aft
 /*
  * Nothing in this app needs installing, so a missing file is never a missing prerequisite:
  * it is an incomplete download, a half-finished extraction, or antivirus having taken the
- * runtime. The tray launcher says the same in a dialog (tools/launcher, main.go).
+ * app. The tray launcher says the same in a dialog (tools/launcher, main.go).
  */
 test('a script whose folder is incomplete says so instead of failing obscurely', () => {
-  assert.match(
-    script('linux').content,
-    /if \[ ! -f \.\/node \] \|\| \[ ! -f src\/main\.ts \] \|\| \[ ! -e "\.\/osu-local-profiles" \]; then/,
-  );
+  for (const os of unix) {
+    assert.match(script(os).content, /if \[ ! -f \.\/app\/osu-local-profiles-app \] \|\| \[ ! -e "\.\//);
+    assert.match(script(os).content, /this folder is incomplete/);
+  }
+  assert.match(script('linux').content, /\[ ! -e "\.\/osu-local-profiles" \]/);
   assert.match(script('osx').content, /\[ ! -e "\.\/osu! local profiles\.app" \]/);
-  for (const os of unix) assert.match(script(os).content, /this folder is incomplete/);
 });
 
 test('the guard says nothing needs installing, and where to get the archive', () => {
@@ -86,8 +94,8 @@ test('the guard says nothing needs installing, and where to get the archive', ()
 test('the scripts tell the user how to restore a lost executable bit', () => {
   for (const os of unix) {
     const { content } = script(os);
-    assert.match(content, /if \[ ! -x \.\/node \] \|\| \[ ! -x "\.\//);
-    assert.match(content, /chmod \+x \.\/node tools\/pp\/osu-pp '/);
+    assert.match(content, /if \[ ! -x \.\/app\/osu-local-profiles-app \] \|\| \[ ! -x "\.\//);
+    assert.match(content, /chmod \+x \.\/app\/osu-local-profiles-app '/);
   }
 });
 
@@ -98,6 +106,10 @@ test('the scripts start with a shebang and use forward slashes', () => {
     assert.ok(!content.includes('\\'), 'a backslash path would not resolve on unix');
     assert.ok(!content.includes('\r'), 'CR would break the shebang line on some shells');
   }
+});
+
+test('the macOS script releases a quarantined app', () => {
+  assert.match(script('osx').content, /xattr -p com\.apple\.quarantine \.\/app\/osu-local-profiles-app /);
 });
 
 /* ------------------------------------------------------------------ README */
@@ -131,7 +143,7 @@ test('each README says where the app is while it runs, and how to stop it', () =
 });
 
 test('the Linux README says how to restore a lost executable bit', () => {
-  assert.match(readmeFor('linux'), /chmod \+x start\.sh node osu-local-profiles tools\/pp\/osu-pp/);
+  assert.match(readmeFor('linux'), /chmod \+x start\.sh osu-local-profiles app\/osu-local-profiles-app/);
 });
 
 test('each README names the launcher that platform actually has', () => {
@@ -142,6 +154,15 @@ test('each README names the launcher that platform actually has', () => {
   assert.ok(!readmeFor('win').includes('.bat'));
 });
 
+test('each README names what is included, and the stand-ins as what they are', () => {
+  for (const os of ['win', 'osx', 'linux'] as const) {
+    assert.match(readmeFor(os), /Nothing needs installing\. osu!'s pp calculator is included\./);
+    assert.doesNotMatch(readmeFor(os), /Node/);
+    // Named as each system's package has them, so nobody takes them for the app.
+    assert.match(readmeFor(os), new RegExp(`^${os === 'win' ? 'node\\.exe' : 'node'}, src and scripts are only there so that versions before 1\\.33\\.0 can$`, 'm'));
+  }
+});
+
 test('every README says how to point it at osu! by hand', () => {
   for (const os of ['win', 'osx', 'linux'] as const) assert.match(readmeFor(os), /installRoots/);
 });
@@ -149,44 +170,4 @@ test('every README says how to point it at osu! by hand', () => {
 test('the Windows README is CRLF so Notepad can read it', () => {
   assert.ok(readmeFor('win').includes('\r\n'));
   assert.ok(!readmeFor('linux').includes('\r\n'));
-});
-
-/* ------------------------------------------------- a release without Node */
-
-/*
- * The C# app's package (docs/csharp-port.md, phase 7). Its `node` is a stand-in for older
- * installs to update through and its src/ a placeholder, so the scripts check and run the app
- * itself: a missing app must never be covered by the stand-in being there.
- */
-const nativeScript = (os: 'osx' | 'linux') => {
-  const launcher = launcherFor(os, 'node', true);
-  assert.ok(launcher, `${os} has a script`);
-  return launcher;
-};
-
-test('without Node, the scripts keep their names and check the app, not the stand-ins', () => {
-  assert.equal(launcherFor('win', 'node.exe', true), null);
-  assert.equal(nativeScript('osx').name, 'Start osu! local profiles.command');
-  assert.equal(nativeScript('linux').name, 'start.sh');
-  for (const os of unix) {
-    const { content, mode } = nativeScript(os);
-    assert.equal(mode, 0o755);
-    assert.match(content, /if \[ ! -f \.\/app\/osu-local-profiles-app \] \|\| \[ ! -e "\.\//);
-    assert.match(content, /if \[ ! -x \.\/app\/osu-local-profiles-app \] \|\| \[ ! -x "\.\//);
-    assert.match(content, /chmod \+x \.\/app\/osu-local-profiles-app '/);
-    assert.doesNotMatch(content, /\.\/node\b|src\/main\.ts|tools\/pp/);
-  }
-  assert.match(nativeScript('osx').content, /xattr -p com\.apple\.quarantine \.\/app\/osu-local-profiles-app /);
-  assert.match(nativeScript('linux').content, /^OSU_LOCAL_PROFILES_LAUNCHER=restarts \.\/app\/osu-local-profiles-app$/m);
-});
-
-test('without Node, the README names what is included and what to make executable', () => {
-  for (const os of ['win', 'osx', 'linux'] as const) {
-    assert.match(readmeFor(os, true), /Nothing needs installing\. osu!'s pp calculator is included\./);
-    assert.doesNotMatch(readmeFor(os, true), /Node/);
-    // The stand-ins, named as each system's package has them, so nobody takes them for the app.
-    assert.match(readmeFor(os, true), new RegExp(`^${os === 'win' ? 'node\\.exe' : 'node'}, src and scripts are only there so that versions before 1\\.33\\.0 can$`, 'm'));
-    assert.doesNotMatch(readmeFor(os), /are only there so that/);
-  }
-  assert.match(readmeFor('linux', true), /chmod \+x start\.sh osu-local-profiles app\/osu-local-profiles-app/);
 });
