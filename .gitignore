@@ -8,8 +8,8 @@ web/dist/
 # .NET build output for the pp helper
 tools/**/bin/
 tools/**/obj/
+# Where the Node app kept its built helper, and that build in progress, in older checkouts.
 tools/pp/
-# The helper being built, and the one it replaces, while build:pp:local swaps them.
 tools/pp.building/
 tools/pp.old/
 
