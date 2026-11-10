@@ -54,6 +54,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     private ReplayWatcher? watcher;
     private LogWatcher? logWatcher;
     private List<McosuWatcher> mcosuWatchers = [];
+    private List<NekiWatcher> nekiWatchers = [];
     private SongsWatcher? songsWatcher;
     private bool enabled;
     private double liveFrom;
@@ -234,6 +235,14 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
             _ = w.Start();
         }
 
+        // neki's passes arrive as replays in the stable folder; its fails and quits only here.
+        foreach (var install in installs.Where(i => i.Kind == "neki"))
+        {
+            var w = new NekiWatcher(install, neki, HandleNekiPlays, e => Error?.Invoke(e));
+            nekiWatchers.Add(w);
+            w.Start();
+        }
+
         var songs = installs.Where(i => i.Kind != "lazer").SelectMany(i => i.BeatmapRoots).ToList();
         songs = [.. songs.Where((p, n) => songs.FindIndex(o => SamePath(o, p)) == n)];
         if (songs.Count > 0)
@@ -264,6 +273,8 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         logWatcher = null;
         foreach (var w in mcosuWatchers) w.Stop();
         mcosuWatchers = [];
+        foreach (var w in nekiWatchers) w.Stop();
+        nekiWatchers = [];
         songsWatcher?.Stop();
         songsWatcher = null;
         resolver.OnMiss = null;
@@ -309,6 +320,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         }
         foreach (var play in scan.Unfinished) Tally(Incomplete.CheckPlay(play, ctx), false, play.CountedAt);
         foreach (var attempt in scan.Attempts) Tally(Incomplete.CheckAttempt(attempt, ctx), true, attempt.EndedAt);
+        foreach (var play in NekiUnfinished(until, chosen)) Tally(Incomplete.CheckNekiPlay(play, ctx), true, play.PlayedAt);
         return new LogBackfillPreview(unfinished, attempts, alreadyTracked, unresolved, filteredCount, scan.Sessions, earliest, latest);
     }
 
@@ -409,6 +421,10 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
                     foreach (var attempt in scan.Attempts)
                     {
                         if (Tally(Incomplete.IngestAttempt(attempt, ctx).Status)) attempts++;
+                    }
+                    foreach (var play in NekiUnfinished(until, chosen))
+                    {
+                        if (Tally(Incomplete.IngestNekiPlay(play, ctx).Status)) attempts++;
                     }
                 }
             }
@@ -747,6 +763,31 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
                 if (result.Status == "added") IncompletePlay?.Invoke(result.Play!);
                 else if (result.Status == "filtered") ReportFiltered(result.Title!, result.TitleOriginal, result.Criterion!, "incomplete");
                 else if (result.Reason != "passed") Skip?.Invoke(result.Reason!);
+            }
+            return Task.CompletedTask;
+        });
+    }
+
+    /// <summary>
+    /// neki's fails and quits up to <paramref name="until"/>, oldest first: as many as its
+    /// <c>neki.recent.json</c> still lists. How early they start is the import's own <c>since</c>.
+    /// </summary>
+    private List<NekiRecentPlay> NekiUnfinished(double? until, IReadOnlyCollection<string>? chosen) =>
+        [.. Chosen(chosen).Where(i => i.Kind == "neki").SelectMany(neki.Recent)
+            .Where(p => !p.Passed && (until is not { } u || p.PlayedAt <= u))
+            .OrderBy(p => p.PlayedAt)];
+
+    private void HandleNekiPlays(List<NekiRecentPlay> plays)
+    {
+        Arrived();
+        Queue(() =>
+        {
+            foreach (var play in plays)
+            {
+                var result = Incomplete.IngestNekiPlay(play, new IncompleteContext(db, resolver, profile, LiveCutoff, CurrentFilter(), "live"));
+                if (result.Status == "added") IncompletePlay?.Invoke(result.Play!);
+                else if (result.Status == "filtered") ReportFiltered(result.Title!, result.TitleOriginal, result.Criterion!, "incomplete");
+                else Skip?.Invoke(result.Reason!);
             }
             return Task.CompletedTask;
         });

@@ -311,6 +311,71 @@ public sealed class NekiTests : IDisposable
         Assert.Empty(new PlayTracker(h.Db, new BeatmapResolver(h.Db, []), [Detect.StableInstall(stable)!], h.ProfileId, 0, null).RelabelNekiPlays());
     }
 
+    /* ------------------------------------------------------- fails and quits */
+
+    [Fact]
+    public void A_fail_or_quit_is_an_attempt_osu_never_received_filed_under_the_mode_neki_played()
+    {
+        var ctx = new IncompleteContext(h.Db, new BeatmapResolver(h.Db, []), h.ProfileId, 0);
+        var quit = new NekiRecentPlay(Map, PlayedAt, 1, false, true, 20416, 1.6, null);
+        Assert.Equal("passed", Incomplete.CheckNekiPlay(quit with { Passed = true, Quit = false }, ctx).Reason);
+        Assert.Equal("too-old", Incomplete.CheckNekiPlay(quit, ctx with { TrackingSince = PlayedAt + 1 }).Reason);
+        // Checking writes nothing.
+        Assert.Equal("ready", Incomplete.CheckNekiPlay(quit, ctx).Status);
+        Assert.Equal(0, Convert.ToInt64(h.Db.Scalar("SELECT COUNT(*) FROM incomplete_plays")));
+
+        var added = Incomplete.IngestNekiPlay(quit, ctx);
+        Assert.Equal(("added", true, 1), (added.Status, added.Play!.Unsubmitted, added.Play.Mode));
+        var row = h.Db.FirstRow("SELECT * FROM incomplete_plays")!;
+        Assert.Equal(($"neki:{Map}:{PlayedAt}", PlayedAt, PlayedAt - 12760, 1L),
+            (row.Str("dedupe_key"), row.Num("played_at"), row.Num("started_at"), (long)row.Num("unsubmitted")!));
+        Assert.Equal("duplicate", Incomplete.IngestNekiPlay(quit, ctx).Reason);
+        // A fail at the very start says nothing of when it began.
+        Incomplete.IngestNekiPlay(quit with { PlayedAt = PlayedAt + 5000, EndTime = 0 }, ctx);
+        Assert.Null(h.Db.FirstRow("SELECT started_at FROM incomplete_plays WHERE played_at = ?", PlayedAt + 5000)!.Num("started_at"));
+
+        // The filter judges it as neki's, and Track anyway brings it back as it was.
+        var filtered = Incomplete.IngestNekiPlay(quit with { PlayedAt = PlayedAt + 9000 },
+            ctx with { Filter = new TrackingFilter { Enabled = true, Clients = ["lazer"] }, Declines = "live" });
+        Assert.Equal(("filtered", "client"), (filtered.Status, filtered.Criterion));
+        var declined = Assert.Single(Tracker.Declined.List(h.Db, h.ProfileId));
+        var json = h.Db.FirstRow("SELECT recording FROM declined_plays WHERE id = ?", declined.Id)!.Str("recording")!;
+        var recording = JsonSerializer.Deserialize<Recording>(json, JsonText.Options)!;
+        Assert.Equal((1, "neki"), (recording.Mode, recording.Client));
+        Assert.Equal(1, Incomplete.IngestRecording(recording, ctx).Play!.Mode);
+    }
+
+    [Fact]
+    public async Task Neki_ending_a_play_without_a_replay_is_picked_up_but_not_what_it_listed_before()
+    {
+        var (_, nekiRoot) = Installed();
+        var recent = Neki.RecentFile(nekiRoot);
+        File.WriteAllText(recent, Recent((Map, "2026-11-10T10:30:00.0000000Z", false, true)));
+        var arrived = new TaskCompletionSource<List<NekiRecentPlay>>();
+        var watcher = new NekiWatcher(Neki.Install(nekiRoot)!, new NekiPlays([]), p => arrived.TrySetResult(p));
+        watcher.Start();
+        try
+        {
+            await Task.Delay(500);
+            File.WriteAllText(recent, Recent(
+                (Map, NekiTime, true, false),
+                (Map, "2026-11-10T10:39:03.0073926Z", false, false),
+                (Map, "2026-11-10T10:30:00.0000000Z", false, true)));
+            var play = Assert.Single(await Within(arrived.Task));
+            Assert.Equal((false, false), (play.Passed, play.Quit));
+        }
+        finally
+        {
+            watcher.Stop();
+        }
+    }
+
+    private static async Task<T> Within<T>(Task<T> task, int seconds = 15)
+    {
+        if (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(seconds))) != task) throw new TimeoutException("nothing arrived");
+        return await task;
+    }
+
     [Fact]
     public void A_folder_both_installs_name_is_watched_once()
     {

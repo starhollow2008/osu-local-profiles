@@ -59,7 +59,7 @@ internal static class Incomplete
     private static IncompleteResult Assess(Recording entry, IncompleteContext ctx)
     {
         var beatmap = ctx.Resolver.Resolve(entry.Md5);
-        var mode = beatmap.OsuPath is { Length: > 0 } osuPath ? Beatmaps.Mode(osuPath) : 0;
+        var mode = entry.Mode ?? (beatmap.OsuPath is { Length: > 0 } osuPath ? Beatmaps.Mode(osuPath) : 0);
         var (title, titleOriginal) = Ingest.Describe(beatmap, entry.Md5);
 
         // No mod list and no star rating: lazer records neither, and a missing fact never rejects.
@@ -67,7 +67,7 @@ internal static class Incomplete
         if (filter.Enabled)
         {
             var facts = TrackingFilter.BeatmapFacts(ctx.Db, ctx.Resolver, beatmap);
-            if (filter.Rejects(TrackingFilter.PlayFactsOf(facts, mode, null, "lazer")) is { } rejected)
+            if (filter.Rejects(TrackingFilter.PlayFactsOf(facts, mode, null, entry.Client ?? "lazer")) is { } rejected)
             {
                 return new IncompleteResult("filtered", Criterion: rejected, Title: title, TitleOriginal: titleOriginal, Recording: entry, Mode: mode);
             }
@@ -147,6 +147,27 @@ internal static class Incomplete
 
     /// <summary>Record an attempt osu! logged it had no token for: always, whatever the setting that decides whether it counts.</summary>
     public static IncompleteResult IngestAttempt(UnsubmittedAttempt attempt, IncompleteContext ctx) => Settle(CheckAttempt(attempt, ctx), ctx);
+
+    /// <summary>A neki play's key: its beatmap and the moment it ended, as neki recorded both.</summary>
+    public static string NekiKey(NekiRecentPlay play) => $"neki:{play.BeatmapMD5}:{Js.NumberToString(play.PlayedAt)}";
+
+    /// <summary>
+    /// Everything <see cref="IngestNekiPlay"/> decides, without writing anything. A fail or a quit in
+    /// neki never reaches osu!, so it is an attempt osu! could not submit, counted as one (roadmap 5.83).
+    /// </summary>
+    public static IncompleteResult CheckNekiPlay(NekiRecentPlay play, IncompleteContext ctx)
+    {
+        // A pass has its replay, and arrives as a score.
+        if (play.Passed) return new IncompleteResult("skipped", "passed");
+        if (play.PlayedAt < ctx.TrackingSince) return new IncompleteResult("skipped", "too-old");
+        var key = NekiKey(play);
+        if (IsRecorded(ctx, key)) return new IncompleteResult("skipped", "duplicate");
+        // How far into the map it ended, at the speed it was played: when it started.
+        double? startedAt = play.EndTime > 0 ? play.PlayedAt - Js.Round(play.EndTime / play.Rate) : null;
+        return Assess(new Recording(key, play.BeatmapMD5, null, play.PlayedAt, startedAt, null, true, play.Mode, "neki"), ctx);
+    }
+
+    public static IncompleteResult IngestNekiPlay(NekiRecentPlay play, IncompleteContext ctx) => Settle(CheckNekiPlay(play, ctx), ctx);
 
     /// <summary>
     /// What lazer's logs hold that a profile has not tracked: plays osu! counted but never wrote a

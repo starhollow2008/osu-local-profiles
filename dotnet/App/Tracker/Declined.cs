@@ -21,9 +21,12 @@ internal sealed record DeclinedPlay(
 /// Plays the tracking filter or the owner check turned away: src/tracker/declined.ts, reading
 /// half. Recorded in <c>declined_plays</c>, which no figure reads.
 /// </summary>
-/// <summary>An unfinished play as lazer's log recorded it, kept with a decline so it can be tracked anyway.</summary>
+/// <summary>
+/// An unfinished play as lazer's log or neki recorded it, kept with a decline so it can be tracked
+/// anyway. <c>Mode</c> and <c>Client</c> are neki's, which says what it played; lazer's log does not.
+/// </summary>
 internal sealed record Recording(string DedupeKey, string Md5, string? BeatmapName, double PlayedAt, double? StartedAt,
-    string? OnlineScoreId, bool Unsubmitted);
+    string? OnlineScoreId, bool Unsubmitted, int? Mode = null, string? Client = null);
 
 /// <summary>
 /// A play turned away: <c>kind</c> score or incomplete, <c>reason</c> filtered, another-player or

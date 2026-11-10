@@ -743,3 +743,76 @@ internal sealed class McosuWatcher(string root, string dir, Action<string> onRep
         onError?.Invoke(e);
     }
 }
+
+/// <summary>
+/// Watches neki's <c>neki.recent.json</c> for plays it ended without a replay: fails and quits
+/// (roadmap 5.83). What the file held at the start is never taken as new; passes arrive as replays.
+/// </summary>
+internal sealed class NekiWatcher(OsuInstall neki, NekiPlays files, Action<List<NekiRecentPlay>> onPlays, Action<Exception>? onError = null)
+{
+    /// <summary>neki rewrites the file whole after every play.</summary>
+    private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(300);
+
+    private readonly object gate = new();
+    private readonly HashSet<string> known = new(StringComparer.Ordinal);
+    private readonly Debounce pending = new();
+    private readonly List<FileSystemWatcher> watchers = [];
+    private bool running;
+
+    private static string Key(NekiRecentPlay p) => $"{p.BeatmapMD5}:{Js.NumberToString(p.PlayedAt)}";
+
+    public void Start()
+    {
+        lock (gate)
+        {
+            if (running) return;
+            running = true;
+            foreach (var play in files.Recent(neki)) known.Add(Key(play));
+        }
+        var file = Neki.RecentFile(neki.Root);
+        var dir = NodePath.Dirname(file);
+        var name = Js.ToLower(NodePath.Basename(file));
+        // The folder rather than the file, which neki replaces whole. Never made here: it is neki's.
+        if (!Directory.Exists(dir)) return;
+        try
+        {
+            watchers.Add(Watch.Start(dir, false, changed =>
+            {
+                if (Js.ToLower(changed) == name) pending.Schedule(name, Settle, Read);
+            }, onError));
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            onError?.Invoke(e);
+        }
+    }
+
+    public void Stop()
+    {
+        lock (gate) running = false;
+        Watch.Stop(watchers);
+        pending.Clear();
+    }
+
+    private void Read()
+    {
+        var fresh = new List<NekiRecentPlay>();
+        lock (gate)
+        {
+            if (!running) return;
+            foreach (var play in files.Recent(neki))
+            {
+                if (known.Add(Key(play)) && !play.Passed) fresh.Add(play);
+            }
+        }
+        if (fresh.Count == 0) return;
+        try
+        {
+            onPlays([.. fresh.OrderBy(p => p.PlayedAt)]);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            onError?.Invoke(e);
+        }
+    }
+}

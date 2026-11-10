@@ -1674,5 +1674,5 @@ seed included.
 1. Find neki, label its plays, add it to the filter and the page. Done.
 2. Price extra-mods plays as stable, and carry saved filters over. Done.
 3. Relabel plays tracked before. Done.
-4. Fails and quits from `neki.recent.json`, live and in Import past plays.
+4. Fails and quits from `neki.recent.json`, live and in Import past plays. Done.
 5. Docs: architecture, user guide, the note on the page.
