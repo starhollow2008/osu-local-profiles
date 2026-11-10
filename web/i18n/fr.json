@@ -791,6 +791,7 @@
   "shareScreenshot": "Enregistrer…",
   "shareTitle": "Partager et sauvegarder",
   "mcosuNote.text": "<b>Tu joues sur McOsu ?</b> Seules les parties terminées sont enregistrées, les parties incomplètes (abandon, échec, reprise) ne peuvent pas être comptées dans le nombre de parties. Le pp affiché ici utilise le calculateur de pp actuel d'osu!, il peut donc différer de celui de McOsu.",
+  "nekiNote.text": "<b>Tu joues sur neki ?</b> Les abandons et les échecs comptent comme Non envoyée.",
   "source.manual": "Saisi à la main",
   "source.manualTitle": "Ce score a été tapé à la main, pas enregistré, donc rien ne l'a vérifié. Ses pp sont calculés à partir des nombres saisis.",
   "stableNote.text": "<b>Tu joues sur osu!stable ?</b> Les scores ne sont enregistrés qu'une fois que tu quittes l'écran des résultats pour revenir à la sélection des musiques. Les parties incomplètes (abandon, échec, reprise) ne peuvent pas être comptées dans le nombre de parties sur stable.",

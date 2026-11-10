@@ -791,6 +791,7 @@
   "shareScreenshot": "儲存……",
   "shareTitle": "分享與備份",
   "mcosuNote.text": "<b>在 McOsu 上遊玩嗎？</b>只有完成的遊玩會被記錄，未完成的遊玩（退出、失敗、重試）無法計入遊玩次數。這裡顯示的 pp 使用 osu! 目前的 pp 計算器，所以可能與 McOsu 的不同。",
+  "nekiNote.text": "<b>在 neki 上遊玩嗎？</b>退出和失敗會計為「未提交」。",
   "source.manual": "手動輸入",
   "source.manualTitle": "這筆成績是手動輸入而非錄製的，因此沒有經過任何檢查。它的 pp 依輸入的數字計算。",
   "stableNote.text": "<b>在 osu!stable 上遊玩嗎？</b>成績只有在你離開結算畫面、回到選歌介面後才會記錄。在 stable 上，未完成的遊玩（退出、失敗、重試）無法計入遊玩次數。",

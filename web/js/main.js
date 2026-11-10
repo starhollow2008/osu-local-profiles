@@ -620,12 +620,14 @@ $('favoritesNote').onclick = async (e) => {
  *
  * McOsu has the second limitation too, worse: it keeps nothing at all of a play it did not
  * save. So a McOsu install gets its own paragraph in the same note, and one dismissal covers
- * both -- they are the same news about the same kind of play.
+ * both -- they are the same news about the same kind of play. neki, which plays from a stable
+ * folder, says what it does keep of those plays (roadmap 5.83).
  */
 function renderStableNote() {
   const paragraphs = [
     ...(installKinds.includes('stable') ? [t('stableNote.text')] : []),
     ...(installKinds.includes('mcosu') ? [t('mcosuNote.text')] : []),
+    ...(installKinds.includes('neki') ? [t('nekiNote.text')] : []),
   ];
   const show = paragraphs.length > 0 && settings.showStableNote !== false;
   for (const note of document.querySelectorAll('[data-stable-note]')) {

@@ -94,7 +94,7 @@ does not have to make it again.
 | 5.80 | Recent, named and placed as on osu!                       | done   |
 | 5.81 | An import's progress, and Import without Check           | done   |
 | 5.82 | One .NET app in place of Node                             | done   |
-| 5.83 | neki                                                      | in progress |
+| 5.83 | neki                                                      | done   |
 
 ## Constraints on every item
 
@@ -1615,7 +1615,7 @@ also where its progress is recorded.
 
 ## 5.83 - neki
 
-**Status:** in progress. Asked for by the owner.
+**Status:** done. Asked for by the owner.
 
 [neki](https://nekigame.nekiak.com/) is a closed-source offline client built to play like
 osu!stable, with its own "extra mods" copied from lazer's. Measured on 2026-11-10 against the build
@@ -1669,10 +1669,5 @@ seed included.
 - neki never sends a play to osu!, so it is never asked about for a rank change, and its score
   links are none.
 
-### Phases
-
-1. Find neki, label its plays, add it to the filter and the page. Done.
-2. Price extra-mods plays as stable, and carry saved filters over. Done.
-3. Relabel plays tracked before. Done.
-4. Fails and quits from `neki.recent.json`, live and in Import past plays. Done.
-5. Docs: architecture, user guide, the note on the page.
+Still open: whether a retry in the middle of a play leaves anything, and how many plays
+`neki.recent.json` keeps.

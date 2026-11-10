@@ -124,6 +124,21 @@ The evidence is in [roadmap.md](roadmap.md) under 5.12.
 - **McOsu-only mods (Nightmare and experimental mods) show as one MC mod.** Plays with it count
   toward pp only while [unranked mods are counted](#include-pp-for-unranked-mods).
 
+## neki
+
+[neki](https://nekigame.nekiak.com/) plays from an osu!stable folder and saves its replays there, so
+it's found wherever it was installed (`AppData\Local\Programs\neki`) and its plays are tracked as
+**neki**, apart from stable's.
+
+- **Plays are scored as osu!stable scores them**, with the Classic mod, as on stable.
+- **neki's extra mods count as osu!lazer's**: Difficulty Adjust, Mirror, Random, Alternate and
+  Single Tap, a custom rate as Double Time or Half Time at that speed, and No Lock as Classic with
+  note lock off. Practice and Pitch change nothing. Plays with them count toward pp only while
+  [unranked mods are counted](#include-pp-for-unranked-mods).
+- **Quits and fails count as Not submitted plays**, the same as osu!lazer's offline attempts. They
+  follow **Count plays osu! could not submit**. A retry in the middle of a play may leave nothing.
+- **Import past plays** brings in neki's quits and fails as far back as neki still lists them.
+
 ## The profile page
 
 Under the rank graph are osu!'s three figures: **Medals** (every medal across all modes), **pp**,
@@ -358,7 +373,7 @@ wide open. There are ten:
 |---|---|
 | **Beatmap rules** | Which beatmaps count, by title, artist, mapper and more. See [Beatmap rules](#beatmap-rules). |
 | **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
-| **Client** | osu!stable, osu!lazer, McOsu. A stable play imported into lazer counts as stable. |
+| **Client** | osu!stable, osu!lazer, McOsu, neki. A stable play imported into lazer counts as stable. |
 | **Difficulty** | The star rating as played, mods included. |
 | **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
 | **Categories** | Ranked, Qualified, Loved, Pending, Work in progress, Graveyarded, Never submitted. |

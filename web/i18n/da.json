@@ -791,6 +791,7 @@
   "shareScreenshot": "Gem…",
   "shareTitle": "Del og sikkerhedskopier",
   "mcosuNote.text": "<b>Spiller du på McOsu?</b> Kun gennemførte forsøg registreres, ufuldførte forsøg (afbrudt, mislykket, gentaget) kan ikke tælles med i antallet af forsøg. pp her bruger osu!'s nuværende pp-beregner, så den kan afvige fra McOsus.",
+  "nekiNote.text": "<b>Spiller du på neki?</b> Afbrudte og mislykkede forsøg tælles som Ikke sendt.",
   "source.manual": "Indtastet i hånden",
   "source.manualTitle": "Dette resultat blev skrevet ind i hånden, ikke optaget, så intet har kontrolleret det. Dets pp beregnes ud fra de indtastede tal.",
   "stableNote.text": "<b>Spiller du på osu!stable?</b> Resultater registreres først, når du forlader resultatskærmen og går tilbage til sangvalget. Ufuldførte forsøg (afbrudt, mislykket, gentaget) kan ikke tælles med i antallet af forsøg på stable.",

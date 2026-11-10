@@ -791,6 +791,7 @@
   "shareScreenshot": "保存……",
   "shareTitle": "分享与备份",
   "mcosuNote.text": "<b>在 McOsu 上游玩吗？</b>只有完成的游玩会被记录，未完成的游玩（退出、失败、重试）无法计入游玩次数。这里显示的 pp 使用 osu! 当前的 pp 计算器，所以可能与 McOsu 的不同。",
+  "nekiNote.text": "<b>在 neki 上游玩吗？</b>退出和失败会计为“未提交”。",
   "source.manual": "手动输入",
   "source.manualTitle": "这条成绩是手动输入而非录制的，因此没有经过任何检查。它的 pp 根据输入的数字计算。",
   "stableNote.text": "<b>在 osu!stable 上游玩吗？</b>成绩只有在你离开结算画面、回到选歌界面后才会记录。在 stable 上，未完成的游玩（退出、失败、重试）无法计入游玩次数。",

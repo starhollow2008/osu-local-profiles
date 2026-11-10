@@ -791,6 +791,7 @@
   "shareScreenshot": "Salvar…",
   "shareTitle": "Compartilhar e fazer backup",
   "mcosuNote.text": "<b>Joga no McOsu?</b> Só jogadas completas são registradas, jogadas incompletas (desistência, falha, tentativa) não podem ser contadas na contagem de jogadas. O pp mostrado aqui usa a calculadora de pp atual do osu!, então pode ser diferente do McOsu.",
+  "nekiNote.text": "<b>Joga no neki?</b> Desistências e falhas contam como Não enviada.",
   "source.manual": "Inserida à mão",
   "source.manualTitle": "Esta pontuação foi digitada à mão, não gravada, então nada a verificou. Os pp dela são calculados a partir dos números inseridos.",
   "stableNote.text": "<b>Joga no osu!stable?</b> As pontuações só são registradas depois que você sai da tela de resultados e volta à seleção de músicas. Jogadas incompletas (desistência, falha, tentativa) não podem ser contadas na contagem de jogadas no stable.",

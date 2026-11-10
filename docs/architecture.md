@@ -733,6 +733,38 @@ AP+RX. Fails, quits and retries leave nothing, so they can't be counted.
   is left out of `dominantTrackedName`. Found on every launch from Steam's libraries, outside
   `missing()`, so it never triggers a drive walk.
 
+## neki
+
+A closed-source client that plays like osu!stable (roadmap 5.83), measured on 2026-11-10. It plays
+from a stable folder (`OsuFolder` in `neki.ini`) and writes its replays into that folder's
+`Data\r`, so `Clients/Neki.cs` decides which plays there are its.
+
+- **The install is not a replay source of its own.** `Neki.Install` is the stable folder's replays
+  and Songs under neki's root, and `PlayTracker.Distinct` watches that `Data\r` once, whichever
+  install named it.
+- **A play is neki's** (`NekiPlays.Claims`) when its lazer block says `client_version: "neki"`,
+  or `neki.recent.json` lists its beatmap at its exact moment (written before the replay), or
+  `scores.neki.db` holds its replay hash and stable's own `scores.db` does not: neki copies
+  stable's scores into its own. A stable replay neki wrote is otherwise stable's byte for byte.
+  `Ingest.WithClient` files it, for ingest and the Check preview alike.
+- **An extra mod or a custom rate makes neki write lazer's format** for what is a stable play:
+  stable's total in the header, lazer's mod JSON in the block (No Lock is CL with
+  `classic_note_lock: false`), and `user_id: 1`, which `Players.ReplayPlayer` ignores. Read as a
+  lazer play it scored 8,642. So it is priced from a stable copy (`Osr.StableCopy`, frames kept,
+  block dropped) with neki's mods as the request's `mods` (`PriceOptions.AsStable`), as McOsu's
+  are: classic 54,612 and standardised 877,225, pp unchanged. CL is left to osu!'s decoder and out
+  of the ranked question, as stable's is, and stable's total is withheld where the mods are not
+  stable's own, since neki's multipliers for them are unknown.
+- **Scored as stable everywhere** (`ScoredAsStable`). The filter judges its mods without CL, its
+  name is left out of `DominantTrackedName`, and it never asks osu! about a rank.
+- **Fails and quits are in `neki.recent.json`** (`passed`, `quit`, how far in), never in a replay.
+  They are attempts osu! never received (`unsubmitted = 1`, `neki:<md5>:<ms>`), counted through
+  `IncompleteSql`, filed under the mode neki played, live through `NekiWatcher` and in Import past
+  plays. How many plays the file keeps is unknown.
+- **Once neki is found**, plays tracked from its folder before it was a client are relabelled
+  (`RelabelNekiPlays`), and its lazer-format ones repriced. A saved filter that tracked stable
+  tracks neki too, once (`PinNekiClient`).
+
 ## osu!'s development client
 
 A Debug build of ppy/osu is tracked **beside** release lazer (roadmap 5.68): `OsuInstall.development`,

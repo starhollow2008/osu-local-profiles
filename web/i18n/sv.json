@@ -791,6 +791,7 @@
   "shareScreenshot": "Spara…",
   "shareTitle": "Dela och säkerhetskopiera",
   "mcosuNote.text": "<b>Spelar du på McOsu?</b> Bara slutförda omgångar registreras, ofullständiga omgångar (avbrott, misslyckande, omförsök) kan inte räknas in i antalet omgångar. pp som visas här använder osu!:s nuvarande pp-kalkylator, så den kan skilja sig från McOsus.",
+  "nekiNote.text": "<b>Spelar du på neki?</b> Avbrott och misslyckanden räknas som Inte skickad.",
   "source.manual": "Angivet för hand",
   "source.manualTitle": "Det här resultatet skrevs in för hand, spelades inte in, så inget har kontrollerat det. Dess pp beräknas från de angivna siffrorna.",
   "stableNote.text": "<b>Spelar du på osu!stable?</b> Resultat registreras först när du lämnar resultatskärmen och går tillbaka till låtvalet. Ofullständiga omgångar (avbrott, misslyckande, omförsök) kan inte räknas in i antalet omgångar på stable.",
