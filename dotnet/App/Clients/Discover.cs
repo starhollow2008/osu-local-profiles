@@ -153,7 +153,9 @@ internal static partial class Discover
         {
             var m = RunHistoryValue().Match(line);
             if (!m.Success) continue;
-            var root = NodePath.Dirname(m.Groups[1].Value);
+            // A Windows path wherever this runs, so cut at its last backslash rather than the platform's separator.
+            var exe = m.Groups[1].Value;
+            var root = exe[..exe.LastIndexOf('\\')];
             if (!roots.Any(r => Js.ToLower(r) == Js.ToLower(root))) roots.Add(root);
         }
         return roots;
