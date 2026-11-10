@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.34.0
+
+- **neki is supported.** Its plays are tracked as neki instead of osu!stable, and scored as
+  osu!stable scores them. Its extra mods count as osu!lazer's, and its quits and fails count as
+  Not submitted plays. Plays it set before this version move under neki.
+
+- **neomod is supported.** Its plays are tracked as neomod and scored as osu!stable scores them.
+  Its speed and CS/AR/OD/HP settings count as Double Time, Half Time and Difficulty Adjust, and
+  Singletap, Alternate, Traceable and Freeze Frame as osu!lazer's mods. Its other experimental mods
+  show as one **NEO** mod and don't change pp. On Windows it's found wherever you've run it from.
+
+- **The play tracking filter can keep only the names you choose.** Its new **Player names** lists
+  the names on your plays and the one osu! is signed in under. Untick a name to stop tracking it,
+  add your own names, and choose whether plays with no name (Guest) count. Plays already turned
+  away under a name come back with the next Import past plays. Your other names moved here.
+
+- **Clicking a score row opens the score, as on osu!**
+
+- **Star ratings on score rows are an option, off by default as on osu!** It's in Other settings.
+  If you're updating, a note under Scores says where it went.
+
+- **Most Played rows show the beatmap's cover and play count, as on osu!** The cover and title
+  open the beatmap.
+
+- **The stats box is laid out as on osu!.** Values are left-aligned, it has osu!'s last line,
+  Replays Watched by Others (a dash for now), and the rank chart grows to the box's height.
+
+- **The mode icons are drawn as osu! draws them.** They're sharper with display scaling, and the
+  score view and favourite beatmaps use them too.
+
+- **The page looks more like osu!'s.** The banner is at full brightness, section links are osu!'s
+  pink, bold text is a little lighter, and a score's menu button sits in the row's right edge.
+
+- **Explicit favourite beatmaps play their preview too.**
+
+- **The browser tab names the profile, as osu!'s player page does.** It reads "Tangy · local
+  profile | osu!".
+
+- **The program kept for updating from before 1.33.0 no longer looks like the app.** On Windows,
+  `node.exe` has no icon, and its description says what it's for.
+
+- **Everything new in this release is translated into all 15 languages.**
+
 ## 1.33.1
 
 - **Global rank estimates use osu!'s November 2026 ranking data.** The global rank on your profile

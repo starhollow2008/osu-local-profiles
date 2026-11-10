@@ -117,10 +117,13 @@ database's first profile. It must not pass a filter. Use it on a copy.
 
 ## README screenshots
 
-The README's images are `.webp` in `docs/images/`. Git keeps every version forever, so keep them
-few, cropped and re-encoded (a full-width section is 60-160KB as WebP at quality 90, against
-150KB-1.4MB as PNG), and replace one only when the page actually looks different. `docs/` is never
-packaged. Don't put them in `web/`, which ships with every release.
+The README has two shots of the same size in `docs/images/`, `profile.png` and `scores.png`, as
+PNG, since WebP came out blurry. Take them in headless Chrome at 1121 CSS pixels wide and twice the
+scale, cropped to the 1000-pixel content column: `profile.png` from the top to the bottom of the
+section links, and `scores.png` the me! and Scores sections, centred in the same height. Measure
+before cropping, since the page's heights move. Git keeps every version forever, so replace them
+only when the page actually looks different. `docs/` is never packaged. Don't put them in `web/`,
+which ships with every release.
 
 ## The sample profile
 
