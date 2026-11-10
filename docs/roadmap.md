@@ -95,7 +95,7 @@ does not have to make it again.
 | 5.81 | An import's progress, and Import without Check           | done   |
 | 5.82 | One .NET app in place of Node                             | done   |
 | 5.83 | neki                                                      | done   |
-| 5.84 | Track plays only from chosen names                        | todo   |
+| 5.84 | Track plays only from chosen names                        | done   |
 | 5.85 | neomod                                                    | done   |
 
 ## Constraints on every item
@@ -1676,8 +1676,22 @@ leaves anything, and how many plays `neki.recent.json` keeps. The user guide say
 
 ## 5.84 - Track plays only from chosen names
 
-**Status:** todo, planned. Asked for by a user who sorts their offline scores by the name they
-play under.
+**Status:** done. Asked for by a user who sorts their offline scores by the name they play under.
+
+A **Player names** section in the tracking filter (`TrackingFilter.Names`, `NoName`): the names
+found on the profile's plays and where osu! is signed in, each ticked or not, a **No name** box, and
+names typed in. Decided with the owner:
+
+- **"Your other names" is merged into it.** `Settings.ownNames` keeps its key and is the names
+  added here; its boxes in Other settings and Import past plays are gone.
+- **One list per profile.** Different names per client means a separate import for each.
+- **Ticking a name brings back nothing by itself.** Plays turned away under it come back with the
+  next Import past plays, which judges every replay again. Saving names no longer re-judges
+  declined plays (`RetrackOwnNames`, kept for "It's me").
+- Null is every name, so a filter switched on narrows nothing; the first name unticked turns it
+  into the list of names still ticked, and **Every name** goes back.
+
+Notes from before it was built:
 
 A profile could take only the plays set under names it lists, in every client. Notes for when it
 is built:
@@ -1691,11 +1705,9 @@ is built:
   choice needs an entry for plays with no name, and stable's signed-out plays and neki's and
   neomod's Guest ones fall under it together.
 - **Fails and quits keep no name yet.** `incomplete_plays` has no player column. neki's name for
-  each is read already (`NekiRecentPlay.Name`) but not stored, so filtering at import works, and
-  filtering what is already stored needs a `player_name` column on `incomplete_plays` (an
-  `ADDED_COLUMNS` entry), written by `Incomplete.Write`. Rows from before it are NULL, which
-  must never reject a play. Where lazer's log names the player behind an unfinished play is
-  still to be found.
+  each is judged at import (`Recording.Player`); nothing filters what is already stored, so no
+  column was needed. Where lazer's log names the player behind an unfinished play is still to be
+  found; until then the criterion never judges one.
 
 ## 5.85 - neomod
 

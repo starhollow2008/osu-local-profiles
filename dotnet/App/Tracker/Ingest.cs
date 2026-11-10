@@ -177,7 +177,8 @@ internal static class Ingest
         if (filter.Enabled)
         {
             facts = TrackingFilter.BeatmapFacts(ctx.Db, ctx.Resolver, beatmap);
-            if (filter.Rejects(TrackingFilter.PlayFactsOf(facts, mode, mods, score.Client)) is { } rejected)
+            var playFacts = TrackingFilter.PlayFactsOf(facts, mode, mods, score.Client) with { PlayerNames = Players.FilterNames(player, ctx.Identity) };
+            if (filter.Rejects(playFacts) is { } rejected)
             {
                 Declined(ctx, Play("filtered", described, rejected));
                 return new IngestOutcome("filtered", Criterion: rejected, Title: described.Title, TitleOriginal: described.TitleOriginal);

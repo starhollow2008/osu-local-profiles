@@ -129,7 +129,24 @@ const MOD_STATE_WORDS = {
 
 /* The filter being edited, and the machine facts that decide what the dialog can offer. */
 let draft = null;
-let context = { statusKnown: true, hasLazer: true, onSaved: null };
+let context = { statusKnown: true, hasLazer: true, onSaved: null, found: null };
+
+/**
+ * The names the player added (`Settings.ownNames`), edited here beside the filter's ticks
+ * (roadmap 5.84). They count as the player's own whether the filter is on or off, so their
+ * controls stay usable while it is off.
+ */
+let ownNames = [];
+
+const MAX_NAME_LENGTH = 32;
+
+/** Matches `TrackingFilter.IsNoName`: empty, or lazer's Guest. */
+const isNoName = (name) => {
+  const trimmed = String(name ?? '').trim();
+  return trimmed === '' || trimmed.toLowerCase() === 'guest';
+};
+
+const sameName = (a, b) => a.toLowerCase() === b.toLowerCase();
 
 const filterHint = (message, isError) => hint('filterHint', message, isError);
 
@@ -152,6 +169,9 @@ function copyFilter(filter) {
     fromKeywords: Boolean(filter?.fromKeywords),
     modes: Array.isArray(filter?.modes) ? [...filter.modes] : [0, 1, 2, 3],
     clients: Array.isArray(filter?.clients) ? [...filter.clients] : CLIENT_NAMES.map(([client]) => client),
+    // Null is every name, ticked or not yet seen.
+    names: Array.isArray(filter?.names) ? [...filter.names] : null,
+    noName: filter?.noName !== false,
     stars: { min: filter?.stars?.min ?? 0, max: filter?.stars?.max ?? null },
     length: { min: filter?.length?.min ?? 0, max: filter?.length?.max ?? null },
     mods: { ...(filter?.mods ?? {}) },
@@ -382,6 +402,131 @@ function clientsSection() {
   return section(t('filter.client'), `<div class="checkgroup">${boxes}</div>`, t('filter.clientHelp'));
 }
 
+/**
+ * Player names (roadmap 5.84): the names found on this profile's plays and where osu! is signed
+ * in, each ticked or not, the plays with no name, and the names the player added. Drawn by
+ * `renderNames`, since adding or removing a name redraws it.
+ */
+function namesSection() {
+  return section(
+    t('filter.players'),
+    `<div class="tf-names" id="tf-names"></div>
+     <div class="tf-names__add">
+       <input type="text" id="tf-name-new" class="tfilter__text" data-own maxlength="${MAX_NAME_LENGTH}"
+              autocomplete="off" spellcheck="false" placeholder="${escapeHtml(t('filter.namePlaceholder'))}"
+              aria-label="${escapeHtml(t('filter.namePlaceholder'))}">
+       <button type="button" class="tf-rules__add" data-act="add-name" data-own>+ ${escapeHtml(t('filter.addName'))}</button>
+       <button type="button" class="tf-rules__add" id="tf-names-all">${escapeHtml(t('filter.everyName'))}</button>
+     </div>
+     <div class="tfilter__readout" id="tf-names-readout"></div>`,
+    t('filter.playersHelp'),
+  );
+}
+
+/**
+ * Every name the section lists: found with plays or a sign-in, then the ones added, then any
+ * ticked name not otherwise seen. Each once, ignoring case.
+ */
+function listedNames() {
+  const list = [];
+  const add = (entry) => {
+    if (!list.some((n) => sameName(n.name, entry.name))) list.push(entry);
+  };
+  for (const n of context.found?.names ?? []) {
+    if (n.plays > 0 || n.signedIn.length > 0) add({ ...n, added: false });
+  }
+  for (const name of ownNames) add({ name, plays: 0, clients: [], signedIn: [], added: true });
+  for (const name of draft.names ?? []) add({ name, plays: 0, clients: [], signedIn: [], added: false });
+  for (const n of list) n.added = ownNames.some((own) => sameName(own, n.name));
+  return list;
+}
+
+const clientName = (client) => CLIENT_NAMES.find(([c]) => c === client)?.[1] ?? client;
+
+const playCount = (n) =>
+  plural(
+    n,
+    () => t('filter.namePlaysOne', { n }),
+    () => tOwn('filter.namePlaysFew', { n }),
+    () => t('filter.namePlaysMany', { n }),
+  );
+
+/** Where a name was seen, as one line: signed in, the clients, how many plays. */
+function nameWhere(n) {
+  const parts = n.signedIn.map((client) => t('filter.signedInTo', { client: clientName(client) }));
+  if (n.clients.length > 0) parts.push(n.clients.map(clientName).join(', '));
+  if (n.plays > 0) parts.push(playCount(n.plays));
+  else if (n.added && n.signedIn.length === 0) parts.push(t('filter.nameAdded'));
+  return parts.join(' · ');
+}
+
+function renderNames() {
+  const rows = listedNames()
+    .map(
+      (n) => `<div class="tf-name">
+        <label class="checkgroup__item"><input type="checkbox" data-player="${escapeHtml(n.name.toLowerCase())}">
+          <b>${escapeHtml(n.name)}</b></label>
+        <span class="tf-name__where">${escapeHtml(nameWhere(n))}</span>
+        ${
+          n.added
+            ? `<button type="button" class="tf-cond__remove" data-act="remove-name" data-name="${escapeHtml(n.name)}" data-own
+                 aria-label="${escapeHtml(t('filter.removeName'))}" title="${escapeHtml(t('filter.removeName'))}">&times;</button>`
+            : ''
+        }
+      </div>`,
+    )
+    .join('');
+  const noNamePlays = context.found?.noNamePlays ?? 0;
+  const noNameWhere = [t('filter.noNameWhere'), ...(noNamePlays > 0 ? [playCount(noNamePlays)] : [])].join(' · ');
+  $('tf-names').innerHTML = `${rows}
+    <div class="tf-name">
+      <label class="checkgroup__item"><input type="checkbox" data-noname> ${escapeHtml(t('filter.noNameLabel'))}</label>
+      <span class="tf-name__where">${escapeHtml(noNameWhere)}</span>
+    </div>`;
+  paintNames();
+}
+
+function paintNames() {
+  for (const box of $('tf-names').querySelectorAll('[data-player]')) {
+    box.checked = draft.names === null || draft.names.some((n) => n.toLowerCase() === box.dataset.player);
+  }
+  $('tf-names').querySelector('[data-noname]').checked = draft.noName;
+}
+
+/** What the names mean, in a sentence. */
+function namesReadout() {
+  if (draft.names === null) return escapeHtml(draft.noName ? t('filter.namesAny') : t('filter.namesAnyNamed'));
+  if (draft.names.length === 0) return escapeHtml(draft.noName ? t('filter.namesNoneOnly') : t('filter.noPlayerTicked'));
+  const names = { names: list(draft.names) };
+  return draft.noName ? t('filter.namesOnlyAndNone', names) : t('filter.namesOnly', names);
+}
+
+/** Add the name typed in the box: the player's own from now on, and ticked. */
+function addName() {
+  const box = $('tf-name-new');
+  const name = box.value.trim().slice(0, MAX_NAME_LENGTH);
+  box.value = '';
+  if (isNoName(name)) return;
+  if (!ownNames.some((own) => sameName(own, name))) ownNames.push(name);
+  if (draft.names !== null && !draft.names.some((n) => sameName(n, name))) draft.names.push(name);
+  renderNames();
+  applyEnabled();
+  renderReadouts();
+  $('tf-name-new').focus();
+}
+
+/** Take back a name the player added. One still found on plays stays listed, as it was ticked. */
+function removeName(name) {
+  ownNames = ownNames.filter((own) => !sameName(own, name));
+  const stillFound = (context.found?.names ?? []).some(
+    (n) => sameName(n.name, name) && (n.plays > 0 || n.signedIn.length > 0),
+  );
+  if (draft.names !== null && !stillFound) draft.names = draft.names.filter((n) => !sameName(n, name));
+  renderNames();
+  applyEnabled();
+  renderReadouts();
+}
+
 function starsSection() {
   return section(
     t('filter.difficulty'),
@@ -549,6 +694,7 @@ function renderBody() {
     rulesSection() +
     modesSection() +
     clientsSection() +
+    namesSection() +
     starsSection() +
     modsSection() +
     categoriesSection(needsLazer) +
@@ -586,6 +732,7 @@ function fillFromDraft() {
   for (const box of $('filterBody').querySelectorAll('[data-client]')) {
     box.checked = draft.clients.includes(box.dataset.client);
   }
+  renderNames();
   for (const box of $('filterBody').querySelectorAll('[data-category]')) {
     box.checked = draft.categories.includes(box.dataset.category);
   }
@@ -731,6 +878,9 @@ function impossibleReason() {
   if (draft.clients.length === 0) {
     return t('filter.noClientTicked');
   }
+  if (draft.names !== null && draft.names.length === 0 && !draft.noName) {
+    return t('filter.noPlayerTicked');
+  }
   if (draft.categories.length === 0) {
     return t('filter.noCategoryTicked');
   }
@@ -743,6 +893,7 @@ function impossibleReason() {
 function renderReadouts() {
   $('tf-rules-readout').innerHTML = rulesReadout();
   $('tf-mods-readout').innerHTML = modsReadout();
+  $('tf-names-readout').innerHTML = namesReadout();
   const impossible = impossibleReason();
   const warning = $('filterImpossible');
   warning.hidden = impossible === null;
@@ -758,6 +909,8 @@ function applyEnabled() {
   const on = $('filterEnabled').checked;
   $('filterBody').classList.toggle('tfilter--inactive', !on);
   for (const control of $('filterBody').querySelectorAll('input, button, select')) control.disabled = !on;
+  // The names the player added are theirs with the filter off too.
+  for (const control of $('filterBody').querySelectorAll('[data-own]')) control.disabled = false;
 
   // With osu!stable alone there is no source for a beatmap's status or either submission date,
   // so those three stay inert even when the filter is on -- there is nothing to compare.
@@ -792,6 +945,13 @@ function bindBody() {
     if (target.dataset.field) readField(target);
   };
 
+  body.onkeydown = (e) => {
+    if (e.key === 'Enter' && e.target.id === 'tf-name-new') {
+      e.preventDefault();
+      addName();
+    }
+  };
+
   body.onchange = (e) => {
     const target = e.target;
     if (target.dataset.part === 'field' || target.dataset.part === 'test') {
@@ -813,6 +973,20 @@ function bindBody() {
       draft.clients = CLIENT_NAMES.map(([client]) => client).filter((client) =>
         client === target.dataset.client ? target.checked : draft.clients.includes(client),
       );
+      renderReadouts();
+      return;
+    }
+    if (target.dataset.player !== undefined) {
+      // The first name unticked turns "every name" into the list of the ones still ticked.
+      const all = listedNames().map((n) => n.name);
+      const name = all.find((n) => n.toLowerCase() === target.dataset.player) ?? target.dataset.player;
+      const ticked = (draft.names ?? all).filter((n) => !sameName(n, name));
+      draft.names = target.checked ? [...ticked, name] : ticked;
+      renderReadouts();
+      return;
+    }
+    if (target.dataset.noname !== undefined) {
+      draft.noName = target.checked;
       renderReadouts();
       return;
     }
@@ -852,9 +1026,24 @@ function bindBody() {
   }, true);
 
   body.onclick = (e) => {
-    const act = e.target.closest('[data-act]')?.dataset.act;
+    const actor = e.target.closest('[data-act]');
+    const act = actor?.dataset.act;
+    if (act === 'add-name') {
+      addName();
+      return;
+    }
+    if (act === 'remove-name') {
+      removeName(actor.dataset.name);
+      return;
+    }
     if (act) {
       ruleAction(act, e.target);
+      return;
+    }
+    if (e.target.closest('#tf-names-all')) {
+      draft.names = null;
+      paintNames();
+      renderReadouts();
       return;
     }
     if (e.target.closest('#tf-mods-all')) {
@@ -1034,6 +1223,7 @@ function readField(input) {
 export function openTrackingFilter(options) {
   context = { ...context, ...options };
   draft = copyFilter(options.filter);
+  ownNames = Array.isArray(options.ownNames) ? [...options.ownNames] : [];
 
   // One or several, as whole sentences: a plural suffix glued onto a number does not
   // survive translation.
@@ -1080,8 +1270,9 @@ export function resetTrackingFilter() {
 export async function saveTrackingFilter() {
   $('filterSave').disabled = true;
   try {
-    const data = await postJson('/api/settings', { trackingFilter: payload() }, 'saving failed');
+    const data = await postJson('/api/settings', { trackingFilter: payload(), ownNames }, 'saving failed');
     draft = copyFilter(data.settings.trackingFilter);
+    ownNames = [...(data.settings.ownNames ?? [])];
     closeTrackingFilter();
     toast(
       draft.enabled

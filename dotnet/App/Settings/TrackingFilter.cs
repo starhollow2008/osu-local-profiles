@@ -60,6 +60,13 @@ internal sealed partial class TrackingFilter
     public bool FromKeywords { get; set; }
     public List<int> Modes { get; set; } = [.. AllModes];
     public List<string> Clients { get; set; } = [.. AllClients];
+    /// <summary>
+    /// The player names whose plays are tracked, as ticked (roadmap 5.84). Null is every name, so a
+    /// name seen for the first time is tracked until a list is chosen.
+    /// </summary>
+    public List<string>? Names { get; set; }
+    /// <summary>Plays with no name: signed out, or a client's Guest.</summary>
+    public bool NoName { get; set; } = true;
     public NumberRange Stars { get; set; } = new();
     public NumberRange Length { get; set; } = new();
     /// <summary>Only the mods that are not <c>allowed</c>, so a mod osu! adds later is allowed too.</summary>
@@ -74,6 +81,14 @@ internal sealed partial class TrackingFilter
     public static readonly string[] RuleTests = ["contains", "is", "notContains"];
     public const int MaxRules = 20;
     public const int MaxConditions = 10;
+    private const int MaxNames = 64;
+    private const int MaxNameLength = 32;
+
+    /// <summary>
+    /// A name that is no name: empty, or the word Guest, which is what lazer writes signed out.
+    /// stable, neki and neomod write an empty one for the same thing.
+    /// </summary>
+    public static bool IsNoName(string? name) => Js.Trim(name ?? "") is var n && (n.Length == 0 || Js.ToLower(n) == "guest");
     private const int MaxValues = 100;
     private const int MaxValueLength = 200;
 
@@ -273,6 +288,20 @@ internal sealed partial class TrackingFilter
                 .Where(e => e.ValueKind == JsonValueKind.String).Select(e => e.GetString()!).ToHashSet();
             output.Clients = [.. AllClients.Where(seen.Contains)];
         }
+        var names = Js.Get(raw, "names");
+        if (Js.IsArray(names))
+        {
+            // An empty list is kept: no name ticked, which with "no name" off tracks nothing.
+            output.Names = [];
+            foreach (var value in names!.Value.EnumerateArray())
+            {
+                if (value.ValueKind != JsonValueKind.String) continue;
+                var name = Js.Slice(Js.Trim(LineBreaks().Replace(value.GetString()!, " ")), MaxNameLength);
+                if (name.Length > 0 && !IsNoName(name) && !output.Names.Any(kept => Js.ToLower(kept) == Js.ToLower(name))) output.Names.Add(name);
+                if (output.Names.Count >= MaxNames) break;
+            }
+        }
+        output.NoName = Js.NotFalse(Js.Get(raw, "noName"));
 
         output.Stars = CoerceRange(Js.Get(raw, "stars"), MaxStars, RoundStars);
         output.Length = CoerceRange(Js.Get(raw, "length"), MaxLengthSeconds, RoundSeconds);
@@ -314,6 +343,7 @@ internal sealed partial class TrackingFilter
         if (!filter.Enabled) return false;
         if (filter.Modes.Count < AllModes.Length) return true;
         if (filter.Clients.Count < AllClients.Length) return true;
+        if (filter.Names is not null || !filter.NoName) return true;
         if (filter.Rules.Count > 0) return true;
         if (filter.Stars.Min > 0 || filter.Stars.Max is not null) return true;
         if (filter.Length.Min > 0 || filter.Length.Max is not null) return true;

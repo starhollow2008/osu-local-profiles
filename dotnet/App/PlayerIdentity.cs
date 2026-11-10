@@ -30,6 +30,16 @@ internal sealed record ReplayPlayer(string Name, double? UserId, double? OnlineI
 /// <summary>An osu! account as <see cref="Players.ConfirmSameAccount"/> needs it.</summary>
 internal sealed record OsuAccount(double Id, string Username, List<string> PreviousUsernames);
 
+/// <summary>
+/// A name the profile's plays go by, as the tracking filter lists it: how many plays (tracked or
+/// turned away by the filter) and in which clients, where osu! is signed in under it, and whether
+/// the player added it.
+/// </summary>
+internal sealed record FoundName(string Name, long Plays, List<string> Clients, List<string> SignedIn, bool Added);
+
+/// <summary>The names found, and the plays with no name.</summary>
+internal sealed record FoundNames(List<FoundName> Names, long NoNamePlays, List<string> NoNameClients);
+
 /// <summary>What a sweep of a profile's existing scores found.</summary>
 internal sealed record ForeignScoreSweep(int Checked, int Hidden, List<(string Name, int Count)> ByPlayer, int Unattributable);
 
@@ -77,14 +87,16 @@ internal static class Players
     /// <summary>
     /// Who this profile's plays belong to: whoever osu! says is signed in here (a linked account
     /// counts only when it is that account), else the name behind its own tracked plays, else
-    /// nobody in particular. Names listed as the player's own join an owner already known.
+    /// nobody in particular. Names added as the player's own, and names ticked in the tracking
+    /// filter (roadmap 5.84), join an owner already known.
     /// </summary>
     public static PlayerIdentity Resolve(Database db, long profileId, IReadOnlyList<OsuInstall> installs)
     {
         var settings = SettingsStore.Get(db, profileId);
         var known = KnownIdentity(db, profileId, installs, settings);
-        if (known.Source == "unknown" || settings.OwnNames.Count == 0) return known;
-        return known with { Names = [.. known.Names, .. settings.OwnNames.Select(Js.ToLower)] };
+        var own = settings.OwnNames.Concat(settings.TrackingFilter.Names ?? []).ToList();
+        if (known.Source == "unknown" || own.Count == 0) return known;
+        return known with { Names = [.. known.Names, .. own.Select(Js.ToLower)] };
     }
 
     private static PlayerIdentity KnownIdentity(Database db, long profileId, IReadOnlyList<OsuInstall> installs, ProfileSettings settings)
@@ -114,6 +126,73 @@ internal static class Players
                 tracked.Name, false, "tracked-plays");
         }
         return PlayerIdentity.Unknown;
+    }
+
+    /// <summary>
+    /// Every name the filter's Player names offers (roadmap 5.84): where osu! is signed in, the names
+    /// on this profile's plays and on plays its filter turned away, and the ones the player added.
+    /// Another player's turned-away replays are left out. Signed in first, then by plays.
+    /// </summary>
+    public static FoundNames Found(Database db, long profileId, IReadOnlyList<OsuInstall> installs)
+    {
+        var settings = SettingsStore.Get(db, profileId);
+        var byName = new Dictionary<string, NameTally>(StringComparer.Ordinal);
+        long noName = 0;
+        var noNameClients = new List<string>();
+        void Count(string? raw, string? client, long plays, string? signedIn = null, bool added = false)
+        {
+            var name = Js.Trim(raw ?? "");
+            if (TrackingFilter.IsNoName(name))
+            {
+                noName += plays;
+                if (client is not null && !noNameClients.Contains(client)) noNameClients.Add(client);
+                return;
+            }
+            var key = Js.ToLower(name);
+            if (!byName.TryGetValue(key, out var entry)) byName[key] = entry = new NameTally(name);
+            entry.Plays += plays;
+            if (client is not null && !entry.Clients.Contains(client)) entry.Clients.Add(client);
+            if (signedIn is not null && !entry.SignedIn.Contains(signedIn)) entry.SignedIn.Add(signedIn);
+            entry.Added |= added;
+        }
+
+        foreach (var session in Session.DetectLocalSessions(installs)) Count(session.Username, null, 0, signedIn: session.Client);
+        foreach (var row in db.Rows($"""
+            SELECT s.player_name AS name, s.client AS client, COUNT(*) AS n
+              FROM scores s
+             WHERE s.profile_id = ? AND {Calc.Eligibility.VisibleSql()} AND s.player_name IS NOT NULL
+             GROUP BY s.player_name, s.client
+            """, profileId))
+        {
+            Count(row.Str("name"), row.Str("client"), (long)(row.Num("n") ?? 0));
+        }
+        foreach (var row in db.Rows("""
+            SELECT player AS name, COUNT(*) AS n FROM declined_plays
+             WHERE profile_id = ? AND reason = 'filtered' AND player IS NOT NULL
+             GROUP BY player
+            """, profileId))
+        {
+            Count(row.Str("name"), null, (long)(row.Num("n") ?? 0));
+        }
+        foreach (var name in settings.OwnNames) Count(name, null, 0, added: true);
+        foreach (var name in settings.TrackingFilter.Names ?? []) Count(name, null, 0);
+
+        var names = byName.Values
+            .OrderByDescending(e => e.SignedIn.Count > 0)
+            .ThenByDescending(e => e.Plays)
+            .ThenBy(e => e.Name, Comparer<string>.Create(CompareNames))
+            .Select(e => new FoundName(e.Name, e.Plays, e.Clients, e.SignedIn, e.Added))
+            .ToList();
+        return new FoundNames(names, noName, noNameClients);
+    }
+
+    private sealed class NameTally(string name)
+    {
+        public string Name { get; } = name;
+        public long Plays { get; set; }
+        public List<string> Clients { get; } = [];
+        public List<string> SignedIn { get; } = [];
+        public bool Added { get; set; }
     }
 
     /// <summary>The names osu! confirmed are one account, added when one of them is already the profile's.</summary>
@@ -189,6 +268,19 @@ internal static class Players
     /// <remarks>neki writes a <c>user_id</c> of its own, never an osu! account's (roadmap 5.83).</remarks>
     public static ReplayPlayer ReplayPlayer(ReplayScore score) =>
         new(score.Username, score.Client == "neki" ? null : Positive(Js.Get(score.Extras, "user_id")), OnlineIdOf(score));
+
+    /// <summary>
+    /// The names the tracking filter judges a play by (roadmap 5.84), lowercased: none for a play with
+    /// no name, and with the profile's account's names too when lazer says the play is that account's,
+    /// so a renamed account still matches.
+    /// </summary>
+    public static IReadOnlyCollection<string> FilterNames(ReplayPlayer player, PlayerIdentity? identity)
+    {
+        if (TrackingFilter.IsNoName(player.Name)) return [];
+        var names = new HashSet<string>(StringComparer.Ordinal) { Js.ToLower(Js.Trim(player.Name)) };
+        if (identity?.UserId is { } id && player.UserId == id) names.UnionWith(identity.Names);
+        return names;
+    }
 
     /// <summary>Whether a replay that turned up at <paramref name="arrivedAt"/> was set moments before.</summary>
     public static bool SetJustNow(double playedAt, double arrivedAt) =>

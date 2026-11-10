@@ -478,4 +478,74 @@ public sealed class IngestTests : IDisposable
         Assert.Equal(Tracker.Declined.MaxDeclines - 1, Tracker.Declined.List(h.Db, h.ProfileId).Count);
         await Task.CompletedTask;
     }
+
+    /* ---------------------------------------------------------- player names */
+
+    [Fact]
+    public void Player_names_track_the_names_ticked_and_plays_with_no_name_by_their_own_box()
+    {
+        var named = Everything with { PlayerNames = ["tangy"] };
+        var nameless = Everything with { PlayerNames = [] };
+        var unknown = Everything with { PlayerNames = null };
+
+        // Every name and no name, as it starts.
+        var any = new TrackingFilter { Enabled = true };
+        Assert.Null(any.Rejects(named));
+        Assert.Null(any.Rejects(nameless));
+        Assert.False(TrackingFilter.Narrows(any));
+
+        var only = new TrackingFilter { Enabled = true, Names = ["TangyHR"] };
+        Assert.True(TrackingFilter.Narrows(only));
+        Assert.Equal("player name", only.Rejects(named));
+        Assert.Null(only.Rejects(Everything with { PlayerNames = ["tangyhr"] }));
+        Assert.Null(only.Rejects(nameless));
+        Assert.Equal("player name", new TrackingFilter { Enabled = true, Names = ["TangyHR"], NoName = false }.Rejects(nameless));
+        // A play whose name is not known, as lazer's unfinished ones, is never turned away by it.
+        Assert.Null(new TrackingFilter { Enabled = true, Names = [], NoName = false }.Rejects(unknown));
+        Assert.Equal("player name", new TrackingFilter { Enabled = true, NoName = false }.Rejects(nameless));
+    }
+
+    [Fact]
+    public void A_play_goes_by_its_name_and_by_the_signed_in_accounts_names_when_lazer_says_it_is_that_account()
+    {
+        Assert.Empty(Players.FilterNames(new ReplayPlayer("", null, null), Owner));
+        Assert.Empty(Players.FilterNames(new ReplayPlayer("Guest", null, null), Owner));
+        Assert.Equal(["cat"], Players.FilterNames(new ReplayPlayer(" Cat ", null, null), Owner));
+        // Renamed since: the account's id says it is still the owner's.
+        Assert.Contains("tangy", Players.FilterNames(new ReplayPlayer("NewName", 3119700, null), Owner));
+        Assert.DoesNotContain("tangy", Players.FilterNames(new ReplayPlayer("NewName", 1, null), Owner));
+
+        var filter = TrackingFilter.Coerce(JsonText.From(new { enabled = true, names = new[] { " Tangy ", "tangy", "Guest", "", "TangyHR" }, noName = false }));
+        Assert.Equal(["Tangy", "TangyHR"], filter.Names);
+        Assert.False(filter.NoName);
+        Assert.Null(TrackingFilter.Coerce(JsonText.From(new { enabled = true })).Names);
+        Assert.Empty(TrackingFilter.Coerce(JsonText.From(new { enabled = true, names = Array.Empty<string>() })).Names!);
+    }
+
+    [Fact]
+    public async Task A_play_under_a_name_not_ticked_is_turned_away_and_comes_back_when_ticked_and_imported_again()
+    {
+        var onlyHr = new TrackingFilter { Enabled = true, Names = ["TangyHR"] };
+        var file = WriteReplay("tangy.osr", "Tangy", 1735689600000);
+        var filtered = await Ingest.ReplayFile(file, Context(onlyHr, declines: "import"));
+        Assert.Equal(("filtered", "player name"), (filtered.Status, filtered.Criterion));
+        Assert.Equal("Tangy", Assert.Single(Tracker.Declined.List(h.Db, h.ProfileId)).Player);
+        Assert.Equal("added", (await Ingest.ReplayFile(WriteReplay("guest.osr", "", 1735690200000), Context(onlyHr))).Status);
+
+        SettingsStore.Update(h.Db, h.ProfileId, JsonText.From(new { trackingFilter = onlyHr, ownNames = new[] { "Alt" } }));
+        var found = Players.Found(h.Db, h.ProfileId, []);
+        Assert.Equal(("Tangy", 1L), (found.Names[0].Name, found.Names[0].Plays));
+        Assert.Equal(1, found.NoNamePlays);
+        Assert.Contains(found.Names, n => n.Name == "TangyHR" && n.Plays == 0 && !n.Added);
+        Assert.Contains(found.Names, n => n.Name == "Alt" && n.Added);
+        // Names ticked or added are the owner's too, once there is one.
+        var stable = SignedIn("stable", "Tangy");
+        Assert.Equal(new[] { "alt", "tangy", "tangyhr" }, Players.Resolve(h.Db, h.ProfileId, [stable]).Names.Order());
+        Assert.Contains(Players.Found(h.Db, h.ProfileId, [stable]).Names, n => n.Name == "Tangy" && n.SignedIn.SequenceEqual(["stable"]));
+
+        // Ticked, and imported again: tracked, and no longer listed as turned away.
+        var both = new TrackingFilter { Enabled = true, Names = ["TangyHR", "Tangy"] };
+        Assert.Equal("added", (await Ingest.ReplayFile(file, Context(both, declines: "import"))).Status);
+        Assert.Empty(Tracker.Declined.List(h.Db, h.ProfileId));
+    }
 }

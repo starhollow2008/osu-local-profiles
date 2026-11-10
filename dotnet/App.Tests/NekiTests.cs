@@ -324,6 +324,13 @@ public sealed class NekiTests : IDisposable
         Assert.Equal("ready", Incomplete.CheckNekiPlay(quit, ctx).Status);
         Assert.Equal(0, Convert.ToInt64(h.Db.Scalar("SELECT COUNT(*) FROM incomplete_plays")));
 
+        // Its name is judged as a replay's (roadmap 5.84); none written is not knowing, which never turns it away.
+        var onlyHr = ctx with { Filter = new TrackingFilter { Enabled = true, Names = ["TangyHR"], NoName = false } };
+        Assert.Equal(("filtered", "player name"), (Incomplete.CheckNekiPlay(quit with { Name = "Tangy" }, onlyHr) is var c ? (c.Status, c.Criterion) : default));
+        Assert.Equal("filtered", Incomplete.CheckNekiPlay(quit with { Name = "" }, onlyHr).Status);
+        Assert.Equal("ready", Incomplete.CheckNekiPlay(quit with { Name = "TangyHR" }, onlyHr).Status);
+        Assert.Equal("ready", Incomplete.CheckNekiPlay(quit, onlyHr).Status);
+
         var added = Incomplete.IngestNekiPlay(quit, ctx);
         Assert.Equal(("added", true, 1), (added.Status, added.Play!.Unsubmitted, added.Play.Mode));
         var row = h.Db.FirstRow("SELECT * FROM incomplete_plays")!;

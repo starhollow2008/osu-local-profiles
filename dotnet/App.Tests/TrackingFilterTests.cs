@@ -221,7 +221,7 @@ public class TrackingFilterTests
     public void The_filter_is_written_in_the_TypeScript_shape()
     {
         Assert.Equal(
-            """{"enabled":false,"rules":[],"fromKeywords":false,"modes":[0,1,2,3],"clients":["stable","lazer","mcosu","neki","neomod"],"stars":{"min":0,"max":null},"length":{"min":0,"max":null},"mods":{},"noMod":"allowed","categories":["ranked","qualified","loved","pending","wip","graveyard","unsubmitted"],"added":{"from":null,"to":null},"submitted":{"from":null,"to":null,"includeUnknown":true},"ranked":{"from":null,"to":null,"includeUnknown":true}}""",
+            """{"enabled":false,"rules":[],"fromKeywords":false,"modes":[0,1,2,3],"clients":["stable","lazer","mcosu","neki","neomod"],"names":null,"noName":true,"stars":{"min":0,"max":null},"length":{"min":0,"max":null},"mods":{},"noMod":"allowed","categories":["ranked","qualified","loved","pending","wip","graveyard","unsubmitted"],"added":{"from":null,"to":null},"submitted":{"from":null,"to":null,"includeUnknown":true},"ranked":{"from":null,"to":null,"includeUnknown":true}}""",
             Json(TrackingFilter.Default()));
     }
 }

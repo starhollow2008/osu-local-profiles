@@ -20,7 +20,8 @@ internal sealed record BeatmapText(
 /// <summary>
 /// The facts a play is judged on, supplied in stages: anything null is not knowable and never
 /// rejects. <c>Mode</c> and <c>Client</c> null mean not supplied; <c>HasDates</c> false means the
-/// dates were not supplied, where a supplied null is an unknown date.
+/// dates were not supplied, where a supplied null is an unknown date. <c>PlayerNames</c> are the
+/// names a play goes by, lowercased (<see cref="Players.FilterNames"/>): empty is no name, null not known.
 /// </summary>
 internal sealed record PlayFacts(
     int? Mode = null,
@@ -33,7 +34,8 @@ internal sealed record PlayFacts(
     bool HasDates = false,
     double? AddedAt = null,
     double? SubmittedAt = null,
-    double? RankedAt = null);
+    double? RankedAt = null,
+    IReadOnlyCollection<string>? PlayerNames = null);
 
 /// <summary>The beatmap's half of the facts, each looked up once and remembered on its <c>beatmaps</c> row.</summary>
 internal sealed record BeatmapFilterFacts(int Status, BeatmapText? Beatmap, double? LengthMs, double? AddedAt, double? SubmittedAt, double? RankedAt);
@@ -203,6 +205,13 @@ internal sealed partial class TrackingFilter
         return false;
     }
 
+    /// <summary>A play with no name by the "no name" box, one with a name by the names ticked, if a list was chosen.</summary>
+    private bool NameAllowed(IReadOnlyCollection<string> playerNames)
+    {
+        if (playerNames.Count == 0) return NoName;
+        return Names is not { } ticked || ticked.Any(n => playerNames.Contains(Js.ToLower(n)));
+    }
+
     private bool CategoryAllowed(int status) =>
         Categories.Any(name => FilterCategories.FirstOrDefault(c => c.Name == name).Statuses?.Contains(status) == true);
 
@@ -216,6 +225,7 @@ internal sealed partial class TrackingFilter
 
         if (facts.Mode is { } mode && !Modes.Contains(mode)) return "mode";
         if (facts.Client is { } client && !Clients.Contains(client)) return "client";
+        if (facts.PlayerNames is { } playerNames && !NameAllowed(playerNames)) return "player name";
 
         // A beatmap whose metadata could not be read is not judged on it.
         if (Rules.Count > 0 && facts.Beatmap is not null && !RulesMatch(Rules, facts.Beatmap)) return "beatmap rules";

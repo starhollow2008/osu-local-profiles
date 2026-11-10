@@ -229,8 +229,8 @@ refused one is gone. So `ownsPlay` refuses only on positive evidence, and these 
   `WRITTEN_AS_PLAYED_MS` (a day) of its play (`wasWrittenLater`: the arrival time live, the file's
   mtime otherwise). One imported into lazer years after its play is judged by its name (roadmap
   5.75, issue #4). McOsu's and built replays are exempt: this app writes them whenever it builds them.
-- **A name listed as yours** (`Settings.ownNames`, in Other settings and Import past plays): a private server's, which
-  osu! can't confirm. Listed names join an owner already known and never make one alone, or they'd
+- **A name listed as yours** (`Settings.ownNames`, added under the filter's Player names, and the
+  names ticked there): a private server's, which osu! can't confirm. Listed names join an owner already known and never make one alone, or they'd
   turn away the signed-in account's plays.
 - **A play set just now** (`setJustNow`). A replay arriving while tracking, set within
   `JUST_SET_MS` (5 minutes) before it arrived, was set here, whatever name it carries; a
@@ -377,6 +377,26 @@ Decides whether a play is **written**. A declined play is never a row of `scores
 - Star rating and length are judged as played, mods included. Beatmap dates and length are filled
   lazily on `beatmaps`: NULL is never looked up, 0 is looked up and unknowable. Tags and Source
   are filled the same way (`''` for none).
+
+### Player names
+
+Which names a play may be set under (roadmap 5.84): `TrackingFilter.Names`, null for every name,
+and `NoName` for plays with none. A play goes by its name and, when lazer's `user_id` is the
+signed-in account's, by that account's names too (`Players.FilterNames`), so a rename doesn't
+break it. **No name** (`TrackingFilter.IsNoName`) is empty or `Guest`: stable and neomod signed
+out, neki's and neomod's Guest, and lazer's.
+
+- **The list is found, not stored** (`Players.Found`, `/api/identity` `names`): signed-in names,
+  names on visible scores and on plays the filter turned away, the names added, and the names
+  ticked. Another player's refused replays are left out.
+- **Names added are `Settings.ownNames`**, edited only here (they were "Your other names" in Other
+  settings and Import past plays). Their controls stay live with the filter off, since they decide
+  ownership too. Names added and ticked join an owner already known (`Players.Resolve`).
+- **Nothing comes back by itself.** Saving names no longer re-judges declined plays
+  (`RetrackOwnNames` runs only for "It's me"); Import past plays judges every replay again, which
+  brings back plays under a name ticked since.
+- **lazer's unfinished plays have no name**, so the criterion never judges them. neki's carry
+  `neki.recent.json`'s `profile` (`Recording.Player`), judged like a replay's.
 
 ### Beatmap rules
 

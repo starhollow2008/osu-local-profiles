@@ -67,7 +67,12 @@ internal static class Incomplete
         if (filter.Enabled)
         {
             var facts = TrackingFilter.BeatmapFacts(ctx.Db, ctx.Resolver, beatmap);
-            if (filter.Rejects(TrackingFilter.PlayFactsOf(facts, mode, null, entry.Client ?? "lazer")) is { } rejected)
+            // lazer's log does not say who played; neki does.
+            var playFacts = TrackingFilter.PlayFactsOf(facts, mode, null, entry.Client ?? "lazer") with
+            {
+                PlayerNames = entry.Player is { } name ? Players.FilterNames(new ReplayPlayer(name, null, null), null) : null,
+            };
+            if (filter.Rejects(playFacts) is { } rejected)
             {
                 return new IncompleteResult("filtered", Criterion: rejected, Title: title, TitleOriginal: titleOriginal, Recording: entry, Mode: mode);
             }
@@ -164,7 +169,7 @@ internal static class Incomplete
         if (IsRecorded(ctx, key)) return new IncompleteResult("skipped", "duplicate");
         // How far into the map it ended, at the speed it was played: when it started.
         double? startedAt = play.EndTime > 0 ? play.PlayedAt - Js.Round(play.EndTime / play.Rate) : null;
-        return Assess(new Recording(key, play.BeatmapMD5, null, play.PlayedAt, startedAt, null, true, play.Mode, "neki"), ctx);
+        return Assess(new Recording(key, play.BeatmapMD5, null, play.PlayedAt, startedAt, null, true, play.Mode, "neki", play.Name), ctx);
     }
 
     public static IncompleteResult IngestNekiPlay(NekiRecentPlay play, IncompleteContext ctx) => Settle(CheckNekiPlay(play, ctx), ctx);

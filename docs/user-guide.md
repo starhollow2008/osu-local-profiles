@@ -248,8 +248,8 @@ You can import someone else's account (an alt, a friend, a banner you like). It 
 plays are yours: that's whoever osu! says is signed in here, and replays other players set (ones you
 watched) are left out on that basis. Plays with no name, lazer's `Guest`, and plays osu! never
 received are always yours, unless the replay was copied in long after it was played, such as a
-top play someone shared. Names osu! can't confirm, like a private server's, go in [Your other
-names](#your-other-names).
+top play someone shared. Names osu! can't confirm, like a private server's, can be added under the
+filter's [Player names](#player-names).
 
 ## The me! section
 
@@ -388,13 +388,14 @@ and the card shows what your machine knows until it can be filled in.
 **Options -> Play tracking filter** decides which plays this profile records at all.
 
 It's **off by default**, and switching it on changes nothing by itself, since every criterion starts
-wide open. There are ten:
+wide open. There are eleven:
 
 | | |
 |---|---|
 | **Beatmap rules** | Which beatmaps count, by title, artist, mapper and more. See [Beatmap rules](#beatmap-rules). |
 | **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
 | **Client** | osu!stable, osu!lazer, McOsu, neki, neomod. A stable play imported into lazer counts as stable. |
+| **Player names** | The names the play was set under. See [Player names](#player-names). |
 | **Difficulty** | The star rating as played, mods included. |
 | **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
 | **Categories** | Ranked, Qualified, Loved, Pending, Work in progress, Graveyarded, Never submitted. |
@@ -408,6 +409,22 @@ each time: a line in the log, a message naming the criterion, a count in the Opt
 on the menu entry while a filter is narrowing anything. It's also listed under [Plays not
 tracked](#plays-not-tracked). **Import past plays** applies the filter too, and can be told to
 ignore it for one import.
+
+### Player names
+
+A play is tracked if it was set under a **ticked** name. The list shows the names found on your plays
+and where osu! is signed in, with the clients and how many plays each has. Untick a name to stop
+tracking it, or type one into the box and press **Add name**. **Every name** goes back to tracking
+any name, including ones not seen yet. Once you untick a name, only the ticked names are tracked.
+
+- **No name** is plays set signed out on stable or neomod, neki's and neomod's Guest, and lazer's
+  `Guest`. All of them write no name, or the word Guest, so they're one box.
+- **Names you add count as yours** even while the filter is off. That's how a private server's
+  name, which osu! can't confirm, gets tracked at all.
+- **Ticking a name doesn't bring back plays already turned away under it.** The next **Import past
+  plays** does. **Track anyway** brings back one play at a time.
+- lazer's fails and quits don't say who played them, so this never turns them away. neki's do, and
+  are judged by it.
 
 ### Beatmap rules
 
@@ -498,8 +515,8 @@ when you played, check what would be imported, then confirm.
 - **Look in**, when more than one osu! install was found, lets you untick installs this import
   shouldn't read. osu!lazer keeps the stable plays it imported, so to leave those out use the
   filter's **Client** instead.
-- **Your other names** are names whose plays are yours too, the same list as in [Other
-  settings](#your-other-names).
+- The filter's [Player names](#player-names) decide whose plays it brings in, and it brings back
+  plays turned away under a name ticked since.
 - It reads osu!lazer's logs as well as replays, so a past session comes back whole: finished plays,
   counted quits and retries, and offline attempts. Each kind is its own tick box with its count.
 - A play on a beatmap you no longer have is skipped, and the check says how many.
@@ -593,12 +610,6 @@ Off by default, because closing the app is how you stop tracking. Turn it on and
 [the import](#importing-plays-you-set-while-it-was-closed) over the time the app was closed, never
 further back than when it last ran or before this profile started. The filter and duplicate checks
 still apply, and it says what it brought in. Per profile.
-
-### Your other names
-
-Names whose plays are yours too, such as a name on a private server, separated by commas. Plays
-under them are tracked live and imported, and plays already turned away under one are checked
-again when you save. The same list is in Import past plays. Per profile.
 
 ### Show beatmap metadata in original language
 

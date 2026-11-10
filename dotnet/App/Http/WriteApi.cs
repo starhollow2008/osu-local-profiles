@@ -105,28 +105,13 @@ internal static partial class Server
 
     /// <summary>
     /// Settings the page edits directly. The whole body is the patch; keys that are not settings
-    /// are ignored. Plays turned away under a name just listed as yours are judged again.
+    /// are ignored. A name added or ticked brings back nothing by itself: plays turned away under it
+    /// come back with the next Import past plays (roadmap 5.84).
     /// </summary>
     private static Task PostSettings(HttpContext context, ServerOptions opts, long profileId) => WithBody(context, body =>
     {
-        var fallbacks = opts.Config.SettingsFallbacks();
-        var before = Js.ToLower(string.Join("\n", SettingsStore.Get(opts.Db, profileId, fallbacks).OwnNames));
-        var settings = SettingsStore.Update(opts.Db, profileId, body, fallbacks);
+        var settings = SettingsStore.Update(opts.Db, profileId, body, opts.Config.SettingsFallbacks());
         opts.Events.Broadcast("settings", settings);
-        if (Js.ToLower(string.Join("\n", settings.OwnNames)) != before && opts.Tracker is { } tracker)
-        {
-            _ = tracker.RetrackOwnNames().ContinueWith(task =>
-            {
-                if (task.IsCompletedSuccessfully)
-                {
-                    if (task.Result > 0) opts.Events.Broadcast("settings", SettingsStore.Get(opts.Db, Profiles.ActiveId(opts.Db), opts.Config.SettingsFallbacks()));
-                }
-                else
-                {
-                    Console.Error.WriteLine($"  Could not check plays under your names again: {task.Exception?.InnerException?.Message}");
-                }
-            }, TaskScheduler.Default);
-        }
         return Json(context, new { ok = true, settings });
     });
 
@@ -471,6 +456,10 @@ internal static partial class Server
                     });
                     return;
                 }
+                // The names the tracking filter's Player names lists (roadmap 5.84).
+                case "names":
+                    await Json(context, Players.Found(opts.Db, id, opts.Installs));
+                    return;
                 case "lookup":
                     await IdentityLookup(context, opts, body);
                     return;

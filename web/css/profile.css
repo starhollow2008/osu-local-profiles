@@ -6139,6 +6139,33 @@ s.bbcode-editor__glyph {
   text-decoration: underline;
 }
 
+/* Player names: a ticked name, where it was seen, and a way to add one. */
+.tf-names {
+  display: grid;
+  gap: 4px;
+}
+
+.tf-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.tf-name__where {
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-f1));
+}
+
+.tf-names__add {
+  display: grid;
+  grid-template-columns: minmax(0, 16em) auto auto;
+  gap: 10px;
+  align-items: center;
+  justify-content: start;
+  margin-top: 8px;
+}
+
 @media (max-width: 600px) {
   /* Field and test on one line, the values under them. */
   .tf-cond {

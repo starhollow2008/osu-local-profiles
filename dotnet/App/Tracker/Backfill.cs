@@ -160,7 +160,9 @@ internal static class Backfill
                 {
                     var beatmap = f.Resolver.Resolve(score.BeatmapMD5);
                     var facts = TrackingFilter.BeatmapFacts(db, f.Resolver, beatmap);
-                    filtered = filter!.Rejects(TrackingFilter.PlayFactsOf(facts, score.Mode, Mods.ScoreMods(score, beatmap.OsuPath), Ingest.WithClient(score, neki).Client)) is not null;
+                    var playFacts = TrackingFilter.PlayFactsOf(facts, score.Mode, Mods.ScoreMods(score, beatmap.OsuPath), Ingest.WithClient(score, neki).Client)
+                        with { PlayerNames = Players.FilterNames(player, owner) };
+                    filtered = filter!.Rejects(playFacts) is not null;
                 }
 
                 candidates.Add(new BackfillCandidate(entry.Path, playedAt, score.Mode, already, filtered));
