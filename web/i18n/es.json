@@ -791,7 +791,6 @@
   "shareScreenshot": "Guardar...",
   "shareTitle": "Compartir y copia de seguridad",
   "mcosuNote.text": "<b>¿Juegas en McOsu?</b> Solo se registran las partidas completadas, las incompletas (abandono, fallo, reintento) no se pueden contar en el número de partidas. El pp que se muestra aquí usa la calculadora de pp actual de osu!, así que puede diferir del de McOsu.",
-  "nekiNote.text": "<b>¿Juegas en neki?</b> Los abandonos y fallos cuentan como No enviada.",
   "source.manual": "Introducida a mano",
   "source.manualTitle": "Esta puntuación se escribió a mano, no se grabó, así que nada la ha comprobado. Sus pp se calculan con los números introducidos.",
   "stableNote.text": "<b>¿Juegas en osu!stable?</b> Las puntuaciones solo se registran después de salir de la pantalla de resultados y volver a la selección de canciones. Las partidas incompletas (abandono, fallo, reintento) no se pueden contar en el número de partidas en stable.",

@@ -791,7 +791,6 @@
   "shareScreenshot": "Salva…",
   "shareTitle": "Condividi e salva",
   "mcosuNote.text": "<b>Giochi su McOsu?</b> Vengono registrate solo le partite completate, quelle incomplete (abbandono, fallimento, ritentativo) non possono essere contate nel numero di partite. Il pp mostrato qui usa l'attuale calcolatore pp di osu!, quindi può differire da quello di McOsu.",
-  "nekiNote.text": "<b>Giochi su neki?</b> Abbandoni e fallimenti contano come Non inviata.",
   "source.manual": "Inserito a mano",
   "source.manualTitle": "Questo punteggio è stato scritto a mano, non registrato, quindi niente l'ha verificato. I suoi pp sono calcolati dai numeri inseriti.",
   "stableNote.text": "<b>Giochi su osu!stable?</b> I punteggi vengono registrati solo dopo che esci dalla schermata dei risultati e torni alla selezione dei brani. Le partite incomplete (abbandono, fallimento, ritentativo) non possono essere contate nel numero di partite su stable.",

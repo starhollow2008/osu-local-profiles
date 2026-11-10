@@ -791,7 +791,6 @@
   "shareScreenshot": "Tallenna…",
   "shareTitle": "Jaa ja varmuuskopioi",
   "mcosuNote.text": "<b>Pelaatko McOsulla?</b> Vain loppuun pelatut suoritukset tallentuvat, keskeneräisiä suorituksia (keskeytys, epäonnistuminen, uudelleenyritys) ei voi laskea suoritusmäärään. Tässä näkyvä pp käyttää osu!:n nykyistä pp-laskinta, joten se voi poiketa McOsun omasta.",
-  "nekiNote.text": "<b>Pelaatko nekillä?</b> Keskeytykset ja epäonnistumiset lasketaan Ei lähetetty -suorituksiksi.",
   "source.manual": "Syötetty käsin",
   "source.manualTitle": "Tämä tulos kirjoitettiin käsin, sitä ei tallennettu, joten mikään ei ole tarkistanut sitä. Sen pp lasketaan syötetyistä luvuista.",
   "stableNote.text": "<b>Pelaatko osu!stablella?</b> Tulokset tallentuvat vasta, kun poistut tulosnäytöltä takaisin kappalevalintaan. Keskeneräisiä suorituksia (keskeytys, epäonnistuminen, uudelleenyritys) ei voi stablella laskea suoritusmäärään.",

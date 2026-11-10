@@ -802,7 +802,6 @@
   "shareScreenshot": "Zapisz…",
   "shareTitle": "Udostępnij i utwórz kopię",
   "mcosuNote.text": "<b>Grasz na McOsu?</b> Zapisywane są tylko ukończone podejścia, nieukończonych podejść (wyjście, porażka, ponowna próba) nie da się wliczyć do liczby podejść. Pokazane tu pp korzysta z obecnego kalkulatora pp osu!, więc może różnić się od tego w McOsu.",
-  "nekiNote.text": "<b>Grasz na neki?</b> Wyjścia i porażki są liczone jako Niewysłane.",
   "source.manual": "Wpisany ręcznie",
   "source.manualTitle": "Ten wynik został wpisany ręcznie, a nie nagrany, więc nic go nie sprawdziło. Jego pp są obliczane z wpisanych liczb.",
   "stableNote.text": "<b>Grasz na osu!stable?</b> Wyniki są zapisywane dopiero po wyjściu z ekranu wyników i powrocie do wyboru utworu. Nieukończonych podejść (wyjście, porażka, ponowna próba) nie da się na stable wliczyć do liczby podejść.",

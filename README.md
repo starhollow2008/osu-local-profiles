@@ -30,9 +30,9 @@ Inspired by [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) an
 
 **Supports**
 
-| Clients              | Game modes                    | Platforms             | Languages |
-| -------------------- | ----------------------------- | --------------------- | --------- |
-| stable, lazer, McOsu | standard, taiko, catch, mania | Windows, macOS, Linux | 16        |
+| Clients                    | Game modes                    | Platforms             | Languages |
+| -------------------------- | ----------------------------- | --------------------- | --------- |
+| stable, lazer, McOsu, neki | standard, taiko, catch, mania | Windows, macOS, Linux | 16        |
 
 **Last updated**
 
@@ -83,6 +83,12 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 - McOsu-only mods (Nightmare and experimental mods) show as one **MC** mod
 - Incomplete plays (fail, quit, retry) are not tracked
 - pp may differ between McOsu and this app
+
+## Warnings for neki
+
+- **Unranked maps will always count for pp** if lazer isn't installed, as on stable
+- neki's extra mods count as lazer's mods (unranked)
+- Quits and fails count as **Not submitted**
 
 ## Technologies Used
 

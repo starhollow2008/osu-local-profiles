@@ -789,7 +789,6 @@
   "shareScreenshot": "Save…",
   "shareTitle": "Share & back up",
   "mcosuNote.text": "<b>Playing on McOsu?</b> Only completed plays are recorded, incomplete plays (quit, fail, retry) can't be tracked for playcount. The pp shown here uses the current osu! pp calculator, so it can differ from McOsu's.",
-  "nekiNote.text": "<b>Playing on neki?</b> Quits and fails count as Not submitted plays.",
   "playMenu.viewOnOsu": "View osu! score link",
   "removedScores.none": "No scores have been removed.",
   "scoreLink.already": "This score is already in this profile.",

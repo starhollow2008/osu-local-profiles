@@ -1669,5 +1669,5 @@ seed included.
 - neki never sends a play to osu!, so it is never asked about for a rank change, and its score
   links are none.
 
-Still open: whether a retry in the middle of a play leaves anything, and how many plays
-`neki.recent.json` keeps.
+Not measured, and left as they are at the owner's call: whether a retry in the middle of a play
+leaves anything, and how many plays `neki.recent.json` keeps. The user guide says both.
