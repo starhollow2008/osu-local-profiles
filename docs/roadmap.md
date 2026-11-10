@@ -95,6 +95,7 @@ does not have to make it again.
 | 5.81 | An import's progress, and Import without Check           | done   |
 | 5.82 | One .NET app in place of Node                             | done   |
 | 5.83 | neki                                                      | done   |
+| 5.84 | Track plays only from chosen names                        | todo   |
 
 ## Constraints on every item
 
@@ -1671,3 +1672,24 @@ seed included.
 
 Not measured, and left as they are at the owner's call: whether a retry in the middle of a play
 leaves anything, and how many plays `neki.recent.json` keeps. The user guide says both.
+
+## 5.84 - Track plays only from chosen names
+
+**Status:** todo, planned. Asked for by a user who sorts their offline scores by the name they
+play under.
+
+A profile could take only the plays set under names it lists, in every client. Notes for when it
+is built:
+
+- **"Guest" is no name at all on stable and neki.** Their replays say `""` for a play set signed
+  out or under neki's default Guest, never the word "Guest"; neki's `neki.recent.json` says
+  `"profile": ""`, and `scores.neki.db` the same. Measured on neki: plays as Guest wrote `""`, the
+  one set as Tangy wrote `"Tangy"`. lazer's own guest is the word `Guest`. So the choice needs an
+  entry for plays with no name, and stable's signed-out plays and neki's Guest ones fall under it
+  together.
+- **Fails and quits keep no name yet.** `incomplete_plays` has no player column. neki's name for
+  each is read already (`NekiRecentPlay.Name`) but not stored, so filtering at import works, and
+  filtering what is already stored needs a `player_name` column on `incomplete_plays` (an
+  `ADDED_COLUMNS` entry), written by `Incomplete.Write`. Rows from before it are NULL, which
+  must never reject a play. Where lazer's log names the player behind an unfinished play is
+  still to be found.
