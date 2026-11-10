@@ -274,6 +274,44 @@ public sealed class NekiTests : IDisposable
     }
 
     [Fact]
+    public void Plays_neki_wrote_before_it_was_a_client_are_filed_under_it_once_and_its_lazer_format_ones_repriced()
+    {
+        var (stable, neki) = Installed();
+        File.WriteAllText(Neki.RecentFile(neki), Recent((Map, NekiTime, true, false)));
+        var dir = Path.Combine(stable, "Data", "r");
+        var listed = Write(dir, "listed.osr", NekiReplay());
+        var extra = Write(dir, "extra.osr", NekiReplay(ExtraMods, replayMd5: "eeee"));
+        var stables = Write(dir, "stable.osr", Shifted(NekiReplay(replayMd5: "ffff")));
+        var elsewhere = Write(h.Folder, "elsewhere.osr", NekiReplay());
+        long Row(string key, string client, string file, long? playerId = null)
+        {
+            h.InsertScore(h.ProfileId, key);
+            h.Db.Run("UPDATE scores SET client = ?, replay_path = ?, player_id = ? WHERE dedupe_key = ?", client, file, playerId, key);
+            return Convert.ToInt64(h.Db.Scalar("SELECT id FROM scores WHERE dedupe_key = ?", key));
+        }
+        var a = Row("listed", "stable", listed);
+        var b = Row("extra", "lazer", extra, 1);
+        Row("stable", "stable", stables);
+        Row("elsewhere", "stable", elsewhere);
+
+        var installs = new List<OsuInstall> { Detect.StableInstall(stable)!, Neki.Install(neki)! };
+        var tracker = new PlayTracker(h.Db, new BeatmapResolver(h.Db, installs), installs, h.ProfileId, 0, null);
+        Assert.Equal([(b, h.ProfileId)], tracker.RelabelNekiPlays());
+        string Clients() => string.Join(",", h.Db.Rows("SELECT dedupe_key, client, player_id FROM scores ORDER BY dedupe_key")
+            .Select(r => $"{r.Str("dedupe_key")}:{r.Str("client")}:{r.Num("player_id")}"));
+        Assert.Equal("elsewhere:stable:,extra:neki:,listed:neki:,stable:stable:", Clients());
+        Assert.Equal(a, Convert.ToInt64(h.Db.Scalar("SELECT id FROM scores WHERE dedupe_key = 'listed'")));
+
+        // Once.
+        h.Db.Run("UPDATE scores SET client = 'stable' WHERE dedupe_key = 'listed'");
+        Assert.Empty(tracker.RelabelNekiPlays());
+        Assert.Equal("stable", h.Db.FirstRow("SELECT client FROM scores WHERE dedupe_key = 'listed'")!.Str("client"));
+        // And never without neki.
+        h.Db.Run("DELETE FROM kv WHERE key = 'nekiPlaysRelabelled'");
+        Assert.Empty(new PlayTracker(h.Db, new BeatmapResolver(h.Db, []), [Detect.StableInstall(stable)!], h.ProfileId, 0, null).RelabelNekiPlays());
+    }
+
+    [Fact]
     public void A_folder_both_installs_name_is_watched_once()
     {
         var (stable, neki) = Installed();

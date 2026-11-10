@@ -618,9 +618,11 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     /// </summary>
     public async Task<RecomputeResult?> RepairScores()
     {
+        var relabelled = await Enqueue(() => Task.FromResult(RelabelNekiPlays()));
         if (calculator is not { } current) return null;
         var redecode = !db.Exists("SELECT 1 AS hit FROM kv WHERE key = ?", RedecodedKey);
-        var rows = Recompute.FoundBeatmapIds(db).Concat(redecode ? Recompute.MisdecodedIds(db) : []).OrderBy(r => r.ProfileId).ToList();
+        var rows = Recompute.FoundBeatmapIds(db).Concat(redecode ? Recompute.MisdecodedIds(db) : []).Concat(relabelled)
+            .OrderBy(r => r.ProfileId).ToList();
         var sum = RecomputeResult.None;
         foreach (var batch in Recompute.ToBatches(rows))
         {
@@ -628,6 +630,45 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         }
         if (redecode) db.Run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", RedecodedKey, Js.NumberToString(Js.Now()));
         return sum;
+    }
+
+    /// <summary>Marks the plays neki wrote before it was a client as filed under it.</summary>
+    private const string NekiRelabelledKey = "nekiPlaysRelabelled";
+
+    /// <summary>
+    /// Plays neki wrote that were tracked as stable's or lazer's before neki was a client (roadmap
+    /// 5.83), filed under neki once neki is found. Those in lazer's format come back to be priced
+    /// again, as the stable plays they are.
+    /// </summary>
+    internal List<(long Id, long ProfileId)> RelabelNekiPlays()
+    {
+        var dirs = installs.Where(i => i.Kind == "neki").Select(i => i.ReplayDir).ToList();
+        if (dirs.Count == 0 || db.Exists("SELECT 1 AS hit FROM kv WHERE key = ?", NekiRelabelledKey)) return [];
+        var rows = db.All("""
+            SELECT id, profile_id, replay_path FROM scores
+             WHERE client IN ('stable', 'lazer') AND replay_path IS NOT NULL AND imported_at IS NULL AND origin IS NULL
+            """, r => (Id: r.Long("id"), ProfileId: r.Long("profile_id"), Path: r.Text("replay_path")));
+        var reprice = new List<(long Id, long ProfileId)>();
+        foreach (var row in rows)
+        {
+            // neki writes only into the stable folder it plays from: nothing else is read.
+            if (!dirs.Any(d => SamePath(NodePath.Dirname(row.Path), d))) continue;
+            ReplayScore score;
+            try
+            {
+                score = Osr.Parse(File.ReadAllBytes(row.Path));
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                continue;
+            }
+            if (!neki.Claims(score)) continue;
+            // neki's user_id was stored as the player's before; it is not an osu! account.
+            db.Run("UPDATE scores SET client = 'neki', player_id = CASE WHEN client = 'lazer' THEN NULL ELSE player_id END WHERE id = ?", row.Id);
+            if (score.Client == "neki") reprice.Add((row.Id, row.ProfileId));
+        }
+        db.Run("INSERT OR REPLACE INTO kv (key, value) VALUES (?, ?)", NekiRelabelledKey, Js.NumberToString(Js.Now()));
+        return reprice;
     }
 
     public Task<StatusRefresh?> RefreshStatuses() => Enqueue(() => Task.FromResult(Clients.Beatmaps.RefreshStatuses(db, resolver)));
