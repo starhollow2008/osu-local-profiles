@@ -17,11 +17,11 @@ import { beatmapArtist, beatmapTitle } from './metadata.js';
 
 const RULESET = ['osu', 'taiko', 'fruits', 'mania'];
 
-/** osu-web's "Played on", with McOsu and neki beside osu!'s own two. */
-const CLIENT_NAMES = { lazer: 'Lazer', stable: 'Stable', mcosu: 'McOsu', neki: 'neki' };
+/** osu-web's "Played on", with McOsu, neki and neomod beside osu!'s own two. */
+const CLIENT_NAMES = { lazer: 'Lazer', stable: 'Stable', mcosu: 'McOsu', neki: 'neki', neomod: 'neomod' };
 
-/** McOsu and neki are osu!stable's scoring, so osu! grades their plays as stable ones. */
-const scoredAsStable = (client) => client === 'stable' || client === 'mcosu' || client === 'neki';
+/** McOsu, neki and neomod are osu!stable's scoring, so osu! grades their plays as stable ones. */
+const scoredAsStable = (client) => ['stable', 'mcosu', 'neki', 'neomod'].includes(client);
 
 /* ------------------------------------------------------------------------ */
 /* Statistics                                                                */
@@ -438,7 +438,7 @@ function breakdown(score, calculator) {
 export function scoreCard(score, who, calculator = null) {
   const cover = coverUrl(score.beatmapsetId, 'cover@2x');
   // osu-web shows stable's letter for a stable score; it has no letter for F, so a failed
-  // stable score keeps the dial. A McOsu or neki score is a stable one to osu!.
+  // stable score keeps the dial. A McOsu, neki or neomod score is a stable one to osu!.
   const grade = scoredAsStable(score.client) && LEGACY_RANKS.has(score.grade) ? legacyRank(score.grade) : scoreDial(score);
 
   return `<div class="score-page">

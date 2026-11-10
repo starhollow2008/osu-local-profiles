@@ -352,7 +352,7 @@
   "foldersClose": "Zamknij",
   "folderSearchNote": "Twoje dyski nie były jeszcze przeszukane. Zajmuje to kilka sekund.",
   "foldersModal.addAFolder": "Dodaj folder",
-  "foldersModal.pickTheFolderThatHas": "Dla osu!stable wybierz folder, w którym jest <code>osu!.exe</code>, dla osu!lazer ten z <code>client.realm</code>, a dla McOsu ten z <code>McEngine.exe</code> - nie folder powyżej.",
+  "foldersModal.pickTheFolderThatHas": "Dla osu!stable wybierz folder, w którym jest <code>osu!.exe</code>, dla osu!lazer ten z <code>client.realm</code>, dla McOsu ten z <code>McEngine.exe</code>, a dla neomod ten z <code>neomod.exe</code> - nie folder powyżej.",
   "foldersModal.theFoldersThisAppReads": "Lokalizacje instalacji",
   "foldersTitle": "Foldery osu!",
   "footer.copyAsOf": " - kopia, stan na {date}",

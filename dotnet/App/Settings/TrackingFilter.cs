@@ -91,7 +91,7 @@ internal sealed partial class TrackingFilter
 
     public static readonly string[] CategoryNames = [.. FilterCategories.Select(c => c.Name)];
     private static readonly int[] AllModes = [0, 1, 2, 3];
-    public static readonly string[] AllClients = ["stable", "lazer", "mcosu", "neki"];
+    public static readonly string[] AllClients = ["stable", "lazer", "mcosu", "neki", "neomod"];
 
     /// <summary>The day osu!'s beatmap listing begins: <c>Date.UTC(2007, 9, 6)</c>.</summary>
     public const double OsuEpoch = 1191628800000;

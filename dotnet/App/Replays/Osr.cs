@@ -33,7 +33,8 @@ internal sealed record ReplayScore(
     long? OnlineScoreId,
     JsonElement? Extras,
     McosuFacts? Mcosu,
-    BuiltFacts? Built);
+    BuiltFacts? Built,
+    Clients.NeomodFacts? Neomod = null);
 
 /// <summary>
 /// Reader for osu! <c>.osr</c> replays: src/osr.ts. Parsed here rather than by osu!'s decoder because
@@ -60,8 +61,8 @@ internal static class Osr
     {
         if (head.Length < 5 || head[0] > 3) return false;
         var version = BinaryPrimitives.ReadInt32LittleEndian(head[1..]);
-        // Stable versions look like 20210520; lazer uses 300000xx.
-        return version is >= 20000000 and <= 40000000;
+        // Stable versions look like 20210520; lazer uses 300000xx, neomod 40000000 and up.
+        return version is >= 20000000 and < 50000000;
     }
 
     private sealed class Cursor(byte[] b)
@@ -115,7 +116,8 @@ internal static class Osr
     /// <summary>
     /// A lazer-format replay as the osu!stable one it stands for: the same header, frames and online
     /// id under a stable version, lazer's block dropped. For neki, which writes a stable play in
-    /// lazer's format only to hold its extra mods (roadmap 5.83). Null for a replay with no block.
+    /// lazer's format only to hold its extra mods (roadmap 5.83), and for neomod, which writes a
+    /// version of its own and its mods after the online id (5.85). Null for a stable replay.
     /// </summary>
     public static byte[]? StableCopy(byte[] buf)
     {
@@ -175,11 +177,17 @@ internal static class Osr
         JsonElement? extras = null;
         McosuFacts? mcosu = null;
         BuiltFacts? built = null;
+        Clients.NeomodFacts? neomod = null;
 
         if (c.Remaining >= 8)
         {
             onlineScoreId = c.Long();
-            if (version >= LazerExtMinVersion && c.Remaining >= 4)
+            if (version >= Clients.Neomod.MinReplayVersion)
+            {
+                // neomod: its own mods record, never lazer's block (roadmap 5.85).
+                neomod = Clients.Neomod.ReadFacts(c.Rest());
+            }
+            else if (version >= LazerExtMinVersion && c.Remaining >= 4)
             {
                 var len = c.Int();
                 if (len > 0 && len <= c.Remaining)
@@ -209,14 +217,16 @@ internal static class Osr
 
         return new ReplayScore(
             // neki writes lazer's format for a play with its extra mods, and says so in the block.
-            version >= LazerExtMinVersion ? Clients.Neki.WroteBlock(extras) ? "neki" : "lazer" : mcosu is not null ? "mcosu" : "stable",
+            version >= Clients.Neomod.MinReplayVersion ? "neomod"
+                : version >= LazerExtMinVersion ? Clients.Neki.WroteBlock(extras) ? "neki" : "lazer"
+                : mcosu is not null ? "mcosu" : "stable",
             mode, version, beatmapMD5, username, replayMD5,
             count300, count100, count50, countGeki, countKatu, countMiss,
             totalScore, maxCombo, perfectCombo, legacyMods,
             // ticks / 10000n, as BigInt division truncates toward zero.
             ticks / 10_000 - TicksAtEpoch / 10_000,
             onlineScoreId == -1 ? null : onlineScoreId,
-            extras, mcosu, built);
+            extras, mcosu, built, neomod);
     }
 }
 

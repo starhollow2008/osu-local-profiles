@@ -130,6 +130,8 @@ internal static class Ingest
         score = WithClient(score, ctx.Neki);
         double playedAt = score.PlayedAtMs;
         if (playedAt < ctx.TrackingSince) return new IngestOutcome("skipped", "too-old");
+        // A fail neomod kept: never a score, which would read as a pass (roadmap 5.85).
+        if (Neomod.Failed(score, replayPath)) return new IngestOutcome("skipped", "not-passed");
 
         // Someone else's play: checked before anything is read or priced. Not knowing is yours.
         var player = Players.ReplayPlayer(score);

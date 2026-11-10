@@ -350,7 +350,7 @@
   "foldersClose": "关闭",
   "folderSearchNote": "还没有搜索过你的磁盘。需要几秒钟。",
   "foldersModal.addAFolder": "添加文件夹",
-  "foldersModal.pickTheFolderThatHas": "osu!stable 请选包含 <code>osu!.exe</code> 的文件夹，osu!lazer 请选包含 <code>client.realm</code> 的文件夹，McOsu 请选包含 <code>McEngine.exe</code> 的文件夹 - 不是它的上一层文件夹。",
+  "foldersModal.pickTheFolderThatHas": "osu!stable 请选包含 <code>osu!.exe</code> 的文件夹，osu!lazer 请选包含 <code>client.realm</code> 的文件夹，McOsu 请选包含 <code>McEngine.exe</code> 的文件夹，neomod 请选包含 <code>neomod.exe</code> 的文件夹 - 不是它的上一层文件夹。",
   "foldersModal.theFoldersThisAppReads": "安装位置",
   "foldersTitle": "osu! 文件夹",
   "footer.copyAsOf": " - 副本，截至 {date}",

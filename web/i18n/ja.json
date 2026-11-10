@@ -350,7 +350,7 @@
   "foldersClose": "閉じる",
   "folderSearchNote": "ドライブはまだ検索していません。数秒かかります。",
   "foldersModal.addAFolder": "フォルダーを追加",
-  "foldersModal.pickTheFolderThatHas": "osu!stable なら <code>osu!.exe</code> が、osu!lazer なら <code>client.realm</code> が、McOsu なら <code>McEngine.exe</code> が入っているフォルダーを選んでください - その一つ上のフォルダーではありません。",
+  "foldersModal.pickTheFolderThatHas": "osu!stable なら <code>osu!.exe</code> が、osu!lazer なら <code>client.realm</code> が、McOsu なら <code>McEngine.exe</code> が、neomod なら <code>neomod.exe</code> が入っているフォルダーを選んでください - その一つ上のフォルダーではありません。",
   "foldersModal.theFoldersThisAppReads": "インストール場所",
   "foldersTitle": "osu! フォルダー",
   "footer.copyAsOf": " － {date}時点のコピー",

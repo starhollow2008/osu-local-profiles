@@ -350,7 +350,7 @@
   "foldersClose": "Sluiten",
   "folderSearchNote": "Je schijven zijn nog niet doorzocht. Dit duurt een paar seconden.",
   "foldersModal.addAFolder": "Een map toevoegen",
-  "foldersModal.pickTheFolderThatHas": "Kies voor osu!stable de map met <code>osu!.exe</code> erin, voor osu!lazer die met <code>client.realm</code>, of voor McOsu die met <code>McEngine.exe</code> - niet de map erboven.",
+  "foldersModal.pickTheFolderThatHas": "Kies voor osu!stable de map met <code>osu!.exe</code> erin, voor osu!lazer die met <code>client.realm</code>, voor McOsu die met <code>McEngine.exe</code>, of voor neomod die met <code>neomod.exe</code> - niet de map erboven.",
   "foldersModal.theFoldersThisAppReads": "Installatielocaties",
   "foldersTitle": "osu!-mappen",
   "footer.copyAsOf": " – een kopie, bijgewerkt tot {date}",

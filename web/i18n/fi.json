@@ -350,7 +350,7 @@
   "foldersClose": "Sulje",
   "folderSearchNote": "Asemiasi ei ole vielä käyty läpi. Se kestää muutaman sekunnin.",
   "foldersModal.addAFolder": "Lisää kansio",
-  "foldersModal.pickTheFolderThatHas": "Valitse osu!stablea varten kansio, jossa on <code>osu!.exe</code>, osu!laseria varten se, jossa on <code>client.realm</code>, tai McOsua varten se, jossa on <code>McEngine.exe</code> - ei sen yläpuolista kansiota.",
+  "foldersModal.pickTheFolderThatHas": "Valitse osu!stablea varten kansio, jossa on <code>osu!.exe</code>, osu!laseria varten se, jossa on <code>client.realm</code>, McOsua varten se, jossa on <code>McEngine.exe</code>, tai neomodia varten se, jossa on <code>neomod.exe</code> - ei sen yläpuolista kansiota.",
   "foldersModal.theFoldersThisAppReads": "Asennuskansiot",
   "foldersTitle": "osu!-kansiot",
   "footer.copyAsOf": " – kopio, tilanne {date}",

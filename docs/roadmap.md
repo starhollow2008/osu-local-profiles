@@ -96,6 +96,7 @@ does not have to make it again.
 | 5.82 | One .NET app in place of Node                             | done   |
 | 5.83 | neki                                                      | done   |
 | 5.84 | Track plays only from chosen names                        | todo   |
+| 5.85 | neomod                                                    | in progress |
 
 ## Constraints on every item
 
@@ -1693,3 +1694,56 @@ is built:
   `ADDED_COLUMNS` entry), written by `Incomplete.Write`. Rows from before it are NULL, which
   must never reject a play. Where lazer's log names the player behind an unfinished play is
   still to be found.
+
+## 5.85 - neomod
+
+**Status:** in progress: built, and checked on replays made in neomod's format from its source. Still to check
+against plays set in neomod itself. Asked for by the owner.
+
+[neomod](https://github.com/neomodnet/neomod) is an open-source fork of McOsu (formerly neosu),
+read from its source (`53ba0b5`, 2026-11-09) and its v44.04 Windows x64 release. Windows x64 is
+the only build looked at; the others are assumed to behave the same until someone says otherwise.
+
+### What neomod leaves
+
+- **A portable folder.** On Windows everything is beside `neomod.exe`: `neomod_scores.db`,
+  `cfg\osu.cfg` (with `osu_folder`, the stable folder it reads beatmaps from), `maps\` (sets it
+  downloaded itself) and `replays\`.
+- **A replay for every score it keeps**, in `replays\` (or `replays\<server>\` when signed in to
+  a server), named `<player id>-<unix seconds>.osr`. It is stable's layout with version 40000000
+  ("40m+ is neomod-specific"), stable's LZMA frames, the stable bitmask (`Mods::to_legacy`), and
+  after the online id neomod's own mods record (`Mods::pack_and_write`): 64 mod flags, the exact
+  speed, the note lock type, the CS/AR/OD/HP overrides (AR and CS may go negative), then the
+  experimental mods' settings, then its settings as text. osu!'s decoder reads any version past
+  30000000 as lazer's and would fail on what follows.
+- **Only passes are kept** by default. `save_failed_scores`, a hidden setting, keeps fails too, as
+  grade F in `neomod_scores.db`. A Relax or Autopilot play scores 0 and is never kept.
+- **Its total is ScoreV1 with its own speed curve** (`getScoreV1ScoreMultiplier`): 1.12 at 1.5x
+  as stable, but 0.296 at 0.75x where stable says 0.3, and 1.12 for DT under ScoreV2 where stable
+  says 1.2.
+- **Replays it downloads from a server's leaderboard go in the same folder**, under their
+  player's name and with the server's score id.
+- The browser version (neomod.net/online) keeps everything in the browser's own storage, which
+  this app cannot reach.
+
+### Decisions
+
+- **One client, `neomod`, scored as stable everywhere**, as McOsu and neki are.
+- **Priced from a stable copy of its replay** (`Osr.StableCopy`, as neki's), with its mods as the
+  request's `mods`:
+  - stable's mods as they are; the speed as DT, NC (no pitch correction), HT or DC at that rate,
+    unpriced outside 0.5x-2.0x;
+  - the overrides as DA after EZ/HR, unpriced past DA's extended limits (CS 0-11, AR -10-11);
+  - Flip Up/Down and Left/Right as MR (vertical, horizontal, or both), Singletap as SG, Alternate
+    as AL, Traceable as TC, Freeze Frame as FR, Target Practice as TP;
+  - everything else neomod has and osu! does not, one app-own mod, **NEO**, never shown to osu!'s
+    calculator, as McOsu's MC. AR and OD locked to the speed are NEO, and leave the play unpriced,
+    since their DA value would have to be worked out.
+- **Stable's total is withheld** unless neomod's multiplier for its mods is stable's for the
+  priced ones and every priced mod is one stable has.
+- **A grade-F score is not a pass**: fails kept by `save_failed_scores` are not tracked.
+- **Found** from its configured folder, its shortcuts, a few usual places, and the walk; often it
+  will need adding under Options -> osu! folders. Its beatmaps are the stable folder's Songs and
+  its own `maps`.
+- A saved filter that tracked every client tracks neomod too, once; one narrowed to some clients
+  stays as it was.

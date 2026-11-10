@@ -350,7 +350,7 @@
   "foldersClose": "Fechar",
   "folderSearchNote": "Suas unidades ainda não foram examinadas. Leva alguns segundos.",
   "foldersModal.addAFolder": "Adicionar uma pasta",
-  "foldersModal.pickTheFolderThatHas": "Escolha a pasta que tem <code>osu!.exe</code> dentro para o osu!stable, a que tem <code>client.realm</code> para o osu!lazer, ou a que tem <code>McEngine.exe</code> para o McOsu - não a pasta acima dela.",
+  "foldersModal.pickTheFolderThatHas": "Escolha a pasta que tem <code>osu!.exe</code> dentro para o osu!stable, a que tem <code>client.realm</code> para o osu!lazer, a que tem <code>McEngine.exe</code> para o McOsu, ou a que tem <code>neomod.exe</code> para o neomod - não a pasta acima dela.",
   "foldersModal.theFoldersThisAppReads": "Locais de instalação",
   "foldersTitle": "Pastas do osu!",
   "footer.copyAsOf": " – uma cópia, de {date}",

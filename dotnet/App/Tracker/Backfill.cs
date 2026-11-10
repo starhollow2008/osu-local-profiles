@@ -150,6 +150,7 @@ internal static class Backfill
                 if (!seenKeys.Add(key)) continue;
 
                 if (Scores.WasDeleted(db, profileId, key)) continue;
+                if (Neomod.Failed(score, entry.Path)) continue;
                 var found = Existing.Find(db, profileId, Existing.ReplayIdentity(score));
                 var already = db.Exists("SELECT 1 AS hit FROM scores WHERE profile_id = ? AND dedupe_key = ?", profileId, key)
                     || (found is not null && !Existing.Replaces(found, score.Built is not null ? "built" : "replay"));

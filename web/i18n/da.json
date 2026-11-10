@@ -350,7 +350,7 @@
   "foldersClose": "Luk",
   "folderSearchNote": "Dine drev er ikke blevet gennemsøgt endnu. Det tager nogle sekunder.",
   "foldersModal.addAFolder": "Tilføj en mappe",
-  "foldersModal.pickTheFolderThatHas": "Vælg mappen med <code>osu!.exe</code> i til osu!stable, den med <code>client.realm</code> til osu!lazer, eller den med <code>McEngine.exe</code> til McOsu - ikke mappen ovenover.",
+  "foldersModal.pickTheFolderThatHas": "Vælg mappen med <code>osu!.exe</code> i til osu!stable, den med <code>client.realm</code> til osu!lazer, den med <code>McEngine.exe</code> til McOsu, eller den med <code>neomod.exe</code> til neomod - ikke mappen ovenover.",
   "foldersModal.theFoldersThisAppReads": "Installationsplaceringer",
   "foldersTitle": "osu!-mapper",
   "footer.copyAsOf": " – en kopi, pr. {date}",

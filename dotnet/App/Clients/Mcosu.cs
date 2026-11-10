@@ -331,6 +331,12 @@ internal static partial class Mcosu
         if (Has(1 << 3)) mcosu *= 1.06;
         if (Has(1 << 12)) mcosu *= 0.9;
 
+        return Math.Abs(mcosu - StableMultiplier(priced, v2)) < 1e-9;
+    }
+
+    /// <summary>osu!stable's score multiplier for these mods, which osu! assumes of a stable total.</summary>
+    public static double StableMultiplier(IReadOnlyList<JsonElement> priced, bool v2)
+    {
         var acronyms = priced.Select(Calc.Mods.Acronym).ToHashSet();
         double osu = 1;
         if (acronyms.Contains("NF") && !v2) osu *= 0.5;
@@ -341,7 +347,6 @@ internal static partial class Mcosu
         if (acronyms.Contains("DT") || acronyms.Contains("NC")) osu *= v2 ? 1.2 : 1.12;
         if (acronyms.Contains("FL")) osu *= 1.12;
         if (acronyms.Contains("SO")) osu *= 0.9;
-
-        return Math.Abs(mcosu - osu) < 1e-9;
+        return osu;
     }
 }

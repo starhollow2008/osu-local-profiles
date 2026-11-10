@@ -124,6 +124,7 @@ internal static class Mods
     public static List<JsonElement> ScoreMods(Replays.ReplayScore score, string? osuPath = null)
     {
         if (score.Mcosu is not null) return McosuModsFor(score, osuPath).Mods;
+        if (score.Neomod is not null) return Clients.Neomod.Mods(score.Neomod).Mods;
         return ReplayMods(score) ?? DecodeLegacy(score.LegacyMods, score.Mode);
     }
 
@@ -143,6 +144,12 @@ internal static class Mods
             // A stable play neki wrote in lazer's format to hold its extra mods: priced from a stable
             // copy with those mods, and without stable's total where the mods are not stable's own.
             return new PriceOptions(neki, EncodeLegacy(neki) is null, AsStable: true);
+        }
+        if (score.Neomod is not null)
+        {
+            // neomod's version would read as lazer's: priced from a stable copy, as neki's (roadmap 5.85).
+            var neomod = Clients.Neomod.Mods(score.Neomod);
+            return neomod.Priced is null ? new PriceOptions(Unpriceable: true) : new PriceOptions(neomod.Priced, neomod.IgnoreLegacyTotalScore, AsStable: true);
         }
         if (score.Mcosu is null) return new PriceOptions();
         var derived = McosuModsFor(score, osuPath);
@@ -172,8 +179,8 @@ internal static class Mods
             ? [.. mods.Where(m => Acronym(m) != "CL")]
             : null;
 
-    /// <summary>Whether osu! scores a client's plays as osu!stable plays (McOsu's and neki's included).</summary>
-    public static bool ScoredAsStable(string? client) => client is "stable" or "mcosu" or "neki";
+    /// <summary>Whether osu! scores a client's plays as osu!stable plays (McOsu's, neki's and neomod's included).</summary>
+    public static bool ScoredAsStable(string? client) => client is "stable" or "mcosu" or "neki" or "neomod";
 
     /// <summary>
     /// osu! scores every stable play with Classic on, and shows it that way: for display only,
@@ -250,7 +257,7 @@ internal static class Pp
     {
         if (official is null) return null;
         // neki's Classic is a stable play's, which osu! ranks, so it is left out like stable's.
-        JsonElement? mods = score.Mcosu is not null ? JsonText.From(Mods.ScoreMods(score, osuPath))
+        JsonElement? mods = score.Mcosu is not null || score.Neomod is not null ? JsonText.From(Mods.ScoreMods(score, osuPath))
             : Mods.NekiExtraMods(score) is { } neki ? JsonText.From(neki)
             : Js.Get(score.Extras, "mods");
         var result = Js.Truthy(mods)

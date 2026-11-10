@@ -20,6 +20,7 @@ import { escapeHtml, MODE_NAMES } from './format.js';
 import { modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS } from './mcosu-mods.js';
+import { NEOMOD_DEFINITIONS } from './neomod-mods.js';
 import { hint, postJson, toast } from './ui.js';
 import { plural, t, tOwn } from './i18n.js';
 
@@ -64,6 +65,7 @@ const CLIENT_NAMES = [
   ['lazer', 'osu!lazer'],
   ['mcosu', 'McOsu'],
   ['neki', 'neki'],
+  ['neomod', 'neomod'],
 ];
 
 const CATEGORY_LABELS = [
@@ -457,8 +459,12 @@ function datesSection(key, title, help, { unknown } = {}) {
  * because the mode criterion is its own section and splitting would draw Hidden four times.
  */
 function modsSection() {
-  // McOsu's MC among the Fun mods: every McOsu-only mod, as one chip.
-  const acronyms = [...Object.keys(MOD_DEFINITIONS), ...Object.keys(MCOSU_DEFINITIONS)].filter(
+  // McOsu's MC and neomod's NEO among the Fun mods: every mod only one of them has, as one chip each.
+  const acronyms = [
+    ...Object.keys(MOD_DEFINITIONS),
+    ...Object.keys(MCOSU_DEFINITIONS),
+    ...Object.keys(NEOMOD_DEFINITIONS),
+  ].filter(
     (a) => !HIDDEN_MODS.has(a),
   );
   const groups = MOD_GROUPS.map(([type, label]) => {

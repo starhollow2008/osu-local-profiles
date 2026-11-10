@@ -11,10 +11,11 @@ import { escapeHtml } from './format.js';
 import { t } from './i18n.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS, mcosuModNames } from './mcosu-mods.js';
+import { NEOMOD_DEFINITIONS, neomodModNames } from './neomod-mods.js';
 
-/** A mod's name, type and settings: osu-web's, or McOsu's MC beside them. */
+/** A mod's name, type and settings: osu-web's, or McOsu's MC and neomod's NEO beside them. */
 export function modDefinition(acronym) {
-  return MOD_DEFINITIONS[acronym] ?? MCOSU_DEFINITIONS[acronym] ?? null;
+  return MOD_DEFINITIONS[acronym] ?? MCOSU_DEFINITIONS[acronym] ?? NEOMOD_DEFINITIONS[acronym] ?? null;
 }
 
 /* Unique ids per generated SVG, since several appear on the page at once. */
@@ -126,6 +127,11 @@ function modTitle(mod, definition) {
     const names = mcosuModNames(mod.settings);
     return names.length === 0 ? 'McOsu' : `McOsu (${names.join(', ')})`;
   }
+  // NEO is neomod's, in the same way.
+  if (mod.acronym === 'NEO') {
+    const names = neomodModNames(mod.settings);
+    return names.length === 0 ? 'neomod' : `neomod (${names.join(', ')})`;
+  }
 
   const settings = [];
   for (const [key, value] of Object.entries(mod.settings ?? {})) {
@@ -157,8 +163,8 @@ export function modPill(mod, { title: named } = {}) {
   const definition = modDefinition(m.acronym);
   const type = MOD_TYPES.has(definition?.type) ? ` mod--type-${definition.type}` : '';
   const extended = extendedContent(m);
-  // MC's settings say which McOsu mods it stands for, not that anything was customised.
-  const customised = m.acronym !== 'MC' && Object.keys(m.settings ?? {}).length > 0;
+  // MC's and NEO's settings say which mods they stand for, not that anything was customised.
+  const customised = m.acronym !== 'MC' && m.acronym !== 'NEO' && Object.keys(m.settings ?? {}).length > 0;
   const title = escapeHtml(named ?? modTitle(m, definition));
   const acronym = escapeHtml(m.acronym);
 

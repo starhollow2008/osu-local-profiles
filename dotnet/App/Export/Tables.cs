@@ -44,7 +44,7 @@ internal static class Tables
         [Js.NumberToString(Status.Unresolved)] = t.T("export.notSubmitted"),
     };
 
-    private static readonly Dictionary<string, string> ClientNames = new() { ["lazer"] = "osu!lazer", ["stable"] = "osu!stable", ["mcosu"] = "McOsu", ["neki"] = "neki" };
+    private static readonly Dictionary<string, string> ClientNames = new() { ["lazer"] = "osu!lazer", ["stable"] = "osu!stable", ["mcosu"] = "McOsu", ["neki"] = "neki", ["neomod"] = "neomod" };
 
     private static string SourceName(string source, Translator t) => source switch
     {

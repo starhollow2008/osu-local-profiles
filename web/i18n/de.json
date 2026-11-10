@@ -350,7 +350,7 @@
   "foldersClose": "Schließen",
   "folderSearchNote": "Deine Laufwerke wurden noch nicht durchsucht. Es dauert ein paar Sekunden.",
   "foldersModal.addAFolder": "Einen Ordner hinzufügen",
-  "foldersModal.pickTheFolderThatHas": "Wähle für osu!stable den Ordner, in dem <code>osu!.exe</code> liegt, für osu!lazer den mit <code>client.realm</code> oder für McOsu den mit <code>McEngine.exe</code> - nicht den Ordner darüber.",
+  "foldersModal.pickTheFolderThatHas": "Wähle für osu!stable den Ordner, in dem <code>osu!.exe</code> liegt, für osu!lazer den mit <code>client.realm</code> für McOsu den mit <code>McEngine.exe</code> oder für neomod den mit <code>neomod.exe</code> - nicht den Ordner darüber.",
   "foldersModal.theFoldersThisAppReads": "Installationsorte",
   "foldersTitle": "osu!-Ordner",
   "footer.copyAsOf": " – eine Kopie, Stand {date}",

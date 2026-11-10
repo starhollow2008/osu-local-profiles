@@ -765,6 +765,43 @@ from a stable folder (`OsuFolder` in `neki.ini`) and writes its replays into tha
   (`RelabelNekiPlays`), and its lazer-format ones repriced. A saved filter that tracked stable
   tracks neki too, once (`PinNekiClient`).
 
+## neomod
+
+An open-source fork of McOsu (roadmap 5.85), read from its source. A portable folder: everything
+is beside `neomod.exe` (`Clients/Neomod.cs`).
+
+- **Its replays are its own version of stable's.** `replays\` (or `replays\<server>\`) holds
+  `<player id>-<unix seconds>.osr`: stable's layout and LZMA frames under version 40000000, then,
+  after the online id, neomod's mods record (`Replay::Mods::pack_and_write`), then its settings as
+  text. `Osr.Parse` files anything from 40000000 up as `neomod` and reads the record
+  (`Neomod.ReadFacts`); osu!'s decoder would take the version as lazer's and fail, so pricing uses
+  a stable copy (`Osr.StableCopy`, `PriceOptions.AsStable`) with the mods as the request's `mods`.
+- **Its mods** (`Neomod.Mods`): stable's as they are, the speed as DT/NC/HT/DC at its rate, the
+  CS/AR/OD/HP overrides as DA after EZ and HR (unpriced past DA's extended limits, and for CS below
+  0), and the experimental mods lazer has under lazer's names: MR (neomod's Flip Up/Down is
+  lazer's *vertical* reflection, though neomod's own lazer importer maps it by name), SG, AL, TC,
+  ST, FR, AD. The rest are one app-own mod, **NEO**, never shown to osu!'s calculator, as McOsu's MC.
+  AR or OD locked to the speed leaves a play at another speed unpriced.
+- **Stable's total is withheld** unless every priced mod is stable's and neomod's multiplier for
+  them (its own speed curve, `getScoreV1ScoreMultiplier`) is stable's.
+- **Only passes are kept**, unless its hidden `save_failed_scores` is on: then a fail is a replay
+  too, grade F in `neomod_scores.db`, which `Neomod.Failed` reads so it is never stored as a pass.
+- **Found** by its folder (`neomod.exe`), from configured roots, shortcuts, the usual unzip places
+  and the walk. Its beatmaps are its `osu_folder`'s Songs (`cfg\osu.cfg`, read as McOsu's) and
+  its `maps\`. Replays downloaded from a server's leaderboard land in the same folder and are
+  judged by their names like any other.
+
+### Classic for McOsu, neki and neomod
+
+All three are filed as stable (`ScoredAsStable`) and shown with CL, and that is what osu!'s
+calculator needs: CL is how it knows a play has stable's judgements only, with no slider-tail or
+tick statistics, so it estimates slider accuracy instead of reading it. Their replays carry
+stable's six counters and nothing more, so CL is right for pricing whatever else is on. Two things
+to keep in mind when reviewing it: CL's other parts (note lock, early fade, classic health) are
+display only here, so a client's note lock setting (neki's No Lock, neomod's `notelock_type`)
+changes nothing priced; and neomod already has unused slider-head and slider-tail accuracy flags,
+so if it ever judges sliders lazer's way, its plays would stop being stable's.
+
 ## osu!'s development client
 
 A Debug build of ppy/osu is tracked **beside** release lazer (roadmap 5.68): `OsuInstall.development`,

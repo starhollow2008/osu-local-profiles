@@ -350,7 +350,7 @@
   "foldersClose": "Cerrar",
   "folderSearchNote": "Aún no se ha buscado en tus unidades. Tarda unos segundos.",
   "foldersModal.addAFolder": "Añadir una carpeta",
-  "foldersModal.pickTheFolderThatHas": "Elige la carpeta que contiene <code>osu!.exe</code> para osu!stable, la que contiene <code>client.realm</code> para osu!lazer, o la que contiene <code>McEngine.exe</code> para McOsu - no la carpeta de encima.",
+  "foldersModal.pickTheFolderThatHas": "Elige la carpeta que contiene <code>osu!.exe</code> para osu!stable, la que contiene <code>client.realm</code> para osu!lazer, la que contiene <code>McEngine.exe</code> para McOsu, o la que contiene <code>neomod.exe</code> para neomod - no la carpeta de encima.",
   "foldersModal.theFoldersThisAppReads": "Ubicaciones de instalación",
   "foldersTitle": "Carpetas de osu!",
   "footer.copyAsOf": " - una copia, con fecha {date}",

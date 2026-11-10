@@ -125,10 +125,10 @@ internal static partial class Discover
         return [.. outputs.SelectMany(RegistryPaths)];
     }
 
-    [GeneratedRegex(@"[A-Za-z]:\\[^\x00-\x1f""*?<>|]{0,240}?osu!\.exe", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"[A-Za-z]:\\[^\x00-\x1f""*?<>|]{0,240}?(?:osu!|neomod)\.exe", RegexOptions.IgnoreCase)]
     private static partial Regex LnkTarget();
 
-    /// <summary>The osu! executables a <c>.lnk</c> points at, read from both of its string encodings.</summary>
+    /// <summary>The osu! (or neomod) executables a <c>.lnk</c> points at, read from both of its string encodings.</summary>
     public static List<string> LnkTargets(byte[] buf)
     {
         var output = new List<string>();
@@ -174,10 +174,10 @@ internal static partial class Discover
         }
     }
 
-    [GeneratedRegex("osu|game", RegexOptions.IgnoreCase)]
+    [GeneratedRegex("osu|game|neomod", RegexOptions.IgnoreCase)]
     private static partial Regex OsuOrGame();
 
-    [GeneratedRegex("osu", RegexOptions.IgnoreCase)]
+    [GeneratedRegex("osu|neomod", RegexOptions.IgnoreCase)]
     private static partial Regex OsuName();
 
     /// <summary>Install directories named by a shortcut, one level of subfolder deep, as the Start Menu keeps them.</summary>
@@ -225,7 +225,7 @@ internal static partial class Discover
     {
         var lower = names.Select(Js.ToLower).ToHashSet();
         return lower.Contains("osu!.exe") || lower.Contains("client.realm") || names.Any(n => Detect.DevelopmentRealm().IsMatch(n))
-            || lower.Contains("mcengine.exe") || lower.Contains("mcosu.exe") || lower.Contains("neki.exe");
+            || lower.Contains("mcengine.exe") || lower.Contains("mcosu.exe") || lower.Contains("neki.exe") || lower.Contains("neomod.exe");
     }
 
     /// <summary>Everywhere the fallback search starts: every drive on Windows, the home folder and mounts elsewhere.</summary>
@@ -310,10 +310,10 @@ internal static partial class Discover
 
     /// <summary>Classify a directory, without saying which client was expected.</summary>
     public static OsuInstall? Classify(string root, string builtReplays) =>
-        Detect.LazerInstall(root) ?? Detect.StableInstall(root) ?? Detect.McosuInstall(root, builtReplays) ?? Neki.Install(root);
+        Detect.LazerInstall(root) ?? Detect.StableInstall(root) ?? Detect.McosuInstall(root, builtReplays) ?? Neki.Install(root) ?? Neomod.Install(root);
 
     /// <summary>
-    /// Find osu!, properly: configured and remembered roots, McOsu, neki and the development client every
+    /// Find osu!, properly: configured and remembered roots, McOsu, neki, neomod and the development client every
     /// time, the cheap tiers when a client is missing, and the walk only then and only once.
     /// </summary>
     public static async Task<DiscoveryResult> Run(IEnumerable<string>? configured, IEnumerable<string>? remembered, string builtReplays,
@@ -339,6 +339,7 @@ internal static partial class Discover
         Add(remembered ?? [], "remembered");
         Add(Detect.McosuCandidates(e), "detected");
         Add(Neki.Candidates(e), "detected");
+        Add(Neomod.Candidates(e, e.Platform == "win32" ? Detect.WindowsDrives() : null), "detected");
         Add(Detect.LazerDevelopmentCandidates(e), "detected");
         if (force || Missing()) Add(Detect.CandidateRoots([], e), "detected");
         if (force || Missing())
@@ -357,7 +358,7 @@ internal static partial class Discover
 
         // One of each, and the development client in a slot of its own beside release lazer.
         var installs = new List<OsuInstall>();
-        foreach (var (kind, development) in new[] { ("lazer", false), ("lazer", true), ("stable", false), ("mcosu", false), ("neki", false) })
+        foreach (var (kind, development) in new[] { ("lazer", false), ("lazer", true), ("stable", false), ("mcosu", false), ("neki", false), ("neomod", false) })
         {
             var best = sorted.FirstOrDefault(c => c.Kind == kind && c.Development == development);
             if (best is not null && Classify(best.Root, builtReplays) is { } install) installs.Add(install);

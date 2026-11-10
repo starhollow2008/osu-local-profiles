@@ -55,7 +55,7 @@ internal static class Players
     private const int MaxReverseLookups = 3;
 
     /// <summary>
-    /// The name behind at least four fifths of this profile's own tracked plays (McOsu's and neki's left out),
+    /// The name behind at least four fifths of this profile's own tracked plays (McOsu's, neki's and neomod's left out),
     /// when there are at least ten; otherwise no clear owner.
     /// </summary>
     public static (string Name, double? UserId)? DominantTrackedName(Database db, long profileId)
@@ -63,7 +63,7 @@ internal static class Players
         var rows = db.Rows("""
             SELECT player_name AS name, player_id AS id, COUNT(*) AS n
               FROM scores
-             WHERE profile_id = ? AND player_name IS NOT NULL AND player_name <> '' AND client NOT IN ('mcosu', 'neki')
+             WHERE profile_id = ? AND player_name IS NOT NULL AND player_name <> '' AND client NOT IN ('mcosu', 'neki', 'neomod')
              GROUP BY LOWER(player_name)
              ORDER BY n DESC
             """, profileId);

@@ -350,7 +350,7 @@
   "foldersClose": "닫기",
   "folderSearchNote": "아직 드라이브를 검색하지 않았습니다. 몇 초 걸립니다.",
   "foldersModal.addAFolder": "폴더 추가",
-  "foldersModal.pickTheFolderThatHas": "osu!stable은 <code>osu!.exe</code>가, osu!lazer는 <code>client.realm</code>이, McOsu는 <code>McEngine.exe</code>가 들어 있는 폴더를 고르세요 - 그 위 폴더가 아닙니다.",
+  "foldersModal.pickTheFolderThatHas": "osu!stable은 <code>osu!.exe</code>가, osu!lazer는 <code>client.realm</code>이, McOsu는 <code>McEngine.exe</code>가, neomod는 <code>neomod.exe</code>가 들어 있는 폴더를 고르세요 - 그 위 폴더가 아닙니다.",
   "foldersModal.theFoldersThisAppReads": "설치 위치",
   "foldersTitle": "osu! 폴더",
   "footer.copyAsOf": " - {date} 기준 사본",

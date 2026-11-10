@@ -26,7 +26,7 @@ let searching = false;
 const setHint = (message, isError = false) => hint('foldersHint', message, isError);
 
 /** Each kind of folder, by the name its game goes by. */
-const KIND_NAMES = { lazer: 'osu!lazer', stable: 'osu!stable', mcosu: 'McOsu', neki: 'neki' };
+const KIND_NAMES = { lazer: 'osu!lazer', stable: 'osu!stable', mcosu: 'McOsu', neki: 'neki', neomod: 'neomod' };
 
 /** A folder's name, the development client told apart from release lazer (roadmap 5.68). */
 export function installName(install) {

@@ -139,6 +139,25 @@ it's found wherever it was installed (`AppData\Local\Programs\neki`) and its pla
   follow **Count plays osu! could not submit**. A retry in the middle of a play may leave nothing.
 - **Import past plays** brings in neki's quits and fails as far back as neki still lists them.
 
+## neomod
+
+[neomod](https://github.com/neomodnet/neomod) is a folder you unzip anywhere, so it's found only in
+the usual places (Downloads, Desktop, a `Games` folder) or through a shortcut to it. Otherwise add
+the folder with `neomod.exe` in it under **Options -> osu! folders**. Its plays are tracked as
+**neomod**. Only the Windows x64 build has been looked at.
+
+- **Plays are scored as osu!stable scores them**, with the Classic mod.
+- **Only passed plays are tracked.** neomod keeps nothing of a quit, and a fail only with a hidden
+  setting, which isn't tracked either.
+- **Its speed and CS/AR/OD/HP settings count as Double Time, Half Time and Difficulty Adjust**, and
+  Flip, Singletap, Alternate, Traceable, Strict Tracking, Freeze Frame and Approach Different as
+  osu!lazer's mods. Its other experimental mods show as one **NEO** mod and don't change pp. A
+  speed outside 0.5x-2x, a value past what Difficulty Adjust allows, or AR or OD locked to the
+  speed leaves a play without pp.
+- Plays with any of these count toward pp only while [unranked mods are
+  counted](#include-pp-for-unranked-mods).
+- The browser version keeps its plays in the browser, out of this app's reach.
+
 ## The profile page
 
 Under the rank graph are osu!'s three figures: **Medals** (every medal across all modes), **pp**,
@@ -373,7 +392,7 @@ wide open. There are ten:
 |---|---|
 | **Beatmap rules** | Which beatmaps count, by title, artist, mapper and more. See [Beatmap rules](#beatmap-rules). |
 | **Mode** | osu!, osu!taiko, osu!catch, osu!mania. |
-| **Client** | osu!stable, osu!lazer, McOsu, neki. A stable play imported into lazer counts as stable. |
+| **Client** | osu!stable, osu!lazer, McOsu, neki, neomod. A stable play imported into lazer counts as stable. |
 | **Difficulty** | The star rating as played, mods included. |
 | **Mods** | Every mod in all four modes, each *may*, *must* or *must not* be used, plus a nomod badge. |
 | **Categories** | Ranked, Qualified, Loved, Pending, Work in progress, Graveyarded, Never submitted. |

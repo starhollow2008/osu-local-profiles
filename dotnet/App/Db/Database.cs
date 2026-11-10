@@ -368,17 +368,30 @@ internal sealed partial class Database : IDisposable
         PinRelaxPricing();
         PinSectionOrder();
         PinNekiClient();
+        PinNeomodClient();
     }
 
     private const string NekiClientPinned = "nekiClientPinned";
+    private const string NeomodClientPinned = "neomodClientPinned";
 
     /// <summary>
     /// A filter saved before neki was a client tracks neki's plays wherever it tracked stable's, since
     /// that is what they were filed under until then (roadmap 5.83).
     /// </summary>
-    private void PinNekiClient()
+    private void PinNekiClient() =>
+        AddClient(NekiClientPinned, "neki", names => names.Contains("stable"));
+
+    /// <summary>
+    /// A filter saved before neomod was a client tracks it too if it tracked every client there was;
+    /// one narrowed to some is left as it was (roadmap 5.85).
+    /// </summary>
+    private void PinNeomodClient() =>
+        AddClient(NeomodClientPinned, "neomod", names => new[] { "stable", "lazer", "mcosu", "neki" }.All(names.Contains));
+
+    /// <summary>Tick a client added since a filter was saved, where <paramref name="when"/> says so, once per database.</summary>
+    private void AddClient(string pinned, string client, Func<List<string?>, bool> when)
     {
-        if (Exists("SELECT 1 AS hit FROM kv WHERE key = ?", NekiClientPinned)) return;
+        if (Exists("SELECT 1 AS hit FROM kv WHERE key = ?", pinned)) return;
         Transaction(() =>
         {
             foreach (var row in Rows("SELECT profile_id, value FROM profile_settings WHERE key = 'trackingFilter'"))
@@ -390,17 +403,17 @@ internal sealed partial class Database : IDisposable
                 }
                 catch (System.Text.Json.JsonException)
                 {
-                    continue; // unreadable: it reads as the default filter, which tracks neki already
+                    continue; // unreadable: it reads as the default filter, which tracks every client already
                 }
                 if (parsed is not System.Text.Json.Nodes.JsonObject filter) continue;
                 if (filter["clients"] is not System.Text.Json.Nodes.JsonArray clients) continue;
                 var names = clients.Select(c => c?.GetValueKind() == System.Text.Json.JsonValueKind.String ? c.GetValue<string>() : null).ToList();
-                if (!names.Contains("stable") || names.Contains("neki")) continue;
-                clients.Add("neki");
+                if (names.Contains(client) || !when(names)) continue;
+                clients.Add(client);
                 Run("UPDATE profile_settings SET value = ? WHERE profile_id = ? AND key = 'trackingFilter'",
                     filter.ToJsonString(JsonText.Options), row["profile_id"]);
             }
-            Run("INSERT INTO kv (key, value) VALUES (?, ?)", NekiClientPinned, Js.Now().ToString());
+            Run("INSERT INTO kv (key, value) VALUES (?, ?)", pinned, Js.Now().ToString());
         });
     }
 

@@ -350,7 +350,7 @@
   "foldersClose": "Fermer",
   "folderSearchNote": "Tes disques n'ont pas encore été fouillés. Cela prend quelques secondes.",
   "foldersModal.addAFolder": "Ajouter un dossier",
-  "foldersModal.pickTheFolderThatHas": "Choisis le dossier contenant <code>osu!.exe</code> pour osu!stable, celui contenant <code>client.realm</code> pour osu!lazer, ou celui contenant <code>McEngine.exe</code> pour McOsu - pas le dossier au-dessus.",
+  "foldersModal.pickTheFolderThatHas": "Choisis le dossier contenant <code>osu!.exe</code> pour osu!stable, celui contenant <code>client.realm</code> pour osu!lazer, celui contenant <code>McEngine.exe</code> pour McOsu, ou celui contenant <code>neomod.exe</code> pour neomod - pas le dossier au-dessus.",
   "foldersModal.theFoldersThisAppReads": "Emplacements d'installation",
   "foldersTitle": "Dossiers osu!",
   "footer.copyAsOf": " – une copie, au {date}",

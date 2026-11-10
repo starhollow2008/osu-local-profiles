@@ -353,7 +353,7 @@
   "foldersClose": "Close",
   "folderSearchNote": "Your drives have not been searched yet. It takes a few seconds.",
   "foldersModal.addAFolder": "Add a folder",
-  "foldersModal.pickTheFolderThatHas": "Pick the folder that has <code>osu!.exe</code> in it for osu!stable, the one with <code>client.realm</code> for osu!lazer, or the one with <code>McEngine.exe</code> for McOsu - not the folder above it.",
+  "foldersModal.pickTheFolderThatHas": "Pick the folder that has <code>osu!.exe</code> in it for osu!stable, the one with <code>client.realm</code> for osu!lazer, the one with <code>McEngine.exe</code> for McOsu, or the one with <code>neomod.exe</code> for neomod - not the folder above it.",
   "foldersModal.theFoldersThisAppReads": "Installation locations",
   "foldersTitle": "osu! folders",
   "footer.copyAsOf": " - a copy, as of {date}",

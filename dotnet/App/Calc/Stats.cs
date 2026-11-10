@@ -122,7 +122,7 @@ internal static class Stats
         };
         // A stable play's legacy id, where one is kept, finds it however the row came to be.
         if (legacyScoreId is not null) return $"https://osu.ppy.sh/scores/{ruleset}/{Text(legacyScoreId)}";
-        if (onlineScoreId is null || onlineScoreId is "0" || client is "mcosu" or "neki") return null;
+        if (onlineScoreId is null || onlineScoreId is "0" || client is "mcosu" or "neki" or "neomod") return null;
         // A stable replay's id is a legacy one, which only the ruleset form finds.
         return client == "stable"
             ? $"https://osu.ppy.sh/scores/{ruleset}/{Text(onlineScoreId)}"

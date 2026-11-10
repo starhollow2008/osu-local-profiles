@@ -350,7 +350,7 @@
   "foldersClose": "Закрыть",
   "folderSearchNote": "Ваши диски ещё не просматривались. Это занимает несколько секунд.",
   "foldersModal.addAFolder": "Добавить папку",
-  "foldersModal.pickTheFolderThatHas": "Выберите папку, в которой лежит <code>osu!.exe</code>, для osu!stable, ту, где есть <code>client.realm</code>, для osu!lazer, или ту, где есть <code>McEngine.exe</code>, для McOsu - а не папку над ней.",
+  "foldersModal.pickTheFolderThatHas": "Выберите папку, в которой лежит <code>osu!.exe</code>, для osu!stable, ту, где есть <code>client.realm</code>, для osu!lazer, ту, где есть <code>McEngine.exe</code>, для McOsu, или ту, где есть <code>neomod.exe</code>, для neomod - а не папку над ней.",
   "foldersModal.theFoldersThisAppReads": "Папки установки",
   "foldersTitle": "Папки osu!",
   "footer.copyAsOf": " - копия по состоянию на {date}",

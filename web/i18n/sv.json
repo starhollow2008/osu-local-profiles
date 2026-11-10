@@ -350,7 +350,7 @@
   "foldersClose": "Stäng",
   "folderSearchNote": "Dina enheter har inte genomsökts ännu. Det tar några sekunder.",
   "foldersModal.addAFolder": "Lägg till en mapp",
-  "foldersModal.pickTheFolderThatHas": "Välj mappen som har <code>osu!.exe</code> i sig för osu!stable, den med <code>client.realm</code> för osu!lazer, eller den med <code>McEngine.exe</code> för McOsu - inte mappen ovanför.",
+  "foldersModal.pickTheFolderThatHas": "Välj mappen som har <code>osu!.exe</code> i sig för osu!stable, den med <code>client.realm</code> för osu!lazer, den med <code>McEngine.exe</code> för McOsu, eller den med <code>neomod.exe</code> för neomod - inte mappen ovanför.",
   "foldersModal.theFoldersThisAppReads": "Installationsplatser",
   "foldersTitle": "osu!-mappar",
   "footer.copyAsOf": " – en kopia, per {date}",
