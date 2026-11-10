@@ -138,6 +138,12 @@ internal static class Mods
     public static PriceOptions ScorePricing(Replays.ReplayScore score, string? osuPath)
     {
         if (score.Built is not null) return score.Built.LegacyTotal || score.Client != "stable" ? new PriceOptions() : new PriceOptions(IgnoreLegacyTotalScore: true);
+        if (NekiExtraMods(score) is { } neki)
+        {
+            // A stable play neki wrote in lazer's format to hold its extra mods: priced from a stable
+            // copy with those mods, and without stable's total where the mods are not stable's own.
+            return new PriceOptions(neki, EncodeLegacy(neki) is null, AsStable: true);
+        }
         if (score.Mcosu is null) return new PriceOptions();
         var derived = McosuModsFor(score, osuPath);
         if (derived.Priced is null) return new PriceOptions(Unpriceable: true);
@@ -157,8 +163,17 @@ internal static class Mods
         _ => false,
     };
 
-    /// <summary>Whether osu! scores a client's plays as osu!stable plays (McOsu's included).</summary>
-    public static bool ScoredAsStable(string? client) => client is "stable" or "mcosu";
+    /// <summary>
+    /// The mods of a neki play written in lazer's format, less Classic, which osu!'s decoder adds to
+    /// every stable replay itself. Null for anything else.
+    /// </summary>
+    public static List<JsonElement>? NekiExtraMods(Replays.ReplayScore score) =>
+        score.Client == "neki" && score.Version >= Replays.Osr.LazerExtMinVersion && ReplayMods(score) is { } mods
+            ? [.. mods.Where(m => Acronym(m) != "CL")]
+            : null;
+
+    /// <summary>Whether osu! scores a client's plays as osu!stable plays (McOsu's and neki's included).</summary>
+    public static bool ScoredAsStable(string? client) => client is "stable" or "mcosu" or "neki";
 
     /// <summary>
     /// osu! scores every stable play with Classic on, and shows it that way: for display only,
@@ -175,7 +190,8 @@ internal static class Mods
 /// How osu!'s calculator is to price a replay, beyond decoding it: mods in place of the replay's,
 /// pricing without the total osu!stable recorded, or not at all.
 /// </summary>
-internal sealed record PriceOptions(List<JsonElement>? Mods = null, bool IgnoreLegacyTotalScore = false, bool Unpriceable = false);
+/// <remarks><c>AsStable</c> prices a stable copy of a lazer-format replay: neki's, roadmap 5.83.</remarks>
+internal sealed record PriceOptions(List<JsonElement>? Mods = null, bool IgnoreLegacyTotalScore = false, bool Unpriceable = false, bool AsStable = false);
 
 /// <summary>A play priced by osu!'s calculator (src/calc/pp.ts, <c>PpResult</c>).</summary>
 internal sealed record PpResult(
@@ -203,8 +219,23 @@ internal static class Pp
     {
         pricing ??= new PriceOptions();
         if (official is null || pricing.Unpriceable) return null;
-        var result = await official.Calculate(replayPath, osuPath, stripMods is { Length: > 0 } ? stripMods : null,
-            pricing.Mods, pricing.IgnoreLegacyTotalScore);
+        var priced = replayPath;
+        if (pricing.AsStable)
+        {
+            if (Replays.Osr.StableCopy(File.ReadAllBytes(replayPath)) is not { } copy) return null;
+            priced = Path.Combine(Path.GetTempPath(), $"olp-stable-{Guid.NewGuid():N}.osr");
+            File.WriteAllBytes(priced, copy);
+        }
+        OfficialResult? result;
+        try
+        {
+            result = await official.Calculate(priced, osuPath, stripMods is { Length: > 0 } ? stripMods : null,
+                pricing.Mods, pricing.IgnoreLegacyTotalScore);
+        }
+        finally
+        {
+            if (priced != replayPath) File.Delete(priced);
+        }
         if (result?.Pp is not { } pp) return null;
         return new PpResult(pp, result.StandardisedScore, result.LegacyTotalScore ?? result.ClassicScore, result.Stars,
             result.MaxCombo, result.Accuracy, result.Rank, result.IsLegacy, result.Stripped, result.Breakdown, official.Version);
@@ -218,7 +249,10 @@ internal static class Pp
     public static async Task<bool?> RankedByOsu(Replays.ReplayScore score, OfficialCalculator? official, string? osuPath = null)
     {
         if (official is null) return null;
-        JsonElement? mods = score.Mcosu is not null ? JsonText.From(Mods.ScoreMods(score, osuPath)) : Js.Get(score.Extras, "mods");
+        // neki's Classic is a stable play's, which osu! ranks, so it is left out like stable's.
+        JsonElement? mods = score.Mcosu is not null ? JsonText.From(Mods.ScoreMods(score, osuPath))
+            : Mods.NekiExtraMods(score) is { } neki ? JsonText.From(neki)
+            : Js.Get(score.Extras, "mods");
         var result = Js.Truthy(mods)
             ? await official.Ranked(score.Mode, mods, null)
             : await official.Ranked(score.Mode, null, score.LegacyMods);

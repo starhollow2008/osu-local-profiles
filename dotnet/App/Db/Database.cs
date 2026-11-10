@@ -367,6 +367,41 @@ internal sealed partial class Database : IDisposable
         PinCountingDefaults();
         PinRelaxPricing();
         PinSectionOrder();
+        PinNekiClient();
+    }
+
+    private const string NekiClientPinned = "nekiClientPinned";
+
+    /// <summary>
+    /// A filter saved before neki was a client tracks neki's plays wherever it tracked stable's, since
+    /// that is what they were filed under until then (roadmap 5.83).
+    /// </summary>
+    private void PinNekiClient()
+    {
+        if (Exists("SELECT 1 AS hit FROM kv WHERE key = ?", NekiClientPinned)) return;
+        Transaction(() =>
+        {
+            foreach (var row in Rows("SELECT profile_id, value FROM profile_settings WHERE key = 'trackingFilter'"))
+            {
+                System.Text.Json.Nodes.JsonNode? parsed;
+                try
+                {
+                    parsed = row.Str("value") is { } json ? System.Text.Json.Nodes.JsonNode.Parse(json) : null;
+                }
+                catch (System.Text.Json.JsonException)
+                {
+                    continue; // unreadable: it reads as the default filter, which tracks neki already
+                }
+                if (parsed is not System.Text.Json.Nodes.JsonObject filter) continue;
+                if (filter["clients"] is not System.Text.Json.Nodes.JsonArray clients) continue;
+                var names = clients.Select(c => c?.GetValueKind() == System.Text.Json.JsonValueKind.String ? c.GetValue<string>() : null).ToList();
+                if (!names.Contains("stable") || names.Contains("neki")) continue;
+                clients.Add("neki");
+                Run("UPDATE profile_settings SET value = ? WHERE profile_id = ? AND key = 'trackingFilter'",
+                    filter.ToJsonString(JsonText.Options), row["profile_id"]);
+            }
+            Run("INSERT INTO kv (key, value) VALUES (?, ?)", NekiClientPinned, Js.Now().ToString());
+        });
     }
 
     /// <summary>Past this much free space inside the file, a rebuild gives it back to the disk.</summary>

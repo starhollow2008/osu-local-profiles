@@ -70,7 +70,7 @@ internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<P
     /// <summary>A play was just tracked. Only one osu! could rank is worth asking about.</summary>
     public void Played(string client, string grade)
     {
-        if (client == "mcosu" || grade == "F") return;
+        if (client is "mcosu" or "neki" || grade == "F") return;
         if (Account() is null) return;
         lock (gate)
         {

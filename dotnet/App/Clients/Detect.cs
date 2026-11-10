@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace OsuLocalProfiles.Clients;
 
 /// <summary>One osu! client on this machine: src/clients/detect.ts's <c>OsuInstall</c>.</summary>
-/// <param name="Kind"><c>lazer</c>, <c>stable</c> or <c>mcosu</c>.</param>
+/// <param name="Kind"><c>lazer</c>, <c>stable</c>, <c>mcosu</c> or <c>neki</c>.</param>
 /// <param name="ReplayDir">Where new replays appear. McOsu writes none: for it, the app's folder of the replays it builds.</param>
 /// <param name="OnlineDb">lazer's cached beatmap metadata database, if present.</param>
 /// <param name="Development">osu!'s development client, tracked beside release lazer (roadmap 5.68).</param>

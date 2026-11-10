@@ -49,6 +49,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     private const double QuietIndexMs = 1500;
 
     private readonly object gate = new();
+    private readonly NekiPlays neki = new(installs);
     private Task queue = Task.CompletedTask;
     private ReplayWatcher? watcher;
     private LogWatcher? logWatcher;
@@ -213,7 +214,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         if (watcher is not null) return;
         liveFrom = liveSince ?? Js.Now();
         watcher = new ReplayWatcher(
-            [.. installs.Where(i => i.Kind != "mcosu").Select(i => i.ReplayDir)],
+            Distinct(installs.Where(i => i.Kind != "mcosu").Select(i => i.ReplayDir)),
             HandleReplay,
             file => Clients.Beatmaps.IndexOneFile(db, file),
             e => Error?.Invoke(e));
@@ -248,6 +249,13 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     /// <summary><c>path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()</c>.</summary>
     internal static bool SamePath(string a, string b) => Js.ToLower(NodePath.Resolve(a)) == Js.ToLower(NodePath.Resolve(b));
 
+    /// <summary>Each folder once: neki writes into the stable folder it plays from, which stable's install names too.</summary>
+    internal static List<string> Distinct(IEnumerable<string> paths)
+    {
+        var all = paths.ToList();
+        return [.. all.Where((p, n) => all.FindIndex(o => SamePath(o, p)) == n)];
+    }
+
     public void Stop()
     {
         watcher?.Stop();
@@ -276,7 +284,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     {
         var filter = ImportFilter(applyFilter);
         await BuildMcosuReplays(from, chosen);
-        var replays = Backfill.ScanForReplays(db, profile, ReplayDirs(chosen), from, until, (resolver, filter), Players.Resolve(db, profile, installs));
+        var replays = Backfill.ScanForReplays(db, profile, ReplayDirs(chosen), from, until, (resolver, filter), Players.Resolve(db, profile, installs), neki: neki);
         return (replays, PreviewLogs(from, until, filter, chosen));
     });
 
@@ -360,7 +368,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
                     lock (gate) importing = importing with { Done = importing.Done + 1 };
                     ReportImport();
                     var result = await Ingest.ReplayFile(candidate.File,
-                        new IngestContext(db, resolver, profile, from, calculator, filter, owner, origin));
+                        new IngestContext(db, resolver, profile, from, calculator, filter, owner, origin, Neki: neki));
                     if (result.Status == "added")
                     {
                         imported++;
@@ -424,7 +432,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     public Task<IngestOutcome> ImportReplayFile(string file, bool applyFilter = true) => Enqueue(async () =>
     {
         var result = await Ingest.ReplayFile(file, new IngestContext(db, resolver, profile, 0, calculator, ImportFilter(applyFilter),
-            Players.Resolve(db, profile, installs), "import"));
+            Players.Resolve(db, profile, installs), "import", Neki: neki));
         if (result.Status == "added") Interlocked.Increment(ref added);
         else if (result.Status == "filtered") Interlocked.Increment(ref filtered);
         return result;
@@ -450,7 +458,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         foreach (var match in Backfill.FindLocalReplays(db, forProfile, ReplayDirs(null), only))
         {
             var result = await Ingest.Score(match.Score, match.File,
-                new IngestContext(db, resolver, forProfile, 0, calculator, TrackingFilter.Default(), PlayerIdentity.Unknown));
+                new IngestContext(db, resolver, forProfile, 0, calculator, TrackingFilter.Default(), PlayerIdentity.Unknown, Neki: neki));
             if (result.Status == "added") attached++;
         }
         return attached;
@@ -506,7 +514,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         }
 
         if (row.Str("replay_path") is not { } replayPath || !(File.Exists(replayPath) || Directory.Exists(replayPath))) return new TrackAnywayResult("missing");
-        var result = await Ingest.ReplayFile(replayPath, new IngestContext(db, resolver, target, 0, calculator, TrackingFilter.Default(), PlayerIdentity.Unknown));
+        var result = await Ingest.ReplayFile(replayPath, new IngestContext(db, resolver, target, 0, calculator, TrackingFilter.Default(), PlayerIdentity.Unknown, Neki: neki));
         if (result is { Status: "skipped", Reason: "unparseable" }) return new TrackAnywayResult("unparseable");
         Declined.ForgetById(db, target, id);
         if (result.Status != "added") return new TrackAnywayResult("already");
@@ -525,7 +533,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         {
             if (row.Player is null || !identity.Names.Contains(Js.ToLower(Js.Trim(row.Player)))) continue;
             if (row.ReplayPath is null || !(File.Exists(row.ReplayPath) || Directory.Exists(row.ReplayPath))) continue;
-            var result = await Ingest.ReplayFile(row.ReplayPath, new IngestContext(db, resolver, target, 0, calculator, CurrentFilter(), identity, row.Source));
+            var result = await Ingest.ReplayFile(row.ReplayPath, new IngestContext(db, resolver, target, 0, calculator, CurrentFilter(), identity, row.Source, Neki: neki));
             if (result.Status == "added")
             {
                 tracked++;
@@ -662,7 +670,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     private List<string> LogDirs(IReadOnlyCollection<string>? chosen) =>
         [.. Chosen(chosen).Select(LazerLog.LogDirOf).Where(d => d is not null).Select(d => d!)];
 
-    private List<string> ReplayDirs(IReadOnlyCollection<string>? chosen) => [.. Chosen(chosen).Select(i => i.ReplayDir)];
+    private List<string> ReplayDirs(IReadOnlyCollection<string>? chosen) => Distinct(Chosen(chosen).Select(i => i.ReplayDir));
 
     /// <summary>One task after everything already queued, whether or not those failed.</summary>
     private Task<T> Enqueue<T>(Func<Task<T>> task)
@@ -732,7 +740,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         Queue(async () =>
         {
             var result = await Ingest.ReplayFile(file, new IngestContext(db, resolver, profile, LiveCutoff, calculator, CurrentFilter(),
-                Players.Resolve(db, profile, installs), "live", arrivedAt));
+                Players.Resolve(db, profile, installs), "live", arrivedAt, neki));
             if (result.Status == "added")
             {
                 Interlocked.Increment(ref added);

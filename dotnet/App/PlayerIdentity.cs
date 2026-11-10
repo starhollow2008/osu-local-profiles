@@ -55,7 +55,7 @@ internal static class Players
     private const int MaxReverseLookups = 3;
 
     /// <summary>
-    /// The name behind at least four fifths of this profile's own tracked plays (McOsu's left out),
+    /// The name behind at least four fifths of this profile's own tracked plays (McOsu's and neki's left out),
     /// when there are at least ten; otherwise no clear owner.
     /// </summary>
     public static (string Name, double? UserId)? DominantTrackedName(Database db, long profileId)
@@ -63,7 +63,7 @@ internal static class Players
         var rows = db.Rows("""
             SELECT player_name AS name, player_id AS id, COUNT(*) AS n
               FROM scores
-             WHERE profile_id = ? AND player_name IS NOT NULL AND player_name <> '' AND client <> 'mcosu'
+             WHERE profile_id = ? AND player_name IS NOT NULL AND player_name <> '' AND client NOT IN ('mcosu', 'neki')
              GROUP BY LOWER(player_name)
              ORDER BY n DESC
             """, profileId);
@@ -186,8 +186,9 @@ internal static class Players
         return legacy > 0 ? legacy : null;
     }
 
+    /// <remarks>neki writes a <c>user_id</c> of its own, never an osu! account's (roadmap 5.83).</remarks>
     public static ReplayPlayer ReplayPlayer(ReplayScore score) =>
-        new(score.Username, Positive(Js.Get(score.Extras, "user_id")), OnlineIdOf(score));
+        new(score.Username, score.Client == "neki" ? null : Positive(Js.Get(score.Extras, "user_id")), OnlineIdOf(score));
 
     /// <summary>Whether a replay that turned up at <paramref name="arrivedAt"/> was set moments before.</summary>
     public static bool SetJustNow(double playedAt, double arrivedAt) =>

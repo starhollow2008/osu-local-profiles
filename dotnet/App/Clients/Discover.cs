@@ -225,7 +225,7 @@ internal static partial class Discover
     {
         var lower = names.Select(Js.ToLower).ToHashSet();
         return lower.Contains("osu!.exe") || lower.Contains("client.realm") || names.Any(n => Detect.DevelopmentRealm().IsMatch(n))
-            || lower.Contains("mcengine.exe") || lower.Contains("mcosu.exe");
+            || lower.Contains("mcengine.exe") || lower.Contains("mcosu.exe") || lower.Contains("neki.exe");
     }
 
     /// <summary>Everywhere the fallback search starts: every drive on Windows, the home folder and mounts elsewhere.</summary>
@@ -310,10 +310,10 @@ internal static partial class Discover
 
     /// <summary>Classify a directory, without saying which client was expected.</summary>
     public static OsuInstall? Classify(string root, string builtReplays) =>
-        Detect.LazerInstall(root) ?? Detect.StableInstall(root) ?? Detect.McosuInstall(root, builtReplays);
+        Detect.LazerInstall(root) ?? Detect.StableInstall(root) ?? Detect.McosuInstall(root, builtReplays) ?? Neki.Install(root);
 
     /// <summary>
-    /// Find osu!, properly: configured and remembered roots, McOsu and the development client every
+    /// Find osu!, properly: configured and remembered roots, McOsu, neki and the development client every
     /// time, the cheap tiers when a client is missing, and the walk only then and only once.
     /// </summary>
     public static async Task<DiscoveryResult> Run(IEnumerable<string>? configured, IEnumerable<string>? remembered, string builtReplays,
@@ -338,6 +338,7 @@ internal static partial class Discover
         Add(configured ?? [], "configured");
         Add(remembered ?? [], "remembered");
         Add(Detect.McosuCandidates(e), "detected");
+        Add(Neki.Candidates(e), "detected");
         Add(Detect.LazerDevelopmentCandidates(e), "detected");
         if (force || Missing()) Add(Detect.CandidateRoots([], e), "detected");
         if (force || Missing())
@@ -356,7 +357,7 @@ internal static partial class Discover
 
         // One of each, and the development client in a slot of its own beside release lazer.
         var installs = new List<OsuInstall>();
-        foreach (var (kind, development) in new[] { ("lazer", false), ("lazer", true), ("stable", false), ("mcosu", false) })
+        foreach (var (kind, development) in new[] { ("lazer", false), ("lazer", true), ("stable", false), ("mcosu", false), ("neki", false) })
         {
             var best = sorted.FirstOrDefault(c => c.Kind == kind && c.Development == development);
             if (best is not null && Classify(best.Root, builtReplays) is { } install) installs.Add(install);

@@ -207,7 +207,8 @@ internal static class DevCommands
             Console.Error.WriteLine(problem);
             return 1;
         }
-        var ctx = new Tracker.IngestContext(db, new Clients.BeatmapResolver(db, installs), profileId, profile.Num("tracking_since") ?? 0, calculator);
+        var ctx = new Tracker.IngestContext(db, new Clients.BeatmapResolver(db, installs), profileId, profile.Num("tracking_since") ?? 0, calculator,
+            Neki: new Clients.NekiPlays(installs));
         if (judged)
         {
             ctx = ctx with

@@ -63,6 +63,7 @@ const CLIENT_NAMES = [
   ['stable', 'osu!stable'],
   ['lazer', 'osu!lazer'],
   ['mcosu', 'McOsu'],
+  ['neki', 'neki'],
 ];
 
 const CATEGORY_LABELS = [

@@ -94,6 +94,7 @@ does not have to make it again.
 | 5.80 | Recent, named and placed as on osu!                       | done   |
 | 5.81 | An import's progress, and Import without Check           | done   |
 | 5.82 | One .NET app in place of Node                             | done   |
+| 5.83 | neki                                                      | in progress |
 
 ## Constraints on every item
 
@@ -1611,3 +1612,67 @@ it answers every endpoint exactly as the Node app does.
 The plan, its phases, the updater bridge an install needs to reach it, and the JavaScript and
 .NET differences the port has to keep are in [`docs/csharp-port.md`](csharp-port.md), which is
 also where its progress is recorded.
+
+## 5.83 - neki
+
+**Status:** in progress. Asked for by the owner.
+
+[neki](https://nekigame.nekiak.com/) is a closed-source offline client built to play like
+osu!stable, with its own "extra mods" copied from lazer's. Measured on 2026-11-10 against the build
+of 2026-10-29 (`%LOCALAPPDATA%\Programs\neki`), with passes, a fail, quits and retries, nomod, DT,
+and every extra mod.
+
+### What neki leaves
+
+- **It plays from an osu!stable folder** (`OsuFolder` in `neki.ini`), reads its `Songs`, and
+  **writes its replays into that folder's `Data\r`**, named as stable names them. Its own files are
+  under `data\`.
+- **A play with stable's mods is a stable replay**, byte for byte: the current stable build's
+  version (20260924), the name set in neki (empty until one is set), no extra block. Nothing in
+  the file says neki.
+- **A play with an extra mod or a custom rate is a lazer replay** (30000001, lazer's block) with
+  `client_version: "neki"`, `user_id: 1`, and the mods in lazer's own JSON: DT `speed_change`, DA,
+  MR, RD `seed`/`angle_sharpness`, AL, SG, and No Lock as CL with `classic_note_lock: false`. Its
+  header total is stable's. Priced as a lazer play it came out at 8,642 standardised.
+- **`data\databases\scores.neki.db`** is stable's `scores.db` format: stable's own scores, copied
+  when neki starts, and neki's passes, by replay hash.
+- **`data\stats\neki.recent.json`** lists every play, fails and quits included: beatmap hash, the
+  exact time (the same moment as the replay's), judgements, legacy mods, `extra`, `rate`,
+  `passed`, `quit`, how far in (`end_time`), and neki's own pp. It is written before the replay.
+- A fail is `passed: false, quit: false`; a quit, including one after Retry on the fail screen,
+  `quit: true`. A mid-play retry in the first session left nothing.
+- **Practice and Pitch** are cosmetic; neither reaches the replay's mods.
+
+osu!'s calculator priced neki's plays within 0.05% of neki's own figures, extra mods and Random's
+seed included.
+
+### Decisions
+
+- **One client, `neki`, scored as stable everywhere** (`ScoredAsStable`), listed with CL like any
+  stable play, in the filter's Client, on the score card and in the export.
+- **A play is neki's** when its replay says `client_version: "neki"`, or `neki.recent.json` lists
+  its beatmap at its exact time, or `scores.neki.db` holds its replay hash and stable's own
+  `scores.db` does not. Anything else in `Data\r` stays stable's.
+- **The install isn't a second replay source.** It names the stable folder it plays from; that
+  folder's `Data\r` is watched once, whichever install found it.
+- **An extra-mods play is priced as the stable play it is**: a stable copy of its replay (version
+  and frames kept, lazer's block dropped), with neki's mods as the request's `mods`, as McOsu's
+  are. CL is left to the decoder, which adds it to every stable replay, and out of the ranked
+  question, as for stable. Stable's total is withheld (`ignoreLegacyTotalScore`) when the mods are
+  not ones stable could set, since neki's multipliers for them are unknown.
+- **`user_id: 1` is ignored.** It is neki's, not an osu! account's.
+- **Fails and quits come from `neki.recent.json`**, as attempts osu! never received
+  (`unsubmitted = 1`), keyed `neki:<beatmap md5>:<time>`. They count through `IncompleteSql`
+  like lazer's.
+- **A saved filter that tracks stable tracks neki too**, once, because those plays were stable's
+  until now. Plays already tracked as stable are relabelled once neki is found.
+- neki never sends a play to osu!, so it is never asked about for a rank change, and its score
+  links are none.
+
+### Phases
+
+1. Find neki, label its plays, add it to the filter and the page. Done.
+2. Price extra-mods plays as stable, and carry saved filters over. Done.
+3. Relabel plays tracked before.
+4. Fails and quits from `neki.recent.json`, live and in Import past plays.
+5. Docs: architecture, user guide, the note on the page.

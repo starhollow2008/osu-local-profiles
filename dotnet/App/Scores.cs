@@ -181,7 +181,7 @@ internal static partial class Scores
         return new ScoreDetail(play)
         {
             Mode = row["mode"],
-            Client = client is "stable" or "mcosu" ? client : "lazer",
+            Client = client is "stable" or "mcosu" or "neki" ? client : "lazer",
             Statistics = ParseStatistics(row.Str("statistics_json")) ?? LegacyStatistics(row["mode"], row),
             MaximumStatistics = ParseStatistics(row.Str("max_statistics_json")) ?? [],
             // The medals' definition of a full combo, so the card and the FC medals never disagree.

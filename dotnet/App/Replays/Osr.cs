@@ -112,6 +112,30 @@ internal static class Osr
         return Encoding.UTF8.GetString(output.ToArray());
     }
 
+    /// <summary>
+    /// A lazer-format replay as the osu!stable one it stands for: the same header, frames and online
+    /// id under a stable version, lazer's block dropped. For neki, which writes a stable play in
+    /// lazer's format only to hold its extra mods (roadmap 5.83). Null for a replay with no block.
+    /// </summary>
+    public static byte[]? StableCopy(byte[] buf)
+    {
+        var c = new Cursor(buf);
+        c.Byte();
+        if (c.Int() < LazerExtMinVersion) return null;
+        c.String(); // beatmap MD5
+        c.String(); // player name
+        c.String(); // replay MD5
+        c.Skip(6 * 2 + 4 + 2 + 1 + 4); // judgement counts, total score, max combo, perfect, mods
+        c.String(); // life bar graph
+        c.Skip(8); // date
+        var frameLength = c.Int();
+        c.Skip(frameLength + 8); // frames, online id
+        if (c.Remaining < 0) return null;
+        var copy = buf[..(buf.Length - c.Remaining)];
+        BinaryPrimitives.WriteInt32LittleEndian(copy.AsSpan(1), Clients.Mcosu.BuiltReplayVersion);
+        return copy;
+    }
+
     /// <summary>A replay's ruleset, version, beatmap and stable bitmask, from its first few hundred bytes.</summary>
     public static (int Mode, int Version, string BeatmapMD5, int LegacyMods) ParseHeader(byte[] buf)
     {
@@ -184,7 +208,8 @@ internal static class Osr
         }
 
         return new ReplayScore(
-            version >= LazerExtMinVersion ? "lazer" : mcosu is not null ? "mcosu" : "stable",
+            // neki writes lazer's format for a play with its extra mods, and says so in the block.
+            version >= LazerExtMinVersion ? Clients.Neki.WroteBlock(extras) ? "neki" : "lazer" : mcosu is not null ? "mcosu" : "stable",
             mode, version, beatmapMD5, username, replayMD5,
             count300, count100, count50, countGeki, countKatu, countMiss,
             totalScore, maxCombo, perfectCombo, legacyMods,

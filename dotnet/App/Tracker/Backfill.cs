@@ -97,7 +97,7 @@ internal static class Backfill
     /// </summary>
     public static BackfillScan ScanForReplays(Database db, long profileId, IReadOnlyList<string> dirs, double since,
         double? until = null, (BeatmapResolver Resolver, TrackingFilter Filter)? filtering = null, PlayerIdentity? owner = null,
-        Action<string, ReplayScore, string>? onOtherPlayer = null, Action<long, long>? onScanned = null)
+        Action<string, ReplayScore, string>? onOtherPlayer = null, Action<long, long>? onScanned = null, NekiPlays? neki = null)
     {
         owner ??= PlayerIdentity.Unknown;
         var candidates = new List<BackfillCandidate>();
@@ -159,7 +159,7 @@ internal static class Backfill
                 {
                     var beatmap = f.Resolver.Resolve(score.BeatmapMD5);
                     var facts = TrackingFilter.BeatmapFacts(db, f.Resolver, beatmap);
-                    filtered = filter!.Rejects(TrackingFilter.PlayFactsOf(facts, score.Mode, Mods.ScoreMods(score, beatmap.OsuPath), score.Client)) is not null;
+                    filtered = filter!.Rejects(TrackingFilter.PlayFactsOf(facts, score.Mode, Mods.ScoreMods(score, beatmap.OsuPath), Ingest.WithClient(score, neki).Client)) is not null;
                 }
 
                 candidates.Add(new BackfillCandidate(entry.Path, playedAt, score.Mode, already, filtered));

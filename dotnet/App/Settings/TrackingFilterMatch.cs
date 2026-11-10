@@ -340,7 +340,8 @@ internal sealed partial class TrackingFilter
         return new PlayFacts(
             Mode: mode,
             Client: client,
-            Mods: mods,
+            // A stable play is judged on the mods chosen, not the Classic osu! adds; neki writes it out.
+            Mods: client == "neki" ? mods?.Where(m => Calc.Mods.Acronym(m) != "CL").ToList() : mods,
             LengthSeconds: facts.LengthMs is { } ms ? Js.Round(ms / rate / 1000) : null,
             Status: facts.Status,
             Beatmap: facts.Beatmap,

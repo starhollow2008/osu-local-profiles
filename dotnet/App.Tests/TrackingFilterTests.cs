@@ -166,7 +166,7 @@ public class TrackingFilterTests
     [Fact]
     public void A_filter_saved_before_the_client_criterion_tracks_every_client_and_an_empty_list_is_kept()
     {
-        Assert.Equal(["stable", "lazer", "mcosu"], Coerce(new { enabled = true, modes = new[] { 0 } }).Clients);
+        Assert.Equal(["stable", "lazer", "mcosu", "neki"], Coerce(new { enabled = true, modes = new[] { 0 } }).Clients);
         Assert.Empty(Coerce(new { clients = Array.Empty<string>() }).Clients);
         Assert.Equal(["lazer", "mcosu"], Coerce(new { clients = new[] { "mcosu", "web", "lazer", "lazer" } }).Clients);
     }
@@ -221,7 +221,7 @@ public class TrackingFilterTests
     public void The_filter_is_written_in_the_TypeScript_shape()
     {
         Assert.Equal(
-            """{"enabled":false,"rules":[],"fromKeywords":false,"modes":[0,1,2,3],"clients":["stable","lazer","mcosu"],"stars":{"min":0,"max":null},"length":{"min":0,"max":null},"mods":{},"noMod":"allowed","categories":["ranked","qualified","loved","pending","wip","graveyard","unsubmitted"],"added":{"from":null,"to":null},"submitted":{"from":null,"to":null,"includeUnknown":true},"ranked":{"from":null,"to":null,"includeUnknown":true}}""",
+            """{"enabled":false,"rules":[],"fromKeywords":false,"modes":[0,1,2,3],"clients":["stable","lazer","mcosu","neki"],"stars":{"min":0,"max":null},"length":{"min":0,"max":null},"mods":{},"noMod":"allowed","categories":["ranked","qualified","loved","pending","wip","graveyard","unsubmitted"],"added":{"from":null,"to":null},"submitted":{"from":null,"to":null,"includeUnknown":true},"ranked":{"from":null,"to":null,"includeUnknown":true}}""",
             Json(TrackingFilter.Default()));
     }
 }
