@@ -30,9 +30,9 @@ Inspired by [Sheppsu's project](https://github.com/Sheppsu/osu-score-tracker) an
 
 **Supports**
 
-| Clients                    | Game modes                    | Platforms             | Languages |
-| -------------------------- | ----------------------------- | --------------------- | --------- |
-| stable, lazer, McOsu, neki | standard, taiko, catch, mania | Windows, macOS, Linux | 16        |
+| Clients                            | Game modes                    | Platforms             | Languages |
+| ---------------------------------- | ----------------------------- | --------------------- | --------- |
+| stable, lazer, McOsu, neki, neomod | standard, taiko, catch, mania | Windows, macOS, Linux | 16        |
 
 **Last updated**
 
@@ -89,6 +89,12 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 - **Unranked maps will always count for pp** if lazer isn't installed, as on stable
 - neki's extra mods count as lazer's mods (unranked)
 - Quits and fails count as **Not submitted**
+
+## Warnings for neomod
+
+- Only passed plays are tracked
+- neomod-only experimental mods show as one **NEO** mod
+- pp may differ between neomod and this app
 
 ## Technologies Used
 
@@ -154,7 +160,7 @@ App reads from lazer's session log to track incomplete plays:
   - pp reworks
   - Global rank (estimate based on curve from data.ppy.sh). Refresh it with `node scripts/build-rank-table.mjs osu --dump YYYY_MM_DD`.
 - Country rank not supported (small sample size)
-- Incomplete plays (fail, quit, retry) not supported in stable and McOsu.
+- Incomplete plays (fail, quit, retry) not supported in stable, McOsu and neomod.
 
 ## Contributing
 
