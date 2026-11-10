@@ -813,8 +813,9 @@ is beside `neomod.exe` (`Clients/Neomod.cs`).
   them (its own speed curve, `getScoreV1ScoreMultiplier`) is stable's.
 - **Only passes are kept**, unless its hidden `save_failed_scores` is on: then a fail is a replay
   too, grade F in `neomod_scores.db`, which `Neomod.Failed` reads so it is never stored as a pass.
-- **Found** by its folder (`neomod.exe`), from configured roots, shortcuts, the usual unzip places
-  and the walk. Its beatmaps are its `songs_folder` (`cfg\osu.cfg`, copied from stable's
+- **Found** by its folder (`neomod.exe`), from configured roots, the usual unzip places, where
+  Windows remembers running it (`Discover.RunHistoryRoots`: MuiCache and the Program Compatibility
+  Assistant's list, read on every launch, which find McOsu outside Steam too), shortcuts and the walk. Its beatmaps are its `songs_folder` (`cfg\osu.cfg`, copied from stable's
   `BeatmapDirectory`: absolute, or under `osu_folder`, `Neomod.Songs`) and its `maps\`. Replays downloaded from a server's leaderboard land in the same folder and are
   judged by their names like any other.
 

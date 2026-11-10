@@ -141,9 +141,9 @@ it's found wherever it was installed (`AppData\Local\Programs\neki`) and its pla
 
 ## neomod
 
-[neomod](https://github.com/neomodnet/neomod) is a folder you unzip anywhere, so it's found only in
-the usual places (Downloads, Desktop, a `Games` folder) or through a shortcut to it. Otherwise add
-the folder with `neomod.exe` in it under **Options -> osu! folders**. Its plays are tracked as
+[neomod](https://github.com/neomodnet/neomod) is a folder you unzip anywhere. On Windows it's found
+wherever you've run it from, the next time the app starts. Otherwise add the folder with
+`neomod.exe` in it under **Options -> osu! folders**. Its plays are tracked as
 **neomod**. Only the Windows x64 build has been looked at.
 
 - **Plays are scored as osu!stable scores them**, with the Classic mod.

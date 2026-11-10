@@ -1774,8 +1774,9 @@ less, which is neomod's, not this app's.
 - **Stable's total is withheld** unless neomod's multiplier for its mods is stable's for the
   priced ones and every priced mod is one stable has.
 - **A grade-F score is not a pass**: fails kept by `save_failed_scores` are not tracked.
-- **Found** from its configured folder, its shortcuts, a few usual places, and the walk; often it
-  will need adding under Options -> osu! folders. Its beatmaps are the stable folder's Songs (its
+- **Found** from its configured folder, a few usual places, where Windows remembers running it
+  (every launch: the owner's copy was in a project folder no usual place covers), its shortcuts,
+  and the walk. Its beatmaps are the stable folder's Songs (its
   `songs_folder`) and its own `maps`.
 - A saved filter that tracked every client tracks neomod too, once; one narrowed to some clients
   stays as it was.

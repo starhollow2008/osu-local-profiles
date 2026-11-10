@@ -100,29 +100,74 @@ internal static partial class Discover
     public static async Task<List<string>> RegistryRoots(DetectEnvironment e)
     {
         if (e.Platform != "win32") return [];
-        var outputs = await Task.WhenAll(RegistryQueries().Select(async key =>
+        var outputs = await Task.WhenAll(RegistryQueries().Select(key => RegQuery(key, recursive: true)));
+        return [.. outputs.SelectMany(RegistryPaths)];
+    }
+
+    /// <summary>What <c>reg query</c> prints for a key, or nothing for a key that is not there.</summary>
+    private static async Task<string> RegQuery(string key, bool recursive)
+    {
+        try
         {
-            try
+            var info = new ProcessStartInfo("reg") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
+            info.ArgumentList.Add("query");
+            info.ArgumentList.Add(key);
+            if (recursive) info.ArgumentList.Add("/s");
+            using var process = Process.Start(info);
+            if (process is null) return "";
+            var read = process.StandardOutput.ReadToEndAsync();
+            var errors = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(5000))
             {
-                using var process = Process.Start(new ProcessStartInfo("reg") { ArgumentList = { "query", key, "/s" }, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true });
-                if (process is null) return "";
-                var read = process.StandardOutput.ReadToEndAsync();
-                var errors = process.StandardError.ReadToEndAsync();
-                if (!process.WaitForExit(5000))
-                {
-                    process.Kill();
-                    return "";
-                }
-                await Task.WhenAll(read, errors);
-                // A key that does not exist exits non-zero. That is the normal case here.
-                return process.ExitCode == 0 ? await read : "";
-            }
-            catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
-            {
+                process.Kill();
                 return "";
             }
-        }));
-        return [.. outputs.SelectMany(RegistryPaths)];
+            await Task.WhenAll(read, errors);
+            // A key that does not exist exits non-zero. That is the normal case here.
+            return process.ExitCode == 0 ? await read : "";
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return "";
+        }
+    }
+
+    /// <summary>
+    /// Where Windows remembers programs being run: Explorer's MuiCache (a value per program, named
+    /// by its path and <c>.FriendlyAppName</c>) and the Program Compatibility Assistant's list.
+    /// </summary>
+    public static readonly string[] RunHistoryKeys =
+    [
+        @"HKCU\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache",
+        @"HKCU\Software\Microsoft\Windows NT\CurrentVersion\AppCompatFlags\Compatibility Assistant\Store",
+    ];
+
+    [GeneratedRegex(@"^\s+([A-Za-z]:\\[^\x00-\x1f""*?<>|]*?\\(?:neomod|McEngine(?:_dx11)?)\.exe)(?:\.FriendlyAppName|\.ApplicationCompany)?\s+REG_", RegexOptions.IgnoreCase)]
+    private static partial Regex RunHistoryValue();
+
+    /// <summary>The folders of the portable clients <c>reg query</c> lists as run: neomod's and McOsu's.</summary>
+    public static List<string> RunHistoryPaths(string output)
+    {
+        var roots = new List<string>();
+        foreach (var line in Regex.Split(output, "\r?\n"))
+        {
+            var m = RunHistoryValue().Match(line);
+            if (!m.Success) continue;
+            var root = NodePath.Dirname(m.Groups[1].Value);
+            if (!roots.Any(r => Js.ToLower(r) == Js.ToLower(root))) roots.Add(root);
+        }
+        return roots;
+    }
+
+    /// <summary>
+    /// Portable clients found by having been run (roadmap 5.85): neomod unzips anywhere, and Windows
+    /// remembers where it was started from. Two quick reads, so every launch makes them.
+    /// </summary>
+    public static async Task<List<string>> RunHistoryRoots(DetectEnvironment e)
+    {
+        if (e.Platform != "win32") return [];
+        var outputs = await Task.WhenAll(RunHistoryKeys.Select(key => RegQuery(key, recursive: false)));
+        return [.. outputs.SelectMany(RunHistoryPaths).Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     [GeneratedRegex(@"[A-Za-z]:\\[^\x00-\x1f""*?<>|]{0,240}?(?:osu!|neomod)\.exe", RegexOptions.IgnoreCase)]
@@ -340,6 +385,7 @@ internal static partial class Discover
         Add(Detect.McosuCandidates(e), "detected");
         Add(Neki.Candidates(e), "detected");
         Add(Neomod.Candidates(e, e.Platform == "win32" ? Detect.WindowsDrives() : null), "detected");
+        Add(await RunHistoryRoots(e), "detected");
         Add(Detect.LazerDevelopmentCandidates(e), "detected");
         if (force || Missing()) Add(Detect.CandidateRoots([], e), "detected");
         if (force || Missing())

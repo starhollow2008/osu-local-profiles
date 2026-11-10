@@ -197,6 +197,25 @@ public sealed class DetectTests : IDisposable
     }
 
     [Fact]
+    public void A_portable_client_is_found_where_Windows_remembers_running_it()
+    {
+        const string muiCache = """
+
+            HKEY_CURRENT_USER\Software\Classes\Local Settings\Software\Microsoft\Windows\Shell\MuiCache
+                LangID    REG_BINARY    0904
+                C:\Users\player\AppData\Local\osu!\osu!.exe.FriendlyAppName    REG_SZ    osu!
+                C:\Users\player\Desktop\games\neomod release\neomod\neomod.exe.FriendlyAppName    REG_SZ    neomod
+                C:\Users\player\Desktop\games\neomod release\neomod\neomod.exe.ApplicationCompany    REG_SZ    neomod
+                D:\McOsu\McEngine.exe.FriendlyAppName    REG_SZ    McOsu
+
+            """;
+        Assert.Equal([@"C:\Users\player\Desktop\games\neomod release\neomod", @"D:\McOsu"], Discover.RunHistoryPaths(muiCache));
+        // The compatibility assistant's list names the program itself, with binary data.
+        Assert.Equal([@"E:\neomod"], Discover.RunHistoryPaths("    E:\\neomod\\NEOMOD.EXE    REG_BINARY    534143500000\r\n    E:\\neomod\\neomod.exe.bak    REG_SZ    x\r\n"));
+        Assert.Empty(Discover.RunHistoryPaths(""));
+    }
+
+    [Fact]
     public async Task A_configured_root_wins_and_one_client_found_is_not_a_reason_to_stop()
     {
         var stable = StableAt(Path.Combine(tmp, "somewhere", "weird", "osu!"));
