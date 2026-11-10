@@ -150,10 +150,12 @@ the folder with `neomod.exe` in it under **Options -> osu! folders**. Its plays 
 - **Only passed plays are tracked.** neomod keeps nothing of a quit, and a fail only with a hidden
   setting, which isn't tracked either.
 - **Its speed and CS/AR/OD/HP settings count as Double Time, Half Time and Difficulty Adjust**, and
-  Flip, Singletap, Alternate, Traceable, Strict Tracking, Freeze Frame and Approach Different as
-  osu!lazer's mods. Its other experimental mods show as one **NEO** mod and don't change pp. A
-  speed outside 0.5x-2x, a value past what Difficulty Adjust allows, or AR or OD locked to the
-  speed leaves a play without pp.
+  Singletap, Alternate, Traceable and Freeze Frame as osu!lazer's mods. AR or OD locked to the speed counts as the Difficulty Adjust value it works
+  out to. Its other experimental mods and note lock settings show as one **NEO** mod and don't
+  change pp. A speed outside 0.5x-2x, or a value past what Difficulty Adjust allows, leaves a play
+  without pp.
+- **neomod doesn't save Flip, Approach Different or Strict Tracking** with a play, so plays show
+  without them.
 - Plays with any of these count toward pp only while [unranked mods are
   counted](#include-pp-for-unranked-mods).
 - The browser version keeps its plays in the browser, out of this app's reach.

@@ -96,7 +96,7 @@ does not have to make it again.
 | 5.82 | One .NET app in place of Node                             | done   |
 | 5.83 | neki                                                      | done   |
 | 5.84 | Track plays only from chosen names                        | todo   |
-| 5.85 | neomod                                                    | in progress |
+| 5.85 | neomod                                                    | done   |
 
 ## Constraints on every item
 
@@ -1685,9 +1685,11 @@ is built:
 - **"Guest" is no name at all on stable and neki.** Their replays say `""` for a play set signed
   out or under neki's default Guest, never the word "Guest"; neki's `neki.recent.json` says
   `"profile": ""`, and `scores.neki.db` the same. Measured on neki: plays as Guest wrote `""`, the
-  one set as Tangy wrote `"Tangy"`. lazer's own guest is the word `Guest`. So the choice needs an
-  entry for plays with no name, and stable's signed-out plays and neki's Guest ones fall under it
-  together.
+  one set as Tangy wrote `"Tangy"`. lazer's own guest is the word `Guest`. neomod is the same as
+  neki: offline plays wrote `""` and the file name `0-<unix seconds>.osr`, plays signed in to
+  neomod.net wrote `"Tangy"` and `3119700-<unix seconds>.osr` under `replays\neomod.net\`. So the
+  choice needs an entry for plays with no name, and stable's signed-out plays and neki's and
+  neomod's Guest ones fall under it together.
 - **Fails and quits keep no name yet.** `incomplete_plays` has no player column. neki's name for
   each is read already (`NekiRecentPlay.Name`) but not stored, so filtering at import works, and
   filtering what is already stored needs a `player_name` column on `incomplete_plays` (an
@@ -1697,8 +1699,8 @@ is built:
 
 ## 5.85 - neomod
 
-**Status:** in progress: built, and checked on replays made in neomod's format from its source. Still to check
-against plays set in neomod itself. Asked for by the owner.
+**Status:** done. Checked on six plays set in neomod v44.04, offline and signed in to neomod.net,
+and on a fail, a retry and a quit, which it kept nothing of. Asked for by the owner.
 
 [neomod](https://github.com/neomodnet/neomod) is an open-source fork of McOsu (formerly neosu),
 read from its source (`53ba0b5`, 2026-11-09) and its v44.04 Windows x64 release. Windows x64 is
@@ -1737,13 +1739,31 @@ the only build looked at; the others are assumed to behave the same until someon
   - Flip Up/Down and Left/Right as MR (vertical, horizontal, or both), Singletap as SG, Alternate
     as AL, Traceable as TC, Freeze Frame as FR, Target Practice as TP;
   - everything else neomod has and osu! does not, one app-own mod, **NEO**, never shown to osu!'s
-    calculator, as McOsu's MC. AR and OD locked to the speed are NEO, and leave the play unpriced,
-    since their DA value would have to be worked out.
+    calculator, as McOsu's MC, with a note lock other than stable's;
+  - an override locked to the speed as the DA value it is before the speed change (AR 9 locked
+    at 1.6x is DA AR 6.6); the map's own AR or OD locked, with no override, is NEO and unpriced,
+    since it would need the map.
+- **Bit 30 alone is nothing.** Late 300s under Half Timing Window is on by default, so every play
+  carries it; only Half Timing Window itself (bit 29) is NEO.
+- **Flip and some experimental mods are never recorded.** `Mods::from_cvars` leaves out the
+  mirror flags, Approach Different, Strict Tracking, Reverse Sliders, Fading Cursor and First
+  Person, so a play set with them shows without them; none changes pp. The mirror flags appear
+  only on scores neomod imported from McOsu.
+- **Its Songs folder is `songs_folder`**, copied from stable's `BeatmapDirectory` on first run:
+  absolute, or under `osu_folder`.
+
+### Checked on real plays
+
+Six passes on one set, against osu!'s calculator and neomod's own pp in `neomod_scores.db`:
+nomod 6.378 / 6.376, HD 71.780 / 71.780, Singletap with Timewarp 4.51 / 4.56, HD DT 13.30 / 13.03,
+1.6x 18.05 / 17.52, and 1.6x with AR 9 locked 70.21 / 68.64. At 1x they agree, so the stable copy
+and its frames are read right. At other speeds neomod's own port of the calculator gives 1-3%
+less, which is neomod's, not this app's.
 - **Stable's total is withheld** unless neomod's multiplier for its mods is stable's for the
   priced ones and every priced mod is one stable has.
 - **A grade-F score is not a pass**: fails kept by `save_failed_scores` are not tracked.
 - **Found** from its configured folder, its shortcuts, a few usual places, and the walk; often it
-  will need adding under Options -> osu! folders. Its beatmaps are the stable folder's Songs and
-  its own `maps`.
+  will need adding under Options -> osu! folders. Its beatmaps are the stable folder's Songs (its
+  `songs_folder`) and its own `maps`.
 - A saved filter that tracked every client tracks neomod too, once; one narrowed to some clients
   stays as it was.

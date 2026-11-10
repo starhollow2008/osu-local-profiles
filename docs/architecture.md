@@ -780,15 +780,22 @@ is beside `neomod.exe` (`Clients/Neomod.cs`).
   CS/AR/OD/HP overrides as DA after EZ and HR (unpriced past DA's extended limits, and for CS below
   0), and the experimental mods lazer has under lazer's names: MR (neomod's Flip Up/Down is
   lazer's *vertical* reflection, though neomod's own lazer importer maps it by name), SG, AL, TC,
-  ST, FR, AD. The rest are one app-own mod, **NEO**, never shown to osu!'s calculator, as McOsu's MC.
-  AR or OD locked to the speed leaves a play at another speed unpriced.
+  ST, FR, AD. The rest are one app-own mod, **NEO**, never shown to osu!'s calculator, as McOsu's MC,
+  with a note lock other than stable's (`notelock_type` 2). Bit 30, late 300s under Half Timing
+  Window, is on in every play by default and is nothing alone.
+- **An override locked to the speed is DA's value before it** (`Neomod.UnlockedAr`/`UnlockedOd`,
+  as `GameRules::arWithSpeed`): AR 9 held at 1.6x is DA AR 6.6 with DT 1.6x. The map's own AR or
+  OD locked, with no override, would need the map, so it is NEO and unpriced.
+- **neomod never records Flip** for its own plays, nor Approach Different, Strict Tracking,
+  Reverse Sliders, Fading Cursor or First Person (`Mods::from_cvars` leaves them out). The
+  mirror bits only come from scores it imported from McOsu.
 - **Stable's total is withheld** unless every priced mod is stable's and neomod's multiplier for
   them (its own speed curve, `getScoreV1ScoreMultiplier`) is stable's.
 - **Only passes are kept**, unless its hidden `save_failed_scores` is on: then a fail is a replay
   too, grade F in `neomod_scores.db`, which `Neomod.Failed` reads so it is never stored as a pass.
 - **Found** by its folder (`neomod.exe`), from configured roots, shortcuts, the usual unzip places
-  and the walk. Its beatmaps are its `osu_folder`'s Songs (`cfg\osu.cfg`, read as McOsu's) and
-  its `maps\`. Replays downloaded from a server's leaderboard land in the same folder and are
+  and the walk. Its beatmaps are its `songs_folder` (`cfg\osu.cfg`, copied from stable's
+  `BeatmapDirectory`: absolute, or under `osu_folder`, `Neomod.Songs`) and its `maps\`. Replays downloaded from a server's leaderboard land in the same folder and are
   judged by their names like any other.
 
 ### Classic for McOsu, neki and neomod

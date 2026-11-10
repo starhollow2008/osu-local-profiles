@@ -322,6 +322,14 @@ internal static partial class Detect
     /// <summary>The Songs folder McOsu loads beatmaps from: <c>osu_folder</c> in its <c>cfg/osu.cfg</c>, usually osu!stable's.</summary>
     public static string? McosuSongs(string root)
     {
+        if (CfgOsuFolder(root) is not { } folder) return null;
+        var songs = NodePath.Join(folder, "Songs");
+        return Exists(songs) ? songs : null;
+    }
+
+    /// <summary>The <c>osu_folder</c> in a McOsu or neomod <c>cfg/osu.cfg</c>, as written: null without one.</summary>
+    public static string? CfgOsuFolder(string root)
+    {
         string cfg;
         try
         {
@@ -335,9 +343,7 @@ internal static partial class Detect
         var raw = NodePath.FirstMatch(cfg, OsuFolder());
         if (raw is null) return null;
         var folder = TrailingSeparators().Replace(Regex.Replace(raw, "^\"|\"$", ""), "");
-        if (folder.Length == 0) return null;
-        var songs = NodePath.Join(folder, "Songs");
-        return Exists(songs) ? songs : null;
+        return folder.Length == 0 ? null : folder;
     }
 
     /// <summary>A McOsu install: its beatmaps wherever <c>osu_folder</c> points, its "replays" the ones this app builds.</summary>

@@ -45,16 +45,45 @@ internal static class Neomod
 
     /// <summary>
     /// A neomod install: its replays folder, and the beatmaps it plays, osu!stable's Songs (its
-    /// <c>osu_folder</c>, as McOsu's) and the sets it downloaded itself.
+    /// <c>osu_folder</c> and <c>songs_folder</c>) and the sets it downloaded itself.
     /// </summary>
     public static OsuInstall? Install(string root)
     {
         if (!IsNeomodRoot(root)) return null;
         var roots = new List<string>();
-        if (Detect.McosuSongs(root) is { } songs) roots.Add(songs);
+        if (Songs(root) is { } songs) roots.Add(songs);
         var maps = NodePath.Join(root, "maps");
         if (Directory.Exists(maps)) roots.Add(maps);
         return new OsuInstall("neomod", root, NodePath.Join(root, "replays"), roots, null);
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex SongsFolderLine = new(@"^[ \t]*songs_folder[ \t]+(.+?)[ \t]*\z");
+
+    /// <summary>
+    /// The Songs folder neomod plays from (<c>Database::getOsuSongsFolder</c>): its <c>songs_folder</c>,
+    /// copied from stable's <c>BeatmapDirectory</c> on its first run, where absolute, and otherwise
+    /// under its <c>osu_folder</c>.
+    /// </summary>
+    public static string? Songs(string root)
+    {
+        string cfg;
+        try
+        {
+            cfg = Js.ReadFileUtf8(NodePath.Join(root, "cfg", "osu.cfg"));
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+        var songs = NodePath.FirstMatch(cfg, SongsFolderLine) is { } raw ? raw.Trim('"') : "";
+        if (songs.Length == 0) songs = "Songs";
+        if (!NodePath.IsAbsolute(songs))
+        {
+            if (Detect.CfgOsuFolder(root) is not { } osuFolder) return null;
+            songs = NodePath.Join(osuFolder, songs);
+        }
+        songs = songs.TrimEnd('/', '\\');
+        return Exists(songs) ? songs : null;
     }
 
     /// <summary>neomod is a folder unzipped anywhere: where people usually unzip one, each one existence test.</summary>
@@ -129,7 +158,8 @@ internal static class Neomod
         (9, "nightmare"), (14, "fposu"), (36, "fposu_strafing"), (18, "timewarp"), (19, "ar_timewarp"),
         (20, "minimize"), (21, "strict_clicks"), (22, "precise_sliders"), (23, "wobble"), (24, "wobble2"),
         (25, "ar_wobble"), (27, "shirone"), (28, "mafham"), (29, "half_timing_window"),
-        (30, "half_timing_window_300s"), (31, "ming3012"), (32, "no_100s"), (33, "no_50s"),
+        // Bit 30, late 300s under Half Timing Window, is on by default and means nothing alone.
+        (31, "ming3012"), (32, "no_100s"), (33, "no_50s"),
         (37, "fading_cursor"), (38, "first_person"), (39, "reverse_sliders"), (40, "millhioref"),
         (44, "no_keylock"), (45, "no_pausing"), (48, "dks"), (62, "no_hp"),
     ];
@@ -144,8 +174,24 @@ internal static class Neomod
     private const double SlowerMin = 0.5, SlowerMax = 0.99, SlowerDefault = 0.75;
     private const double DaMax = 11, DaMinAr = -10;
 
-    /// <summary>neomod stores floats; two decimals is finer than any slider it offers.</summary>
+    /// <summary>neomod stores floats; two decimals is as fine as its sliders go.</summary>
     private static double Round2(double n) => Js.Round(n * 100) / 100;
+
+    /// <summary>Its note lock settings other than stable's (2, the default), under NEO.</summary>
+    private static readonly Dictionary<int, string> NoteLocks = new() { [0] = "no_note_lock", [1] = "neomod_note_lock", [3] = "lazer_note_lock" };
+
+    /// <summary>AR to approach time and back (<c>GameRules::arToMilliseconds</c>): 1800, 1200 and 450 ms at AR 0, 5 and 10.</summary>
+    private static double ApproachMs(double ar) => ar > 5 ? 1200 - 150 * (ar - 5) : 1200 + 120 * (5 - ar);
+
+    private static double ArOf(double ms) => ms < 1200 ? 5 + (1200 - ms) / 150 : 5 - (ms - 1200) / 120;
+
+    /// <summary>
+    /// The AR or OD osu!'s DA takes before the speed change for one neomod held at the speed
+    /// (<c>GameRules::arWithSpeed</c>, <c>odWithSpeed</c>): its approach time or 300 window, longer by the speed.
+    /// </summary>
+    public static double UnlockedAr(double ar, double speed) => ArOf(ApproachMs(ar) * speed);
+
+    public static double UnlockedOd(double od, double speed) => (80 - (80 - 6 * od) * speed) / 6;
 
     /// <summary>
     /// A neomod play's mods as osu! would write them: speed as DT, NC, HT or DC at its rate, the
@@ -197,12 +243,21 @@ internal static class Neomod
             settings[key] = v;
             if (v > DaMax || v < min) priceable = false;
         }
+        // AR or OD locked to the speed is what DA's would be before it. Locking the map's own
+        // value would need the map, so only an override's is priced.
+        var own = new Dictionary<string, object>();
+        var arLock = speed != 1 && Has(f, ArLockBit);
+        var odLock = speed != 1 && Has(f, OdLockBit);
+        double? ar = facts.ArOverride >= 0 ? facts.ArOverride : facts.ArNegative < 0 ? facts.ArNegative : null;
+        double? od = facts.OdOverride >= 0 ? facts.OdOverride : null;
         if (facts.CsOverride >= 0) Override("circle_size", facts.CsOverride, 0);
         else if (facts.CsNegative < 0) Override("circle_size", facts.CsNegative, 0);
-        if (facts.ArOverride >= 0) Override("approach_rate", facts.ArOverride, DaMinAr);
-        else if (facts.ArNegative < 0) Override("approach_rate", facts.ArNegative, DaMinAr);
-        if (facts.OdOverride >= 0) Override("overall_difficulty", facts.OdOverride, 0);
+        if (ar is { } a) Override("approach_rate", arLock ? UnlockedAr(a, speed) : a, DaMinAr);
+        if (od is { } o) Override("overall_difficulty", odLock ? UnlockedOd(o, speed) : o, 0);
         if (facts.HpOverride >= 0) Override("drain_rate", facts.HpOverride, 0);
+        if (arLock && ar is null) own["ar_lock"] = true;
+        if (odLock && od is null) own["od_lock"] = true;
+        if (own.Count > 0) priceable = false;
         if (settings.Count > 0)
         {
             if (settings.Values.Any(v => v is double d && (d > 10 || d < 0))) settings["extended_limits"] = true;
@@ -210,15 +265,8 @@ internal static class Neomod
         }
 
         List<JsonElement>? priced = null;
-        var own = new Dictionary<string, object>();
         foreach (var (bit, key) in OwnMods) if (Has(f, bit)) own[key] = true;
-        // A lock only matters at another speed, where osu!'s DA would need the value worked out.
-        if (speed != 1)
-        {
-            if (Has(f, ArLockBit)) own["ar_lock"] = true;
-            if (Has(f, OdLockBit)) own["od_lock"] = true;
-            if (Has(f, ArLockBit) || Has(f, OdLockBit)) priceable = false;
-        }
+        if (NoteLocks.TryGetValue(facts.NoteLock, out var noteLock)) own[noteLock] = true;
         if (priceable) priced = [.. mods];
         if (own.Count > 0) mods.Add(Calc.Mods.With(OwnMod, own));
 

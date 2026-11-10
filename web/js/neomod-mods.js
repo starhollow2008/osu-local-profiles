@@ -29,7 +29,6 @@ const NAMES = {
   shirone: 'Shirone',
   mafham: 'Mafham',
   half_timing_window: 'Half Timing Window',
-  half_timing_window_300s: 'Half Timing Window (300s allowed)',
   ming3012: 'MinG3012',
   no_100s: 'No 100s no 50s',
   no_50s: 'No 50s',
@@ -43,6 +42,9 @@ const NAMES = {
   no_hp: 'No HP drain',
   ar_lock: 'AR locked to speed',
   od_lock: 'OD locked to speed',
+  no_note_lock: 'No note lock',
+  neomod_note_lock: 'neomod note lock',
+  lazer_note_lock: 'osu!lazer 2020 note lock',
 };
 
 /** The neomod mods a NEO badge stands for, by name. One this list does not know is shown by its key. */

@@ -22,11 +22,12 @@ public sealed class NeomodTests : IDisposable
     private static ulong Bits(params int[] bits) => bits.Aggregate(0UL, (a, b) => a | (1UL << b));
 
     private const int NF = 0, EZ = 1, AP = 2, RX = 3, HD = 4, HR = 5, FL = 6, SD = 7, PF = 8, NoPitch = 10, TD = 11, SO = 12, SV2 = 13,
-        FPoSu = 14, Target = 15, ArLock = 16, Timewarp = 18, Wobble = 23, FullAlternate = 26, FlipUpDown = 34, FlipLeftRight = 35,
-        StrictTracking = 41, ApproachDifferent = 42, Singletap = 43, Traceable = 49, FreezeFrame = 50;
+        FPoSu = 14, Target = 15, ArLock = 16, OdLock = 17, Timewarp = 18, Wobble = 23, FullAlternate = 26, HalfWindow = 29,
+        HalfWindowAllow300s = 30, FlipUpDown = 34, FlipLeftRight = 35, StrictTracking = 41, ApproachDifferent = 42, Singletap = 43,
+        Traceable = 49, FreezeFrame = 50;
 
     private static NeomodFacts Facts(ulong flags = 0, double speed = 1, double ar = -1, double arNegative = 0, double cs = -1,
-        double csNegative = 0, double hp = -1, double od = -1) => new(flags, speed, 2, ar, arNegative, cs, csNegative, hp, od);
+        double csNegative = 0, double hp = -1, double od = -1, int noteLock = 2) => new(flags, speed, noteLock, ar, arNegative, cs, csNegative, hp, od);
 
     /// <summary>neomod's mods record as <c>Replay::Mods::pack_and_write</c> writes it, its settings text after.</summary>
     private static byte[] Packed(NeomodFacts f, bool withSettings = true)
@@ -79,6 +80,15 @@ public sealed class NeomodTests : IDisposable
         var install = Neomod.Install(root)!;
         Assert.Equal(("neomod", Path.Combine(root, "replays")), (install.Kind, install.ReplayDir));
         Assert.Equal([Path.Combine(stable, "Songs"), Path.Combine(root, "maps")], install.BeatmapRoots);
+
+        // songs_folder, copied from stable's BeatmapDirectory: under osu_folder, or anywhere.
+        Directory.CreateDirectory(Path.Combine(stable, "Beatmaps"));
+        File.WriteAllText(Path.Combine(root, "cfg", "osu.cfg"), $"osu_folder {stable.Replace('\\', '/')}/\nsongs_folder Beatmaps/\n");
+        Assert.Equal(Path.Combine(stable, "Beatmaps"), Neomod.Install(root)!.BeatmapRoots[0]);
+        var elsewhere = Path.Combine(h.Folder, "Songs elsewhere");
+        Directory.CreateDirectory(elsewhere);
+        File.WriteAllText(Path.Combine(root, "cfg", "osu.cfg"), $"osu_folder {stable}\\\nsongs_folder {elsewhere}\\\n");
+        Assert.Equal(elsewhere, Neomod.Install(root)!.BeatmapRoots[0]);
         Assert.Equal("neomod", Discover.Classify(root, Path.Combine(h.Folder, "mcosu"))!.Kind);
         Assert.True(Discover.LooksLikeInstall(["neomod.exe", "bass.dll"]));
         File.Delete(Path.Combine(root, "neomod.exe"));
@@ -166,11 +176,33 @@ public sealed class NeomodTests : IDisposable
         Assert.Equal("""[{"acronym":"HD"},{"acronym":"NEO","settings":{"fposu":true,"timewarp":true,"wobble":true}}]""", Json(own.Mods));
         Assert.Equal("HD", Mods.Label(own.Priced!));
 
-        // AR locked to the speed: nothing at 1x, unpriced at any other.
+        // Late 300s under Half Timing Window is on in every play neomod saves, and nothing alone.
+        Assert.Equal("None", Label(Facts(Bits(HalfWindowAllow300s))));
+        Assert.Equal("""[{"acronym":"NEO","settings":{"half_timing_window":true}}]""", Json(Neomod.Mods(Facts(Bits(HalfWindow, HalfWindowAllow300s))).Mods));
+
+        // Note lock: stable's is the default; any other is neomod's own.
+        Assert.Equal("None", Label(Facts(noteLock: 2)));
+        var noLock = Neomod.Mods(Facts(noteLock: 0));
+        Assert.Equal("""[{"acronym":"NEO","settings":{"no_note_lock":true}}]""", Json(noLock.Mods));
+        Assert.Equal("[]", Json(noLock.Priced!));
+    }
+
+    [Fact]
+    public void AR_or_OD_locked_to_the_speed_is_DAs_value_before_it_and_unpriced_without_an_override()
+    {
         Assert.Equal("None", Label(Facts(Bits(ArLock))));
-        var locked = Neomod.Mods(Facts(Bits(ArLock), speed: 1.5, ar: 9));
-        Assert.Equal("DTDANEO", Mods.Label(locked.Mods));
-        Assert.Null(locked.Priced);
+        // AR 9 held at 1.5x is 600 ms of real time, 900 ms of the map's: AR 7. As played: AR 9 at 1.6x is DA 6.6.
+        Assert.Equal("""[{"acronym":"DT"},{"acronym":"DA","settings":{"approach_rate":7}}]""", Json(Neomod.Mods(Facts(Bits(ArLock), speed: 1.5, ar: 9)).Priced!));
+        Assert.Equal(6.6, Math.Round(Neomod.UnlockedAr(9, 1.6), 6));
+        Assert.Equal(11, Math.Round(Neomod.UnlockedAr(9, 0.5), 6));
+        Assert.Equal(2, Math.Round(Neomod.UnlockedAr(5, 1.3), 6));
+        // OD 8 held at 1.5x: a 32 ms window, 48 ms of the map's.
+        Assert.Equal("""[{"acronym":"DT"},{"acronym":"DA","settings":{"overall_difficulty":5.33}}]""", Json(Neomod.Mods(Facts(Bits(OdLock), speed: 1.5, od: 8)).Priced!));
+
+        // Locking the map's own value would need the map.
+        var mapAr = Neomod.Mods(Facts(Bits(ArLock), speed: 1.5));
+        Assert.Equal("""[{"acronym":"DT"},{"acronym":"NEO","settings":{"ar_lock":true}}]""", Json(mapAr.Mods));
+        Assert.Null(mapAr.Priced);
     }
 
     [Fact]
