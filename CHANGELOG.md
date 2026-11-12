@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.34.1
+
+- **osu!mania accuracy matches osu!lazer.** MAX is worth 305 accuracy points in mania,
+  not 350. Previously tracked lazer mania scores are corrected once using their stored
+  judgements, without changing pp or needing the replay files.
+
 ## 1.34.0
 
 - **neki is supported.** Its plays are tracked as neki instead of osu!stable, and scored as
