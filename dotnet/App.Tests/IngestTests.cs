@@ -41,6 +41,54 @@ public sealed class IngestTests : IDisposable
     }
 
     [Fact]
+    public void Lazer_mania_MAX_uses_305_while_other_modes_keep_their_weights()
+    {
+        const string judgementJson = """{"statistics":{"perfect":60,"great":40},"maximum_statistics":{"perfect":100}}""";
+        var mania = Replay(mode: 3, extras: judgementJson);
+        var standard = Replay(mode: 0, extras: judgementJson);
+        Assert.Equal((60.0 * 305 + 40 * 300) / (100 * 305), Grade.Accuracy(mania, 3), 12);
+        Assert.Equal((60.0 * 350 + 40 * 300) / (100 * 350), Grade.Accuracy(standard, 0), 12);
+    }
+
+    [Fact]
+    public void Existing_lazer_mania_scores_are_repaired_only_once_without_touching_imported_scores()
+    {
+        using var h = new TempDb();
+        void Insert(string key, int mode, string client, double accuracy, bool imported) => h.Db.Run("""
+            INSERT INTO scores
+              (profile_id, dedupe_key, mode, beatmap_md5, client, mods_json, mods_label,
+               count300, count100, count50, count_geki, count_katu, count_miss,
+               accuracy, max_combo, total_score, passed, grade, played_at,
+               statistics_json, max_statistics_json, imported_at)
+            VALUES (?, ?, ?, 'map', ?, '[]', '',
+                    60, 0, 0, 0, 0, 0,
+                    ?, 100, 500000, 1, 'S', 0,
+                    '{"perfect":60,"great":40}', '{"perfect":100}', ?)
+            """, h.ProfileId, key, mode, client, accuracy, imported ? 1 : null);
+
+        Insert("mania", 3, "lazer", 0.93, false);
+        Insert("imported", 3, "lazer", 0.93, true);
+        Insert("stable", 3, "stable", 0.93, false);
+        Insert("standard", 0, "lazer", 0.93, false);
+
+        // Pretend these scores preceded the upgrade and reopen to run its migration.
+        h.Db.Run("DELETE FROM kv WHERE key = 'maniaAccuracy305Repaired'");
+        h.Reopen();
+
+        double Acc(string key) => Convert.ToDouble(
+            h.Db.Scalar("SELECT accuracy FROM scores WHERE dedupe_key = ?", key));
+        var expected = (60.0 * 305 + 40 * 300) / (100 * 305);
+        Assert.Equal(expected, Acc("mania"), 12);
+        Assert.Equal(0.93, Acc("imported"));
+        Assert.Equal(0.93, Acc("stable"));
+        Assert.Equal(0.93, Acc("standard"));
+
+        h.Db.Run("UPDATE scores SET accuracy = 0.123 WHERE dedupe_key = 'mania'");
+        h.Reopen();
+        Assert.Equal(0.123, Acc("mania"));
+    }
+
+    [Fact]
     public void A_stable_grade_is_worked_out_and_lazers_own_is_taken_as_written()
     {
         Assert.Equal("X", Grade.GradeOf(Replay(), 0, []));
