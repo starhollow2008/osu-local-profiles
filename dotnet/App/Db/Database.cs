@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
+using OsuLocalProfiles.Calc;
 
 namespace OsuLocalProfiles.Db;
 
@@ -369,6 +370,43 @@ internal sealed partial class Database : IDisposable
         PinSectionOrder();
         PinNekiClient();
         PinNeomodClient();
+        RepairLazerManiaAccuracy();
+    }
+
+    private const string ManiaAccuracyRepaired = "maniaAccuracy305Repaired";
+
+    /// <summary>
+    /// Recalculate previously saved osu!lazer mania accuracy once, using stored judgement
+    /// statistics. Imported/manual scores already have their own accuracy and are left alone.
+    /// No replay files, beatmap access, or pp recalculation are required.
+    /// </summary>
+    private void RepairLazerManiaAccuracy()
+    {
+        if (Exists("SELECT 1 FROM kv WHERE key = ?", ManiaAccuracyRepaired)) return;
+        Transaction(() =>
+        {
+            foreach (var row in Rows("""
+                SELECT id, statistics_json, max_statistics_json FROM scores
+                 WHERE mode = 3 AND client = 'lazer'
+                   AND imported_at IS NULL AND origin IS NULL
+                   AND statistics_json IS NOT NULL AND max_statistics_json IS NOT NULL
+                """))
+            {
+                try
+                {
+                    using var statistics = JsonDocument.Parse(row.Str("statistics_json")!);
+                    using var maximum = JsonDocument.Parse(row.Str("max_statistics_json")!);
+                    var accuracy = Grade.LazerAccuracy(3, statistics.RootElement, maximum.RootElement);
+                    if (accuracy is not null)
+                        Run("UPDATE scores SET accuracy = ? WHERE id = ?", accuracy.Value, row["id"]);
+                }
+                catch (JsonException)
+                {
+                    // Bad stored statistics cannot be recomputed safely; retain their original value.
+                }
+            }
+            Run("INSERT INTO kv (key, value) VALUES (?, ?)", ManiaAccuracyRepaired, "1");
+        });
     }
 
     private const string NekiClientPinned = "nekiClientPinned";
