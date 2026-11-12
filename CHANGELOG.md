@@ -2,6 +2,8 @@
 
 ## 1.34.1
 
+<!-- important -->
+
 - **osu!lazer accuracy in osu!mania, osu!taiko and osu!catch matches osu!.** Judgements were
   weighed as osu! weighs them in osu! only, so mania read up to a few percent low, taiko low on
   every OK, and catch didn't count drops and droplets the same as fruits. Scores already tracked
