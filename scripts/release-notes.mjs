@@ -149,12 +149,28 @@ const CREDIT = new RegExp(String.raw`\s*Thanks to (${MENTION}(?:(?:, and |, | an
 
 /** The people a credit names, as a release page mentions them: plain `@name`s. */
 function thanks(names) {
-  const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0];
-  return `Thanks to ${list}.`;
+  return `Thanks to ${listed(names)}.`;
 }
 
 /** An issue, linked as the CHANGELOG writes it: `[#4](https://github.com/<repo>/issues/4)`. */
 const ISSUE = String.raw`\[#\d+\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+\)`;
+
+/** A pull request or an issue, linked: `[#17](https://github.com/<repo>/pull/17)`. */
+const CHANGE = String.raw`\[#\d+\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:pull|issues)\/\d+\)`;
+
+/**
+ * A contribution closing an entry: `By [@name](https://github.com/name) in [#17](<pull link>).`,
+ * people and pull requests each joined with commas and "and". The release page ends the line
+ * with it as `by @name in #17`.
+ */
+const BY = new RegExp(
+  String.raw`\s*[Bb]y (${MENTION}(?:(?:, and |, | and )${MENTION})*) in (${CHANGE}(?:(?:, and |, | and )${CHANGE})*)\.?$`,
+);
+
+/** Names or numbers as a sentence lists them: `a`, `a and b`, `a, b and c`. */
+function listed(items) {
+  return items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : items[0];
+}
 
 /**
  * The issues an entry came from, just before its credit: `Reported in [#4](...).`, or several
@@ -172,6 +188,11 @@ const REPORTED = new RegExp(String.raw`\s*Reported in (${ISSUE}(?:(?:, and |, | 
  */
 export function headline(entry) {
   const whole = entry.replace(/\s+/g, ' ').trim();
+  const by = BY.exec(whole);
+  if (by) {
+    const line = headline(whole.slice(0, by.index)).replace(/(?<!\.)\.$/, '');
+    return `${line} by ${listed(by[1].match(/@[\w-]+/g))} in ${listed(by[2].match(/#\d+/g))}`;
+  }
   const credit = CREDIT.exec(whole);
   let text = credit ? whole.slice(0, credit.index) : whole;
   const reported = REPORTED.exec(text);

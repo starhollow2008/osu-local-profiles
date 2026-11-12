@@ -6,7 +6,7 @@
   weighed as osu! weighs them in osu! only, so mania read up to a few percent low, taiko low on
   every OK, and catch didn't count drops and droplets the same as fruits. Scores already tracked
   are corrected once from their stored judgements, without changing pp.
-  Thanks to [@cambarr](https://github.com/cambarr).
+  By [@cambarr](https://github.com/cambarr) in [#17](https://github.com/jonathant09/osu-local-profiles/pull/17).
 
 ## 1.34.0
 

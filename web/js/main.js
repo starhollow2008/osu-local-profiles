@@ -1072,10 +1072,13 @@ const MAX_NOTE_LINES = 12;
 /** Where an issue named in the patch notes, `(#4)`, lives (scripts/release-notes.mjs). */
 const ISSUES_URL = 'https://github.com/jonathant09/osu-local-profiles/issues/';
 
+/** An issue or pull request a patch-notes line names, linked (GitHub sends an issue link to its pull request). */
+const issueLink = (n) => `<a href="${ISSUES_URL}${n}" target="_blank" rel="noreferrer noopener">#${n}</a>`;
+
 /**
  * A version's changes, a line each, newest version first (dotnet/App/Update/Notes.cs). The lines are
- * the CHANGELOG's own, escaped; only its `code` spans, and the issues it names as `(#4)`, become
- * markup.
+ * the CHANGELOG's own, escaped; only its `code` spans, the issues it names as `(#4)`, and the pull
+ * requests closing it as `by @name in #17`, become markup.
  */
 function notesHtml(notes) {
   let left = MAX_NOTE_LINES;
@@ -1093,9 +1096,9 @@ function notesHtml(notes) {
       .map((l) => {
         const html = escapeHtml(l)
           .replace(/`([^`]+)`/g, '<code>$1</code>')
-          .replace(/\((#\d+(?:, #\d+)*)\)/g, (_, list) =>
-            `(${list.replace(/#(\d+)/g, `<a href="${ISSUES_URL}$1" target="_blank" rel="noreferrer noopener">#$1</a>`)})`,
-          );
+          .replace(/\((#\d+(?:, #\d+)*)\)/g, (_, list) => `(${list.replace(/#(\d+)/g, (__, n) => issueLink(n))})`)
+          .replace(/( by @[\w-]+(?:(?:, | and )@[\w-]+)* in )(#\d+(?:(?:, | and )#\d+)*)$/, (_, lead, list) =>
+            `${lead}${list.replace(/#(\d+)/g, (__, n) => issueLink(n))}`);
         return `<li>${html}</li>`;
       })
       .join('');

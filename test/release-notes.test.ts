@@ -145,6 +145,26 @@ test('an old release names only the downloads it actually has', () => {
   assert.match(releaseNotes(CHANGELOG, '1.10.0'), /macOS Intel `osx-x64` · Linux `linux-x64`/);
 });
 
+test('a contribution ends its line by @name in #n, as GitHub writes one', () => {
+  const pull = (n: number) => `[#${n}](https://github.com/jonathant09/osu-local-profiles/pull/${n})`;
+  assert.equal(
+    headline(`**osu!lazer accuracy matches osu!.** Mania read low. By [@cambarr](https://github.com/cambarr) in ${pull(17)}.`),
+    'osu!lazer accuracy matches osu! by @cambarr in #17',
+  );
+  assert.equal(
+    headline(`**The chart looks like osu!'s.** It has gridlines. by @a and [@b-c](https://github.com/b-c) in ${pull(3)}, ${pull(4)} and ${pull(5)}`),
+    "The chart looks like osu!'s by @a and @b-c in #3, #4 and #5",
+  );
+  // With the issues it came from, and cut short or not, the credit is whole.
+  assert.equal(
+    headline(`**Your other names.** Plays under them are yours. Reported in [#4](https://github.com/jonathant09/osu-local-profiles/issues/4). By @someone in ${pull(6)}.`),
+    'Your other names (#4) by @someone in #6',
+  );
+  assert.match(headline(`**${'a '.repeat(100)}** By @someone in ${pull(7)}.`), /\.\.\. by @someone in #7$/);
+  // A "by" that names nobody is part of the change.
+  assert.equal(headline('**Sorted by date in the list.** Newest first.'), 'Sorted by date in the list.');
+});
+
 test('the issues a change came from stay on its line, as #n a release page links', () => {
   const issue = (n: number) => `[#${n}](https://github.com/jonathant09/osu-local-profiles/issues/${n})`;
   assert.equal(

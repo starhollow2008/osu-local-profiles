@@ -181,7 +181,7 @@ changed on its own, then a plain sentence or two):
 - A refresh: `**Global rank estimates use osu!'s <Month Year> ranking data.**`
 - Every commit since the last `v*` tag that changes the app (`feat`, `fix`, `perf`, and a
   `style` that changes what players see) and has no entry yet gets one, written from its commit
-  and diff, keeping any `Reported in` and `Thanks to` lines its commit names. Small related
+  and diff, keeping any `Reported in` and `By ... in` credit lines its commit names. Small related
   changes can share an entry. Docs, tests and chores get none. They ship in this release.
 
 The version: the next minor (`1.31.0` to `1.32.0`) for a rework or when any unreleased commit is
