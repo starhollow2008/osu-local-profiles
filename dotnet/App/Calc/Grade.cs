@@ -33,13 +33,19 @@ internal static class Grade
 
     private static readonly HashSet<string> Grades = ["XH", "X", "SH", "S", "A", "B", "C", "D", "F"];
 
-    private static (double Total, bool Unknown) Weigh(JsonElement stats)
+    private static (double Total, bool Unknown) Weigh(JsonElement stats, int mode)
     {
         double total = 0;
         var unknown = false;
         foreach (var (key, count) in Js.Entries(stats))
         {
-            if (HitValues.TryGetValue(key, out var value)) total += value * Js.ToNumber(count);
+            if (HitValues.TryGetValue(key, out var value))
+            {
+                // osu!mania overrides the generic 350-point MAX with 305 accuracy points.
+                // See ManiaScoreProcessor.GetBaseScoreForResult in ppy/osu.
+                if (mode == 3 && key == "perfect") value = 305;
+                total += value * Js.ToNumber(count);
+            }
             else unknown = true;
         }
         return (total, unknown);
@@ -54,8 +60,14 @@ internal static class Grade
         var stats = Js.Get(score.Extras, "statistics");
         var max = Js.Get(score.Extras, "maximum_statistics");
         if (!Js.Truthy(stats) || !Js.Truthy(max)) return null;
-        var achieved = Weigh(stats!.Value);
-        var possible = Weigh(max!.Value);
+        return LazerAccuracy(score.Mode, stats!.Value, max!.Value);
+    }
+
+    /// <summary>Calculate from stored judgements when repairing old lazer mania scores.</summary>
+    internal static double? LazerAccuracy(int mode, JsonElement stats, JsonElement max)
+    {
+        var achieved = Weigh(stats, mode);
+        var possible = Weigh(max, mode);
         if (achieved.Unknown || possible.Unknown) return null;
         if (possible.Total <= 0) return null;
         return Math.Min(1, achieved.Total / possible.Total);
