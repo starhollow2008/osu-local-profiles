@@ -41,47 +41,80 @@ public sealed class IngestTests : IDisposable
     }
 
     [Fact]
-    public void Lazer_mania_MAX_uses_305_while_other_modes_keep_their_weights()
+    public void Every_judgement_a_ruleset_can_give_weighs_what_osus_own_score_processor_says()
     {
-        const string judgementJson = """{"statistics":{"perfect":60,"great":40},"maximum_statistics":{"perfect":100}}""";
-        var mania = Replay(mode: 3, extras: judgementJson);
-        var standard = Replay(mode: 0, extras: judgementJson);
-        Assert.Equal((60.0 * 305 + 40 * 300) / (100 * 305), Grade.Accuracy(mania, 3), 12);
-        Assert.Equal((60.0 * 350 + 40 * 300) / (100 * 350), Grade.Accuracy(standard, 0), 12);
+        osu.Game.Rulesets.Ruleset[] rulesets =
+        [
+            new osu.Game.Rulesets.Osu.OsuRuleset(), new osu.Game.Rulesets.Taiko.TaikoRuleset(),
+            new osu.Game.Rulesets.Catch.CatchRuleset(), new osu.Game.Rulesets.Mania.ManiaRuleset(),
+        ];
+        foreach (var ruleset in rulesets)
+        {
+            var processor = ruleset.CreateScoreProcessor();
+            foreach (var result in ruleset.GetValidHitResults())
+            {
+                var key = JsonNamingPolicy.SnakeCaseLower.ConvertName(result.ToString());
+                double expected = osu.Game.Rulesets.Scoring.HitResultExtensions.AffectsAccuracy(result)
+                    ? processor.GetBaseScoreForResult(result)
+                    : 0;
+                Assert.True(Grade.HitValue(ruleset.RulesetInfo.OnlineID, key) == expected,
+                    $"{ruleset.ShortName} {key}: {Grade.HitValue(ruleset.RulesetInfo.OnlineID, key)?.ToString() ?? "unknown"}, osu! says {expected}");
+            }
+        }
     }
 
     [Fact]
-    public void Existing_lazer_mania_scores_are_repaired_only_once_without_touching_imported_scores()
+    public void Lazer_accuracy_is_weighed_as_each_ruleset_weighs_it()
     {
-        using var h = new TempDb();
-        void Insert(string key, int mode, string client, double accuracy, bool imported) => h.Db.Run("""
+        double Lazer(int mode, string statistics, string maximum) =>
+            Grade.Accuracy(Replay(mode: mode, extras: $$"""{"statistics":{{statistics}},"maximum_statistics":{{maximum}}}"""), mode);
+        // mania: PERFECT (MAX) is 305, GREAT 300.
+        Assert.Equal((60.0 * 305 + 40 * 300) / (100 * 305), Lazer(3, """{"perfect":60,"great":40}""", """{"perfect":100}"""), 12);
+        // taiko: an OK is half a GREAT, as on osu!stable.
+        Assert.Equal(0.975, Lazer(1, """{"great":950,"ok":50}""", """{"great":1000}"""), 12);
+        // catch: every fruit, drop and droplet caught counts the same.
+        Assert.Equal(790.0 / 800, Lazer(2,
+            """{"great":300,"large_tick_hit":100,"small_tick_hit":390,"small_tick_miss":10,"large_bonus":20}""",
+            """{"great":300,"large_tick_hit":100,"small_tick_hit":400,"large_bonus":20}"""), 12);
+    }
+
+    [Fact]
+    public void Lazer_accuracy_already_stored_is_worked_out_again_once()
+    {
+        void Insert(string key, int mode, string client, string? origin, bool imported, string? statistics, string? maximum) => h.Db.Run("""
             INSERT INTO scores
               (profile_id, dedupe_key, mode, beatmap_md5, client, mods_json, mods_label,
                count300, count100, count50, count_geki, count_katu, count_miss,
                accuracy, max_combo, total_score, passed, grade, played_at,
-               statistics_json, max_statistics_json, imported_at)
+               statistics_json, max_statistics_json, origin, imported_at)
             VALUES (?, ?, ?, 'map', ?, '[]', '',
                     60, 0, 0, 0, 0, 0,
-                    ?, 100, 500000, 1, 'S', 0,
-                    '{"perfect":60,"great":40}', '{"perfect":100}', ?)
-            """, h.ProfileId, key, mode, client, accuracy, imported ? 1 : null);
+                    0.5, 100, 500000, 1, 'S', 0,
+                    ?, ?, ?, ?)
+            """, h.ProfileId, key, mode, client, statistics, maximum, origin, imported ? 1 : null);
 
-        Insert("mania", 3, "lazer", 0.93, false);
-        Insert("imported", 3, "lazer", 0.93, true);
-        Insert("stable", 3, "stable", 0.93, false);
-        Insert("standard", 0, "lazer", 0.93, false);
+        Insert("mania", 3, "lazer", null, false, """{"perfect":60,"great":40}""", """{"perfect":100}""");
+        Insert("mania from its link", 3, "lazer", "link", false, """{"perfect":60,"great":40}""", """{"perfect":100}""");
+        Insert("taiko", 1, "lazer", null, false, """{"great":950,"ok":50}""", """{"great":1000}""");
+        Insert("catch", 2, "lazer", null, false, """{"great":90,"small_tick_hit":10}""", """{"great":90,"small_tick_hit":20}""");
+        Insert("from osu.ppy.sh", 3, "lazer", null, true, """{"perfect":60,"great":40}""", """{"perfect":100}""");
+        Insert("stable", 3, "stable", null, false, null, null);
+        Insert("unknown judgement", 3, "lazer", null, false, """{"perfect":60,"some_future_judgement":40}""", """{"perfect":100}""");
+        Insert("unreadable", 3, "lazer", null, false, "{", """{"perfect":100}""");
 
-        // Pretend these scores preceded the upgrade and reopen to run its migration.
-        h.Db.Run("DELETE FROM kv WHERE key = 'maniaAccuracy305Repaired'");
+        // As a database from before the repair: reopening runs it.
+        h.Db.Run("DELETE FROM kv WHERE key = 'lazerAccuracyRepaired'");
         h.Reopen();
 
-        double Acc(string key) => Convert.ToDouble(
-            h.Db.Scalar("SELECT accuracy FROM scores WHERE dedupe_key = ?", key));
-        var expected = (60.0 * 305 + 40 * 300) / (100 * 305);
-        Assert.Equal(expected, Acc("mania"), 12);
-        Assert.Equal(0.93, Acc("imported"));
-        Assert.Equal(0.93, Acc("stable"));
-        Assert.Equal(0.93, Acc("standard"));
+        double Acc(string key) => Convert.ToDouble(h.Db.Scalar("SELECT accuracy FROM scores WHERE dedupe_key = ?", key));
+        Assert.Equal((60.0 * 305 + 40 * 300) / (100 * 305), Acc("mania"), 12);
+        Assert.Equal((60.0 * 305 + 40 * 300) / (100 * 305), Acc("mania from its link"), 12);
+        Assert.Equal(0.975, Acc("taiko"), 12);
+        Assert.Equal(100.0 / 110, Acc("catch"), 12);
+        Assert.Equal(0.5, Acc("from osu.ppy.sh"));
+        Assert.Equal(0.5, Acc("stable"));
+        Assert.Equal(0.5, Acc("unknown judgement"));
+        Assert.Equal(0.5, Acc("unreadable"));
 
         h.Db.Run("UPDATE scores SET accuracy = 0.123 WHERE dedupe_key = 'mania'");
         h.Reopen();

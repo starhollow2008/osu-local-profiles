@@ -7,12 +7,14 @@ namespace OsuLocalProfiles.Calc;
 internal static class Grade
 {
     /// <summary>
-    /// What each judgement is worth, from osu!lazer's <c>Judgement.ToNumericResult</c>. Judgements
-    /// worth nothing are listed so an unrecognised key is absent rather than silently zero.
+    /// What each judgement is worth toward accuracy, from osu!lazer's
+    /// <c>ScoreProcessor.GetBaseScoreForResult</c>; <see cref="RulesetValues"/> has each ruleset's
+    /// overrides. Judgements that don't count toward accuracy are listed as zero, so an
+    /// unrecognised key is absent rather than silently zero.
     /// </summary>
     private static readonly Dictionary<string, double> HitValues = new(StringComparer.Ordinal)
     {
-        ["perfect"] = 350,
+        ["perfect"] = 300,
         ["great"] = 300,
         ["good"] = 200,
         ["ok"] = 100,
@@ -31,7 +33,25 @@ internal static class Grade
         ["small_bonus"] = 0,
     };
 
+    /// <summary>
+    /// Each ruleset's own <c>GetBaseScoreForResult</c> overrides: taiko's OK is half a GREAT, catch
+    /// weighs every fruit, drop and droplet the same, and mania's PERFECT (MAX) is 305.
+    /// </summary>
+    private static readonly Dictionary<string, double>[] RulesetValues =
+    [
+        [],
+        new(StringComparer.Ordinal) { ["ok"] = 150 },
+        new(StringComparer.Ordinal) { ["large_tick_hit"] = 300, ["small_tick_hit"] = 300 },
+        new(StringComparer.Ordinal) { ["perfect"] = 305 },
+    ];
+
     private static readonly HashSet<string> Grades = ["XH", "X", "SH", "S", "A", "B", "C", "D", "F"];
+
+    /// <summary>What a judgement is worth toward accuracy in this ruleset; null for one this does not recognise.</summary>
+    internal static double? HitValue(int mode, string key) =>
+        mode is >= 0 and <= 3 && RulesetValues[mode].TryGetValue(key, out var own) ? own
+        : HitValues.TryGetValue(key, out var value) ? value
+        : null;
 
     private static (double Total, bool Unknown) Weigh(JsonElement stats, int mode)
     {
@@ -39,13 +59,7 @@ internal static class Grade
         var unknown = false;
         foreach (var (key, count) in Js.Entries(stats))
         {
-            if (HitValues.TryGetValue(key, out var value))
-            {
-                // osu!mania overrides the generic 350-point MAX with 305 accuracy points.
-                // See ManiaScoreProcessor.GetBaseScoreForResult in ppy/osu.
-                if (mode == 3 && key == "perfect") value = 305;
-                total += value * Js.ToNumber(count);
-            }
+            if (HitValue(mode, key) is { } value) total += value * Js.ToNumber(count);
             else unknown = true;
         }
         return (total, unknown);
@@ -63,7 +77,7 @@ internal static class Grade
         return LazerAccuracy(score.Mode, stats!.Value, max!.Value);
     }
 
-    /// <summary>Calculate from stored judgements when repairing old lazer mania scores.</summary>
+    /// <summary>lazer's accuracy from its two judgement blocks, as a replay or a stored score has them.</summary>
     internal static double? LazerAccuracy(int mode, JsonElement stats, JsonElement max)
     {
         var achieved = Weigh(stats, mode);

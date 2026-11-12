@@ -370,25 +370,24 @@ internal sealed partial class Database : IDisposable
         PinSectionOrder();
         PinNekiClient();
         PinNeomodClient();
-        RepairLazerManiaAccuracy();
+        RepairLazerAccuracy();
     }
 
-    private const string ManiaAccuracyRepaired = "maniaAccuracy305Repaired";
+    private const string LazerAccuracyRepaired = "lazerAccuracyRepaired";
 
     /// <summary>
-    /// Recalculate previously saved osu!lazer mania accuracy once, using stored judgement
-    /// statistics. Imported/manual scores already have their own accuracy and are left alone.
-    /// No replay files, beatmap access, or pp recalculation are required.
+    /// Work out lazer accuracy again, once, from each score's stored judgements: before 1.34.1 taiko's
+    /// OK, catch's drops and droplets and mania's PERFECT were weighed differently from osu!. A score
+    /// taken from osu.ppy.sh keeps osu!'s own accuracy. No replay is read and pp is untouched.
     /// </summary>
-    private void RepairLazerManiaAccuracy()
+    private void RepairLazerAccuracy()
     {
-        if (Exists("SELECT 1 FROM kv WHERE key = ?", ManiaAccuracyRepaired)) return;
+        if (Exists("SELECT 1 FROM kv WHERE key = ?", LazerAccuracyRepaired)) return;
         Transaction(() =>
         {
             foreach (var row in Rows("""
-                SELECT id, statistics_json, max_statistics_json FROM scores
-                 WHERE mode = 3 AND client = 'lazer'
-                   AND imported_at IS NULL AND origin IS NULL
+                SELECT id, mode, accuracy, statistics_json, max_statistics_json FROM scores
+                 WHERE imported_at IS NULL
                    AND statistics_json IS NOT NULL AND max_statistics_json IS NOT NULL
                 """))
             {
@@ -396,16 +395,17 @@ internal sealed partial class Database : IDisposable
                 {
                     using var statistics = JsonDocument.Parse(row.Str("statistics_json")!);
                     using var maximum = JsonDocument.Parse(row.Str("max_statistics_json")!);
-                    var accuracy = Grade.LazerAccuracy(3, statistics.RootElement, maximum.RootElement);
-                    if (accuracy is not null)
-                        Run("UPDATE scores SET accuracy = ? WHERE id = ?", accuracy.Value, row["id"]);
+                    var mode = Convert.ToInt32(row["mode"], System.Globalization.CultureInfo.InvariantCulture);
+                    var accuracy = Grade.LazerAccuracy(mode, statistics.RootElement, maximum.RootElement);
+                    if (accuracy is { } a && a != Convert.ToDouble(row["accuracy"], System.Globalization.CultureInfo.InvariantCulture))
+                        Run("UPDATE scores SET accuracy = ? WHERE id = ?", a, row["id"]);
                 }
                 catch (JsonException)
                 {
-                    // Bad stored statistics cannot be recomputed safely; retain their original value.
+                    // Unreadable statistics: the accuracy it was stored with stays.
                 }
             }
-            Run("INSERT INTO kv (key, value) VALUES (?, ?)", ManiaAccuracyRepaired, "1");
+            Run("INSERT INTO kv (key, value) VALUES (?, ?)", LazerAccuracyRepaired, "1");
         });
     }
 

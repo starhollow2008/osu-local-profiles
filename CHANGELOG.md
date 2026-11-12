@@ -2,9 +2,11 @@
 
 ## 1.34.1
 
-- **osu!mania accuracy matches osu!lazer.** MAX is worth 305 accuracy points in mania,
-  not 350. Previously tracked lazer mania scores are corrected once using their stored
-  judgements, without changing pp or needing the replay files.
+- **osu!lazer accuracy in osu!mania, osu!taiko and osu!catch matches osu!.** Judgements were
+  weighed as osu! weighs them in osu! only, so mania read up to a few percent low, taiko low on
+  every OK, and catch didn't count drops and droplets the same as fruits. Scores already tracked
+  are corrected once from their stored judgements, without changing pp.
+  Thanks to [@cambarr](https://github.com/cambarr).
 
 ## 1.34.0
 
