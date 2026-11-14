@@ -215,7 +215,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         if (watcher is not null) return;
         liveFrom = liveSince ?? Js.Now();
         watcher = new ReplayWatcher(
-            Distinct(installs.Where(i => i.Kind != "mcosu").Select(i => i.ReplayDir)),
+            Distinct(installs.Where(i => i.Kind != "mcosu").SelectMany(i => i.ReplayDirs())),
             HandleReplay,
             file => Clients.Beatmaps.IndexOneFile(db, file),
             e => Error?.Invoke(e));
@@ -235,10 +235,12 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
             _ = w.Start();
         }
 
-        // neki's passes arrive as replays in the stable folder; its fails and quits only here.
+        // neki's passes arrive as replays; its fails and quits only here. Its own replay folder is
+        // made by its update to 1.2.0, which may come while this runs: it lists a play before
+        // writing the replay, so that is when to look for the folder.
         foreach (var install in installs.Where(i => i.Kind == "neki"))
         {
-            var w = new NekiWatcher(install, neki, HandleNekiPlays, e => Error?.Invoke(e));
+            var w = new NekiWatcher(install, neki, HandleNekiPlays, e => Error?.Invoke(e), () => watcher?.WatchNewFolders());
             nekiWatchers.Add(w);
             w.Start();
         }
@@ -634,7 +636,11 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     /// </summary>
     public async Task<RecomputeResult?> RepairScores()
     {
-        var relabelled = await Enqueue(() => Task.FromResult(RelabelNekiPlays()));
+        var relabelled = await Enqueue(() =>
+        {
+            FollowNekiReplays();
+            return Task.FromResult(RelabelNekiPlays());
+        });
         if (calculator is not { } current) return null;
         var redecode = !db.Exists("SELECT 1 AS hit FROM kv WHERE key = ?", RedecodedKey);
         var rows = Recompute.FoundBeatmapIds(db).Concat(redecode ? Recompute.MisdecodedIds(db) : []).Concat(relabelled)
@@ -648,6 +654,41 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         return sum;
     }
 
+    /// <summary>
+    /// neki 1.2.0 moves the replays it wrote into osu!stable's folder to its own, under the same
+    /// names. A play tracked or declined where it was is pointed at where it is, or it could not be
+    /// priced again or downloaded. Returns how many were.
+    /// </summary>
+    internal int FollowNekiReplays()
+    {
+        var followed = 0;
+        foreach (var install in installs.Where(i => i.Kind == "neki" && i.OwnReplayDir is not null))
+        {
+            HashSet<string> moved;
+            try
+            {
+                if (!Directory.Exists(install.OwnReplayDir)) continue;
+                moved = new(Directory.EnumerateFiles(install.OwnReplayDir!).Select(f => Js.ToLower(NodePath.Basename(f))), StringComparer.Ordinal);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                continue;
+            }
+            if (moved.Count == 0) continue;
+            foreach (var table in new[] { "scores", "declined_plays" })
+            {
+                foreach (var row in db.All($"SELECT id, replay_path FROM {table} WHERE replay_path IS NOT NULL", r => (Id: r.Long("id"), Path: r.Text("replay_path"))))
+                {
+                    var name = NodePath.Basename(row.Path);
+                    if (!moved.Contains(Js.ToLower(name)) || !SamePath(NodePath.Dirname(row.Path), install.ReplayDir) || File.Exists(row.Path)) continue;
+                    db.Run($"UPDATE {table} SET replay_path = ? WHERE id = ?", NodePath.Join(install.OwnReplayDir!, name), row.Id);
+                    followed++;
+                }
+            }
+        }
+        return followed;
+    }
+
     /// <summary>Marks the plays neki wrote before it was a client as filed under it.</summary>
     private const string NekiRelabelledKey = "nekiPlaysRelabelled";
 
@@ -658,7 +699,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     /// </summary>
     internal List<(long Id, long ProfileId)> RelabelNekiPlays()
     {
-        var dirs = installs.Where(i => i.Kind == "neki").Select(i => i.ReplayDir).ToList();
+        var dirs = installs.Where(i => i.Kind == "neki").SelectMany(i => i.ReplayDirs()).ToList();
         if (dirs.Count == 0 || db.Exists("SELECT 1 AS hit FROM kv WHERE key = ?", NekiRelabelledKey)) return [];
         var rows = db.All("""
             SELECT id, profile_id, replay_path FROM scores
@@ -667,7 +708,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         var reprice = new List<(long Id, long ProfileId)>();
         foreach (var row in rows)
         {
-            // neki writes only into the stable folder it plays from: nothing else is read.
+            // neki writes only into the stable folder it plays from and its own: nothing else is read.
             if (!dirs.Any(d => SamePath(NodePath.Dirname(row.Path), d))) continue;
             ReplayScore score;
             try
@@ -678,7 +719,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
             {
                 continue;
             }
-            if (!neki.Claims(score)) continue;
+            if (!neki.Claims(score, row.Path)) continue;
             // neki's user_id was stored as the player's before; it is not an osu! account.
             db.Run("UPDATE scores SET client = 'neki', player_id = CASE WHEN client = 'lazer' THEN NULL ELSE player_id END WHERE id = ?", row.Id);
             if (score.Client == "neki") reprice.Add((row.Id, row.ProfileId));
@@ -727,7 +768,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     private List<string> LogDirs(IReadOnlyCollection<string>? chosen) =>
         [.. Chosen(chosen).Select(LazerLog.LogDirOf).Where(d => d is not null).Select(d => d!)];
 
-    private List<string> ReplayDirs(IReadOnlyCollection<string>? chosen) => Distinct(Chosen(chosen).Select(i => i.ReplayDir));
+    private List<string> ReplayDirs(IReadOnlyCollection<string>? chosen) => Distinct(Chosen(chosen).SelectMany(i => i.ReplayDirs()));
 
     /// <summary>One task after everything already queued, whether or not those failed.</summary>
     private Task<T> Enqueue<T>(Func<Task<T>> task)

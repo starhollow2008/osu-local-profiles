@@ -20,8 +20,9 @@ internal sealed record NekiRecentPlay(
 
 /// <summary>
 /// neki, a closed-source client that plays like osu!stable (roadmap 5.83). It plays from a stable
-/// folder and writes its replays into that folder's <c>Data\r</c>; what says a replay there is
-/// neki's is its own files, read here.
+/// folder. Before 1.2.0 it wrote its replays into that folder's <c>Data\r</c>, where what says a
+/// replay is neki's is its own files, read here; since 1.2.0 into its own <c>data\replays</c>,
+/// moving there the ones it had written before.
 /// </summary>
 internal static partial class Neki
 {
@@ -48,18 +49,23 @@ internal static partial class Neki
     }
 
     /// <summary>
-    /// A neki install: its replays and beatmaps are the stable folder's it plays from. That folder
-    /// need not hold osu!stable itself, only what neki reads and writes there.
+    /// A neki install: its beatmaps are the stable folder's it plays from, and its replays that
+    /// folder's and its own. The stable folder need not hold osu!stable itself, only what neki reads
+    /// and writes there. Its own folder is named whether or not it is there yet: an update makes it.
     /// </summary>
     public static OsuInstall? Install(string root)
     {
         if (!IsNekiRoot(root)) return null;
+        var own = ReplayDir(root);
         var folder = OsuFolder(root);
-        if (folder is null) return new OsuInstall("neki", root, NodePath.Join(root, "Data", "r"), [], null);
-        if (Detect.StableInstall(folder) is { } stable) return stable with { Kind = "neki", Root = root };
+        if (folder is null) return new OsuInstall("neki", root, NodePath.Join(root, "Data", "r"), [], null, OwnReplayDir: own);
+        if (Detect.StableInstall(folder) is { } stable) return stable with { Kind = "neki", Root = root, OwnReplayDir = own };
         var songs = NodePath.Join(folder, "Songs");
-        return new OsuInstall("neki", root, NodePath.Join(folder, "Data", "r"), Exists(songs) ? [songs] : [], null);
+        return new OsuInstall("neki", root, NodePath.Join(folder, "Data", "r"), Exists(songs) ? [songs] : [], null, OwnReplayDir: own);
     }
+
+    /// <summary>Where neki has written its replays since 1.2.0.</summary>
+    public static string ReplayDir(string root) => NodePath.Join(root, "data", "replays");
 
     public static string RecentFile(string root) => NodePath.Join(root, "data", "stats", "neki.recent.json");
 
@@ -188,9 +194,10 @@ internal static partial class Neki
 }
 
 /// <summary>
-/// Which plays in a stable folder's <c>Data\r</c> are neki's, from neki's own files: a play it lists
-/// in <c>neki.recent.json</c> at that moment, or one its <c>scores.neki.db</c> holds and stable's own
-/// <c>scores.db</c> does not (neki copies stable's in). Each file is read again only when it changes.
+/// Which plays are neki's: any replay in its own folder, and in a stable folder's <c>Data\r</c>
+/// those neki's own files say: a play it lists in <c>neki.recent.json</c> at that moment, or one its
+/// <c>scores.neki.db</c> holds and stable's own <c>scores.db</c> does not (neki copies stable's in).
+/// Each file is read again only when it changes.
 /// </summary>
 internal sealed class NekiPlays(IReadOnlyList<OsuInstall> installs)
 {
@@ -237,11 +244,13 @@ internal sealed class NekiPlays(IReadOnlyList<OsuInstall> installs)
 
     private HashSet<string> Hashes(string file) => Read(file, Neki.ScoreReplayHashes, new HashSet<string>());
 
-    /// <summary>Is this replay, found in a stable folder, one neki wrote?</summary>
-    public bool Claims(ReplayScore score)
+    /// <summary>Is this replay one neki wrote? <paramref name="file"/> is where it was found, when it is a file somewhere.</summary>
+    public bool Claims(ReplayScore score, string? file = null)
     {
         if (score.Client == "neki") return true;
         if (score.Client != "stable") return false;
+        if (file is not null && NodePath.Dirname(file) is var dir
+            && installs.Any(i => i.Kind == "neki" && i.OwnReplayDir is { } own && Tracker.PlayTracker.SamePath(own, dir))) return true;
         foreach (var neki in installs.Where(i => i.Kind == "neki"))
         {
             if (Recent(neki).Any(p => p.BeatmapMD5 == Js.ToLower(score.BeatmapMD5) && Math.Abs(p.PlayedAt - score.PlayedAtMs) <= 1)) return true;

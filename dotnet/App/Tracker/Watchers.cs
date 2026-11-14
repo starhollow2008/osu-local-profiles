@@ -213,6 +213,8 @@ internal sealed class ReplayWatcher(IReadOnlyList<string> dirs, Action<string> o
     private readonly List<FileSystemWatcher> watchers = [];
     private readonly Debounce pending = new();
     private readonly HashSet<string> seen = new(StringComparer.Ordinal);
+    private readonly List<string> missing = [];
+    private DateTime startedAt;
     private bool running;
 
     public void Start()
@@ -221,18 +223,54 @@ internal sealed class ReplayWatcher(IReadOnlyList<string> dirs, Action<string> o
         {
             if (running) return;
             running = true;
+            startedAt = DateTime.UtcNow;
+            missing.Clear();
         }
         foreach (var dir in dirs)
         {
-            if (!Directory.Exists(dir) && !File.Exists(dir)) continue;
-            try
+            if (TryWatch(dir)) continue;
+            lock (gate) missing.Add(dir);
+        }
+    }
+
+    /// <summary>Watch a folder if it is there. A watch that fails is reported, and not tried again.</summary>
+    private bool TryWatch(string dir)
+    {
+        if (!Directory.Exists(dir) && !File.Exists(dir)) return false;
+        try
+        {
+            // Resolved for the watch, reported against the folder as configured.
+            var w = Watch.Start(dir, true, name => Queue(NodePath.Join(dir, name)), onError);
+            lock (gate) watchers.Add(w);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            onError?.Invoke(e);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// Watch the folders that were not there at the start and are now, with whatever was written
+    /// into them since the start: a replay may have beaten the watch there.
+    /// </summary>
+    public void WatchNewFolders()
+    {
+        List<string> appeared;
+        double since;
+        lock (gate)
+        {
+            if (!running || missing.Count == 0) return;
+            appeared = [.. missing.Where(d => Directory.Exists(d))];
+            since = Js.MtimeMs(startedAt);
+        }
+        foreach (var dir in appeared)
+        {
+            if (!TryWatch(dir)) continue;
+            lock (gate) missing.Remove(dir);
+            foreach (var (file, mtime) in Backfill.Walk(dir))
             {
-                // Resolved for the watch, reported against the folder as configured.
-                watchers.Add(Watch.Start(dir, true, name => Queue(NodePath.Join(dir, name)), onError));
-            }
-            catch (Exception e) when (e is not OutOfMemoryException)
-            {
-                onError?.Invoke(e);
+                if (mtime >= since) Queue(file);
             }
         }
     }
@@ -748,7 +786,8 @@ internal sealed class McosuWatcher(string root, string dir, Action<string> onRep
 /// Watches neki's <c>neki.recent.json</c> for plays it ended without a replay: fails and quits
 /// (roadmap 5.83). What the file held at the start is never taken as new; passes arrive as replays.
 /// </summary>
-internal sealed class NekiWatcher(OsuInstall neki, NekiPlays files, Action<List<NekiRecentPlay>> onPlays, Action<Exception>? onError = null)
+internal sealed class NekiWatcher(OsuInstall neki, NekiPlays files, Action<List<NekiRecentPlay>> onPlays, Action<Exception>? onError = null,
+    Action? onChanged = null)
 {
     /// <summary>neki rewrites the file whole after every play.</summary>
     private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(300);
@@ -796,6 +835,19 @@ internal sealed class NekiWatcher(OsuInstall neki, NekiPlays files, Action<List<
 
     private void Read()
     {
+        lock (gate)
+        {
+            if (!running) return;
+        }
+        // Before anything else: a pass listed here has its replay written next.
+        try
+        {
+            onChanged?.Invoke();
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            onError?.Invoke(e);
+        }
         var fresh = new List<NekiRecentPlay>();
         lock (gate)
         {

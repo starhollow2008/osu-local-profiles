@@ -122,12 +122,12 @@ internal static class Ingest
     private static bool Truthy(JsonElement? value) => Js.Truthy(value);
 
     /// <summary>The client a play is filed under: a stable replay neki wrote is neki's (roadmap 5.83).</summary>
-    public static ReplayScore WithClient(ReplayScore score, NekiPlays? neki) =>
-        score.Client == "stable" && neki?.Claims(score) == true ? score with { Client = "neki" } : score;
+    public static ReplayScore WithClient(ReplayScore score, NekiPlays? neki, string? file = null) =>
+        score.Client == "stable" && neki?.Claims(score, file) == true ? score with { Client = "neki" } : score;
 
     public static async Task<IngestOutcome> Score(ReplayScore score, string replayPath, IngestContext ctx)
     {
-        score = WithClient(score, ctx.Neki);
+        score = WithClient(score, ctx.Neki, replayPath);
         double playedAt = score.PlayedAtMs;
         if (playedAt < ctx.TrackingSince) return new IngestOutcome("skipped", "too-old");
         // A fail neomod kept: never a score, which would read as a pass (roadmap 5.85).

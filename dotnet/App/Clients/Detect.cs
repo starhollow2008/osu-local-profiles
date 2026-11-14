@@ -7,7 +7,13 @@ namespace OsuLocalProfiles.Clients;
 /// <param name="ReplayDir">Where new replays appear. McOsu writes none: for it, the app's folder of the replays it builds.</param>
 /// <param name="OnlineDb">lazer's cached beatmap metadata database, if present.</param>
 /// <param name="Development">osu!'s development client, tracked beside release lazer (roadmap 5.68).</param>
-internal sealed record OsuInstall(string Kind, string Root, string ReplayDir, List<string> BeatmapRoots, string? OnlineDb, bool Development = false);
+/// <param name="OwnReplayDir">A second folder its replays appear in, every one of them its own: neki's since 1.2.0.</param>
+internal sealed record OsuInstall(string Kind, string Root, string ReplayDir, List<string> BeatmapRoots, string? OnlineDb, bool Development = false,
+    string? OwnReplayDir = null)
+{
+    /// <summary>Every folder its replays appear in.</summary>
+    public IEnumerable<string> ReplayDirs() => OwnReplayDir is null ? [ReplayDir] : [ReplayDir, OwnReplayDir];
+}
 
 /// <summary>Everything about the machine that decides where osu! might be, passed in so every platform can be tested from one.</summary>
 internal sealed record DetectEnvironment(string Platform, string Home, IReadOnlyDictionary<string, string?> Env)

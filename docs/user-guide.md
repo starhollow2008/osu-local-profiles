@@ -126,9 +126,9 @@ The evidence is in [roadmap.md](roadmap.md) under 5.12.
 
 ## neki
 
-[neki](https://nekigame.nekiak.com/) plays from an osu!stable folder and saves its replays there, so
-it's found wherever it was installed (`AppData\Local\Programs\neki`) and its plays are tracked as
-**neki**, apart from stable's.
+[neki](https://nekigame.nekiak.com/) plays from an osu!stable folder and saves its replays there, or
+in its own folder since neki 1.2.0. It's found wherever it was installed
+(`AppData\Local\Programs\neki`) and its plays are tracked as **neki**, apart from stable's.
 
 - **Plays are scored as osu!stable scores them**, with the Classic mod, as on stable.
 - **neki's extra mods count as osu!lazer's**: Difficulty Adjust, Mirror, Random, Alternate and

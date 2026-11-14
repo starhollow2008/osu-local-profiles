@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.34.2
+
+- **neki 1.2.0's plays are tracked again.** neki now saves its replays in its own folder, so its
+  passes stopped showing up while its quits and fails still did. Plays set since updating neki
+  come in with Import past plays.
+
 ## 1.34.1
 
 <!-- important -->

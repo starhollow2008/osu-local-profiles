@@ -755,18 +755,27 @@ AP+RX. Fails, quits and retries leave nothing, so they can't be counted.
 
 ## neki
 
-A closed-source client that plays like osu!stable (roadmap 5.83), measured on 2026-11-10. It plays
-from a stable folder (`OsuFolder` in `neki.ini`) and writes its replays into that folder's
-`Data\r`, so `Clients/Neki.cs` decides which plays there are its.
+A closed-source client that plays like osu!stable (roadmap 5.83), measured on 2026-11-10 and, for
+1.2.0, on 2026-11-13. It plays from a stable folder (`OsuFolder` in `neki.ini`). Before 1.2.0 it
+wrote its replays into that folder's `Data\r`, so `Clients/Neki.cs` decides which plays there are
+its. Since 1.2.0 it writes them into its own `data\replays`, in the same format under the same
+names, and its first start moves there the ones it wrote before (`moved-from-osu.txt` lists them).
 
-- **The install is not a replay source of its own.** `Neki.Install` is the stable folder's replays
-  and Songs under neki's root, and `PlayTracker.Distinct` watches that `Data\r` once, whichever
-  install named it.
-- **A play is neki's** (`NekiPlays.Claims`) when its lazer block says `client_version: "neki"`,
-  or `neki.recent.json` lists its beatmap at its exact moment (written before the replay), or
-  `scores.neki.db` holds its replay hash and stable's own `scores.db` does not: neki copies
-  stable's scores into its own. A stable replay neki wrote is otherwise stable's byte for byte.
-  `Ingest.WithClient` files it, for ingest and the Check preview alike.
+- **Its replays are in two folders** (`OsuInstall.ReplayDirs`): the stable folder's `Data\r`,
+  which `PlayTracker.Distinct` watches once whichever install named it, and `OwnReplayDir`, neki's
+  own. Both stay: a neki older than 1.2.0 still writes into the first. The second is named
+  whether or not it exists, because neki updates itself and may make it while the app runs:
+  `NekiWatcher` has `ReplayWatcher.WatchNewFolders` look whenever `neki.recent.json` changes,
+  which is before the replay is written.
+- **A play is neki's** (`NekiPlays.Claims`) when its replay is in neki's own folder, or its lazer
+  block says `client_version: "neki"`, or `neki.recent.json` lists its beatmap at its exact moment
+  (written before the replay), or `scores.neki.db` holds its replay hash and stable's own
+  `scores.db` does not: neki copies stable's scores into its own. A stable replay neki wrote is
+  otherwise stable's byte for byte. `Ingest.WithClient` files it, for ingest and the Check preview
+  alike.
+- **Replays 1.2.0 moved are followed** (`FollowNekiReplays`, at every start): a score or declined
+  play whose replay left `Data\r` and is in neki's folder under the same name has its
+  `replay_path` pointed there, or it could not be priced again or downloaded.
 - **An extra mod or a custom rate makes neki write lazer's format** for what is a stable play:
   stable's total in the header, lazer's mod JSON in the block (No Lock is CL with
   `classic_note_lock: false`), and `user_id: 1`, which `Players.ReplayPlayer` ignores. Read as a

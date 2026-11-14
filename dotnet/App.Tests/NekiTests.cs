@@ -131,6 +131,10 @@ public sealed class NekiTests : IDisposable
         var install = Neki.Install(neki)!;
         Assert.Equal(("neki", neki), (install.Kind, install.Root));
         Assert.Equal(Path.Combine(stable, "Data", "r"), install.ReplayDir);
+        // Its own folder since 1.2.0, named before an update has made it.
+        Assert.Equal(Path.Combine(neki, "data", "replays"), install.OwnReplayDir);
+        Assert.Equal([install.ReplayDir, install.OwnReplayDir], install.ReplayDirs());
+        Assert.Equal([Path.Combine(stable, "Data", "r")], Detect.StableInstall(stable)!.ReplayDirs());
         Assert.Equal([Path.Combine(stable, "Songs")], install.BeatmapRoots);
         Assert.Equal("neki", Discover.Classify(neki, Path.Combine(h.Folder, "mcosu"))!.Kind);
         Assert.Equal("stable", Discover.Classify(stable, Path.Combine(h.Folder, "mcosu"))!.Kind);
@@ -192,6 +196,12 @@ public sealed class NekiTests : IDisposable
 
         Assert.False(NekiPlays.None.Claims(replay));
         Assert.Equal("neki", Ingest.WithClient(replay with { ReplayMD5 = "5d3e" }, plays).Client);
+
+        // Anything in neki's own folder is neki's, whatever its files say; the same file elsewhere is not.
+        var unlisted = replay with { ReplayMD5 = "0000" };
+        Assert.False(plays.Claims(unlisted, Path.Combine(stable, "Data", "r", "a.osr")));
+        Assert.True(plays.Claims(unlisted, Path.Combine(neki, "data", "replays", "a.osr")));
+        Assert.False(NekiPlays.None.Claims(unlisted, Path.Combine(neki, "data", "replays", "a.osr")));
     }
 
     [Fact]
@@ -263,6 +273,84 @@ public sealed class NekiTests : IDisposable
         h.Db.Run("DELETE FROM scores");
         var unknown = await Ingest.ReplayFile(Path.Combine(dir, "neki.osr"), ctx with { Neki = null });
         Assert.Equal("stable", unknown.Score!.Client);
+    }
+
+    [Fact]
+    public async Task A_replay_in_nekis_own_folder_is_tracked_as_neki_and_imported_from_there()
+    {
+        var (stable, neki) = Installed();
+        var own = Neki.ReplayDir(neki);
+        Directory.CreateDirectory(own);
+        var file = Write(own, $"{Map}-134387807040549131.osr", NekiReplay());
+        var installs = new List<OsuInstall> { Detect.StableInstall(stable)!, Neki.Install(neki)! };
+        var plays = new NekiPlays(installs);
+
+        // An import looks there, and its filter sees the play as neki's.
+        var stableOnly = new TrackingFilter { Enabled = true, Clients = ["stable"] };
+        var scan = Backfill.ScanForReplays(h.Db, h.ProfileId, [.. installs.SelectMany(i => i.ReplayDirs())], 0,
+            filtering: (new BeatmapResolver(h.Db, []), stableOnly), neki: plays);
+        Assert.Equal((file, true), (Assert.Single(scan.Candidates).File, scan.Candidates[0].Filtered));
+
+        var ctx = new IngestContext(h.Db, new BeatmapResolver(h.Db, []), h.ProfileId, 0, null, Neki: plays);
+        var tracked = await Ingest.ReplayFile(file, ctx);
+        Assert.Equal(("added", "neki"), (tracked.Status, tracked.Score!.Client));
+    }
+
+    [Fact]
+    public void Replays_neki_moved_to_its_own_folder_are_followed_there()
+    {
+        var (stable, neki) = Installed();
+        var old = Path.Combine(stable, "Data", "r");
+        var own = Neki.ReplayDir(neki);
+        var installs = new List<OsuInstall> { Detect.StableInstall(stable)!, Neki.Install(neki)! };
+        var tracker = new PlayTracker(h.Db, new BeatmapResolver(h.Db, installs), installs, h.ProfileId, 0, null);
+        void Row(string key, string file)
+        {
+            h.InsertScore(h.ProfileId, key);
+            h.Db.Run("UPDATE scores SET client = 'neki', replay_path = ? WHERE dedupe_key = ?", file, key);
+        }
+        Row("moved", Path.Combine(old, "moved.osr"));
+        Row("copied", Write(old, "copied.osr", NekiReplay()));
+        Row("gone", Path.Combine(old, "gone.osr"));
+        Row("elsewhere", Path.Combine(h.Folder, "moved.osr"));
+        Tracker.Declined.Record(h.Db, h.ProfileId, new Decline("score", "declined", "filtered", "client", null, "live", null, null, 0, PlayedAt,
+            Path.Combine(old, "declined.osr"), null));
+        string Paths() => string.Join("|", h.Db.Rows("SELECT replay_path FROM scores ORDER BY dedupe_key").Select(r => r.Str("replay_path")));
+        var before = Paths();
+
+        // neki before 1.2.0: no folder of its own, nothing to follow.
+        Assert.Equal(0, tracker.FollowNekiReplays());
+        Directory.CreateDirectory(own);
+        foreach (var name in new[] { "moved.osr", "copied.osr", "declined.osr" }) Write(own, name, NekiReplay());
+        Assert.Equal(2, tracker.FollowNekiReplays());
+
+        // Only what left the stable folder and is in neki's: a file still where it was stays.
+        Assert.Equal(before.Replace(Path.Combine(old, "moved.osr"), Path.Combine(own, "moved.osr")), Paths());
+        Assert.Equal(Path.Combine(own, "declined.osr"), h.Db.FirstRow("SELECT replay_path FROM declined_plays")!.Str("replay_path"));
+        Assert.Equal(0, tracker.FollowNekiReplays());
+    }
+
+    [Fact]
+    public async Task Nekis_own_folder_made_while_watching_is_watched_with_what_it_already_holds()
+    {
+        var (stable, neki) = Installed();
+        var own = Neki.ReplayDir(neki);
+        var arrived = new TaskCompletionSource<string>();
+        var watcher = new ReplayWatcher([Path.Combine(stable, "Data", "r"), own], f => arrived.TrySetResult(f));
+        watcher.Start();
+        try
+        {
+            // The update makes the folder and a replay lands before anything looks.
+            Directory.CreateDirectory(own);
+            var file = Write(own, "first.osr", NekiReplay());
+            watcher.WatchNewFolders();
+            Assert.Equal(file, await Within(arrived.Task));
+            watcher.WatchNewFolders();
+        }
+        finally
+        {
+            watcher.Stop();
+        }
     }
 
     /// <summary>The same replay ten minutes later, past the app's match on the play itself: another play neki never listed.</summary>
@@ -387,8 +475,8 @@ public sealed class NekiTests : IDisposable
     public void A_folder_both_installs_name_is_watched_once()
     {
         var (stable, neki) = Installed();
-        var dirs = PlayTracker.Distinct([Detect.StableInstall(stable)!.ReplayDir, Neki.Install(neki)!.ReplayDir, Path.Combine(h.Folder, "lazer", "files")]);
-        Assert.Equal([Path.Combine(stable, "Data", "r"), Path.Combine(h.Folder, "lazer", "files")], dirs);
+        var dirs = PlayTracker.Distinct([.. Detect.StableInstall(stable)!.ReplayDirs(), .. Neki.Install(neki)!.ReplayDirs(), Path.Combine(h.Folder, "lazer", "files")]);
+        Assert.Equal([Path.Combine(stable, "Data", "r"), Path.Combine(neki, "data", "replays"), Path.Combine(h.Folder, "lazer", "files")], dirs);
     }
 
     /* ------------------------------------------------------------ saved filters */
