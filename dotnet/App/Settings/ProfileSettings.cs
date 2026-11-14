@@ -31,6 +31,8 @@ internal sealed class ProfileSettings
     public bool ShowFcUnknownNote { get; set; } = true;
     public string Scoring { get; set; } = "lazer";
     public TrackingFilter TrackingFilter { get; set; } = TrackingFilter.Default();
+    /// <summary>How the Scores view was last set up (roadmap 5.86).</summary>
+    public ScoreListView ScoreList { get; set; } = ScoreListView.Default();
     public List<string> SectionOrder { get; set; } = [];
     public List<string> HiddenSections { get; set; } = [];
     public long LinkedUserId { get; set; }
@@ -161,6 +163,7 @@ internal static partial class SettingsStore
         new("showFcUnknownNote", (s, raw) => s.ShowFcUnknownNote = Js.NotFalse(raw), s => s.ShowFcUnknownNote),
         new("scoring", (s, raw) => s.Scoring = Js.IsString(raw, out var v) && v == "classic" ? "classic" : "lazer", s => s.Scoring),
         new("trackingFilter", (s, raw) => s.TrackingFilter = TrackingFilter.Coerce(raw), s => s.TrackingFilter),
+        new("scoreList", (s, raw) => s.ScoreList = ScoreListView.Coerce(raw), s => s.ScoreList),
         new("sectionOrder", (s, raw) => s.SectionOrder = SectionIds(raw), s => s.SectionOrder),
         new("hiddenSections", (s, raw) => s.HiddenSections = SectionIds(raw), s => s.HiddenSections),
         new("linkedUserId", (s, raw) =>

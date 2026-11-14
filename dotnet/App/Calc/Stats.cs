@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using OsuLocalProfiles.Db;
 
 namespace OsuLocalProfiles.Calc;
@@ -43,6 +44,15 @@ internal sealed class Play
     public string? OsuUrl { get; init; }
     /// <summary><c>without-unranked-mods</c> when priced with Relax or Autopilot removed.</summary>
     public string? PpBasis { get; init; }
+
+    // The Scores view's own columns (roadmap 5.86), left out of every other list.
+    /// <summary>Every attempt on this beatmap, as Most Played counts them.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? Playcount { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? Misses { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Client { get; set; }
 
     /// <summary>For sorting by time: <c>playedAt</c> as a number.</summary>
     internal double At => PlayedAt switch { long l => l, double d => d, _ => double.NaN };
@@ -103,7 +113,7 @@ internal sealed record ProfileStats(
     int DistinctRankedBeatmaps);
 
 /// <summary>The profile's totals and lists: src/calc/stats.ts.</summary>
-internal static class Stats
+internal static partial class Stats
 {
     private static readonly string[] GradeNames = ["XH", "X", "SH", "S", "A", "B", "C", "D", "F"];
 

@@ -2,6 +2,14 @@
 
 ## 1.34.2
 
+- **Every score, on a page of its own.** **scores** at the top left, or **All scores** beside the
+  Scores heading, lists every score of the mode: by default your best on each beatmap by pp,
+  Best Performance without the cap of 100. Sort it by any column, search it by artist, title,
+  difficulty or mapper (guest difficulties included), filter it by mods, grade, client, stars or
+  date, show every play, and see each beatmap's playcount. It shows 100 at a time, or all at once.
+  As osu!'s rows or a table, it remembers how you left it, Reset puts it back, and Export
+  downloads it as CSV, Excel or JSON.
+
 - **neki 1.2.0's plays are tracked again.** neki now saves its replays in its own folder, so its
   passes stopped showing up while its quits and fails still did. Plays set since updating neki
   come in with Import scores.

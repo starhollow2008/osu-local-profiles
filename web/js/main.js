@@ -57,6 +57,15 @@ import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from 
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { forgetAnnouncedMedals, renderMedals } from './medals.js';
+import {
+  bindScoreList,
+  closeScoreList,
+  closeScoreListPopovers,
+  openScoreList,
+  refreshScoreList,
+  scoreListOpen,
+  scoreListPopoverOpen,
+} from './score-list.js';
 import { setPopupCards } from './beatmaps-popup.js';
 import {
   closeTrackingFilter,
@@ -368,6 +377,7 @@ for (const id of ['modes', 'modesMobile']) {
     resetPaging();
     renderModes();
     loadProfile();
+    refreshScoreList();
   });
 }
 
@@ -838,6 +848,57 @@ async function loadState() {
     mode = s.defaultMode ?? 0;
   }
   renderModes();
+  // The page asked for on arrival: the Scores view, once the profile's setup of it is known.
+  if (!window.__viewInit) {
+    window.__viewInit = true;
+    showView(viewFromAddress(), { push: false });
+  }
+}
+
+/* ------------------------------------------------------------------ views */
+
+/*
+ * The profile, or the Scores view (roadmap 5.86, web/js/score-list.js), from the header's tabs or
+ * Best Performance's All scores. Which one is in the address (`?view=scores`), so a reload and
+ * the browser's Back keep it. A shared copy has only the profile.
+ */
+const viewFromAddress = () => (!isStatic && new URLSearchParams(location.search).get('view') === 'scores' ? 'scores' : 'profile');
+
+function showView(name, { push = true } = {}) {
+  const scores = name === 'scores';
+  if (scores === scoreListOpen()) return;
+  if (push) {
+    const params = new URLSearchParams(location.search);
+    if (scores) params.set('view', 'scores');
+    else params.delete('view');
+    const query = params.toString();
+    history.pushState(null, '', `${location.pathname}${query ? `?${query}` : ''}`);
+  }
+  if (scores) openScoreList();
+  else closeScoreList();
+  scrollTo(0, 0);
+}
+
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-view-tab], [data-view-link]');
+  if (!link || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  showView(link.dataset.viewTab ?? link.dataset.viewLink);
+});
+window.addEventListener('popstate', () => showView(viewFromAddress(), { push: false }));
+
+bindScoreList({
+  getMode: () => mode,
+  getSettings: () => settings,
+  setSettings: (next) => {
+    settings = next;
+  },
+  getConfig: () => app.config,
+  openScore: (id) => void openScoreCard(id),
+});
+if (isStatic) {
+  $('viewTabs').hidden = true;
+  $('allScoresLink').hidden = true;
 }
 
 /* -------------------------------------------------------------- tracking */
@@ -1055,7 +1116,9 @@ document.addEventListener('click', () => setMenuOpen(false));
 $('optionsMenu').onclick = (e) => e.stopPropagation();
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  // These two open over Import past plays: Escape closes the one on top, not both.
+  // The Scores view's Filters or Export first, as any menu.
+  if (scoreListPopoverOpen()) return closeScoreListPopovers();
+  // These two open over Import scores: Escape closes the one on top, not both.
   if (!$('scoreLinkModal').hidden) return closeScoreLink();
   if (!$('manualModal').hidden) return closeManual();
   // The score card's own menu closes first; a second Escape closes the card.
@@ -4922,7 +4985,10 @@ on('score', (e) => {
   toast(
     `${s.grade} ${pct(s.accuracy)} ${pp} - ${original(s.title, s.titleOriginal)}`.replace(/\s+/g, ' '),
   );
-  if (s.mode === mode) loadProfile();
+  if (s.mode === mode) {
+    loadProfile();
+    refreshScoreList();
+  }
   loadState();
 });
 /*
@@ -5054,6 +5120,7 @@ on('medals', () => {
 on('scores', () => {
   loadProfile();
   loadState();
+  refreshScoreList();
 });
 /*
  * The beatmaps Recalculate every score downloads. osu! is asked once a second at most

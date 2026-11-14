@@ -20,5 +20,5 @@ export function countingNoteText(counting: {
 /** One score row, as osu-web's `.play-detail`. */
 export function playRow(
   play: Record<string, unknown>,
-  options?: { showWeight?: boolean; actions?: boolean; reorderable?: boolean; starRating?: boolean },
+  options?: { showWeight?: boolean; actions?: boolean; reorderable?: boolean; starRating?: boolean; playcount?: string | null },
 ): string;

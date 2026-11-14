@@ -6856,3 +6856,671 @@ s.bbcode-editor__glyph {
   font: inherit;
   color-scheme: dark;
 }
+
+/* ======================================================================== */
+/* The profile's pages, and the Scores view (roadmap 5.86)                  */
+/* ======================================================================== */
+
+/*
+ * osu-web's `.header-nav-v4--list` (`header-nav-v4.less`): the user's pages as text tabs on the
+ * left of the bar, the one open bold with a pill under it. Shown at every width here, since the
+ * profile has only two and the bar has room for them.
+ */
+.header-nav-v4 {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  font-size: var(--fs-title-small);
+}
+
+.header-v4__nav > .view-tabs {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: start;
+  align-self: stretch;
+}
+
+.header-nav-v4__item {
+  display: flex;
+  align-items: stretch;
+}
+
+.header-nav-v4__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 1px;
+  color: hsl(var(--hsl-c1));
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.header-nav-v4__link::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 4px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-h1));
+  transform: scaleY(0);
+  transition: transform 120ms ease-out;
+}
+
+.header-nav-v4__link:hover::before,
+.header-nav-v4__link--active::before {
+  transform: scaleY(1);
+}
+
+.header-nav-v4__link--active {
+  font-weight: bold;
+}
+
+/* Below osu-web's desktop breakpoint the mode tabs move out of the bar; the two tabs keep its left. */
+@media (max-width: 899px) {
+  .header-nav-v4 {
+    gap: 14px;
+    font-size: var(--fs-normal);
+  }
+}
+
+/* A section's heading with something beside it: the heading keeps its rule, the row its margin. */
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 20px;
+}
+
+.title-row > .title {
+  margin-bottom: 0;
+}
+
+/* The way on from Scores, past the 100 osu! weights: a pill beside the heading. */
+.all-scores-link {
+  padding: 4px 12px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  text-decoration: none;
+}
+
+.all-scores-link::after {
+  content: " \2192";
+}
+
+.all-scores-link:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+/*
+ * The Scores view in place of the profile: under the same bar, the rest of the profile set aside
+ * while it is open.
+ */
+.score-list-view {
+  display: none;
+  padding-top: 20px;
+}
+
+/*
+ * Drawn as a profile section, but not one: the profile's reordering and its tab bar work on
+ * `.page-extra`, and this is a page of its own.
+ */
+.score-list {
+  --inner-gutter: 8px;
+  position: relative;
+  box-shadow: var(--box-shadow);
+  padding: 20px var(--inner-gutter);
+  margin: 0 2px;
+  background-color: hsl(var(--hsl-b4));
+  font-size: var(--fs-title-small);
+  border-radius: var(--radius-large);
+}
+
+@media (min-width: 900px) {
+  .score-list {
+    --inner-gutter: 40px;
+    margin: 0 10px;
+  }
+}
+
+.view-scores .score-list-view {
+  display: block;
+}
+
+.view-scores .profile-info__bg,
+.view-scores .profile-info__details,
+.view-scores .profile-detail,
+.view-scores .profile-detail-bar,
+.view-scores .page-mode,
+.view-scores .user-profile-pages:not(.score-list-view) {
+  display: none;
+}
+
+.score-list__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 4px 0 14px;
+  font-size: var(--fs-normal);
+}
+
+/* Pills, as the rest of the page's controls. */
+.score-list__seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+}
+
+.score-list__seg button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 13px;
+  border: 0;
+  border-radius: 10000px;
+  background: none;
+  color: hsl(var(--hsl-c2));
+  font: inherit;
+  cursor: pointer;
+}
+
+.score-list__seg button:hover {
+  color: hsl(var(--hsl-c1));
+}
+
+.score-list__seg button[aria-pressed="true"] {
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-weight: 600;
+}
+
+.score-list__layout button {
+  padding: 5px 10px;
+}
+
+.score-list__layout svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+}
+
+.score-list__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 0 13px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+}
+
+.score-list__sort-label {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-list__sort select {
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  color: hsl(var(--hsl-h1));
+  font: inherit;
+  font-weight: 600;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+.score-list__order {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 10000px;
+  background: none;
+  color: hsl(var(--hsl-c1));
+  cursor: pointer;
+}
+
+.score-list__order::before {
+  content: "\2193";
+}
+
+.score-list__order[data-order="asc"]::before {
+  content: "\2191";
+}
+
+.score-list__order:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+.score-list__search {
+  flex: 1 1 200px;
+  min-width: 160px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font: inherit;
+}
+
+.score-list__search::placeholder {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-list__pop {
+  position: relative;
+}
+
+.score-list__button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font: inherit;
+  cursor: pointer;
+}
+
+.score-list__button::after {
+  content: "\25BE";
+  font-size: 0.8em;
+}
+
+.score-list__button:hover,
+.score-list__button[aria-expanded="true"] {
+  background-color: hsl(var(--hsl-b3));
+}
+
+/* How many filters are in force, on the button that holds them. */
+.score-list__count:not(:empty) {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-size: var(--fs-small);
+  font-weight: 600;
+  text-align: center;
+}
+
+.score-list__panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  display: grid;
+  gap: 12px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 14px;
+  border-radius: var(--radius-large);
+  background-color: hsl(var(--hsl-b4));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  font-size: var(--fs-normal-2);
+}
+
+.score-list__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.score-list__group {
+  display: grid;
+  gap: 6px;
+}
+
+.score-list__group-label {
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small);
+  font-weight: 600;
+}
+
+.score-list__choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.score-list__choice {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c2));
+  font: inherit;
+  font-size: var(--fs-small-2);
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.score-list__choice:hover {
+  opacity: 1;
+}
+
+.score-list__choice[aria-pressed="true"] {
+  border-color: hsl(var(--hsl-h1));
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+  opacity: 1;
+}
+
+.score-list__choice .mod,
+.score-list__choice .score-rank {
+  font-size: 13px;
+}
+
+.score-list__none {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-list__range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-list__range input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  font: inherit;
+  color-scheme: dark;
+}
+
+.score-list__export {
+  min-width: 170px;
+}
+
+.score-list__export a {
+  display: block;
+  padding: 9px 11px;
+  border-radius: 5px;
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-title-small);
+  text-decoration: none;
+}
+
+.score-list__export a:hover {
+  background-color: hsl(var(--hsl-b3));
+}
+
+/* The filters in force, each with its own x, and Reset once anything is off its default. */
+.score-list__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 14px;
+  font-size: var(--fs-small-2);
+}
+
+.score-list__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 4px 3px 10px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+}
+
+.score-list__chip button {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 10000px;
+  background: none;
+  color: hsl(var(--hsl-f1));
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.score-list__chip button:hover {
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+}
+
+.score-list__reset {
+  padding: 3px 6px;
+  border: 0;
+  background: none;
+  color: hsl(var(--hsl-red-1));
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.score-list__reset:hover {
+  text-decoration: underline;
+}
+
+/*
+ * The table: a row per score, denser than osu!'s rows, its columns sortable from their heads. It
+ * scrolls sideways on a narrow screen rather than squeezing the beatmap's name to nothing.
+ */
+.score-table__scroll {
+  overflow-x: auto;
+}
+
+.score-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: separate;
+  border-spacing: 0 2px;
+  font-size: var(--fs-normal-2);
+}
+
+.score-table th {
+  padding: 2px 6px 4px;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small);
+  font-weight: 600;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.score-table th.num {
+  text-align: right;
+}
+
+.score-table__sort {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.score-table__sort:hover,
+.score-table__sort--active {
+  color: hsl(var(--hsl-h1));
+}
+
+.score-table__arrow {
+  margin-left: 3px;
+}
+
+.score-table td {
+  height: 38px;
+  padding: 0 6px;
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+  white-space: nowrap;
+}
+
+.score-table__row {
+  cursor: pointer;
+}
+
+.score-table__row:hover td {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.score-table td:first-child {
+  border-radius: var(--radius-base) 0 0 var(--radius-base);
+}
+
+.score-table td:last-child {
+  border-radius: 0 var(--radius-base) var(--radius-base) 0;
+}
+
+.score-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-table__place {
+  width: 1px;
+  color: hsl(var(--hsl-f1));
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.score-table td.score-table__place {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-table__grade .score-rank {
+  font-size: 13px;
+}
+
+.score-table__beatmap {
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-table td.score-table__beatmap small {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-table__version {
+  color: hsl(var(--hsl-orange-1));
+}
+
+.score-table__mods {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 1px;
+  font-size: 11px;
+}
+
+.score-table td.score-table__pp {
+  color: hsl(var(--hsl-h1));
+  font-weight: 700;
+}
+
+.score-table__pp small {
+  font-size: 0.8em;
+}
+
+/* A score that does not count toward pp, listed because the filters asked: quieter. */
+.score-table__row--uncounted td {
+  color: hsl(var(--hsl-c2));
+}
+
+.score-table__row--uncounted td.score-table__pp {
+  color: hsl(var(--hsl-f1));
+  font-weight: 400;
+}
+
+.score-table__muted,
+.score-table td.score-table__date {
+  color: hsl(var(--hsl-f1));
+}
+
+.score-table__menu {
+  width: 1px;
+  padding-right: 4px;
+}
+
+/* Its three dots stay in the row, where osu!'s rows put theirs out in the section's padding. */
+.score-table .play-detail__menu {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: var(--radius-base);
+}
+
+.score-table .play-detail__menu:hover {
+  background-color: hsla(var(--hsl-b6), 0.5);
+}
+
+/* osu!'s rows, as Best Performance draws them, with each beatmap's playcount beside the date. */
+.play-detail__playcount {
+  flex: none;
+  margin-left: 10px;
+  color: hsl(var(--hsl-f1));
+}
+
+/* Under the list: show more and show all in the middle, how many at a time at the right. */
+.score-list__paging {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.score-list__more {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.score-list__page-size {
+  grid-column: 3;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal-2);
+}
+
+.score-list__page-size select {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font: inherit;
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+@media (max-width: 599px) {
+  .score-list__paging {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  .score-list__more,
+  .score-list__page-size {
+    grid-column: 1;
+    justify-self: center;
+  }
+}

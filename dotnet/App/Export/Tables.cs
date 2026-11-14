@@ -117,7 +117,12 @@ internal static class Tables
     /// Every score this profile holds, in every mode or in <paramref name="mode"/>, by pp from
     /// highest to lowest, then those with no pp newest first.
     /// </summary>
-    public static Table Scores(Database db, long profileId, Eligibility e, double? mode, Translator t, string? name = null)
+    /// <param name="listed">
+    /// The Scores view's rows (roadmap 5.86): only these, in this order, with each beatmap's playcount
+    /// after the pp. Null for every visible score.
+    /// </param>
+    public static Table Scores(Database db, long profileId, Eligibility e, double? mode, Translator t, string? name = null,
+        IReadOnlyList<Play>? listed = null)
     {
         var rows = db.Rows($"""
             SELECT s.*, {Eligibility.PpColumn(e)} AS shown_pp, {Eligibility.StarsColumn(e)} AS shown_stars, {Eligibility.ScoreColumn(e)} AS shown_score,
@@ -127,8 +132,15 @@ internal static class Tables
               FROM scores s
               LEFT JOIN beatmaps b ON b.md5 = s.beatmap_md5
              WHERE s.profile_id = ? AND {Eligibility.VisibleSql()} {(mode is null ? "" : "AND s.mode = ?")}
+                   {(listed is null ? "" : "AND s.id IN (SELECT value FROM json_each(?))")}
              ORDER BY shown_pp IS NULL, shown_pp DESC, s.played_at DESC
-            """, mode is null ? [profileId] : [profileId, mode.Value]);
+            """, [profileId, .. mode is null ? Array.Empty<object?>() : [mode.Value], .. listed is null ? Array.Empty<object?>() : [JsonText.Stringify(listed.Select(p => p.Id))]]);
+        if (listed is not null)
+        {
+            var place = listed.Select((p, i) => (Id: Text(p.Id), i)).ToDictionary(x => x.Id, x => x.i);
+            rows = [.. rows.OrderBy(r => place.GetValueOrDefault(Text(r["id"]), int.MaxValue))];
+        }
+        var playcounts = listed?.ToDictionary(p => Text(p.Id), p => p.Playcount);
 
         // Where each counted score stands among the profile's best performances, as the page lists them.
         var best = new Dictionary<string, (int Place, double? Weighted)>();
@@ -179,6 +191,10 @@ internal static class Tables
             new(t.T("export.beatmapsetId"), 10), new(t.T("export.beatmapLink"), 28), new(t.T("export.scoreLink"), 34),
             new(t.T("export.beatmapMd5"), 20),
         ]);
+
+        // The Scores view's own column, beside the pp.
+        var playcountAt = columns.FindIndex(c => c.Header == "pp") + 1;
+        if (playcounts is not null) columns.Insert(playcountAt, new Column(t.T("scoreList.playcount"), 9));
 
         var statuses = StatusNames(t);
         var table = rows.Select((r, i) =>
@@ -241,6 +257,7 @@ internal static class Tables
                 Stats.ScoreUrl(r.Num("mode") ?? double.NaN, client, r["online_score_id"], r["legacy_score_id"]),
                 Cell(r["beatmap_md5"]),
             ]);
+            if (playcounts is not null) cells.Insert(playcountAt, Cell(playcounts.GetValueOrDefault(Text(r["id"]))));
             return cells.ToArray();
         }).ToList();
 

@@ -535,6 +535,10 @@ const unlessSet = (value) => (filterInUse ? SKIP : value);
 check('the filter dialog is hidden on load', await shown('filterModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optFilter').click()");
+// It opens once the names its Player names lists have been asked for, so give that a moment.
+await evaluate(`(async () => {
+  for (let i = 0; i < 50 && document.getElementById('filterModal').hidden; i++) await new Promise((r) => setTimeout(r, 100));
+})()`);
 check('the filter dialog opens', await shown('filterModal'), 'grid');
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
 check(
@@ -3250,6 +3254,61 @@ check('stats box is b4', await bg('.profile-stats'), await literal('hsl(333, 10%
 // in the same band, so it reads as its own region with the b4 stats card lighter on top.
 check('stats band is b5', await bg('.profile-detail'), await literal('hsl(333, 10%, 15%)'));
 check('level bar is b3', await bg('.profile-detail-bar'), await literal('hsl(333, 10%, 25%)'));
+
+/*
+ * The Scores view (roadmap 5.86): the header's second tab, in place of the profile under the same
+ * bar. Opened and read only: a filter or the layout changed here would be saved to the profile
+ * this runs against.
+ */
+console.log('\nthe Scores view');
+check('the header names the profile and the Scores view', await evaluate(
+  "[...document.querySelectorAll('#viewTabs [data-view-tab]')].map((a) => a.textContent.trim()).join()"), 'player info,scores');
+check('the Scores heading leads on to every score, beside it', await evaluate(
+  "document.querySelector('#section-top_ranks .title-row > .title + #allScoresLink') !== null && getComputedStyle(document.getElementById('allScoresLink')).display !== 'none'"), true);
+check('the view is set aside until it is opened', await shown('scoreListView'), 'none');
+const scoresView = JSON.parse(await evaluate(`(async () => {
+  document.querySelector('[data-view-tab=scores]').click();
+  for (let i = 0; i < 40 && !document.querySelector('#scoreListBody table, #scoreListBody .play-detail, #scoreListBody .u-empty'); i++) {
+    await new Promise((r) => setTimeout(r, 100));
+  }
+  const s = await (await fetch('/api/state')).json();
+  const out = {
+    address: location.search,
+    view: getComputedStyle(document.getElementById('scoreListView')).display,
+    cover: getComputedStyle(document.querySelector('.profile-info__bg')).display,
+    profile: getComputedStyle(document.querySelector('.user-profile-pages:not(.score-list-view)')).display,
+    active: document.querySelector('#viewTabs .header-nav-v4__link--active')?.dataset.viewTab,
+    layout: s.settings.scoreList.layout,
+    drawn: document.querySelector('#scoreListBody table') ? 'table' : document.querySelector('#scoreListBody .play-detail') ? 'rows' : 'empty',
+    sorted: document.querySelector('#scoreListBody th[aria-sort] [data-sort]')?.dataset.sort ?? null,
+    sort: s.settings.scoreList.sort,
+    menuInRow: (() => {
+      const b = document.querySelector('#scoreListBody td .play-detail__menu');
+      const t = document.querySelector('#scoreListBody .score-table__scroll');
+      return !b || (b.getBoundingClientRect().right <= t.getBoundingClientRect().right + 1);
+    })(),
+    reset: document.getElementById('scoreListReset') !== null,
+    pageSize: document.getElementById('scoreListPageSize').value,
+    savedPageSize: String(s.settings.scoreList.pageSize),
+    pageFull: document.querySelectorAll('#scoreListBody [data-score-id]').length <= s.settings.scoreList.pageSize,
+    changed: JSON.stringify(s.settings.scoreList) !== JSON.stringify({ ...s.settings.scoreList, show: 'best', uncounted: false, sort: 'pp', order: 'desc', search: '', mods: [], grades: [], clients: [], starsMin: null, starsMax: null, from: null, to: null }),
+  };
+  document.querySelector('[data-view-tab=profile]').click();
+  out.back = getComputedStyle(document.getElementById('scoreListView')).display + ',' + getComputedStyle(document.querySelector('.profile-info__bg')).display;
+  out.backAddress = location.search;
+  return JSON.stringify(out);
+})()`));
+check('its tab opens it, and the address says so', scoresView.address, '?view=scores');
+check('it shows in place of the profile', [scoresView.view, scoresView.cover, scoresView.profile].join(), 'block,none,none');
+check('its tab is the one marked open', scoresView.active, 'scores');
+check('it is drawn as the profile last chose', scoresView.drawn === 'empty' ? SKIP : scoresView.drawn, scoresView.layout);
+check('the table marks the column it is sorted by', scoresView.drawn === 'table' ? scoresView.sorted : SKIP, scoresView.sort);
+check('each row keeps its menu inside the table', scoresView.menuInRow, true);
+check('Reset is offered exactly when the view is off its default', scoresView.reset, scoresView.changed);
+check('it shows as many at a time as the profile picked', scoresView.pageSize, scoresView.savedPageSize);
+check('and no more than that to begin with', scoresView.pageFull, true);
+check('player info goes back to the profile', scoresView.back, 'none,block');
+check('and the address with it', scoresView.backAddress, '');
 
 console.log('\nthe page rendered');
 check('four game modes', await evaluate("document.querySelectorAll('#modes a').length"), 4);

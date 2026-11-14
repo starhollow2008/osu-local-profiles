@@ -18,15 +18,19 @@
     osu-web's `header-v4__row--bar`, the nav bar above the cover: `@osu-colour-d4` in
     `header-v4.less`, which is the d family rather than the b one -- 20% saturation, not 10%.
     osu-web's own bar holds links to the other pages of the user (modding, playlists,
-    multiplayer, ranked play), which this app does not have, so the mode tabs go here instead:
-    osu-web puts those on the right of this same row. Nothing is invented on the left, because a
-    link to the page you are already on is a dead control. The app's own buttons (tracking,
-    language, Options, Quit) are at the right end, off the cover, and below the desktop
-    breakpoint the bar stays for them alone.
+    multiplayer, ranked play) on its left, as `header-nav-v4` (`header-nav-v4.less`): here the
+    profile and the Scores view (roadmap 5.86). The mode tabs sit in the middle of the same row,
+    where osu-web puts them on the right. The app's own buttons (tracking, language, Options,
+    Quit) are at the right end, off the cover, and below the desktop breakpoint the bar stays for
+    them and the two tabs.
   -->
   <div class="header-v4__row header-v4__row--bar">
     <div class="header-v4__container band">
       <div class="band__inner header-v4__nav">
+        <ul class="header-nav-v4 header-nav-v4--list view-tabs" id="viewTabs" aria-label="Pages" data-i18n-attr="aria-label:viewTabs.label">
+          <li class="header-nav-v4__item"><a class="header-nav-v4__link header-nav-v4__link--active" href="./" data-view-tab="profile" aria-current="page" data-i18n="viewTabs.profile">player info</a></li>
+          <li class="header-nav-v4__item"><a class="header-nav-v4__link" href="?view=scores" data-view-tab="scores" data-i18n="viewTabs.scores">scores</a></li>
+        </ul>
         <nav class="game-mode" id="modes" aria-label="Game mode" data-i18n-attr="aria-label:modes.label"></nav>
         <div class="header-v4__actions">
           <button class="update-pill" id="updateBtn" type="button" hidden data-i18n="updateBtn">Update available</button>
@@ -344,7 +348,11 @@
   </section>
 
   <section class="page-extra" id="section-top_ranks">
-    <h2 class="title" data-i18n="section.scores">Scores</h2>
+    <!-- Past the 100 osu! weights: every score, in the Scores view (roadmap 5.86). -->
+    <div class="title-row">
+      <h2 class="title" data-i18n="section.scores">Scores</h2>
+      <a class="all-scores-link" id="allScoresLink" href="?view=scores" data-view-link="scores" data-i18n="scoreList.allScores">All scores</a>
+    </div>
     <div class="counting-note" id="starRatingNotice" hidden></div>
     <h3 class="title title--sub title--sub-first"><span data-i18n="heading.pinnedScores">Pinned Scores</span><span class="title__count" id="pinnedCount">0</span></h3>
     <div id="pinnedPlays"></div>
@@ -373,6 +381,125 @@
     <h3 class="title title--sub title--sub-first"><span data-i18n="heading.favoriteBeatmaps">Favorite Beatmaps</span><span class="title__count" id="favoriteCount">0</span></h3>
     <div class="counting-note" id="favoritesNote" hidden></div>
     <div id="favoriteBeatmaps"></div>
+  </section>
+</main>
+
+<!--
+  The Scores view (roadmap 5.86): every score of the mode, or the best on each beatmap, sorted and
+  narrowed, as a table or as osu!'s rows. In place of the profile while it is open, under the same
+  bar (body.view-scores). Kept as the profile last set it up; Reset puts back all but the layout.
+  See web/js/score-list.js.
+-->
+<main class="user-profile-pages score-list-view" id="scoreListView">
+  <section class="score-list">
+    <h2 class="title" data-i18n="scoreList.title">Scores</h2>
+    <div class="score-list__toolbar">
+      <div class="score-list__seg" id="scoreListShow" role="group">
+        <button type="button" data-show="best" aria-pressed="true" data-i18n="scoreList.best">Best per beatmap</button>
+        <button type="button" data-show="every" aria-pressed="false" data-i18n="scoreList.every">Every play</button>
+      </div>
+      <div class="score-list__sort">
+        <label class="score-list__sort-label" for="scoreListSort" data-i18n="scoreList.sort">Sort</label>
+        <select id="scoreListSort">
+          <option value="pp">pp</option>
+          <option value="score" data-i18n="scoreList.sortScore">Score</option>
+          <option value="accuracy" data-i18n="scoreList.colAccuracy">Accuracy</option>
+          <option value="combo" data-i18n="scoreList.colCombo">Combo</option>
+          <option value="stars" data-i18n="scoreList.colStars">Stars</option>
+          <option value="misses" data-i18n="scoreList.sortMisses">Misses</option>
+          <option value="playcount" data-i18n="scoreList.playcount">Playcount</option>
+          <option value="date" data-i18n="scoreList.sortDate">Date played</option>
+          <option value="beatmap" data-i18n="scoreList.colBeatmap">Beatmap</option>
+        </select>
+        <button type="button" class="score-list__order" id="scoreListOrder" data-order="desc"></button>
+      </div>
+      <input type="search" class="score-list__search" id="scoreListSearch" autocomplete="off"
+             placeholder="Search artist, title, difficulty or mapper" data-i18n-attr="placeholder:scoreList.searchPlaceholder">
+      <div class="score-list__pop">
+        <button type="button" class="score-list__button" id="scoreListFiltersBtn" aria-haspopup="true" aria-expanded="false">
+          <span data-i18n="scoreList.filters">Filters</span><span class="score-list__count" id="scoreListFiltersCount"></span>
+        </button>
+        <div class="score-list__panel" id="scoreListFilters" hidden>
+          <label class="score-list__check">
+            <input type="checkbox" id="scoreListUncounted">
+            <span data-i18n="scoreList.uncounted">Include scores that don't count toward pp</span>
+          </label>
+          <div class="score-list__group">
+            <span class="score-list__group-label" data-i18n="scoreList.colMods">Mods</span>
+            <div class="score-list__choices" id="scoreListMods"></div>
+          </div>
+          <div class="score-list__group">
+            <span class="score-list__group-label" data-i18n="scoreList.colGrade">Grade</span>
+            <div class="score-list__choices" id="scoreListGrades"></div>
+          </div>
+          <div class="score-list__group">
+            <span class="score-list__group-label" data-i18n="scoreList.clients">Client</span>
+            <div class="score-list__choices" id="scoreListClients"></div>
+          </div>
+          <div class="score-list__group">
+            <span class="score-list__group-label" data-i18n="scoreList.colStars">Stars</span>
+            <div class="score-list__range">
+              <input type="number" id="scoreListStarsMin" min="0" step="0.1" placeholder="Min" data-i18n-attr="placeholder:scoreList.min">
+              <span>–</span>
+              <input type="number" id="scoreListStarsMax" min="0" step="0.1" placeholder="Max" data-i18n-attr="placeholder:scoreList.max">
+            </div>
+          </div>
+          <div class="score-list__group">
+            <span class="score-list__group-label" data-i18n="scoreList.colPlayed">Played</span>
+            <div class="score-list__range">
+              <input type="date" id="scoreListFrom" aria-label="From" data-i18n-attr="aria-label:backfillModal.from">
+              <span>–</span>
+              <input type="date" id="scoreListTo" aria-label="To" data-i18n-attr="aria-label:backfillModal.to">
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="score-list__seg score-list__layout" id="scoreListLayout" role="group">
+        <button type="button" data-layout="rows" aria-pressed="true" title="Rows" aria-label="Rows" data-i18n-attr="title:scoreList.rows;aria-label:scoreList.rows">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1" y="1.5" width="14" height="5.5" rx="2"/><rect x="1" y="9" width="14" height="5.5" rx="2"/></svg>
+        </button>
+        <button type="button" data-layout="table" aria-pressed="false" title="Table" aria-label="Table" data-i18n-attr="title:scoreList.table;aria-label:scoreList.table">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 2h14v3H1zM1 6.5h14v3H1zM1 11h14v3H1z"/></svg>
+        </button>
+      </div>
+      <div class="score-list__pop">
+        <button type="button" class="score-list__button" id="scoreListExportBtn" aria-haspopup="true" aria-expanded="false" data-i18n="scoreList.export">Export</button>
+        <div class="menu score-list__export" id="scoreListExport" role="menu" hidden>
+          <a role="menuitem" id="scoreListExport-csv" download>CSV</a>
+          <a role="menuitem" id="scoreListExport-xlsx" download data-i18n="scoreList.excel">Excel (.xlsx)</a>
+          <a role="menuitem" id="scoreListExport-json" download>JSON</a>
+        </div>
+      </div>
+    </div>
+    <div class="score-list__chips" id="scoreListChips" hidden></div>
+    <div id="scoreListBody"></div>
+    <!--
+      Its own show more: 100 at a time unless picked otherwise here, and show all, which asks for
+      the rest in a few large pieces. Remembered with the view; Reset leaves it alone.
+    -->
+    <div class="score-list__paging" id="scoreListPaging" hidden>
+      <div class="score-list__more">
+        <button class="show-more-link" type="button" id="scoreListMore" hidden>
+          <svg class="show-more-link__chevron" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span class="show-more-link__text" data-i18n="section.showMore">show more</span>
+          <svg class="show-more-link__chevron" viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="show-more-link" type="button" id="scoreListAll" hidden>
+          <span class="show-more-link__text"><span data-i18n="section.showAll">show all</span> <span id="scoreListAllCount"></span></span>
+        </button>
+      </div>
+      <label class="score-list__page-size">
+        <select id="scoreListPageSize">
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+          <option value="250">250</option>
+          <option value="500">500</option>
+          <option value="1000">1000</option>
+        </select>
+        <span data-i18n="scoreList.atATime">at a time</span>
+      </label>
+    </div>
   </section>
 </main>
 

@@ -650,6 +650,24 @@ internal sealed partial class BeatmapResolver
         return names.Count > 0 ? names : null;
     });
 
+    /// <summary>
+    /// Every difficulty a mapper whose name contains <paramref name="text"/> mapped, by osu!'s record,
+    /// guests and collabs included: what the Scores view's search finds a mapper by (roadmap 5.86).
+    /// Empty where there is no <c>online.db</c> to ask.
+    /// </summary>
+    public List<double> BeatmapsMappedBy(string text) => FromOnline(o =>
+    {
+        var ids = o.All("""
+            SELECT DISTINCT o.beatmap_id FROM beatmap_owners o
+              JOIN users u ON u.user_id = o.user_id
+             WHERE u.username LIKE ? ESCAPE '\'
+            """, r => r.GetDouble(0), $"%{LikeEscaped(text)}%");
+        return ids.Count > 0 ? ids : null;
+    }) ?? [];
+
+    /// <summary>Text matched as itself by <c>LIKE … ESCAPE '\'</c>: its wildcards made literal.</summary>
+    public static string LikeEscaped(string text) => text.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
+
     [GeneratedRegex(@"\[([^\]]*)\]\.osu\z", RegexOptions.IgnoreCase)]
     private static partial Regex FilenameVersion();
 

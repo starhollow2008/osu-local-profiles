@@ -323,6 +323,18 @@ internal static partial class Server
             return;
         }
 
+        // The Scores view: one page of it, or all of it as a download (roadmap 5.86).
+        if (pathname == "/api/score-list" && method is "GET" or "HEAD")
+        {
+            await Json(context, ExportApi.ScoreList(request, opts, Current()));
+            return;
+        }
+        if (pathname == "/api/score-list/export" && method == "GET")
+        {
+            await ExportApi.ScoreListExport(context, opts, Current());
+            return;
+        }
+
         // This profile's avatar or banner, served only if it has one. `?profile=` names another
         // profile's, for a score page showing whose score it is.
         var image = ImageRoute().Match(pathname);

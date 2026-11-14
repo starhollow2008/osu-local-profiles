@@ -268,6 +268,30 @@ as safe as one you wrote.
 
 ## Scores
 
+### Every score
+
+Best Performance stops at 100, as on osu!. **scores**, beside **player info** at the top left, or
+**All scores** beside the Scores heading, opens every score of the mode on a page of its own.
+
+It starts as Best Performance without the cap: your best score on each beatmap, among those that
+count toward pp, by pp. From there:
+
+- **Best per beatmap** or **Every play**.
+- **Sort** by pp, score, accuracy, combo, stars, misses, playcount, date played or beatmap, from the
+  menu or by clicking a column's name. The arrow beside it turns the order round.
+- **Search** finds every word you type in the artist, title, difficulty, tags or mapper. Mapper is
+  osu!'s own record of who mapped the difficulty, so guest difficulties are found by the guest.
+- **Filters**: scores that don't count toward pp as well, mods (a play needs all of those picked),
+  grade, client, stars and the dates played.
+- **Playcount** is every attempt on that beatmap, as Most Played counts it.
+- It shows osu!'s rows; the button beside them, by Export, switches to a **table**.
+- **Export** downloads the whole list as it stands, sorted and filtered, as CSV, Excel or JSON.
+- It shows 100 at a time. **show more** adds the next ones, **show all** the rest, and the menu
+  beside them changes how many at a time.
+
+The list remembers how you left it, per profile. Each filter in use shows as a chip you can x out,
+and **Reset** puts everything back but the table or rows choice and how many at a time.
+
 ### Pinning and removing scores
 
 Every score row has a **⋯** menu.

@@ -97,6 +97,7 @@ does not have to make it again.
 | 5.83 | neki                                                      | done   |
 | 5.84 | Track plays only from chosen names                        | done   |
 | 5.85 | neomod                                                    | done   |
+| 5.86 | Scores: every score, sorted, filtered and exported        | done   |
 
 ## Constraints on every item
 
@@ -1780,3 +1781,55 @@ less, which is neomod's, not this app's.
   `songs_folder`) and its own `maps`.
 - A saved filter that tracked every client tracks neomod too, once; one narrowed to some clients
   stays as it was.
+
+## 5.86 - Scores: every score, sorted, filtered and exported
+
+**Status:** done. Asked for by a mapper (Blue Dragon) when the app was new: more than the 100
+Best Performance shows, ideally all of it, the way a spreadsheet of his own maps' scores would.
+
+Best Performance and Recent Plays stay as osu! has them. Best Performance is the 100 scores pp is
+weighted from, and its weights and count would stop being true under a filter; Recent Plays is a
+timeline. So the list is a page of its own.
+
+### Decisions
+
+- **A page beside the profile, not a section of it.** osu-web's bar holds a user's other pages
+  (modding, playlists, multiplayer) as text tabs on its left (`header-nav-v4`): here
+  **player info | scores**. The Scores heading has **All scores** beside it. The Scores view replaces
+  the profile under the same bar; the mode tabs work as on the profile. `?view=scores` is in the
+  address, so a reload and the browser's Back keep it. A shared copy has only the profile.
+- **The default is Best Performance without its cap**: the best score on each beatmap, among
+  those that count toward this profile's pp (so its own choice of loved, unranked and the rest,
+  `CountsSql`), by pp. Exactly the same plays in the same order for the first 100 (tested).
+- **Playcount, not "not submitted".** Each beatmap's every attempt, scores included, as Most Played
+  counts it (`IncompleteSql`, so unsubmitted attempts as the profile counts them). Unfinished plays
+  are never rows: they have no accuracy, combo or pp to sort by.
+- **One mode at a time**, from the mode tabs.
+- **Show:** best per beatmap, or every play. **Sort:** pp, score, accuracy, combo, stars, misses,
+  playcount, date played, beatmap; from the menu or a column's head, each way. **Search:** every
+  word in the artist, title (both scripts), difficulty, set creator, tags, or the name of whoever
+  mapped the difficulty by osu!'s record (`online.db` `beatmap_owners`, so guest difficulties and
+  collabs), the same record the tracking filter's Mapper reads. **Filters:** scores that do not
+  count toward pp as well, mods (all of those picked; No mod), grade, client, stars, played dates.
+  The filters offer only what the mode's scores have. Filters apply before the best on each
+  beatmap is picked: "No mod" lists each map's best no-mod play, not its best play if that was.
+- **osu!'s rows by default, a table as the other layout**, the owner's choice once both were
+  built. The table: place, grade, beatmap, mods, accuracy, combo, stars, pp, playcount, played,
+  and the row's menu. A row opens its score card as on the profile, in either.
+- **Remembered per profile** (`scoreList`), as show more is. Each filter in force is a chip with
+  its own x; **Reset**, in red, appears whenever anything is off its default and puts it all
+  back, except the layout, which is how the list is looked at rather than what it lists.
+- **Export** writes the whole list as it stands, sorted and narrowed, not just the rows loaded:
+  CSV and Excel in Share & back up's scores columns with Playcount beside the pp, and JSON as the
+  same rows keyed by the English column names, so a script reading it works in any language.
+- **100 at a time, its own choice.** Under the list: show more, show all (asked for in pieces of
+  the server's 10,000 cap, for profiles with many thousands), and how many at a time (25 to 1000).
+  Not the profile's show more setting, whose default of 25 suits a section, not a list like this.
+  Kept with the view, and like the layout, Reset leaves it alone.
+
+### Where it lives
+
+`dotnet/App/Calc/ScoreList.cs` (the query, on the same definitions as Best Performance),
+`dotnet/App/Settings/ScoreListView.cs` (the saved view), `dotnet/App/Http/ScoreListApi.cs`
+(`/api/score-list` and `/api/score-list/export`), `web/js/score-list.js`; `ScoreListTests` and
+`test/score-list.test.ts`.
