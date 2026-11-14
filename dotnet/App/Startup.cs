@@ -191,7 +191,7 @@ internal static class Startup
         else
         {
             Console.WriteLine("  Plays set while this app is closed are not tracked.");
-            Console.WriteLine("  Options -> Import past plays brings them in if you want them,");
+            Console.WriteLine("  Options -> Import scores brings them in if you want them,");
             Console.WriteLine("  and Other settings can have every launch do it for you.");
         }
         if (tracker.FilterNarrowing)

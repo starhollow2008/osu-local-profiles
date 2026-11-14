@@ -125,9 +125,29 @@ internal static partial class Server
     /// </summary>
     private static async Task IdentityImport(HttpContext context, ServerOptions opts, long id, JsonElement body)
     {
+        // One at a time: a second, from another tab, would write the same scores alongside the first.
+        if (!opts.OsuImport.TryStart())
+        {
+            await Json(context, new { error = "an import from osu! is already running" }, 409);
+            return;
+        }
+        try
+        {
+            await ImportFromAccount(context, opts, id, body);
+        }
+        finally
+        {
+            opts.OsuImport.Finish();
+        }
+    }
+
+    private static async Task ImportFromAccount(HttpContext context, ServerOptions opts, long id, JsonElement body)
+    {
         var db = opts.Db;
         var fallbacks = opts.Config.SettingsFallbacks();
+        var progress = opts.OsuImport;
         var user = await opts.Osu.LookupUser(Str(body, "query"));
+        progress.Named(user.Username);
         bool Want(string key, bool fallback) => Js.Get(body, key) is { ValueKind: JsonValueKind.True or JsonValueKind.False } v ? v.ValueKind == JsonValueKind.True : fallback;
         var done = new List<string>();
         var failures = new List<string>();
@@ -194,7 +214,8 @@ internal static partial class Server
             try
             {
                 // Read a hundred a second at most, so a big list says how far it has got.
-                var sets = await opts.Osu.FetchFavouriteBeatmapsets(user.Id, read => opts.Events.Broadcast("osu-progress", new { step = "favourites", done = read }));
+                progress.Step("favourites");
+                var sets = await opts.Osu.FetchFavouriteBeatmapsets(user.Id, read => progress.Step("favourites", read));
                 favouritesFound = sets.Count;
                 favouritesAdded = Favorites.Import(db, FavoritesOf(opts, id), sets);
                 done.Add($"{favouritesFound} favourite beatmap{(favouritesFound == 1 ? "" : "s")}");
@@ -221,7 +242,7 @@ internal static partial class Server
         {
             foreach (var mode in new[] { 0, 1, 2, 3 })
             {
-                opts.Events.Broadcast("osu-progress", new { step = "scores", mode });
+                progress.Step("scores", mode, 4, mode);
                 try
                 {
                     var best = wantBest ? await opts.Osu.FetchBestPerformances(user.Id, mode) : [];
@@ -243,11 +264,14 @@ internal static partial class Server
             if (scores.Count > 0)
             {
                 // The replays osu! wrote for these plays, where this computer still has them, first.
+                // Both of these take a while with nothing new from osu!, so each is a step of its own.
+                progress.Step("replays");
                 var attached = await opts.Tracker!.AttachLocalReplays(id);
                 if (attached > 0) done.Add($"{Plural(attached, "replay")} from this computer");
                 // Then each priced here, built from what osu! handed over; a missing beatmap is downloaded now.
+                progress.Step("pricing");
                 var conversion = await ScoreEntry.ConvertImported(EntryDeps.Of(opts.Tracker, db, opts.Paths.DataDir, id, opts.Osu), id, download: true,
-                    onDownload: (doneCount, total) => opts.Events.Broadcast("osu-progress", new { step = "beatmaps", done = doneCount, total }));
+                    onScore: (doneCount, total) => progress.Step("pricing", doneCount, total));
                 if (conversion.Converted > 0) done.Add($"{conversion.Converted} priced here");
             }
         }

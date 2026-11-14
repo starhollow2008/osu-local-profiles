@@ -172,6 +172,15 @@ public class SettingsTests
     }
 
     [Fact]
+    public void The_medals_note_on_unknown_full_combos_is_shown_until_a_profile_closes_it()
+    {
+        using var h = new TempDb();
+        Assert.True(SettingsStore.Get(h.Db, h.ProfileId).ShowFcUnknownNote);
+        Assert.False(SettingsStore.Update(h.Db, h.ProfileId, Patch(("showFcUnknownNote", false))).ShowFcUnknownNote);
+        Assert.False(SettingsStore.Get(h.Db, h.ProfileId).ShowFcUnknownNote);
+    }
+
+    [Fact]
     public void A_new_profile_counts_every_unranked_mod_and_beatmap_status_by_default()
     {
         using var h = new TempDb();

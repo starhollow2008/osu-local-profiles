@@ -57,6 +57,9 @@ internal sealed class ServerOptions
     /// <summary>The live feed every open page listens to.</summary>
     public LiveFeed Events { get; init; } = new();
 
+    /// <summary>Profiles -> Import from osu!, while it runs.</summary>
+    public OsuImportProgress OsuImport { get; } = new();
+
     /// <summary>Where osu! is, and how to change the answer; null in a copy that cannot change its osu! folders.</summary>
     public Clients.OsuFolders? Folders { get; init; }
 
@@ -124,6 +127,8 @@ internal static partial class Server
         if (opts.Updater is { } updater) updater.Changed += (_, found) => opts.Events.Broadcast("update", StateApi.UpdateView(opts, found));
         // A build from the player's osu! source, or a switch: what Settings shows, as it happens.
         if (opts.PpSource is { } ppSource) ppSource.Changed += state => opts.Events.Broadcast("pp-source", state);
+        // An import from an osu! account: every open page shows how far it has got.
+        opts.OsuImport.Changed += state => opts.Events.Broadcast("osu-import", state);
         if (opts.Tracker is { } tracker)
         {
             opts.Events.Follow(tracker);

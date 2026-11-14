@@ -68,7 +68,7 @@
               <button id="optSettings" type="button" data-i18n="optSettings">Other settings</button>
               <div class="sep"></div>
               <div class="menu__heading" data-i18n="optionsMenu.tracking">Tracking</div>
-              <button id="optBackfill" type="button" data-i18n="optBackfill">Import past plays</button>
+              <button id="optBackfill" type="button" data-i18n="optBackfill">Import scores</button>
               <button id="optFilter" type="button" data-i18n="optFilter">Play tracking filter</button>
               <div class="sep"></div>
               <button id="optLazerScoring" class="menu__toggle" type="button" role="menuitemcheckbox"
@@ -148,6 +148,31 @@
         </span>
         <span class="bar index-notice__bar"><span class="bar__fill" id="importFill"></span></span>
       </button>
+      <!--
+        Profiles -> Import from osu!, once Profiles is closed: it keeps going, and this says how far
+        it has got. Clicking it opens the section again.
+      -->
+      <button type="button" class="index-notice index-notice--button" id="osuImportNotice" hidden>
+        <span class="index-notice__head">
+          <span class="index-notice__title u-ellipsis" id="osuImportTitle"></span>
+          <span class="index-notice__detail" id="osuImportDetail"></span>
+        </span>
+        <span class="bar index-notice__bar"><span class="bar__fill" id="osuImportFill"></span></span>
+      </button>
+      <!--
+        An update downloading, then downloaded: how far it has got, and Restart to update once it
+        is in. It stays after the update dialog is closed; clicking its text opens the dialog again.
+      -->
+      <div class="index-notice update-notice" id="updateNotice" role="status" aria-live="polite" hidden>
+        <button type="button" class="update-notice__open" id="updateNoticeOpen">
+          <span class="index-notice__head">
+            <span class="index-notice__title u-ellipsis" id="updateNoticeTitle"></span>
+            <span class="index-notice__detail" id="updateNoticeDetail"></span>
+          </span>
+          <span class="bar index-notice__bar" id="updateNoticeBar"><span class="bar__fill" id="updateNoticeFill"></span></span>
+        </button>
+        <button type="button" class="update-notice__restart" id="updateNoticeRestart" data-i18n="update.restart" hidden>Restart to update</button>
+      </div>
     </div>
   </div>
 
@@ -938,7 +963,7 @@
       <p class="setting__hint" id="importNote"></p>
       <!-- Here rather than beside the welcome: this section is the welcome's, moved in while it is open. -->
       <p class="setting__hint" data-i18n-html="importSection.localScoresHint">
-        To import scores from your osu! client, go to <b>Options → Import past plays</b>.
+        To import scores from your osu! client, go to <b>Options → Import scores</b>.
       </p>
       <p class="setting__hint" data-i18n-html="importSection.oneRequestToOsuPpy">
         One request to <code>osu.ppy.sh</code> to find the account, one per picture, one per
@@ -946,6 +971,15 @@
       </p>
 
       <div class="profile-hint" id="importHint">&nbsp;</div>
+      <!-- While an import runs. Closing Profiles leaves it running, and the cover shows it. -->
+      <div class="backfill-progress" id="importProgress" role="status" aria-live="polite" hidden>
+        <div class="backfill-progress__head">
+          <span id="importProgressText"></span>
+          <span class="backfill-progress__percent" id="importProgressPercent"></span>
+        </div>
+        <div class="bar backfill-progress__bar"><div class="bar__fill" id="importProgressFill"></div></div>
+        <div class="setting__hint" data-i18n="backfillModal.keepsRunning">You can close this, the import keeps going.</div>
+      </div>
       <div class="actions actions--inline">
         <button id="importGo" class="primary" type="button" data-i18n="importGo">Import</button>
       </div>
@@ -969,7 +1003,7 @@
 
 <div class="backdrop" id="backfillModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">
-    <h3 id="backfillTitle" data-i18n="backfillTitle">Import past plays</h3>
+    <h3 id="backfillTitle" data-i18n="backfillTitle">Import scores</h3>
     <p data-i18n="backfillModal.playsSetWhileThisApp">
       Import plays from osu! client, including from before this app was installed.
     </p>
@@ -1015,21 +1049,19 @@
       The play tracking filter applies to an import as well as to live tracking, which is
       usually what you want and occasionally not: a filter set for how you play now has no
       say over an evening you played last month. Ticked by default, so the two agree unless
-      you say otherwise, and the hint underneath names the filter or offers to set one.
+      you say otherwise. Which clients and player names an import takes is the filter's to say,
+      not this dialog's, so the way there is a callout of its own, hard to miss.
     -->
-    <label class="field">
-      <span data-i18n="backfillModal.onlyImportPlaysThatMatch">Only import plays that match my play tracking filter</span>
-      <input type="checkbox" id="backfillFiltered" checked>
-    </label>
-    <div class="setting__hint" id="backfillFilterHint"></div>
-
-    <!--
-      Where to look: every osu! install this app tracks, each ticked. A profile kept for one
-      client's playstyle can leave the others out. Shown only when there is a choice to make.
-    -->
-    <div class="field field--stacked" id="backfillInstallsField" hidden>
-      <span data-i18n="backfillModal.lookIn">Look in</span>
-      <div class="checkgroup" id="backfillInstalls"></div>
+    <div class="backfill-filter" id="backfillFilterCallout">
+      <div class="backfill-filter__head">
+        <span class="backfill-filter__text" data-i18n="backfillModal.filterWhere">Choose clients, player names and more in the play tracking filter.</span>
+        <button type="button" class="backfill-filter__open" id="backfillOpenFilter" data-i18n="backfillModal.openFilter">Play tracking filter</button>
+      </div>
+      <label class="field">
+        <span data-i18n="backfillModal.onlyImportPlaysThatMatch">Only import plays that match my play tracking filter</span>
+        <input type="checkbox" id="backfillFiltered" checked>
+      </label>
+      <div class="setting__hint" id="backfillFilterHint"></div>
     </div>
 
     <!--
@@ -1038,18 +1070,19 @@
       imported as soon as it arrives, through the same checks as a range, and the filter box
       above applies to them too. See dotnet/App/UploadedReplays.cs.
     -->
+    <!--
+      One column of buttons, each hint beside what it explains. No replay at all: a score's link
+      on osu!, or, as a last resort, typing it in.
+    -->
     <div class="backfill-files">
       <button type="button" id="backfillChooseFiles" data-i18n="backfillChooseFiles">Import replay files…</button>
       <input type="file" id="backfillFileInput" accept=".osr" multiple hidden>
       <span class="setting__hint" data-i18n="backfillModal.dropHint">
         You can drag multiple .osr replays into this window to import them.
       </span>
-    </div>
-    <!-- No replay at all: a score's link on osu!, or, as a last resort, typing it in. -->
-    <div class="backfill-files backfill-files--more">
       <button type="button" id="backfillScoreLink" data-i18n="backfillScoreLink">Import from a score link…</button>
+      <span class="setting__hint backfill-files__no-replay" data-i18n="backfillModal.noReplayHint">No replay? Use its link on osu.ppy.sh, or type it in as a last resort.</span>
       <button type="button" id="backfillManual" data-i18n="backfillManual">Enter a score by hand…</button>
-      <span class="setting__hint" data-i18n="backfillModal.noReplayHint">No replay? Use its link on osu.ppy.sh, or type it in as a last resort.</span>
     </div>
 
     <div class="backfill-summary" id="backfillSummary">
@@ -1078,7 +1111,7 @@
 </div>
 
 <!--
-  Import past plays -> Import from a score link. Checked first, so the page can show whose score
+  Import scores -> Import from a score link. Checked first, so the page can show whose score
   it is and what it is before anything is written; imported on a second press. The score is then
   priced here from its numbers like any other -- see dotnet/App/ScoreEntry.cs.
 -->
@@ -1104,7 +1137,7 @@
 </div>
 
 <!--
-  Import past plays -> Enter a score by hand. The last resort, for a play with no replay and no
+  Import scores -> Enter a score by hand. The last resort, for a play with no replay and no
   link. Every number is checked against the beatmap, the pp comes from osu!'s calculator and never
   from the form, and the score says "Manually entered by hand" everywhere it is shown.
 -->
@@ -1183,11 +1216,21 @@
       undone rather than leaving a half-installed app.
     </p>
     <p class="update-auto" id="updateAuto" data-i18n="updateModal.autoHint">To have new versions installed by themselves, turn on Options → Auto-update.</p>
+    <!-- While it downloads. Closing the dialog leaves it downloading, and the cover shows it. -->
+    <div class="backfill-progress" id="updateProgress" role="status" aria-live="polite" hidden>
+      <div class="backfill-progress__head">
+        <span id="updateProgressText"></span>
+        <span class="backfill-progress__percent" id="updateProgressPercent"></span>
+      </div>
+      <div class="bar backfill-progress__bar"><div class="bar__fill" id="updateProgressFill"></div></div>
+      <div class="setting__hint" data-i18n="update.keepsDownloading">You can close this, the download keeps going.</div>
+    </div>
     <div class="profile-hint" id="updateHint">&nbsp;</div>
     <div class="actions">
       <button id="updateCancel" type="button" data-i18n="updateCancel">Not now</button>
       <button id="updateLater" type="button" data-i18n="updateLater">When I quit</button>
-      <button id="updateConfirm" class="primary" type="button" data-i18n="updateConfirm">Update and restart</button>
+      <!-- Download, then Restart to update once it is in: two presses (renderUpdateProgress). -->
+      <button id="updateConfirm" class="primary" type="button">Download update</button>
     </div>
   </div>
 </div>

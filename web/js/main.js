@@ -53,7 +53,7 @@ import {
 } from './language-picker.js';
 import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './metadata.js';
 import { applyConfigFont, pageFont, setPageFont } from './font.js';
-import { bindOsuFolders, closeOsuFolders, installName, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
+import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { forgetAnnouncedMedals, renderMedals } from './medals.js';
@@ -251,8 +251,6 @@ let playsRefused = 0;
 let unsubmittedAttempts = 0;
 /** Which clients were found, so the page can say how the one being watched behaves. */
 let installKinds = [];
-/** The osu! installs the app tracks, as /api/state lists them: what an import can look in. */
-let installs = [];
 let sharing = { canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
@@ -584,6 +582,20 @@ function renderFavoritesNote(total) {
     </div>`;
 }
 
+/* The medals section's note on plays with no maximum combo: its X puts it away for this profile. */
+$('medalsNote').onclick = async (e) => {
+  if (!e.target.closest('[data-dismiss-note]')) return;
+
+  $('medalsNote').hidden = true;
+  settings = { ...settings, showFcUnknownNote: false };
+  try {
+    const d = await postJson('/api/settings', { showFcUnknownNote: false }, 'saving that failed');
+    settings = d.settings;
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
 $('favoritesNote').onclick = async (e) => {
   if (e.target.closest('[data-import-favorites]')) {
     openProfiles({ section: 'import', favoritesOnly: true });
@@ -682,7 +694,7 @@ async function loadProfile() {
     showMore('events', data.events.length, shown.events, totalFor('events', data.events), settings.showMoreAll);
 
   renderCountingNote(data.counting);
-  renderMedals(data.medals, mode);
+  renderMedals(data.medals, mode, { showNote: settings.showFcUnknownNote !== false });
 
   // Held for the menu's Move up / Move down and for drag reordering, both of which work in
   // terms of positions in this list.
@@ -784,7 +796,6 @@ async function loadState() {
 
   renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
-  installs = s.installs;
   renderStableNote();
   // osu!'s development client is a lazer of its own, and says which (roadmap 5.68).
   const kinds =
@@ -816,6 +827,7 @@ async function loadState() {
   setTracking(s.tracking);
   renderIndexing(s.indexing);
   renderImporting(s.importing);
+  renderOsuImport(s.osuImport);
   renderIdentity();
   // Never clobber what is being typed: a 15-second poll must not swallow a draft.
   if (!editingAbout) renderAbout();
@@ -970,6 +982,60 @@ function renderImporting(state) {
 
 $('importNotice').onclick = () => openBackfill();
 
+/*
+ * Profiles -> Import from osu! while it runs: a bar in its section, and in the cover's corner once
+ * the section is closed. The import is one request the server carries on with whatever the page
+ * does, and it sends how far it has got as `osu-import` (dotnet/App/Http/OsuImportProgress.cs).
+ * Each step has its own bar; one that cannot say how much there is sweeps.
+ */
+let osuImportState = null;
+
+const osuImportRunning = () => osuImportState?.active === true;
+
+function osuImportText(state) {
+  switch (state.step) {
+    case 'favourites': return t('progress.favourites', { n: fmt(state.done) });
+    case 'scores': return t('progress.scores', { mode: MODE_NAMES[state.mode] ?? '' });
+    case 'replays': return t('progress.replays');
+    case 'pricing': return t('progress.pricing', { done: fmt(state.done), total: fmt(state.total) });
+    default: return t('import.running');
+  }
+}
+
+/** Whether Import from osu! is on screen: in Profiles, or borrowed by the welcome. */
+const importSectionShowing = () => $('importSection').closest('.backdrop')?.hidden === false;
+
+function renderOsuImport(state) {
+  if (!state) return;
+  const wasRunning = osuImportRunning();
+  osuImportState = state;
+  const running = state.active;
+  const sweeping = !(state.total > 0);
+  const done = sweeping ? 0 : Math.min(1, state.done / state.total);
+  const percent = sweeping ? '' : `${Math.floor(done * 100)}%`;
+  const text = osuImportText(state);
+
+  $('importProgress').hidden = !running;
+  $('importProgress').classList.toggle('backfill-progress--scanning', running && sweeping);
+  $('importProgressText').textContent = text;
+  $('importProgressPercent').textContent = percent;
+  $('importProgressFill').style.setProperty('--fill', `${done * 100}%`);
+
+  $('osuImportNotice').hidden = !running || importSectionShowing();
+  $('osuImportNotice').classList.toggle('index-notice--counting', running && sweeping);
+  $('osuImportTitle').textContent = state.username
+    ? t('osuImport.title', { name: state.username })
+    : t('import.running');
+  $('osuImportDetail').textContent = percent;
+  $('osuImportFill').style.setProperty('--fill', `${done * 100}%`);
+  $('osuImportNotice').title = text;
+
+  // Import is held while one runs, from this tab or another.
+  if (running !== wasRunning) renderImportNote();
+}
+
+$('osuImportNotice').onclick = () => openProfiles({ section: 'import' });
+
 /* ---------------------------------------------------------- options menu */
 
 function setMenuOpen(open) {
@@ -1061,6 +1127,7 @@ function renderUpdate() {
   }
   $('optAutoUpdate').setAttribute('aria-checked', String(app.config?.autoUpdate === true));
   renderNudge();
+  renderUpdateNotice();
   if (!$('updateModal').hidden) renderUpdateProgress();
   openUpdateFromLink();
   showWhatsNew();
@@ -1120,22 +1187,57 @@ function updateLinks(releaseUrl, changelogUrl, version) {
   return links.join(' &middot; ');
 }
 
-/** Set while this page's Update and restart runs, so the live feed does not talk over it. */
+/** Set while this page's Restart to update runs, so the live feed does not talk over it. */
 let applyingHere = false;
 
+/** The newest release is downloaded, checked and waiting: Restart to update installs it. */
+const updateWaiting = (u) => u.ready != null && u.ready === u.latestVersion;
+
+/**
+ * How far a download has got, from the live feed (`receivedBytes` of `totalBytes`, dotnet/App/Update/
+ * Updater.cs): the line to show, the fraction done, and whether the bar sweeps for want of a size.
+ */
+function updateDownload(u) {
+  const total = u.totalBytes ?? 0;
+  const received = u.receivedBytes ?? 0;
+  if (!(total > 0)) return { text: t('update.downloading'), done: 0, sweeping: true };
+  const done = Math.min(1, received / total);
+  const mb = (n) => fmt(n / 1048576, 1);
+  return {
+    text: done >= 1 ? t('update.checking') : t('update.progress', { done: mb(received), total: mb(total) }),
+    done,
+    sweeping: false,
+  };
+}
+
 /*
- * The dialog's line under the notes, and its buttons: downloading, downloaded and waiting for
- * the quit, or why a download did not happen. From the live feed, so it follows a download
- * started in the background without anyone having to reopen anything.
+ * The dialog's bar, its line under the notes, and its buttons: Download, then Restart to update
+ * once the build is in, two presses (roadmap 5.66: installed only when asked). From the live
+ * feed, so it follows a download started anywhere without anyone having to reopen anything.
  */
 function renderUpdateProgress() {
   const u = app.update ?? {};
-  const waiting = u.ready != null && u.ready === u.latestVersion;
+  const waiting = updateWaiting(u);
+  const downloading = Boolean(u.preparing) || (Boolean(u.applying) && u.receivedBytes != null);
   $('updateLater').hidden = waiting && u.installOnQuit;
-  $('updateLater').disabled = Boolean(u.preparing);
+  $('updateLater').disabled = downloading || applyingHere;
+
+  const d = updateDownload(u);
+  $('updateProgress').hidden = !downloading;
+  $('updateProgress').classList.toggle('backfill-progress--scanning', downloading && d.sweeping);
+  $('updateProgressText').textContent = d.text;
+  $('updateProgressPercent').textContent = d.sweeping ? '' : `${Math.floor(d.done * 100)}%`;
+  $('updateProgressFill').style.setProperty('--fill', `${d.done * 100}%`);
+
   if (applyingHere) return;
+  $('updateConfirm').textContent = waiting
+    ? t('update.restart')
+    : downloading
+      ? t('update.downloading')
+      : t('update.download');
+  $('updateConfirm').disabled = downloading;
   let hintText = '';
-  if (u.preparing) hintText = t('update.preparing');
+  if (downloading) hintText = '';
   else if (waiting && u.installOnQuit) hintText = t('update.installsOnQuit', { version: u.ready });
   else if (waiting) hintText = t('update.downloaded', { version: u.ready });
   else if (u.prepareError) hintText = u.prepareError;
@@ -1143,6 +1245,34 @@ function renderUpdateProgress() {
   if (hintText) $('updateHint').textContent = hintText;
   else $('updateHint').innerHTML = '&nbsp;';
 }
+
+/*
+ * The same in the cover's corner, so it can be followed with the dialog closed: the download's
+ * bar while it runs, then Restart to update. Clicking its text opens the dialog again.
+ */
+function renderUpdateNotice() {
+  const u = app.update ?? {};
+  const waiting = updateWaiting(u);
+  const downloading = Boolean(u.preparing) || (Boolean(u.applying) && u.receivedBytes != null);
+  const offered = u.available && u.blocked == null;
+  $('updateNotice').hidden = !offered || !(downloading || waiting || applyingHere);
+  if ($('updateNotice').hidden) return;
+  const d = updateDownload(u);
+  const version = u.latestVersion ?? '';
+  $('updateNoticeTitle').textContent = downloading
+    ? t('update.noticeDownloading', { version })
+    : t('update.noticeReady', { version });
+  $('updateNoticeDetail').textContent = downloading && !d.sweeping ? `${Math.floor(d.done * 100)}%` : '';
+  $('updateNoticeBar').hidden = !downloading;
+  $('updateNotice').classList.toggle('index-notice--counting', downloading && d.sweeping);
+  $('updateNoticeFill').style.setProperty('--fill', `${d.done * 100}%`);
+  $('updateNoticeOpen').title = downloading ? d.text : '';
+  $('updateNoticeRestart').hidden = !waiting && !applyingHere;
+  $('updateNoticeRestart').disabled = applyingHere;
+  $('updateNoticeRestart').textContent = applyingHere ? t('update.restarting') : t('update.restart');
+}
+
+$('updateNoticeOpen').onclick = () => openUpdate();
 
 /* ----------------------------------------------------- the notice above */
 
@@ -1276,7 +1406,6 @@ function openUpdate() {
   $('updateNotes').innerHTML = updateLinks(u.releaseUrl, u.changelogUrl, u.latestVersion);
   $('updateAuto').hidden = app.config?.autoUpdate === true;
   $('updateHint').innerHTML = '&nbsp;';
-  $('updateConfirm').disabled = false;
   renderUpdateProgress();
   $('updateModal').hidden = false;
   $('updateCancel').focus();
@@ -1290,7 +1419,9 @@ $('updateLater').onclick = async () => {
   $('updateLater').disabled = true;
   try {
     await postJson('/api/update/later', {}, 'the download could not start');
-    $('updateHint').textContent = t('update.preparing');
+    // Shown at once; the live feed takes it from here.
+    app = { ...app, update: { ...app.update, preparing: true } };
+    renderUpdate();
   } catch (err) {
     $('updateHint').textContent = err.message;
     $('updateLater').disabled = false;
@@ -1306,24 +1437,50 @@ $('updateModal').onclick = (e) => {
 };
 
 /*
- * The app exits as part of succeeding here, so the request is expected to be the last one
- * this page ever makes: a dropped connection after a 200 is the update working, not failing.
+ * Download: fetch the build now and let it wait, checked, for Restart to update. Nothing is
+ * installed by this press, and not at a quit either unless Auto-update is on.
  */
-$('updateConfirm').onclick = async () => {
+async function downloadUpdate() {
+  $('updateConfirm').disabled = true;
+  try {
+    await postJson('/api/update/download', {}, 'the download could not start');
+    app = { ...app, update: { ...app.update, preparing: true, prepareError: null } };
+    renderUpdate();
+  } catch (err) {
+    $('updateHint').textContent = err.message;
+    $('updateConfirm').disabled = false;
+  }
+}
+
+/*
+ * Restart to update: install the build that is waiting and restart into it. The app exits as
+ * part of succeeding here, so the request is expected to be the last one this page ever makes:
+ * a dropped connection after a 200 is the update working, not failing. From the cover's notice
+ * the dialog is closed, so what happens is said as a toast.
+ */
+async function restartToUpdate() {
   applyingHere = true;
   $('updateConfirm').disabled = true;
+  $('updateConfirm').textContent = t('update.restarting');
   $('updateLater').disabled = true;
-  $('updateHint').textContent = t('update.downloading');
+  $('updateHint').innerHTML = '&nbsp;';
+  renderUpdateNotice();
   try {
     const d = await postJson('/api/update/apply', {}, 'the update failed');
-    $('updateHint').textContent = `${d.message} ${t('update.startYourself')}`;
+    const said = `${d.message} ${t('update.startYourself')}`;
+    $('updateHint').textContent = said;
+    if ($('updateModal').hidden) toast(said);
   } catch (err) {
     applyingHere = false;
     $('updateHint').textContent = err.message;
-    $('updateConfirm').disabled = false;
-    $('updateLater').disabled = false;
+    if ($('updateModal').hidden) toast(err.message);
+    renderUpdate();
+    renderUpdateProgress();
   }
-};
+}
+
+$('updateConfirm').onclick = () => (updateWaiting(app.update ?? {}) ? restartToUpdate() : downloadUpdate());
+$('updateNoticeRestart').onclick = () => restartToUpdate();
 
 /* ------------------------------------------------------------------- quit */
 
@@ -2166,7 +2323,7 @@ function renderImportNote() {
     notes.push(t('import.medals'));
   }
   $('importNote').textContent = notes.join(' ');
-  $('importGo').disabled = !Object.values(choices).some(Boolean);
+  $('importGo').disabled = osuImportRunning() || !Object.values(choices).some(Boolean);
 }
 
 const joinList = (items) =>
@@ -2263,14 +2420,14 @@ $('importGo').onclick = async () => {
   const choices = importChoices();
 
   $('importGo').disabled = true;
+  // The bar under it says how far it has got; this says how long to expect.
   const slow = choices.favorites || choices.bestPerformances || choices.pinnedScores;
-  importHint(
-    slow
-      ? t('import.slow')
-      : t('import.running'),
-  );
+  importHint(slow ? t('import.slow') : ' ');
+  renderOsuImport({ active: true, step: 'account', mode: null, done: 0, total: 0, username: importUser?.username ?? null });
   try {
     const d = await identityAction({ action: 'import', query, ...choices });
+    // Finished: the live feed says so too, but this answer can arrive first.
+    renderOsuImport({ ...osuImportState, active: false });
     settings = d.settings;
     // Medals copied from osu! arrive by the dozen, and they are not the moment of unlocking any.
     if (choices.medals) forgetAnnouncedMedals();
@@ -2291,6 +2448,8 @@ $('importGo').onclick = async () => {
     void loadSuggestions();
     importHint(`${what}.`);
   } catch (err) {
+    // Refused because one is already running elsewhere: that one's bar stays.
+    if (!/already running/.test(err.message)) renderOsuImport({ ...osuImportState, active: false });
     importHint(err.message, true);
   } finally {
     renderImportNote();
@@ -2358,6 +2517,7 @@ function closeWelcome() {
   $('welcomeModal').hidden = true;
   $('importHeading').hidden = false;
   $('sharedSection').before($('importSection'));
+  renderOsuImport(osuImportState);
   // Whatever the language row ended on is the answer, including when the answer was to
   // leave it alone: `language` has to stop being empty, or "never chosen" stays true.
   if (!knownLocale(app.config?.language)) void chooseLanguage($('welcomeLang').value);
@@ -3542,9 +3702,11 @@ function openProfiles({ section = null, favoritesOnly = false, banner = false } 
   profileHint(' ');
   renderProfiles();
   renderProfileEdit();
-  resetImport({ favoritesOnly });
+  // An import from osu! that is running is left as it is, with its bar showing.
+  if (!osuImportRunning()) resetImport({ favoritesOnly });
   $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
   $('profilesModal').hidden = false;
+  renderOsuImport(osuImportState);
   $('profilesModal').querySelector('.modal').scrollTop = 0;
   $('profilesClose').focus({ preventScroll: true });
   if (section) $(section === 'import' ? 'importSection' : 'profileEdit').scrollIntoView({ block: 'start' });
@@ -3558,7 +3720,11 @@ function openProfiles({ section = null, favoritesOnly = false, banner = false } 
 }
 
 
-const closeProfiles = () => { $('profilesModal').hidden = true; };
+/** Closing only hides it. An import from osu! that is running carries on, shown in the cover's corner. */
+const closeProfiles = () => {
+  $('profilesModal').hidden = true;
+  renderOsuImport(osuImportState);
+};
 
 $('optProfiles').onclick = () => openProfiles();
 $('profilesClose').onclick = closeProfiles;
@@ -3803,16 +3969,15 @@ let backfillFilesImporting = false;
 
 /**
  * The dialog's buttons. Import needs no preview: it is held only while something is running,
- * or when nothing could be imported (no install to look in, every kind unticked).
+ * or when nothing could be imported (every kind unticked).
  */
 function renderBackfillButtons() {
   const running = importRunning();
   const busy = running || backfillChecking || backfillFilesImporting;
-  const nowhere = backfillInstallRoots()?.length === 0;
   const ticked = tickedSources();
   const total = ticked === null ? null : ticked.reduce((sum, box) => sum + Number(box.dataset.count), 0);
-  $('backfillCheck').disabled = busy || nowhere;
-  $('backfillConfirm').disabled = busy || nowhere || total === 0;
+  $('backfillCheck').disabled = busy;
+  $('backfillConfirm').disabled = busy || total === 0;
   $('backfillChooseFiles').disabled = backfillFilesImporting;
   $('backfillConfirm').textContent = running
     ? t('backfill.importing')
@@ -3849,51 +4014,22 @@ $('backfillSources').onchange = renderBackfillButtons;
 /** Whether this import should be judged by the play tracking filter. */
 const backfillApplyFilter = () => $('backfillFiltered').checked;
 
-/**
- * Where this import looks: one ticked box per osu! install, all of them each time the dialog
- * opens. Only offered when there are two or more -- with one there is nothing to choose.
+/*
+ * Every osu! install is looked in. Which clients and player names an import takes is the play
+ * tracking filter's to say (its Clients and Player names), which the callout above the box opens.
  */
-function renderBackfillInstalls() {
-  $('backfillInstallsField').hidden = installs.length < 2;
-  $('backfillInstalls').innerHTML = installs
-    .map(
-      (i) =>
-        `<label class="checkgroup__item" title="${escapeHtml(i.root)}"><input type="checkbox" data-root="${escapeHtml(i.root)}" checked> ${escapeHtml(installName(i))}</label>`,
-    )
-    .join('');
-}
-
-/** The roots of the installs ticked, or null for every one when there was no choice to make. */
-function backfillInstallRoots() {
-  if ($('backfillInstallsField').hidden) return null;
-  return [...$('backfillInstalls').querySelectorAll('input[data-root]:checked')].map((box) => box.dataset.root);
-}
-
-$('backfillInstalls').onchange = () => {
-  const none = backfillInstallRoots()?.length === 0;
-  // Other folders hold other plays, so the counts are no longer the ones this would import.
-  resetBackfillPreview(none ? t('backfill.noInstalls') : t('backfill.installsChanged'));
-};
-
 
 /**
- * What ticking the box would actually do, said under it.
- *
- * Three states, because the box means something different in each: a filter that is set and
- * narrowing something, one that exists but lets everything through, and none at all. The last
- * is the one worth a prompt -- somebody who wants a filtered import has to be told where the
- * filter lives, since nothing on this dialog creates one.
+ * What ticking the box would actually do, said under it: a filter that is set and narrowing
+ * something, applied or not, or none at all, when the box changes nothing.
  */
 function renderBackfillFilterHint() {
   const hint = $('backfillFilterHint');
-  const on = backfillApplyFilter();
   if (!filterNarrowing) {
-    hint.innerHTML = t('backfill.noFilter');
+    hint.textContent = t('backfill.noFilterSet');
     return;
   }
-  hint.innerHTML = on
-    ? t('backfill.filterOn')
-    : t('backfill.filterOff');
+  hint.textContent = backfillApplyFilter() ? t('backfill.filterApplies') : t('backfill.filterOff');
 }
 
 $('backfillFiltered').onchange = () => {
@@ -3902,9 +4038,8 @@ $('backfillFiltered').onchange = () => {
   resetBackfillPreview(t('backfill.filterChanged'));
 };
 
-/* The prompt to the filter itself. One dialog at a time, so this closes on the way. */
-$('backfillFilterHint').onclick = (e) => {
-  if (!e.target.closest('#backfillOpenFilter')) return;
+/* The way to the filter itself. One dialog at a time, so this closes on the way. */
+$('backfillOpenFilter').onclick = () => {
   closeBackfill();
   $('optFilter').click();
 };
@@ -3934,7 +4069,6 @@ function openBackfill() {
   // decision to bypass the filter should be made for the import in front of you.
   $('backfillFiltered').checked = true;
   renderBackfillFilterHint();
-  renderBackfillInstalls();
   resetBackfillPreview(t('backfill.pickATime'));
   $('backfillModal').hidden = false;
   $('backfillCancel').focus();
@@ -4005,7 +4139,7 @@ $('backfillCheck').onclick = async () => {
   try {
     const d = await postJson(
       '/api/backfill/preview',
-      { since, until, applyFilter: backfillApplyFilter(), installs: backfillInstallRoots() },
+      { since, until, applyFilter: backfillApplyFilter() },
       'preview failed',
     );
 
@@ -4148,7 +4282,7 @@ $('backfillConfirm').onclick = async () => {
   try {
     await postJson(
       '/api/backfill',
-      { since, until, confirm: true, sources, applyFilter: backfillApplyFilter(), installs: backfillInstallRoots() },
+      { since, until, confirm: true, sources, applyFilter: backfillApplyFilter() },
       'import failed',
     );
     closeBackfill();
@@ -4869,6 +5003,7 @@ on('backfill', (e) => {
 });
 // How far an import of past plays has got, from this page or any other.
 on('importing', (e) => renderImporting(JSON.parse(e.data)));
+on('osu-import', (e) => renderOsuImport(JSON.parse(e.data)));
 /*
  * The same, for the import a launch runs by itself when the profile asks it to. Announced,
  * unlike the one above: nobody pressed a button for this one, so scores appearing without a
@@ -4921,23 +5056,15 @@ on('scores', () => {
   loadState();
 });
 /*
- * How far a long exchange with osu! has got: an import from it, or the beatmaps Recalculate
- * every score downloads. osu! is asked once a second at most (dotnet/App/Clients/OsuWeb.cs), so
- * a big one takes minutes. Said in the import's own hint while that runs, otherwise as a toast
- * every few seconds.
+ * The beatmaps Recalculate every score downloads. osu! is asked once a second at most
+ * (dotnet/App/Clients/OsuWeb.cs), so a big one takes minutes: a toast every few seconds. An
+ * import from osu! has its own progress, `osu-import`.
  */
 let osuProgressToastAt = 0;
 on('osu-progress', (e) => {
   const p = JSON.parse(e.data);
-  let text;
-  if (p.step === 'favourites') text = t('progress.favourites', { n: fmt(p.done) });
-  else if (p.step === 'scores') text = t('progress.scores', { mode: MODE_NAMES[p.mode] ?? '' });
-  else if (p.step === 'beatmaps') text = t('progress.beatmaps', { done: fmt(p.done), total: fmt(p.total) });
-  else return;
-  if ($('importGo').disabled) {
-    importHint(text);
-    return;
-  }
+  if (p.step !== 'beatmaps') return;
+  const text = t('progress.beatmaps', { done: fmt(p.done), total: fmt(p.total) });
   const now = Date.now();
   if (now - osuProgressToastAt < 5000 && p.done !== p.total) return;
   osuProgressToastAt = now;

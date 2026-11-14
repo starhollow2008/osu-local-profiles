@@ -2439,6 +2439,10 @@
   background-color: hsl(var(--hsl-b5));
   color: hsl(var(--hsl-l1));
   font-size: var(--fs-normal-2);
+  /* The counting note's shape: the sentence, then its X. */
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 /* ======================================================================== */
@@ -3699,18 +3703,31 @@
 }
 
 /* Import replay files: the button, and the sentence that says dropping works too. */
+/*
+ * The other ways in, one button under another, each as wide as the widest, with its hint
+ * beside it. The no-replay hint speaks for both of the last two.
+ */
 .backfill-files {
-  display: flex;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid hsl(var(--hsl-b3));
 }
 
+.backfill-files__no-replay {
+  grid-row: span 2;
+}
+
+.backfill-files > button {
+  grid-column: 1;
+}
+
 .backfill-files button {
-  flex: none;
   padding: 6px 12px;
+  text-align: start;
   border-radius: var(--radius-base);
   background-color: hsl(var(--hsl-b3));
   color: hsl(var(--hsl-c1));
@@ -3724,12 +3741,54 @@
   margin: 0;
 }
 
-/* The second row: a score's link, or typing one in. */
-.backfill-files--more {
-  margin-top: 8px;
-  padding-top: 0;
-  border-top: 0;
+/*
+ * Where the play tracking filter is, said so it is seen: which clients and names an import
+ * takes is set there, not in this dialog.
+ */
+.backfill-filter {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid hsl(var(--hsl-h1));
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+}
+
+.backfill-filter__head {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.backfill-filter__text {
+  color: hsl(var(--hsl-c1));
+  font-size: var(--fs-normal);
+  font-weight: 600;
+}
+
+.backfill-filter__open {
+  flex: none;
+  padding: 6px 14px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font-weight: 600;
+}
+
+.backfill-filter__open:hover,
+.backfill-filter__open:focus-visible {
+  background-color: hsl(var(--hsl-p));
+}
+
+.backfill-filter .field {
+  margin: 0;
+}
+
+.backfill-filter .setting__hint {
+  margin: 0;
 }
 
 /* Something a score-link check says to be careful of: not yours, or already here. */
@@ -5530,6 +5589,55 @@ body:has(#audioPlayer[data-audio-visible="1"]) .toast {
     width: 100%;
     opacity: 0.35;
   }
+}
+
+/*
+ * An update downloading, then waiting: its text opens the update dialog, and once it is in,
+ * Restart to update sits under it.
+ */
+.update-notice__open {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  margin: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.update-notice__open .bar__fill {
+  display: block;
+}
+
+.update-notice:hover,
+.update-notice:focus-within {
+  background-color: hsla(var(--hsl-b6), 0.9);
+}
+
+.update-notice__restart {
+  margin-top: 2px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-h2));
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.update-notice__restart:hover:not(:disabled),
+.update-notice__restart:focus-visible {
+  background-color: hsl(var(--hsl-p));
+}
+
+.update-notice__restart:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* The pp breakdown under a score's judgements, and the osu! release it came from. */

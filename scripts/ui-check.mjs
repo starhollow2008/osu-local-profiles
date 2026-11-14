@@ -234,7 +234,7 @@ await evaluate(
 );
 check('Escape closes it', await shown('resetModal'), 'none');
 
-console.log('\nimport past plays dialog');
+console.log('\nimport scores dialog');
 check('import dialog is hidden on load', await shown('backfillModal'), 'none');
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optBackfill').click()");
@@ -281,17 +281,30 @@ const filterHint = await evaluate(`fetch('/api/state').then((r) => r.json()).the
   JSON.stringify({
     narrowing: Boolean(s.filterNarrowing),
     text: document.getElementById('backfillFilterHint').textContent.trim(),
-    prompt: document.getElementById('backfillOpenFilter') !== null,
   }))`);
 const hint = JSON.parse(filterHint);
 check('the hint under it says something', hint.text.length > 0, true);
-// Only meaningful on a profile with no filter -- one that has a filter gets "Change the
-// filter" instead, which the next check covers by the hint's wording.
-check(
-  'with no filter set, it offers the menu that makes one',
-  hint.narrowing ? SKIP : hint.prompt,
-  true,
-);
+/*
+ * Which clients and player names an import takes is the filter's to say, so the way there is a
+ * callout of its own, set off from the hints around it, with a button rather than a link.
+ */
+const callout = JSON.parse(await evaluate(`(() => {
+  const box = document.getElementById('backfillFilterCallout');
+  const button = document.getElementById('backfillOpenFilter');
+  const style = getComputedStyle(box);
+  return JSON.stringify({
+    shown: style.display !== 'none',
+    accent: style.borderLeftWidth,
+    button: button !== null && button.tagName === 'BUTTON' && getComputedStyle(button).display !== 'none',
+    holdsTheBox: box.contains(document.getElementById('backfillFiltered')),
+    installList: document.getElementById('backfillInstallsField') !== null,
+  });
+})()`));
+check('the filter callout is on screen', callout.shown, true);
+check('and set off with an accent', callout.accent, '3px');
+check('with a button to the play tracking filter', callout.button, true);
+check('the filter box sits inside it', callout.holdsTheBox, true);
+check('the dialog has no list of osu! installs of its own', callout.installList, false);
 // Unticking has to change what the hint promises, and retire a preview taken under the other
 // answer -- the counts it produced are no longer the ones an import would bring in.
 await evaluate(`(() => {
@@ -312,7 +325,7 @@ check(
   'with no filter, it says so however the box is set',
   hint.narrowing
     ? SKIP
-    : await evaluate("document.getElementById('backfillFilterHint').textContent.includes('No play tracking filter')"),
+    : await evaluate("document.getElementById('backfillFilterHint').textContent.includes('No filter is set')"),
   true,
 );
 check(
@@ -483,33 +496,17 @@ await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optBackfill').click()");
 
 /*
- * Look in: one ticked box per osu! install, offered only when there are two or more to choose
- * between, and Check refused while none is ticked -- an import that looks nowhere finds nothing.
+ * The other ways in: Import replay files, Import from a score link and Enter a score by hand,
+ * one under another in a column, each as wide as the widest.
  */
-const installCount = await evaluate("(async () => (await (await fetch('/api/state')).json()).installs.length)()");
-const withChoice = (value) => (installCount < 2 ? SKIP : value);
-check('Look in is offered only with a choice to make', await shown('backfillInstallsField'), installCount < 2 ? 'none' : 'flex');
-check(
-  'every install is listed, ticked',
-  withChoice(await evaluate("[...document.querySelectorAll('#backfillInstalls input')].map((b) => b.checked).join()")),
-  Array(installCount).fill('true').join(),
-);
-// Only with a choice on screen: with one install or none there are no boxes to untick.
-if (installCount >= 2) {
-  await evaluate(`(() => {
-    for (const box of document.querySelectorAll('#backfillInstalls input')) box.checked = false;
-    document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
-}
-check('Check is refused with nowhere to look', withChoice(await evaluate("document.getElementById('backfillCheck').disabled")), true);
-check('and so is Import', withChoice(await evaluate("document.getElementById('backfillConfirm').disabled")), true);
-if (installCount >= 2) {
-  await evaluate(`(() => {
-    document.querySelector('#backfillInstalls input').checked = true;
-    document.getElementById('backfillInstalls').dispatchEvent(new Event('change', { bubbles: true }));
-  })()`);
-}
-check('and allowed again once one is ticked', await evaluate("document.getElementById('backfillCheck').disabled"), false);
+const ways = JSON.parse(await evaluate(`JSON.stringify(['backfillChooseFiles', 'backfillScoreLink', 'backfillManual'].map((id) => {
+  const r = document.getElementById(id).getBoundingClientRect();
+  return [Math.round(r.left), Math.round(r.top), Math.round(r.width)];
+}))`));
+check('the three import buttons share a left edge', new Set(ways.map((w) => w[0])).size, 1);
+check('and stack top to bottom', ways[0][1] < ways[1][1] && ways[1][1] < ways[2][1], true);
+check('each as wide as the widest', new Set(ways.map((w) => w[2])).size, 1);
+check('Check is offered with every install looked in', await evaluate("document.getElementById('backfillCheck').disabled"), false);
 check('Import too', await evaluate("document.getElementById('backfillConfirm').disabled"), false);
 
 await evaluate(
@@ -2748,6 +2745,48 @@ check(
   u.blocked === null ? 'packaged' : 'blocked',
   // This script normally runs against the dev tree, where updating would overwrite the repo.
   u.currentVersion === null || u.blocked !== null ? 'blocked' : 'packaged',
+);
+// The cover's corner shows a download, or Restart to update once it is in, and nothing else.
+check(
+  'the update notice shows only while one downloads or waits',
+  await shown('updateNotice'),
+  u.available === true && u.blocked === null && (u.preparing || (u.ready != null && u.ready === u.latestVersion)) ? 'grid' : 'none',
+);
+check(
+  'the dialog downloads first and restarts second',
+  await evaluate(`(() => {
+    document.getElementById('updateBtn').hidden || document.getElementById('updateBtn').click();
+    const label = document.getElementById('updateConfirm').textContent;
+    document.getElementById('updateCancel').click();
+    return label;
+  })()`),
+  u.available === true && u.blocked === null
+    ? u.ready != null && u.ready === u.latestVersion ? 'Restart to update' : u.preparing ? 'Downloading...' : 'Download update'
+    : 'Download update',
+);
+
+console.log('\nan import from osu!');
+check(
+  'its corner notice and bar show only while one runs',
+  await evaluate(`(async () => {
+    const s = (await (await fetch('/api/state')).json()).osuImport;
+    if (s.active) return 'skipped';
+    return [getComputedStyle(document.getElementById('importProgress')).display,
+      getComputedStyle(document.getElementById('osuImportNotice')).display].join();
+  })()`),
+  'none,none',
+);
+
+console.log('\nthe medals note');
+// Checked without clicking, which would write a setting into the profile this runs against.
+check(
+  'a shown note on unknown full combos has its X',
+  await evaluate(`(() => {
+    const note = document.getElementById('medalsNote');
+    if (note.hidden) return 'skipped';
+    return note.querySelectorAll('[data-dismiss-note]').length === 1 && getComputedStyle(note).display === 'flex';
+  })()`),
+  true,
 );
 
 console.log('\nthe page says what it is');

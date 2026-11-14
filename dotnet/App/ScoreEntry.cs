@@ -240,8 +240,10 @@ internal static partial class ScoreEntry
     /// Put a profile's imported best performances on built replays, priced here, each taking its row's
     /// place. A beatmap not installed is downloaded only when <paramref name="download"/> is set (an
     /// import, or Recalculate every score); otherwise that play waits for the next chance.
+    /// <paramref name="onScore"/> hears each play done, of how many, priced or not.
     /// </summary>
-    public static async Task<Conversion> ConvertImported(EntryDeps deps, long profileId, bool download, Action<int, int>? onDownload = null)
+    public static async Task<Conversion> ConvertImported(EntryDeps deps, long profileId, bool download, Action<int, int>? onDownload = null,
+        Action<int, int>? onScore = null)
     {
         var rows = deps.Db.Rows("""
             SELECT id, mode, beatmap_md5, beatmap_id, client, mods_json, statistics_json, max_statistics_json,
@@ -259,6 +261,7 @@ internal static partial class ScoreEntry
         // Written under the account the scores came from, which is whose they are.
         var player = new LinkedPlayer(null, SettingsStore.Get(deps.Db, profileId).LinkedUsername);
         int converted = 0, left = 0;
+        onScore?.Invoke(0, rows.Count);
         foreach (var row in rows)
         {
             var md5 = row.Str("beatmap_md5")!;
@@ -290,6 +293,7 @@ internal static partial class ScoreEntry
             {
                 left++;
             }
+            onScore?.Invoke(converted + left, rows.Count);
         }
         return new Conversion(converted, left);
     }

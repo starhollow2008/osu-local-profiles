@@ -88,7 +88,7 @@ function medalCard(medal) {
     </div>`;
 }
 
-export function renderMedals(summary, mode) {
+export function renderMedals(summary, mode, { showNote = true } = {}) {
   if (!summary) return;
 
   medalsBySlug = new Map(summary.medals.map((m) => [m.slug, m]));
@@ -97,23 +97,30 @@ export function renderMedals(summary, mode) {
   /*
    * An FC cannot be told from a near-miss without the beatmap's own maximum combo, which
    * older scores were never given. Say so rather than quietly under-awarding, and point at
-   * the fix.
+   * the fix. Its X puts it away for this profile (`showFcUnknownNote`, web/js/main.js).
    */
   const note = $('medalsNote');
-  if (summary.fcUnknown > 0) {
+  if (summary.fcUnknown > 0 && showNote) {
     note.hidden = false;
     // One play or several: two whole sentences rather than one with a plural suffix glued
     // on, because "1 play was" and "2 plays were" differ in more than an "s" in most
     // languages, and in ways a suffix cannot express.
     const count = { n: fmt(summary.fcUnknown) };
-    note.textContent = plural(
+    const text = plural(
       summary.fcUnknown,
       () => t('medals.fcUnknownOne', count),
       () => tOwn('medals.fcUnknownFew', count),
       () => t('medals.fcUnknownMany', count),
     );
+    note.innerHTML = `<div class="counting-note__text">${escapeHtml(text)}</div>
+      <div class="counting-note__actions">
+        <button type="button" class="counting-note__close" data-dismiss-note
+                aria-label="${escapeHtml(t('common.dontShowThisAgain'))}"
+                title="${escapeHtml(t('common.dontShowThisAgain'))}">&times;</button>
+      </div>`;
   } else {
     note.hidden = true;
+    note.innerHTML = '';
   }
 
   const groups = MEDAL_GROUPS.map(([grouping, families]) => {

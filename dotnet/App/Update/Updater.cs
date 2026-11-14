@@ -14,7 +14,7 @@ internal sealed record Release(string Version, string ReleaseUrl, List<ReleaseAs
 internal sealed record UpdateState(
     string? CurrentVersion, string? LatestVersion, bool Available, string? ReleaseUrl, string? Blocked, string? Error, string? CheckedAt,
     bool Applying, List<VersionNotes> Notes, string ChangelogUrl, string? Nudge, string? Ready, bool InstallOnQuit, bool Preparing,
-    string? PrepareError, double? DownloadedBytes, bool? Metered, bool AutoUpdate);
+    string? PrepareError, double? DownloadedBytes, bool? Metered, bool AutoUpdate, double? ReceivedBytes = null, double? TotalBytes = null);
 
 /// <summary>A staged build handed to its swapper, and what this process exits with so the swap can begin.</summary>
 internal sealed record ApplyResult(string Version, string StagedDir, int ExitCode);
@@ -53,6 +53,8 @@ internal sealed partial class Updater
     private bool available, applying, installOnQuit, preparingNow;
     private bool? metered;
     private double? downloadedBytes;
+    // How far the download in progress has got, and of how much; null when none is running.
+    private double? receivedBytes, totalBytes;
     private List<VersionNotes> notes = [];
     private string changelogUrl = Notes.ChangelogUrl;
 
@@ -84,7 +86,7 @@ internal sealed partial class Updater
         lock (gate)
         {
             return new UpdateState(version(), latestVersion, available, releaseUrl, blocked, error, checkedAt, applying, [.. notes], changelogUrl,
-                nudge, ready, installOnQuit, preparingNow, prepareError, downloadedBytes, metered, autoUpdate());
+                nudge, ready, installOnQuit, preparingNow, prepareError, downloadedBytes, metered, autoUpdate(), receivedBytes, totalBytes);
         }
     }
 
@@ -383,18 +385,58 @@ internal sealed partial class Updater
 
     /* ---------------------------------------------------------------- downloads */
 
-    /// <summary>One file from a release, whole, in memory, its size checked before anything is unpacked.</summary>
+    /// <summary>How often the page hears how far a download has got.</summary>
+    private const double ProgressEveryMs = 250;
+
+    /// <summary>
+    /// One file from a release, whole, in memory, its size checked before anything is unpacked. How
+    /// much has arrived is in the state while it runs, and the page hears it a few times a second.
+    /// </summary>
     private async Task<byte[]> Download(string url, double size, TimeSpan timeout)
     {
         using var cancel = new CancellationTokenSource(timeout);
         var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.TryAddWithoutValidation("user-agent", "osu-local-profiles");
-        var response = await http.SendAsync(request, cancel.Token);
+        var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancel.Token);
         if ((int)response.StatusCode is < 200 or > 299)
         {
             throw new InvalidOperationException($"downloading {Path.GetFileName(new Uri(url).AbsolutePath)} failed ({(int)response.StatusCode})");
         }
-        var bytes = await response.Content.ReadAsByteArrayAsync(cancel.Token);
+        double? total = size > 0 ? size : response.Content.Headers.ContentLength;
+        var announcedAt = 0.0;
+        void Received(double n, bool force)
+        {
+            lock (gate)
+            {
+                receivedBytes = n;
+                totalBytes = total;
+            }
+            var now = Js.Now();
+            if (!force && now - announcedAt < ProgressEveryMs) return;
+            announcedAt = now;
+            Announce();
+        }
+        byte[] bytes;
+        try
+        {
+            Received(0, true);
+            using var body = await response.Content.ReadAsStreamAsync(cancel.Token);
+            using var memory = total is > 0 and < int.MaxValue ? new MemoryStream((int)total.Value) : new MemoryStream();
+            var buffer = new byte[81920];
+            int read;
+            while ((read = await body.ReadAsync(buffer, cancel.Token)) > 0)
+            {
+                memory.Write(buffer, 0, read);
+                Received(memory.Length, false);
+            }
+            Received(memory.Length, true);
+            bytes = memory.ToArray();
+        }
+        catch
+        {
+            lock (gate) receivedBytes = totalBytes = null;
+            throw;
+        }
         if (size > 0 && bytes.Length != size) throw new InvalidOperationException($"the download was {bytes.Length} bytes, expected {Js.NumberToString(size)}");
         return bytes;
     }
@@ -427,8 +469,19 @@ internal sealed partial class Updater
 
     /* ---------------------------------------------------- a build waiting to install */
 
-    /// <summary>A downloaded build: which, why (Auto-update or "When I quit"), and installs started from it.</summary>
+    /// <summary>
+    /// A downloaded build: which, why, and installs started from it. <c>auto</c> is Auto-update,
+    /// <c>user</c> "When I quit", and <c>now</c> the dialog's Download, which waits for Restart to update
+    /// and installs at a quit only as Auto-update would.
+    /// </summary>
     private sealed record ReadyRecord(string Version, string Requested, double Attempts);
+
+    /// <summary>Which of two reasons for a download wins: "When I quit", then Download, then Auto-update.</summary>
+    internal static string Outranking(string a, string? b)
+    {
+        static int Rank(string? r) => r switch { "user" => 2, "now" => 1, _ => 0 };
+        return Rank(b) > Rank(a) ? b! : a;
+    }
 
     private ReadyRecord? ReadReady()
     {
@@ -437,7 +490,7 @@ internal sealed partial class Updater
             using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataDir, "update", ReadyFile)));
             var r = doc.RootElement;
             if (!Js.IsString(Js.Get(r, "version"), out var v)) return null;
-            return new ReadyRecord(v, Js.IsString(Js.Get(r, "requested"), out var q) && q == "user" ? "user" : "auto",
+            return new ReadyRecord(v, Js.IsString(Js.Get(r, "requested"), out var q) && q is "user" or "now" ? q : "auto",
                 Js.Get(r, "attempts") is { ValueKind: JsonValueKind.Number } n ? Js.NumberOf(n) : 0);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
@@ -492,9 +545,9 @@ internal sealed partial class Updater
                 return running.ContinueWith(_ =>
                 {
                     var waiting = ReadReady();
-                    if (requested == "user" && waiting is not null && waiting.Requested != "user")
+                    if (waiting is not null && Outranking(waiting.Requested, requested) != waiting.Requested)
                     {
-                        WriteReady(waiting with { Requested = "user" });
+                        WriteReady(waiting with { Requested = requested });
                         RefreshReady();
                         Announce();
                     }
@@ -527,7 +580,7 @@ internal sealed partial class Updater
                 DropReady();
                 await Stage(release);
             }
-            WriteReady(new ReadyRecord(release.Version, requested == "user" || waiting?.Requested == "user" ? "user" : "auto", 0));
+            WriteReady(new ReadyRecord(release.Version, Outranking(requested, waiting?.Requested), 0));
             failedPrepare = null;
         }
         catch (Exception e) when (e is InvalidOperationException or IOException or HttpRequestException or TaskCanceledException or UnauthorizedAccessException)
@@ -545,6 +598,7 @@ internal sealed partial class Updater
             {
                 preparingNow = false;
                 preparing = null;
+                receivedBytes = totalBytes = null;
             }
             RefreshReady();
             Announce();
@@ -666,7 +720,11 @@ internal sealed partial class Updater
         }
         finally
         {
-            lock (gate) applying = false;
+            lock (gate)
+            {
+                applying = false;
+                receivedBytes = totalBytes = null;
+            }
             RefreshReady();
             Announce();
         }

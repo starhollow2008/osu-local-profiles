@@ -34,6 +34,11 @@ internal static partial class Server
                 if (updater is not null) _ = updater.PrepareUpdate("user").ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
                 await Json(context, new { ok = true });
                 return true;
+            // Download: fetch it now, then wait for Restart to update (apply), which installs what is waiting.
+            case "/api/update/download":
+                if (updater is not null) _ = updater.PrepareUpdate("now").ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                await Json(context, new { ok = true });
+                return true;
             // What changed, after an update: seen, so it is not shown again.
             case "/api/update/seen":
                 Notes.MarkSeen(opts.Db, opts.Paths.Version());

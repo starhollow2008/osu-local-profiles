@@ -94,7 +94,7 @@ Count plays osu! could not submit**; they're still recorded, so turning it back 
 The log can't say whether osu! would have counted an attempt (it ignores a play with no hits), so
 an attempt quit before hitting anything counts here.
 
-**Import past plays** can bring in attempts from before the app was running.
+**Import scores** can bring in attempts from before the app was running.
 
 ## osu!stable is different
 
@@ -137,7 +137,7 @@ in its own folder since neki 1.2.0. It's found wherever it was installed
   [unranked mods are counted](#include-pp-for-unranked-mods).
 - **Quits and fails count as Not submitted plays**, the same as osu!lazer's offline attempts. They
   follow **Count plays osu! could not submit**. A retry in the middle of a play may leave nothing.
-- **Import past plays** brings in neki's quits and fails as far back as neki still lists them.
+- **Import scores** brings in neki's quits and fails as far back as neki still lists them.
 
 ## neomod
 
@@ -219,7 +219,8 @@ one.
 ### Importing from an osu! profile
 
 Under *Import from osu!*: type a username, user id or profile link, press **Look up**, tick what to
-copy, and press **Import**.
+copy, and press **Import**. A bar shows how far it has got. You can close Profiles while it runs:
+the import keeps going, and its bar moves to the top right of the page.
 
 | What | Ticked to begin with |
 | ---- | -------------------- |
@@ -407,7 +408,7 @@ wide open. There are eleven:
 **A play the filter turns away isn't tracked**: no score, no pp, no play count. So the app tells you
 each time: a line in the log, a message naming the criterion, a count in the Options menu, and a mark
 on the menu entry while a filter is narrowing anything. It's also listed under [Plays not
-tracked](#plays-not-tracked). **Import past plays** applies the filter too, and can be told to
+tracked](#plays-not-tracked). **Import scores** applies the filter too, and can be told to
 ignore it for one import.
 
 ### Player names
@@ -490,7 +491,7 @@ count.
 
 **Options -> Other settings -> Plays not tracked** lists every play this profile turned away and
 why: declined by the filter (naming the criterion), set by another player, or a replay that couldn't
-be read. Each shows who set it and whether it was turned away while tracking, by Import past plays,
+be read. Each shows who set it and whether it was turned away while tracking, by Import scores,
 or by the import at launch. It's the first place to look when a play never appeared.
 
 **Track anyway** brings one play in regardless, as if you had just played it. It never adds a play
@@ -504,7 +505,7 @@ plays turned away under them are tracked (the filter still applies).
 
 ## Importing plays you set while it was closed
 
-Plays are only tracked while the app runs. **Options -> Import past plays** covers the rest: pick
+Plays are only tracked while the app runs. **Options -> Import scores** covers the rest: pick
 when you played, check what would be imported, then confirm.
 
 - **A preset** (1 hour up to 1 day) imports from that long ago up to now.
@@ -512,9 +513,8 @@ when you played, check what would be imported, then confirm.
   take a minute or two.
 - **From** and **To** pick your own range. Tick **Earliest** to start from the oldest play, and
   **Now** (ticked by default) to run up to the present.
-- **Look in**, when more than one osu! install was found, lets you untick installs this import
-  shouldn't read. osu!lazer keeps the stable plays it imported, so to leave those out use the
-  filter's **Client** instead.
+- Every osu! install is read. To leave a client out, untick it in the filter's **Client**; the
+  dialog's **Play tracking filter** button opens it.
 - The filter's [Player names](#player-names) decide whose plays it brings in, and it brings back
   plays turned away under a name ticked since.
 - It reads osu!lazer's logs as well as replays, so a past session comes back whole: finished plays,
@@ -540,7 +540,7 @@ The same dialog has three ways to add plays osu! no longer has a replay for:
 For all of these, and for best performances imported from your osu! account, pp is calculated here
 from the score's numbers exactly as osu! calculates it, and recalculated here after a pp rework with
 no internet needed. A beatmap you don't have is downloaded once and kept. If the real replay of one
-of these plays turns up (on your computer, from Import past plays, or a file you add), it takes that
+of these plays turns up (on your computer, from Import scores, or a file you add), it takes that
 score's place, keeping its pin.
 
 A score you typed in is marked **Manually entered by hand** on every row, card and shared page.
@@ -681,7 +681,7 @@ needs git and the .NET 10 SDK.
 - **Restore from backup** takes that zip (or a `.db` from before 1.22.0), says which profiles it holds,
   and asks before doing anything. The app restarts to swap it in. The profiles it replaces are moved
   to `data/before-restore-<date and time>/`. Plays set between the backup and now aren't imported;
-  use **Import past plays** for those.
+  use **Import scores** for those.
 - **The data folder** is shown with an **Open folder** button. With the app closed, copying the folder
   is a complete backup too. (While it runs, recent writes can sit in `profiles.db-wal`.) `config.json`
   in that folder holds this install's settings, which is why backups leave it out.
@@ -719,8 +719,10 @@ one:
 
 - **Update to 1.x.x** appears at the top of the page and the tray icon gets a dot. The dialog lists
   what each new version changes.
-- **Update and restart** installs it now. **When I quit** downloads it now and installs it when you
-  quit. The tray menu has both too.
+- **Download update** downloads it, with its progress in the dialog and in the top right of the
+  page, which stays after the dialog is closed. **Restart to update** then installs it. **When I
+  quit** downloads it now and installs it when you quit. The tray menu's **Update to 1.x.x and
+  restart** does both in one go.
 - After an update, the first start shows what it brought, once.
 - An update waiting two weeks, or one marked important, is also mentioned at the foot of the page.
 

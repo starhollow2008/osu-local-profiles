@@ -84,7 +84,7 @@ instead, and `visibleSql()` filters it from every query. A removed score leaves 
 level bar too.
 
 **Deleting a removed score for good keeps its key.** The row goes, but its `dedupe_key` is written
-to `deleted_scores` first, and ingest and Import past plays refuse any key listed there
+to `deleted_scores` first, and ingest and Import scores refuse any key listed there
 (`wasDeleted`). Never delete a score row any other way.
 
 **Every pp value carries its osu! release.** The helper reports the `ppy.osu.Game` version on its
@@ -195,7 +195,7 @@ name against `osu_files.name`, which is lazer's own `Artist - Title (Creator) [V
 from each `.osu`, unique matches only. On 20 real logs it matched 59 of 59 attempts, with no
 `online.db` needed.
 
-**Import past plays reads the logs too** (`dotnet/App/Tracker/Incomplete.cs`). Counted unfinished plays
+**Import scores reads the logs too** (`dotnet/App/Tracker/Incomplete.cs`). Counted unfinished plays
 and unsubmitted attempts are separate sources beside replays, and preview and import share
 `checkIncompletePlay`/`checkUnsubmittedAttempt`, so the preview's numbers are the import's.
 
@@ -339,7 +339,7 @@ All three live paths ingest against it (`handleReplay`, `handleLoggedPlays`,
 and on re-arms it. Each watcher also starts at "now" on its own, but that's two promises in two
 files that an unrelated change could weaken; the cutoff makes the promise once.
 
-Import past plays supplies its own `since` and is unaffected. `TrackerOptions.liveSince` exists
+Import scores supplies its own `since` and is unaffected. `TrackerOptions.liveSince` exists
 only for tests; nothing in the app passes it. The startup banner states the rule every launch.
 
 ### Catching up on the gap, when the profile asks
@@ -367,7 +367,7 @@ Decides whether a play is **written**. A declined play is never a row of `scores
 - A declined play is announced: a log line, an SSE `filtered` event, a toast naming the criterion,
   a count in `/api/state`, and a row in `declined_plays`.
 - Nine criteria, matched against the replay, the `.osu` and `online.db`. The same answer at live
-  ingest and in Import past plays, unless that import is told otherwise: its checkbox (ticked by
+  ingest and in Import scores, unless that import is told otherwise: its checkbox (ticked by
   default, re-ticked every time the dialog opens) can run one import against
   `defaultTrackingFilter()`, which permits everything. `applyFilter` is absent-means-true on the API.
   Preview and import get the same answer.
@@ -390,10 +390,10 @@ out, neki's and neomod's Guest, and lazer's.
   names on visible scores and on plays the filter turned away, the names added, and the names
   ticked. Another player's refused replays are left out.
 - **Names added are `Settings.ownNames`**, edited only here (they were "Your other names" in Other
-  settings and Import past plays). Their controls stay live with the filter off, since they decide
+  settings and Import scores). Their controls stay live with the filter off, since they decide
   ownership too. Names added and ticked join an owner already known (`Players.Resolve`).
 - **Nothing comes back by itself.** Saving names no longer re-judges declined plays
-  (`RetrackOwnNames` runs only for "It's me"); Import past plays judges every replay again, which
+  (`RetrackOwnNames` runs only for "It's me"); Import scores judges every replay again, which
   brings back plays under a name ticked since.
 - **lazer's unfinished plays have no name**, so the criterion never judges them. neki's carry
   `neki.recent.json`'s `profile` (`Recording.Player`), judged like a replay's.
@@ -432,7 +432,7 @@ definition.
 A toast reaches only a visible tab, the launcher hides the console, the count resets at launch, and
 an import declines hundreds of plays at once, so "why is my play missing?" had no answer a day
 later. `dotnet/App/Tracker/Declined.cs` keeps what the app announces: plays the filter declined, replays
-another player set, and replays that couldn't be read, from live tracking, Import past plays and the
+another player set, and replays that couldn't be read, from live tracking, Import scores and the
 launch catch-up (`source`). Skips that are the app working as meant (duplicate, deleted for good,
 before the cutoff) aren't kept.
 
@@ -739,7 +739,7 @@ AP+RX. Fails, quits and retries leave nothing, so they can't be counted.
   (`mcosu:<md5>:<ms>`), import and recalculation. It survives deletion in McOsu. **Never offered for
   download** (`has_replay`, `replayAvailable`, `replayDownload`).
 - **Live:** `McosuWatcher` watches the McOsu folder (through `watchablePath`), remembers what was
-  there at start, and builds a replay for each new entry. Import past plays builds the range first
+  there at start, and builds a replay for each new entry. Import scores builds the range first
   (`buildMcosuReplays`). McOsu's copies of stable scores (`isImportedLegacyScore`) are never built.
 - **Mods are what osu! would write** (`mcosuMods`): speed from what was played, not the bits (the
   speed slider sets none); overrides as Difficulty Adjust after EZ/HR, since osu! applies mods in

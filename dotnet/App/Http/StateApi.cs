@@ -152,6 +152,8 @@ internal static class StateApi
             filterNarrowing = TrackingFilter.Narrows(settings.TrackingFilter),
             indexing = tracker?.IndexState ?? new Tracker.IndexState(false, false, "indexing", 0, 0, 0, false, 0, null),
             importing = tracker?.ImportState ?? new Tracker.ImportState(false, "scanning", 0, 0, 0, 0, "import"),
+            // Profiles -> Import from osu!, while it runs, so a page opened meanwhile shows it too.
+            osuImport = opts.OsuImport.State,
             /*
              * Which osu! release prices scores, and how many of this profile's a different one priced:
              * after an update that brings a pp rework, the ones Settings offers to recalculate.

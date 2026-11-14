@@ -4,7 +4,20 @@
 
 - **neki 1.2.0's plays are tracked again.** neki now saves its replays in its own folder, so its
   passes stopped showing up while its quits and fails still did. Plays set since updating neki
-  come in with Import past plays.
+  come in with Import scores.
+
+- **Importing from an osu! profile shows its progress, and no longer looks stuck.** After reading
+  osu!mania scores it went quiet while it priced every score, which can take minutes. A bar now
+  shows each step, and the import keeps going in the top right of the page when Profiles is closed.
+
+- **Updates show their download progress.** **Download update** downloads it, with a bar in the
+  dialog and in the top right of the page, and **Restart to update** installs it once it's in.
+
+- **Import past plays is now Import scores.** Which clients and player names it brings in is set in
+  the play tracking filter, which a button in the dialog opens, so its own list of osu! installs is
+  gone. Enter a score by hand sits under the other two buttons.
+
+- **The medals section's note on plays with no maximum combo can be closed.**
 
 ## 1.34.1
 

@@ -27,6 +27,8 @@ internal sealed class ProfileSettings
     public bool ShowMoreAll { get; set; }
     public bool ShowFavoritesHint { get; set; } = true;
     public bool ShowStableNote { get; set; } = true;
+    /// <summary>The medals section's note on plays from before maximum combos were recorded, until closed.</summary>
+    public bool ShowFcUnknownNote { get; set; } = true;
     public string Scoring { get; set; } = "lazer";
     public TrackingFilter TrackingFilter { get; set; } = TrackingFilter.Default();
     public List<string> SectionOrder { get; set; } = [];
@@ -156,6 +158,7 @@ internal static partial class SettingsStore
         new("showMoreAll", (s, raw) => s.ShowMoreAll = Js.IsTrue(raw), s => s.ShowMoreAll),
         new("showFavoritesHint", (s, raw) => s.ShowFavoritesHint = Js.NotFalse(raw), s => s.ShowFavoritesHint),
         new("showStableNote", (s, raw) => s.ShowStableNote = Js.NotFalse(raw), s => s.ShowStableNote),
+        new("showFcUnknownNote", (s, raw) => s.ShowFcUnknownNote = Js.NotFalse(raw), s => s.ShowFcUnknownNote),
         new("scoring", (s, raw) => s.Scoring = Js.IsString(raw, out var v) && v == "classic" ? "classic" : "lazer", s => s.Scoring),
         new("trackingFilter", (s, raw) => s.TrackingFilter = TrackingFilter.Coerce(raw), s => s.TrackingFilter),
         new("sectionOrder", (s, raw) => s.SectionOrder = SectionIds(raw), s => s.SectionOrder),

@@ -117,7 +117,11 @@ public sealed class OnlineImportTests : IDisposable
         // No calculator: nothing can be priced, so nothing moves.
         Assert.Equal(new Conversion(0, 1), await ScoreEntry.ConvertImported(deps, h.ProfileId, download: true));
         // A calculator, but the beatmap is not here and a launch never goes online.
-        Assert.Equal(new Conversion(0, 1), await ScoreEntry.ConvertImported(deps with { CanPrice = true }, h.ProfileId, download: false));
+        // Each play is said as it is done, priced or not, so an import's bar moves through all of them.
+        var heard = new List<(int, int)>();
+        Assert.Equal(new Conversion(0, 1), await ScoreEntry.ConvertImported(deps with { CanPrice = true }, h.ProfileId, download: false,
+            onScore: (done, total) => heard.Add((done, total))));
+        Assert.Equal([(0, 1), (1, 1)], heard);
         Assert.Equal(1L, h.Db.Scalar("SELECT COUNT(*) FROM scores WHERE imported_at IS NOT NULL"));
     }
 

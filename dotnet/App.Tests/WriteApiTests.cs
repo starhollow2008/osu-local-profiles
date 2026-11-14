@@ -535,6 +535,31 @@ public sealed class WriteApiTests : IAsyncLifetime
         Assert.Equal("that file is not an osu! replay", Error(body));
         Assert.False(Directory.Exists(Path.Combine(DataDir, "replays")) && Directory.EnumerateFiles(Path.Combine(DataDir, "replays")).Any());
     }
+
+    [Fact]
+    public async Task An_import_from_osu_runs_one_at_a_time_and_is_over_however_it_ends()
+    {
+        // Ended by osu! being out of reach: no longer running, as the page's state says.
+        var (failed, _) = await Post("/api/identity", new { action = "import", query = "someone" });
+        Assert.NotEqual(HttpStatusCode.OK, failed);
+        Assert.False(opts.OsuImport.State.Active);
+        Assert.False((await client.GetFromJson("/api/state")).GetProperty("osuImport").GetProperty("active").GetBoolean());
+
+        // One already running, from another tab: a second is refused, and the first carries on.
+        Assert.True(opts.OsuImport.TryStart());
+        Assert.False(opts.OsuImport.TryStart());
+        var (refused, body) = await Post("/api/identity", new { action = "import", query = "someone" });
+        Assert.Equal(HttpStatusCode.Conflict, refused);
+        Assert.Equal("an import from osu! is already running", Error(body));
+        Assert.True(opts.OsuImport.State.Active);
+        opts.OsuImport.Step("pricing", 3, 10);
+        var state = (await client.GetFromJson("/api/state")).GetProperty("osuImport");
+        Assert.Equal(("pricing", 3, 10), (state.GetProperty("step").GetString(), state.GetProperty("done").GetInt32(), state.GetProperty("total").GetInt32()));
+        opts.OsuImport.Finish();
+        // A step after the end changes nothing.
+        opts.OsuImport.Step("scores", 1, 4, 1);
+        Assert.Equal(("pricing", false), (opts.OsuImport.State.Step, opts.OsuImport.State.Active));
+    }
 }
 
 internal static class HttpClientJson

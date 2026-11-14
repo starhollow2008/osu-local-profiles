@@ -257,6 +257,70 @@ public sealed class UpdaterTests : IDisposable
         }
     }
 
+    /// <summary>An install of 1.26.0 whose GitHub offers a real 1.27.0 build, and that build's size.</summary>
+    private (Updater Updater, int Size) WithRelease127(string dir)
+    {
+        File.WriteAllText(Path.Combine(dir, "package.json"), """{"version":"1.26.0","repository":{"url":"git+https://github.com/x/y.git"}}""");
+        Directory.CreateDirectory(Path.Combine(dir, "app"));
+        File.WriteAllText(Path.Combine(dir, "app", "osu-local-profiles-app.exe"), "");
+        const string folder = "osu-local-profiles-1.27.0-win-x64/";
+        var zip = MakeZip([
+            (folder + "package.json", """{"version":"1.27.0"}"""u8.ToArray(), null),
+            (folder + "web/index.html", "<p></p>"u8.ToArray(), null),
+            (folder + Updater.LauncherExecutableFor("win32"), "launcher"u8.ToArray(), null),
+            (folder + Updater.NativeAppFor("win32"), "app"u8.ToArray(), null),
+            .. Enumerable.Range(0, 8).Select(i => (folder + $"web/{i}.js", "x"u8.ToArray(), (int?)null)),
+        ]);
+        const string asset = "osu-local-profiles-1.27.0-win-x64.zip";
+        var updater = For(dir, github: url =>
+            url.EndsWith("/releases/latest", StringComparison.Ordinal)
+                ? FakeOsu.Answer(ReleaseJson("v1.27.0", asset).Replace("\"size\":5", $"\"size\":{zip.Length}"))
+                : url.EndsWith(asset, StringComparison.Ordinal)
+                    ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(zip) }
+                    : FakeOsu.Answer("[]"));
+        return (updater, zip.Length);
+    }
+
+    [Fact]
+    public async Task Download_says_how_far_it_has_got_and_its_build_waits_for_Restart_to_update()
+    {
+        var dir = Tmp();
+        var (updater, size) = WithRelease127(dir);
+        await updater.CheckForUpdate();
+        var heard = new List<UpdateState>();
+        updater.Changed += (state, _) => { lock (heard) heard.Add(state); };
+        await updater.PrepareUpdate("now");
+
+        // The page heard the download arrive, all of it, of its size, and nothing of it once done.
+        Assert.Contains(heard, s => s.Preparing && s.ReceivedBytes == size && s.TotalBytes == size);
+        Assert.All(heard.Where(s => s.ReceivedBytes is not null), s => Assert.True(s.ReceivedBytes <= s.TotalBytes));
+        var after = updater.State();
+        Assert.Null(after.ReceivedBytes);
+        Assert.Null(after.TotalBytes);
+
+        // Waiting, for Restart to update: a quit installs it only as Auto-update would, which is off.
+        Assert.Equal("1.27.0", after.Ready);
+        Assert.False(after.InstallOnQuit);
+        Assert.Contains("\"requested\":\"now\"", File.ReadAllText(Path.Combine(dir, "data", "update", "ready.json")));
+        Assert.Null(updater.InstallAtQuit());
+        Assert.True(File.Exists(Path.Combine(dir, "data", "update", "1.27.0", Updater.NativeAppFor("win32"))));
+
+        // When I quit afterwards outranks it, without downloading again.
+        await updater.PrepareUpdate("user");
+        Assert.True(updater.State().InstallOnQuit);
+        Assert.Contains("\"requested\":\"user\"", File.ReadAllText(Path.Combine(dir, "data", "update", "ready.json")));
+    }
+
+    [Fact]
+    public void When_I_quit_outranks_Download_which_outranks_Auto_update()
+    {
+        Assert.Equal("user", Updater.Outranking("now", "user"));
+        Assert.Equal("user", Updater.Outranking("user", "now"));
+        Assert.Equal("now", Updater.Outranking("auto", "now"));
+        Assert.Equal("now", Updater.Outranking("now", "auto"));
+        Assert.Equal("auto", Updater.Outranking("auto", null));
+    }
+
     [Fact]
     public async Task A_release_downloads_ahead_of_time_when_data_update_does_not_exist_yet()
     {
