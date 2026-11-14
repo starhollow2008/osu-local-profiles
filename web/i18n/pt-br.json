@@ -933,5 +933,7 @@
   "scoreList.descending": "Decrescente",
   "scoreList.remove": "Remover {filter}",
   "scoreList.reset": "Redefinir",
-  "scoreList.atATime": "por vez"
+  "scoreList.atATime": "por vez",
+  "heading.firstPlaceRanks": "Primeiros lugares",
+  "import.firstPlaces": "Primeiros lugares traz as pontuações com que você está em #1 em cada modo de jogo. Elas contam como as melhores performances, e a lista fica sempre atualizada. Muitas podem demorar um pouco."
 }

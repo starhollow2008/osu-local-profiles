@@ -933,5 +933,7 @@
   "scoreList.descending": "遞減",
   "scoreList.remove": "移除{filter}",
   "scoreList.reset": "重設",
-  "scoreList.atATime": "筆一次"
+  "scoreList.atATime": "筆一次",
+  "heading.firstPlaceRanks": "第一名",
+  "import.firstPlaces": "第一名會匯入你在每個遊戲模式中拿到第一名的成績。它們會像最佳表現一樣計算，清單也會保持最新。數量多時可能需要一段時間。"
 }

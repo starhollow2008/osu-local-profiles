@@ -156,6 +156,12 @@ internal sealed record OsuWebStanding(double? TotalPp, double? GlobalRank, doubl
 /// <summary>One of an account's rank events, as its profile's Recent lists them.</summary>
 internal sealed record RankEvent(double Id, double At, double Rank, string Grade, int Mode, double BeatmapId);
 
+/// <summary>osu! saying the account lost first place on a beatmap in a ruleset, and when.</summary>
+internal sealed record FirstPlaceLost(double At, int Mode, double BeatmapId);
+
+/// <summary>What one read of an account's recent activity says about its leaderboard places.</summary>
+internal sealed record RecentActivity(List<RankEvent> Ranks, List<FirstPlaceLost> Lost);
+
 internal sealed record DownloadedImage(byte[] Bytes, string Extension);
 
 /// <summary>osu! answered, and has no account by that name or id, as opposed to not answering at all.</summary>
@@ -653,15 +659,21 @@ internal sealed partial class OsuWeb
     private const int ScoresPage = 100;
     private const int MaxScorePages = 20;
 
-    /// <summary>One page-by-page read of a user's best or pinned scores, until a page comes back empty.</summary>
-    private async Task<List<OsuWebScore>> FetchScoreList(double userId, string list, double mode)
+    /// <summary>
+    /// How far a read of first places goes: 50,000 of them, far past anyone's, at the gate's one
+    /// request a second. osu! paged a list of 664 to its end (offset 600) when this was measured.
+    /// </summary>
+    private const int MaxFirstPlacePages = 500;
+
+    /// <summary>One page-by-page read of a user's best, pinned or first-place scores, until a page comes back empty.</summary>
+    private async Task<List<OsuWebScore>> FetchScoreList(double userId, string list, double mode, int maxPages = MaxScorePages)
     {
         if (!IsWholePositive(userId)) throw new InvalidOperationException("not a user id");
         const string shapeError = "the scores were not in the shape expected; osu! may have changed them";
         var scores = new List<OsuWebScore>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var offset = 0;
-        for (var page = 0; page < MaxScorePages; page++)
+        for (var page = 0; page < maxPages; page++)
         {
             var response = await Fetch(
                 $"https://osu.ppy.sh/users/{Js.NumberToString(userId)}/scores/{list}?mode={OsuWebMode(mode)}&limit={ScoresPage}&offset={offset}",
@@ -684,6 +696,23 @@ internal sealed partial class OsuWeb
 
     /// <summary>The scores an account has pinned to its profile, in the order osu! lists them.</summary>
     public Task<List<OsuWebScore>> FetchPinnedScores(double userId, double mode) => FetchScoreList(userId, "pinned", mode);
+
+    /// <summary>The scores that hold first place on their beatmap's leaderboard, every page of them (roadmap 5.87).</summary>
+    public Task<List<OsuWebScore>> FetchFirstPlaces(double userId, double mode) => FetchScoreList(userId, "firsts", mode, MaxFirstPlacePages);
+
+    /// <summary>
+    /// How many first places osu! says an account holds in a ruleset: one request, the profile's own
+    /// <c>top_ranks</c> page, which carries the count beside the first few. Null when it is not there.
+    /// </summary>
+    public async Task<double?> FetchFirstPlaceCount(double userId, double mode)
+    {
+        if (!IsWholePositive(userId)) throw new InvalidOperationException("not a user id");
+        var response = await Fetch(
+            $"https://osu.ppy.sh/users/{Js.NumberToString(userId)}/extra-pages/top_ranks?mode={OsuWebMode(mode)}",
+            "application/json", "could not reach osu.ppy.sh");
+        if (!response.Ok) throw Answered(response.Status);
+        return Num(Js.Get(Js.Get(Parse(await response.Text()), "firsts"), "count"));
+    }
 
     /// <summary>osu!'s own total pp and global rank for one ruleset, read for the bonus pp an import cannot work out.</summary>
     public async Task<OsuWebStanding> FetchStanding(double userId, double mode)
@@ -737,7 +766,10 @@ internal sealed partial class OsuWeb
     }
 
     /// <summary>An account's latest rank events: one request, for the 100 newest events of every kind.</summary>
-    public async Task<List<RankEvent>> FetchRankEvents(double userId)
+    public async Task<List<RankEvent>> FetchRankEvents(double userId) => (await FetchRecentActivity(userId)).Ranks;
+
+    /// <summary>One request for the 100 newest events: the ranks reached, and the first places lost.</summary>
+    public async Task<RecentActivity> FetchRecentActivity(double userId)
     {
         if (!IsWholePositive(userId)) throw new InvalidOperationException("not a user id");
         var response = await Fetch($"https://osu.ppy.sh/users/{Js.NumberToString(userId)}/recent_activity?limit=100&offset=0",
@@ -747,6 +779,30 @@ internal sealed partial class OsuWeb
         {
             throw new InvalidOperationException("the recent activity was not in the shape expected; osu! may have changed it");
         }
-        return RankEventsFromJson(list);
+        return new RecentActivity(RankEventsFromJson(list), FirstPlacesLostFromJson(list));
+    }
+
+    /// <summary>
+    /// The first places lost in a recent-activity page: osu-web's <c>rankLost</c>, "lost first place
+    /// on" a beatmap in a ruleset, at a moment. Anything else it lists is left.
+    /// </summary>
+    public static List<FirstPlaceLost> FirstPlacesLostFromJson(JsonElement? list)
+    {
+        var output = new List<FirstPlaceLost>();
+        if (list is not { ValueKind: JsonValueKind.Array } items) return output;
+        foreach (var raw in items.EnumerateArray())
+        {
+            if (raw.ValueKind != JsonValueKind.Object || Str(Js.Get(raw, "type")) != "rankLost") continue;
+            var url = Js.Get(Js.Get(raw, "beatmap"), "url") is { ValueKind: not JsonValueKind.Null } u ? Js.ToJsString(u) : "";
+            var found = BeatmapUrl().Match(url);
+            var beatmapId = found.Success ? Js.StringToNumber(found.Groups[1].Value) : double.NaN;
+            var created = Js.Get(raw, "createdAt") is { ValueKind: not JsonValueKind.Null } c ? c
+                : Js.Get(raw, "created_at") is { ValueKind: not JsonValueKind.Null } c2 ? c2 : (JsonElement?)null;
+            var at = Js.DateParse(created is { } when ? Js.ToJsString(when) : "");
+            var modeName = Js.Get(raw, "mode") is { } m ? Js.ToJsString(m) : "undefined";
+            if (!RulesetForMode.TryGetValue(modeName, out var mode) || !IsWholePositive(beatmapId) || !double.IsFinite(at)) continue;
+            output.Add(new FirstPlaceLost(at, mode, beatmapId));
+        }
+        return output;
     }
 }

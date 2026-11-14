@@ -933,5 +933,7 @@
   "scoreList.descending": "Absteigend",
   "scoreList.remove": "{filter} entfernen",
   "scoreList.reset": "Zurücksetzen",
-  "scoreList.atATime": "auf einmal"
+  "scoreList.atATime": "auf einmal",
+  "heading.firstPlaceRanks": "Erste Plätze",
+  "import.firstPlaces": "Erste Plätze holt die Scores, mit denen du #1 bist, in jedem Spielmodus. Sie zählen wie beste Leistungen, und die Liste bleibt aktuell. Viele können eine Weile dauern."
 }

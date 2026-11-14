@@ -933,5 +933,7 @@
   "scoreList.descending": "Fallande",
   "scoreList.remove": "Ta bort {filter}",
   "scoreList.reset": "Återställ",
-  "scoreList.atATime": "åt gången"
+  "scoreList.atATime": "åt gången",
+  "heading.firstPlaceRanks": "Förstaplatser",
+  "import.firstPlaces": "Förstaplatser hämtar resultaten du har #1 med i varje spelläge. De räknas som bästa prestationer, och listan hålls uppdaterad. Många kan ta en stund."
 }

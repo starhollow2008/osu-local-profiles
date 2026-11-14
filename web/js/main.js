@@ -224,7 +224,7 @@ const PAGE_ALL = 10_000;
  */
 const PAGE_FIRST_SIZES = { favorites: 6 };
 const CARDS_PER_ROW = { favorites: 2 };
-const PAGED = ['events', 'top', 'mostPlayed', 'recent', 'favorites'];
+const PAGED = ['events', 'top', 'firsts', 'mostPlayed', 'recent', 'favorites'];
 const firstPage = (section) => PAGE_FIRST_SIZES[section] ?? PAGE_FIRST;
 const pageStep = (section) => (settings.showMoreRows || PAGE_STEP) * (CARDS_PER_ROW[section] ?? 1);
 
@@ -732,6 +732,14 @@ async function loadProfile() {
           ? t('empty.noPpPlays')
           : t('empty.noRankedPlays'),
     }) + showMore('top', data.top.length, shown.top, topTotal, settings.showMoreAll);
+
+  // osu!'s First Place Ranks: the beatmaps held at #1 on its leaderboards (roadmap 5.87).
+  const firstsTotal = totalFor('firsts', data.firsts ?? []);
+  $('firstsCount').textContent = fmt(firstsTotal);
+  $('firstPlaces').innerHTML =
+    // None leaves the space empty, as Pinned Scores does.
+    playList(data.firsts ?? [], { actions: true, starRating, empty: '' }) +
+    showMore('firsts', (data.firsts ?? []).length, shown.firsts, firstsTotal, settings.showMoreAll);
 
   const chart = playHistoryChart(data.monthlyPlaycounts);
   $('playcountChart').innerHTML = chart;
@@ -2343,11 +2351,11 @@ $('identityFile').onchange = async () => {
  */
 const IMPORT_DEFAULTS = {
   avatar: true, cover: true, country: true, aboutMe: true,
-  favorites: false, bestPerformances: false, pinnedScores: false, medals: false,
+  favorites: false, bestPerformances: false, pinnedScores: false, firstPlaces: false, medals: false,
 };
 const IMPORT_FAVORITES_ONLY = {
   avatar: false, cover: false, country: false, aboutMe: false,
-  favorites: true, bestPerformances: false, pinnedScores: false, medals: false,
+  favorites: true, bestPerformances: false, pinnedScores: false, firstPlaces: false, medals: false,
 };
 
 const importHint = (message, isError) => hint('importHint', message, isError);
@@ -2379,7 +2387,10 @@ function renderImportNote() {
   if (choices.pinnedScores) {
     notes.push(t('import.pinnedScores'));
   }
-  if (choices.bestPerformances || choices.pinnedScores) {
+  if (choices.firstPlaces) {
+    notes.push(t('import.firstPlaces'));
+  }
+  if (choices.bestPerformances || choices.pinnedScores || choices.firstPlaces) {
     notes.push(t('import.noDuplicates'));
   }
   if (choices.medals) {
@@ -2484,7 +2495,7 @@ $('importGo').onclick = async () => {
 
   $('importGo').disabled = true;
   // The bar under it says how far it has got; this says how long to expect.
-  const slow = choices.favorites || choices.bestPerformances || choices.pinnedScores;
+  const slow = choices.favorites || choices.bestPerformances || choices.pinnedScores || choices.firstPlaces;
   importHint(slow ? t('import.slow') : ' ');
   renderOsuImport({ active: true, step: 'account', mode: null, done: 0, total: 0, username: importUser?.username ?? null });
   try {

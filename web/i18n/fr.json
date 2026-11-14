@@ -933,5 +933,7 @@
   "scoreList.descending": "Décroissant",
   "scoreList.remove": "Retirer {filter}",
   "scoreList.reset": "Réinitialiser",
-  "scoreList.atATime": "à la fois"
+  "scoreList.atATime": "à la fois",
+  "heading.firstPlaceRanks": "Premières places",
+  "import.firstPlaces": "Premières places importe les scores avec lesquels tu es #1 dans chaque mode de jeu. Ils comptent comme les meilleures performances, et la liste reste à jour. Beaucoup peuvent prendre un moment."
 }

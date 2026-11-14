@@ -231,10 +231,20 @@ the import keeps going, and its bar moves to the top right of the page.
 | Favorite beatmaps | no (added to the list) |
 | Medals | no |
 | Best performances and pinned scores | no |
+| First place ranks | no |
 
 **Best performances and pinned scores** bring in up to 200 plays per mode, so a profile's pp and
 accuracy match the website even for plays set on another PC. See
 [Scores without a replay](#scores-without-a-replay).
+
+**First place ranks** brings in every score you hold #1 on osu! with, in every mode, as scores of
+the profile that count like best performances, and lists them under **First Place Ranks**, below
+Best Performance. Each needs its beatmap to be priced, so thousands of first places on beatmaps you
+don't have can take a while; it runs in the background like the rest of the import. After that the
+list keeps itself current: a #1 you set while the app runs is added, osu!'s "lost first place" takes
+one off (the score stays, and so do your pp and play count), and each launch asks osu! how many
+you hold, reading the list again only when that changed. Losing first place is noticed the next time
+the app starts or after your next ranked play, not the moment it happens.
 
 **Medals** copies the medals the account already has, with their dates, but only the ones this app
 has (see [Medals](#medals)). They join the medals your plays here earn, and a medal shows whichever

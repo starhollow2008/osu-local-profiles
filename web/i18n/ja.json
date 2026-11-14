@@ -933,5 +933,7 @@
   "scoreList.descending": "降順",
   "scoreList.remove": "{filter} を外す",
   "scoreList.reset": "リセット",
-  "scoreList.atATime": "件ずつ"
+  "scoreList.atATime": "件ずつ",
+  "heading.firstPlaceRanks": "1位ランク",
+  "import.firstPlaces": "1位ランクは、すべてのゲームモードで1位を取っているスコアを取り込みます。ベストパフォーマンスと同じように数えられ、リストは最新に保たれます。数が多いと時間がかかることがあります。"
 }

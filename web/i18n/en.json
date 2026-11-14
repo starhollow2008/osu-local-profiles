@@ -950,5 +950,7 @@
   "scoreList.descending": "Descending",
   "scoreList.remove": "Remove {filter}",
   "scoreList.reset": "Reset",
-  "scoreList.atATime": "at a time"
+  "scoreList.atATime": "at a time",
+  "heading.firstPlaceRanks": "First Place Ranks",
+  "import.firstPlaces": "First place ranks brings in the scores you hold #1 with in every game mode. They count as best performances do, and the list stays up to date. Many can take a while."
 }

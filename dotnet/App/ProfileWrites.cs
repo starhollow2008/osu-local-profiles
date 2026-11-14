@@ -297,6 +297,8 @@ internal static class ProfileData
             db.Run("DELETE FROM imported_standing WHERE profile_id = ?", profileId);
             db.Run("DELETE FROM imported_medals WHERE profile_id = ?", profileId);
             db.Run("DELETE FROM rank_events WHERE profile_id = ?", profileId);
+            db.Run("DELETE FROM first_places WHERE profile_id = ?", profileId);
+            db.Run("DELETE FROM first_place_counts WHERE profile_id = ?", profileId);
             db.Run("UPDATE profiles SET tracking_since = ? WHERE id = ?", now, profileId);
         });
         return (before, now);

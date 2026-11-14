@@ -139,7 +139,7 @@ internal static partial class Server
              */
             var db = opts.Db;
             var rank = new RankEventWatcher(db, () => Profiles.ActiveId(db), () => tracker.PlayerIdentity, opts.Osu,
-                _ => opts.Events.Broadcast("scores", new { action = "rank-events" }));
+                _ => opts.Events.Broadcast("scores", new { action = "rank-events" }), tracker.Beatmaps);
             opts.RankEvents = rank;
             tracker.Score += score => rank.Played(score.Client, score.Grade);
             _ = rank.CatchUp();

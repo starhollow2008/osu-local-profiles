@@ -351,4 +351,28 @@ CREATE TABLE IF NOT EXISTS rank_events (
   PRIMARY KEY (profile_id, event_id)
 );
 
+-- The beatmaps where the profile's player holds first place on osu!'s leaderboard (roadmap 5.87):
+-- from an import of the account's first places, then kept current by its rank events (#1 for a
+-- play here, first place lost) and, once a launch, osu!'s count. A row names a beatmap, not a
+-- score: the page shows the profile's own best score on it, preferring the one osu! named. Losing
+-- first place removes the row and nothing else. Cleared by a reset.
+CREATE TABLE IF NOT EXISTS first_places (
+  profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  mode        INTEGER NOT NULL,
+  beatmap_id  INTEGER NOT NULL,
+  score_id    TEXT,
+  since       INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, mode, beatmap_id)
+);
+
+-- How many first places osu! said the account held in a mode at the last full read of them: a row
+-- per mode the profile imported first places for, which is what a launch asks osu! about again.
+CREATE TABLE IF NOT EXISTS first_place_counts (
+  profile_id  INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  mode        INTEGER NOT NULL,
+  count       INTEGER NOT NULL,
+  read_at     INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, mode)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

@@ -2,6 +2,11 @@
 
 ## 1.34.2
 
+- **First Place Ranks, as on osu!.** Import from osu! can bring in the scores you hold #1 with,
+  in every mode, as scores that count like best performances. They're listed under First Place
+  Ranks below Best Performance, and the list keeps itself current: a #1 you set is added, and
+  losing first place takes it off without removing the score.
+
 - **Every score, on a page of its own.** **scores** at the top left, or **All scores** beside the
   Scores heading, lists every score of the mode: by default your best on each beatmap by pp,
   Best Performance without the cap of 100. Sort it by any column, search it by artist, title,

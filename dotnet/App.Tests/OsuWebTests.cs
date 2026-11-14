@@ -266,6 +266,14 @@ public class OsuWebTests
             new RankEvent(3, Js.DateParse("2026-10-07T00:00:00Z"), 5, "S", 2, 77),
         ], events);
         Assert.Empty(OsuWeb.RankEventsFromJson(Json("\"nonsense\"")));
+
+        // osu-web's rankLost: first place lost on a beatmap, in a ruleset, at a moment (roadmap 5.87).
+        var lost = OsuWeb.FirstPlacesLostFromJson(Json("""
+            [{"createdAt":"2026-10-08T12:00:00+00:00","id":7,"type":"rankLost","mode":"mania","beatmap":{"title":"x","url":"/beatmaps/4321"}},
+             {"createdAt":"2026-10-08T12:00:00+00:00","id":8,"type":"rank","scoreRank":"S","rank":1,"mode":"osu","beatmap":{"url":"/beatmaps/1"}},
+             {"id":9,"type":"rankLost","mode":"osu","beatmap":{"url":"/beatmaps/5"}}]
+            """));
+        Assert.Equal([new FirstPlaceLost(Js.DateParse("2026-10-08T12:00:00Z"), 3, 4321)], lost);
     }
 
     [Fact]

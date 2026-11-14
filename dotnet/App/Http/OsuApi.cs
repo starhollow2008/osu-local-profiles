@@ -234,11 +234,13 @@ internal static partial class Server
             done.Add(Plural(kept, "medal"));
         }
 
-        // Best performances and pinned scores, every ruleset, both lists in one pass.
+        // Best performances, pinned scores and first places, every ruleset, in one pass.
         var scores = new List<Tracker.ModeImportResult>();
+        var firstPlaces = new List<FirstPlacesImport>();
         var wantBest = Want("bestPerformances", false);
         var wantPinned = Want("pinnedScores", false);
-        if (wantBest || wantPinned)
+        var wantFirsts = Want("firstPlaces", false);
+        if (wantBest || wantPinned || wantFirsts)
         {
             foreach (var mode in new[] { 0, 1, 2, 3 })
             {
@@ -247,21 +249,40 @@ internal static partial class Server
                 {
                     var best = wantBest ? await opts.Osu.FetchBestPerformances(user.Id, mode) : [];
                     var pinned = wantPinned ? await opts.Osu.FetchPinnedScores(user.Id, mode) : [];
-                    if (best.Count == 0 && pinned.Count == 0) continue;
-                    // Only worth a request once there is something to correct the bonus of.
-                    var standing = wantBest && best.Count > 0 ? await opts.Osu.FetchStanding(user.Id, mode) : null;
-                    scores.Add(Tracker.OnlineImport.ImportMode(db, opts.Tracker!.Beatmaps, id, mode, best, pinned, standing));
+                    if (best.Count > 0 || pinned.Count > 0)
+                    {
+                        // Only worth a request once there is something to correct the bonus of.
+                        var standing = wantBest && best.Count > 0 ? await opts.Osu.FetchStanding(user.Id, mode) : null;
+                        scores.Add(Tracker.OnlineImport.ImportMode(db, opts.Tracker!.Beatmaps, id, mode, best, pinned, standing));
+                    }
                 }
                 catch (Exception e) when (e is not OutOfMemoryException)
                 {
                     failures.Add($"{ModeLabels[mode]} scores: {e.Message}");
                 }
+                if (!wantFirsts) continue;
+                try
+                {
+                    // osu!'s count first: one request, and the list only when there is one to read.
+                    if (await opts.Osu.FetchFirstPlaceCount(user.Id, mode) is not { } count) continue;
+                    var firsts = count > 0 ? await opts.Osu.FetchFirstPlaces(user.Id, mode) : [];
+                    // Kept current from now on only in a ruleset with anything in it, so a launch asks no more than it needs.
+                    if (count > 0 || db.Exists("SELECT 1 AS hit FROM scores WHERE profile_id = ? AND mode = ? LIMIT 1", id, mode))
+                    {
+                        firstPlaces.Add(FirstPlaces.Import(db, opts.Tracker!.Beatmaps, id, mode, firsts, count));
+                    }
+                }
+                catch (Exception e) when (e is not OutOfMemoryException)
+                {
+                    failures.Add($"{ModeLabels[mode]} first places: {e.Message}");
+                }
             }
-            var added = scores.Sum(r => r.Added);
+            var added = scores.Sum(r => r.Added) + firstPlaces.Sum(f => f.Added);
             var pins = scores.Sum(r => r.Pinned);
-            if (wantBest && added > 0) done.Add(Plural(added, "score"));
+            if ((wantBest || wantFirsts) && added > 0) done.Add(Plural(added, "score"));
             if (wantPinned && pins > 0) done.Add($"{pins} pinned");
-            if (scores.Count > 0)
+            if (wantFirsts) done.Add(Plural(firstPlaces.Sum(f => f.Held), "first place"));
+            if (scores.Count > 0 || firstPlaces.Any(f => f.Added + f.Updated > 0))
             {
                 // The replays osu! wrote for these plays, where this computer still has them, first.
                 // Both of these take a while with nothing new from osu!, so each is a step of its own.
@@ -282,7 +303,7 @@ internal static partial class Server
         if (opts.RankEvents is { } rank) _ = rank.CatchUp();
         opts.Events.Broadcast("settings", Settings.SettingsStore.Get(db, id, fallbacks));
         if (favouritesAdded > 0) opts.Events.Broadcast("favorites", new { action = "import" });
-        if (scores.Count > 0) opts.Events.Broadcast("scores", new { action = "import" });
+        if (scores.Count > 0 || firstPlaces.Count > 0) opts.Events.Broadcast("scores", new { action = "import" });
         await Json(context, IdentityAnswer(opts, id, new
         {
             ok = true,
@@ -291,6 +312,7 @@ internal static partial class Server
             failures,
             favorites = new { found = favouritesFound, added = favouritesAdded },
             scores,
+            firstPlaces,
             settings = Settings.SettingsStore.Get(db, id, fallbacks),
         }));
     }

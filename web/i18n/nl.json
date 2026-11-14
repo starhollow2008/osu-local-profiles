@@ -933,5 +933,7 @@
   "scoreList.descending": "Aflopend",
   "scoreList.remove": "{filter} verwijderen",
   "scoreList.reset": "Herstellen",
-  "scoreList.atATime": "tegelijk"
+  "scoreList.atATime": "tegelijk",
+  "heading.firstPlaceRanks": "Eerste plaatsen",
+  "import.firstPlaces": "Eerste plaatsen haalt de scores op waarmee je #1 staat, in elke spelmodus. Ze tellen mee zoals beste prestaties, en de lijst blijft bijgewerkt. Veel kan even duren."
 }

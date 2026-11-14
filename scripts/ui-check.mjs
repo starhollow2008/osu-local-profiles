@@ -2070,12 +2070,12 @@ check(
   true,
 );
 check(
-  'the four decorative choices are ticked; the four that write plays, lists or medals are not',
+  'the four decorative choices are ticked; the five that write plays, lists or medals are not',
   await evaluate(`JSON.stringify(Object.fromEntries(
     [...document.querySelectorAll('#importSection [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
-  // Favorites, best performances, pinned scores and medals all start off: the first adds to a
-  // list shared across profiles, the next two write plays that move pp and accuracy, and medals
-  // borrows osu!'s record of them.
+  // Favorites, best performances, pinned scores, first places and medals all start off: the first
+  // adds to a list shared across profiles, the next three write plays that move pp and accuracy,
+  // and medals borrows osu!'s record of them.
   JSON.stringify({
     avatar: true,
     cover: true,
@@ -2084,6 +2084,7 @@ check(
     favorites: false,
     bestPerformances: false,
     pinnedScores: false,
+    firstPlaces: false,
     medals: false,
   }),
 );
@@ -3260,6 +3261,20 @@ check('level bar is b3', await bg('.profile-detail-bar'), await literal('hsl(333
  * bar. Opened and read only: a filter or the layout changed here would be saved to the profile
  * this runs against.
  */
+/* First Place Ranks (roadmap 5.87): under Best Performance as on osu!, its count the server's. */
+console.log('\nfirst place ranks');
+check(
+  'First Place Ranks follows Best Performance, with its count',
+  await evaluate(`(async () => {
+    const p = await (await fetch('/api/profile?mode=' + (document.querySelector('#modes [aria-current]')?.dataset.mode ?? 0))).json();
+    const heads = [...document.querySelectorAll('#section-top_ranks h3.title')].map((h) => h.firstElementChild.textContent.trim());
+    return heads.join('|') + ':' + (document.getElementById('firstsCount').textContent === String(p.totals.firsts));
+  })()`),
+  'Pinned Scores|Best Performance|First Place Ranks:true',
+);
+check('Import from osu! offers first place ranks, unticked', await evaluate(
+  "document.querySelector('[data-import=firstPlaces]')?.checked"), false);
+
 console.log('\nthe Scores view');
 check('the header names the profile and the Scores view', await evaluate(
   "[...document.querySelectorAll('#viewTabs [data-view-tab]')].map((a) => a.textContent.trim()).join()"), 'player info,scores');

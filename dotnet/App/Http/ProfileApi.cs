@@ -111,6 +111,9 @@ internal static class ProfileApi
             pinned = cache.Remember($"pinned:{rulesKey}", () => Stats.PinnedPlays(db, profileId, mode, e)),
             top = cache.Remember($"top:{rulesKey}:{Page(request, "top", 100)}",
                 () => Stats.TopPlays(db, profileId, mode, Page(request, "top", 100), e)),
+            // First Place Ranks (roadmap 5.87), under Best Performance as on osu!.
+            firsts = cache.Remember($"firsts:{rulesKey}:{Page(request, "firsts", 5)}",
+                () => Stats.FirstPlaceList(db, profileId, mode, Page(request, "firsts", 5), e)),
             // Recent Plays reads only the newest rows through an index, so it is not worth keeping.
             recent = Stats.RecentPlays(db, profileId, mode, Page(request, "recent", 25), e, settings.ShowIncompleteInRecent),
             mostPlayed = cache.Remember($"mostPlayed:{rulesKey}:{Page(request, "mostPlayed", 15)}",
@@ -121,6 +124,7 @@ internal static class ProfileApi
             totals = new
             {
                 top = Math.Min(stats.DistinctRankedBeatmaps, TopPlays),
+                firsts = cache.Remember($"firstsTotal:{rulesKey}", () => Stats.FirstPlaceTotal(db, profileId, mode, e)),
                 recent = recentTotal,
                 mostPlayed = mostPlayedCount,
                 events = history.EventsTotal,

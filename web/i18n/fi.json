@@ -933,5 +933,7 @@
   "scoreList.descending": "Laskeva",
   "scoreList.remove": "Poista {filter}",
   "scoreList.reset": "Palauta",
-  "scoreList.atATime": "kerrallaan"
+  "scoreList.atATime": "kerrallaan",
+  "heading.firstPlaceRanks": "Ensimmäiset sijat",
+  "import.firstPlaces": "Ensimmäiset sijat tuo tulokset, joilla olet #1, jokaisessa pelimuodossa. Ne lasketaan kuten parhaat suoritukset, ja lista pysyy ajan tasalla. Monen tuonti voi kestää hetken."
 }

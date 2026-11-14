@@ -945,5 +945,7 @@
   "scoreList.descending": "Malejąco",
   "scoreList.remove": "Usuń {filter}",
   "scoreList.reset": "Resetuj",
-  "scoreList.atATime": "naraz"
+  "scoreList.atATime": "naraz",
+  "heading.firstPlaceRanks": "Pierwsze miejsca",
+  "import.firstPlaces": "Pierwsze miejsca pobiera wyniki, którymi zajmujesz #1, w każdym trybie gry. Liczą się jak najlepsze wyniki, a lista jest na bieżąco aktualizowana. Wiele może chwilę potrwać."
 }

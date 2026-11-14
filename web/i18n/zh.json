@@ -933,5 +933,7 @@
   "scoreList.descending": "降序",
   "scoreList.remove": "移除{filter}",
   "scoreList.reset": "重置",
-  "scoreList.atATime": "条一次"
+  "scoreList.atATime": "条一次",
+  "heading.firstPlaceRanks": "第一名",
+  "import.firstPlaces": "第一名会导入你在每个游戏模式中拿到第一名的成绩。它们会像最佳表现一样计算，列表也会保持最新。数量多时可能需要一段时间。"
 }

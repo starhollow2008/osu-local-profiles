@@ -213,4 +213,91 @@ public sealed class OnlineImportTests : IDisposable
         Assert.Equal(["https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0"], osu.Asked);
         Assert.Equal(1, told);
     }
+
+    /* ------------------------------------------------- First Place Ranks (roadmap 5.87) */
+
+    private List<object?> FirstPlaceIds() => [.. Stats.FirstPlaceList(h.Db, h.ProfileId, 0, 100, Eligibility.Vanilla).Select(p => p.Id)];
+
+    [Fact]
+    public void A_first_place_lists_the_profiles_score_on_it_and_losing_it_keeps_the_score()
+    {
+        Play(2108789);
+        h.Db.Run("UPDATE scores SET total_score = 400000 WHERE beatmap_id = 2108789");
+        Play(2108789, client: "stable");
+        var best = Convert.ToInt64(h.Db.Scalar("SELECT id FROM scores WHERE client = 'stable'"));
+        Play(137120);
+        var other = Convert.ToInt64(h.Db.Scalar("SELECT id FROM scores WHERE beatmap_id = 137120"));
+        var scores = Convert.ToInt64(h.Db.Scalar("SELECT COUNT(*) FROM scores"));
+
+        // A beatmap the profile has no score on is held but not listed.
+        FirstPlaces.Replace(h.Db, h.ProfileId, 0, [new(2108789, null, 2_000), new(137120, null, 1_000), new(999, null, 3_000)], 3);
+        Assert.Equal([best, other], FirstPlaceIds());
+        Assert.Equal(2, Stats.FirstPlaceTotal(h.Db, h.ProfileId, 0, Eligibility.Vanilla));
+        Assert.Equal([(0.0, 3.0)], FirstPlaces.Counts(h.Db, h.ProfileId));
+
+        // Lost after it was held: off the list, and the score stays where it was.
+        Assert.Equal(1, FirstPlaces.Lost(h.Db, h.ProfileId, [new FirstPlaceLost(5_000, 0, 137120)]));
+        Assert.Equal([best], FirstPlaceIds());
+        Assert.Equal(scores, Convert.ToInt64(h.Db.Scalar("SELECT COUNT(*) FROM scores")));
+        // Lost before it was held again, or in another ruleset: it stays.
+        Assert.Equal(0, FirstPlaces.Lost(h.Db, h.ProfileId, [new FirstPlaceLost(1_000, 0, 2108789), new FirstPlaceLost(9_000, 3, 2108789)]));
+
+        // A removed score is not listed; the next best one on the beatmap is.
+        h.Db.Run("UPDATE scores SET hidden_at = 1 WHERE id = ?", best);
+        Assert.Single(FirstPlaceIds());
+        Assert.NotEqual(best, FirstPlaceIds()[0]);
+    }
+
+    [Fact]
+    public void A_number_one_for_a_play_here_holds_its_beatmap_and_any_other_place_does_not()
+    {
+        Play();
+        Play(137120);
+        RankEvents.Save(h.Db, h.ProfileId, [Event() with { Rank = 1 }, Event(id: 2, beatmapId: 137120)]);
+        Assert.Equal(2108789L, h.Db.Scalar("SELECT beatmap_id FROM first_places"));
+        Assert.Single(FirstPlaceIds());
+    }
+
+    [Fact]
+    public void Imported_first_places_are_scores_as_best_performances_are_and_the_list_is_osus()
+    {
+        FirstPlaces.Replace(h.Db, h.ProfileId, 0, [new(555, null, 1)], 1);
+        var result = FirstPlaces.Import(h.Db, resolver, h.ProfileId, 0, [Parsed()], 1);
+        Assert.Equal((1, 1, 0), (result.Held, result.Added, result.Updated));
+        // It counts, as an imported best performance does.
+        Assert.Equal(1, Stats.Compute(h.Db, h.ProfileId, 0, Eligibility.Vanilla).Playcount);
+        // The list is osu!'s now: the old one is gone, the new one names osu!'s score.
+        Assert.Equal([(2403946L, "1716608692")], h.Db.All("SELECT beatmap_id, score_id FROM first_places", r => (r.GetInt64(0), r.GetString(1))));
+        Assert.Single(FirstPlaceIds());
+        // Again: the same score, updated, not a second one.
+        Assert.Equal((1, 0, 1), (FirstPlaces.Import(h.Db, resolver, h.ProfileId, 0, [Parsed()], 1) is var again ? (again.Held, again.Added, again.Updated) : default));
+        Assert.Equal(1L, h.Db.Scalar("SELECT COUNT(*) FROM scores"));
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(2, true)]
+    public async Task A_launch_reads_the_first_places_again_only_when_osus_count_has_changed(int stored, bool reads)
+    {
+        Play(137120);
+        Settings.SettingsStore.Update(h.Db, h.ProfileId, JsonText.From(new { linkedUserId = 3119700, linkedUsername = "Tangy" }));
+        FirstPlaces.Replace(h.Db, h.ProfileId, 0, [new(137120, null, 1_000)], stored);
+        var osu = new FakeOsu(url => FakeOsu.Answer(
+            url.Contains("recent_activity") ? """[{"createdAt":"2026-10-07T00:00:00+00:00","id":9,"type":"rankLost","mode":"osu","beatmap":{"url":"/beatmaps/137120"}}]"""
+            : url.Contains("extra-pages/top_ranks") ? """{"firsts":{"count":1,"items":[]}}"""
+            : url.Contains("offset=0") ? $"[{Base}]" : "[]"));
+        var watcher = new RankEventWatcher(h.Db, () => h.ProfileId, () => PlayerIdentity.Unknown, osu.Client(), beatmaps: resolver);
+        await watcher.CatchUp();
+
+        // osu!'s "lost first place" took 137120 off, whatever the count said.
+        Assert.False(h.Db.Exists("SELECT 1 AS hit FROM first_places WHERE beatmap_id = 137120"));
+        Assert.Equal(reads, osu.Asked.Any(u => u.Contains("/scores/firsts")));
+        Assert.Equal(reads, h.Db.Exists("SELECT 1 AS hit FROM first_places WHERE beatmap_id = 2403946"));
+        Assert.Equal([(0.0, 1.0)], FirstPlaces.Counts(h.Db, h.ProfileId));
+
+        // Once a launch: a play later asks about its events, not the count.
+        var asked = osu.Asked.Count;
+        await watcher.CatchUp();
+        Assert.Equal(["https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0"], osu.Asked.Skip(asked));
+    }
 }

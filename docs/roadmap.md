@@ -98,6 +98,7 @@ does not have to make it again.
 | 5.84 | Track plays only from chosen names                        | done   |
 | 5.85 | neomod                                                    | done   |
 | 5.86 | Scores: every score, sorted, filtered and exported        | done   |
+| 5.87 | First Place Ranks                                         | done   |
 
 ## Constraints on every item
 
@@ -1833,3 +1834,47 @@ timeline. So the list is a page of its own.
 `dotnet/App/Settings/ScoreListView.cs` (the saved view), `dotnet/App/Http/ScoreListApi.cs`
 (`/api/score-list` and `/api/score-list/export`), `web/js/score-list.js`; `ScoreListTests` and
 `test/score-list.test.ts`.
+
+## 5.87 - First Place Ranks
+
+**Status:** done. Asked for by the owner, as osu!'s profile has it.
+
+### What osu! offers
+
+Measured on osu.ppy.sh, no login: `users/{id}/scores/firsts?mode=` is the first places, a page of
+100 at a time like `scores/best` (a list of 664 paged to its end at offset 600; no account with more
+than 1,000 was found to test further), and `users/{id}/extra-pages/top_ranks?mode=` carries
+`firsts.count` beside the first few, one request. The account's recent activity, which Recent
+already reads (5.79), has `rank` events (#1 among them) and `rankLost` ("lost first place on").
+
+### Decisions
+
+- **The scores and the #1 are two things.** An imported first place is a score of the profile,
+  imported as Best performances are (`OnlineImport.ImportScore`), so it counts toward pp, play
+  count and ranked score; the owner asked for that over keeping them display only. Holding first
+  place is a row in `first_places` by beatmap and ruleset. Losing it removes the row, never the
+  score: a snipe must not take pp away.
+- **The section shows the profile's own score on each held beatmap**, the one osu! named where the
+  profile has it, else its highest there. A beatmap held with no score here yet is not listed.
+  Under Best Performance, as on osu!, newest first, paged like the others.
+- **No polling.** In: the import (an unticked choice, like Best performances); a #1 among the rank
+  events of a play tracked here. Out: `rankLost`. Both come from the read Recent already makes,
+  once a launch and after a play osu! could rank. And once a launch, for each ruleset first places
+  were imported for, osu!'s count against the count at the last read (`first_place_counts`): the
+  same, nothing more; different, the list is read again and replaces the old one, and a first place
+  with no score here yet comes in as the import brought the rest. Comparing against the count at
+  the last read, not against the rows, means a list osu! might cut short is not read every launch.
+- **Rate limits.** Every request waits its turn at the gate, one a second, and a 429 waits as long
+  as osu! says. A read is a request per 100 first places, up to 50,000; the count is one request a
+  ruleset a launch, and only for rulesets imported. Pricing each new score is the slow part: a
+  beatmap not installed is downloaded first, one a second. The import says many can take a while.
+- **Not live.** A snipe shows at the next launch or after the next ranked play.
+- Only osu!'s own leaderboards: McOsu, neki and neomod plays, and attempts osu! could not submit,
+  are never first places. Needs a linked account of the player's own, as Recent's ranks do.
+
+### Where it lives
+
+`dotnet/App/FirstPlaces.cs`, `dotnet/App/Calc/FirstPlaceList.cs`, the rank events and their watcher
+(`dotnet/App/RankEvents.cs`), `FetchFirstPlaces`, `FetchFirstPlaceCount` and
+`FirstPlacesLostFromJson` in `dotnet/App/Clients/OsuWeb.cs`; tests in `OnlineImportTests` and
+`OsuWebTests`.

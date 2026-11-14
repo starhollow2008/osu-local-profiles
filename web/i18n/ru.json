@@ -933,5 +933,7 @@
   "scoreList.descending": "По убыванию",
   "scoreList.remove": "Убрать {filter}",
   "scoreList.reset": "Сбросить",
-  "scoreList.atATime": "за раз"
+  "scoreList.atATime": "за раз",
+  "heading.firstPlaceRanks": "Первые места",
+  "import.firstPlaces": "Первые места загружает результаты, с которыми вы на #1, во всех режимах игры. Они учитываются как лучшие результаты, а список остаётся актуальным. Если их много, это может занять время."
 }

@@ -48,6 +48,8 @@ internal static class RankEvents
                  ORDER BY ABS(s.played_at - ?) ASC, s.id DESC LIMIT 1
                 """, r => r.GetString(0), profileId, e.BeatmapId, e.Mode, e.At - MatchWindowMs, e.At + MatchWindowMs, e.At);
             if (play is null) continue;
+            // First place for a play here: First Place Ranks holds the beatmap from then (roadmap 5.87).
+            if (e.Rank == 1) FirstPlaces.Gained(db, profileId, e.Mode, e.BeatmapId, e.At);
             added += db.Run("""
                 INSERT OR IGNORE INTO rank_events (profile_id, event_id, dedupe_key, rank, grade, achieved_at)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -61,11 +63,14 @@ internal static class RankEvents
 /// When to ask osu!: once at start, and <see cref="RankEvents.AskAfterPlayMs"/> after the last of a
 /// run of plays. A failure (offline, osu! down) is quiet: the next play or launch asks again.
 /// </summary>
-internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<PlayerIdentity> identity, OsuWeb osu, Action<int>? onNew = null)
+internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<PlayerIdentity> identity, OsuWeb osu, Action<int>? onNew = null,
+    BeatmapResolver? beatmaps = null)
 {
     private readonly object gate = new();
     private Timer? timer;
     private int asking;
+    /// <summary>Whether this launch has compared osu!'s first-place counts yet: once a launch, not once a play.</summary>
+    private bool countsCompared;
 
     /// <summary>A play was just tracked. Only one osu! could rank is worth asking about.</summary>
     public void Played(string client, string grade)
@@ -90,9 +95,16 @@ internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<P
         try
         {
             if (Account() is not { } account) return 0;
-            var events = await osu.FetchRankEvents(account);
-            var added = RankEvents.Save(db, profileId(), events);
-            if (added > 0) onNew?.Invoke(added);
+            var profile = profileId();
+            var activity = await osu.FetchRecentActivity(account);
+            var added = RankEvents.Save(db, profile, activity.Ranks);
+            var changed = added + FirstPlaces.Lost(db, profile, activity.Lost);
+            if (!countsCompared && beatmaps is not null)
+            {
+                countsCompared = true;
+                changed += await CompareFirstPlaceCounts(account, profile, beatmaps);
+            }
+            if (changed > 0) onNew?.Invoke(changed);
             return added;
         }
         catch (Exception e) when (e is not OutOfMemoryException)
@@ -106,4 +118,30 @@ internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<P
     }
 
     private double? Account() => RankEvents.Account(db, profileId(), identity());
+
+    /// <summary>
+    /// For each ruleset first places were imported for, osu!'s count now against the count at the
+    /// last read: the same, nothing more is asked; different, the list is read again, and any first
+    /// place this profile has no score for yet comes in as the import brought the rest. How many
+    /// rulesets changed. One that fails is left for the next launch.
+    /// </summary>
+    private async Task<int> CompareFirstPlaceCounts(double account, long profile, BeatmapResolver resolver)
+    {
+        var changed = 0;
+        foreach (var (mode, stored) in FirstPlaces.Counts(db, profile))
+        {
+            try
+            {
+                if (await osu.FetchFirstPlaceCount(account, mode) is not { } count || count == stored) continue;
+                var firsts = count > 0 ? await osu.FetchFirstPlaces(account, mode) : [];
+                FirstPlaces.Import(db, resolver, profile, mode, firsts, count);
+                changed++;
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                /* osu! out of reach: the next launch asks again */
+            }
+        }
+        return changed;
+    }
 }
