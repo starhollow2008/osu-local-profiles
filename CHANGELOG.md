@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.34.2
+## 1.35.0
 
 - **First Place Ranks, as on osu!.** Import from osu! can bring in the scores you hold #1 with,
   in every mode, as scores that count like best performances. They're listed under First Place
