@@ -7076,6 +7076,12 @@ s.bbcode-editor__glyph {
   cursor: pointer;
 }
 
+/* Custom sort... opens a dialog rather than sorting, so it reads apart from the sorts in the menu. */
+.score-list__sort select option.score-list__custom-sort {
+  color: #000;
+  background-color: #fff;
+}
+
 .score-list__order {
   width: 26px;
   height: 26px;

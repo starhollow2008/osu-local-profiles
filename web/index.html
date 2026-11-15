@@ -404,6 +404,9 @@
       <div class="score-list__sort">
         <label class="score-list__sort-label" for="scoreListSort" data-i18n="scoreList.sort">Sort</label>
         <select id="scoreListSort">
+          <!-- Opens the custom sort dialog; and a custom sort in force, named by its levels. -->
+          <option value="customEdit" class="score-list__custom-sort" data-i18n="scoreList.customSort">Custom sort…</option>
+          <option value="custom" id="scoreListSortCustom" hidden></option>
           <option value="pp">pp</option>
           <option value="score" data-i18n="scoreList.sortScore">Score</option>
           <option value="accuracy" data-i18n="scoreList.colAccuracy">Accuracy</option>
@@ -415,9 +418,6 @@
           <option value="playcount" data-i18n="scoreList.playcount">Playcount</option>
           <option value="date" data-i18n="scoreList.sortDate">Date played</option>
           <option value="beatmap" data-i18n="scoreList.colBeatmap">Beatmap</option>
-          <!-- A custom sort in force, named by its levels; and the entry that opens the dialog. -->
-          <option value="custom" id="scoreListSortCustom" hidden></option>
-          <option value="customEdit" data-i18n="scoreList.customSort">Custom sort…</option>
         </select>
         <button type="button" class="score-list__order" id="scoreListOrder" data-order="desc"></button>
       </div>
