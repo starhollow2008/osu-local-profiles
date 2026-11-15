@@ -353,6 +353,30 @@ public sealed class NekiTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task A_replay_stamped_by_the_coarser_file_clock_just_before_the_start_still_counts()
+    {
+        var (stable, neki) = Installed();
+        var own = Neki.ReplayDir(neki);
+        var arrived = new TaskCompletionSource<string>();
+        var watcher = new ReplayWatcher([Path.Combine(stable, "Data", "r"), own], f => arrived.TrySetResult(f));
+        var before = DateTime.UtcNow;
+        watcher.Start();
+        try
+        {
+            // Written after the start, but stamped a tick earlier, as Windows' file clock can.
+            Directory.CreateDirectory(own);
+            var file = Write(own, "first.osr", NekiReplay());
+            File.SetLastWriteTimeUtc(file, before - TimeSpan.FromMilliseconds(20));
+            watcher.WatchNewFolders();
+            Assert.Equal(file, await Within(arrived.Task));
+        }
+        finally
+        {
+            watcher.Stop();
+        }
+    }
+
     /// <summary>The same replay ten minutes later, past the app's match on the play itself: another play neki never listed.</summary>
     private static byte[] Shifted(byte[] replay)
     {

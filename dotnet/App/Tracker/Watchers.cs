@@ -209,6 +209,13 @@ internal sealed class ReplayWatcher(IReadOnlyList<string> dirs, Action<string> o
     private static readonly TimeSpan Settle = TimeSpan.FromMilliseconds(250);
     private const int SettleAttempts = 20;
 
+    /// <summary>
+    /// How far before the start a file's time may be and still count as written since it. The start
+    /// is read from a precise clock, but Windows stamps files from one that moves in steps of up to
+    /// ~16 ms, so a replay written just after the start can carry a time just before it.
+    /// </summary>
+    private const double FileClockSlackMs = 100;
+
     private readonly object gate = new();
     private readonly List<FileSystemWatcher> watchers = [];
     private readonly Debounce pending = new();
@@ -262,7 +269,7 @@ internal sealed class ReplayWatcher(IReadOnlyList<string> dirs, Action<string> o
         {
             if (!running || missing.Count == 0) return;
             appeared = [.. missing.Where(d => Directory.Exists(d))];
-            since = Js.MtimeMs(startedAt);
+            since = Js.MtimeMs(startedAt) - FileClockSlackMs;
         }
         foreach (var dir in appeared)
         {
