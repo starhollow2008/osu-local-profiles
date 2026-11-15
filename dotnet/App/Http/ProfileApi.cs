@@ -88,6 +88,9 @@ internal static class ProfileApi
 
         return new
         {
+            // Which profile this answers for, so the page never mistakes another profile's
+            // medals for ones just unlocked (web/js/medals.js).
+            profileId,
             mode,
             stats,
             // What the profile is counting, so the page can say when it is not scoring as osu! would.

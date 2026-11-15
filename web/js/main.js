@@ -704,7 +704,10 @@ async function loadProfile() {
     showMore('events', data.events.length, shown.events, totalFor('events', data.events), settings.showMoreAll);
 
   renderCountingNote(data.counting);
-  renderMedals(data.medals, mode, { showNote: settings.showFcUnknownNote !== false });
+  renderMedals(data.medals, mode, {
+    showNote: settings.showFcUnknownNote !== false,
+    profileId: data.profileId ?? profile?.id ?? null,
+  });
 
   // Held for the menu's Move up / Move down and for drag reordering, both of which work in
   // terms of positions in this list.

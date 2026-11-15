@@ -47,15 +47,18 @@ let medalsBySlug = new Map();
 export const medalFor = (slug) => medalsBySlug.get(slug);
 
 /** What this page last saw earned, so a newly unlocked medal can be announced once. */
-let lastEarned = { mode: null, slugs: new Set() };
+let lastEarned = { key: null, slugs: new Set() };
 
 /**
  * Start over from what the next render shows, announcing none of it: medals imported from osu!
  * were earned long ago, and a toast naming forty of them is no one's moment of unlocking.
  */
 export function forgetAnnouncedMedals() {
-  lastEarned = { mode: null, slugs: new Set() };
+  lastEarned = { key: null, slugs: new Set() };
 }
+
+/** The baseline a render is compared against: one per profile and mode. */
+const medalBaselineKey = (profileId, mode) => `${profileId ?? ''}:${mode}`;
 
 /**
  * The card's content, osu-web's `tooltip-achievement`: the group, then the icon, name and
@@ -88,11 +91,11 @@ function medalCard(medal) {
     </div>`;
 }
 
-export function renderMedals(summary, mode, { showNote = true } = {}) {
+export function renderMedals(summary, mode, { showNote = true, profileId = null } = {}) {
   if (!summary) return;
 
   medalsBySlug = new Map(summary.medals.map((m) => [m.slug, m]));
-  announceNewMedals(summary, mode);
+  announceNewMedals(summary, medalBaselineKey(profileId, mode));
 
   /*
    * An FC cannot be told from a near-miss without the beatmap's own maximum combo, which
@@ -145,15 +148,16 @@ export function renderMedals(summary, mode, { showNote = true } = {}) {
 /**
  * Say so when a medal is unlocked while the page is open.
  *
- * Only against what this page already saw *in the same mode*: the first render of a mode
- * sets the baseline, so opening the page or switching tabs never announces medals that were
- * earned long ago. The Recent feed is the permanent record; this is the moment itself.
+ * Only against what this page already saw *for the same profile and mode*: the first render
+ * of either sets the baseline, so opening the page, switching tabs or switching profiles never
+ * announces medals that were earned long ago. The Recent feed is the permanent record; this is
+ * the moment itself.
  */
-function announceNewMedals(summary, mode) {
+function announceNewMedals(summary, key) {
   const earned = summary.medals.filter((m) => m.achievedAt !== null);
   const slugs = new Set(earned.map((m) => m.slug));
 
-  if (lastEarned.mode === mode) {
+  if (lastEarned.key === key) {
     const fresh = earned.filter((m) => !lastEarned.slugs.has(m.slug));
     // Medal names are osu!'s own and stay as osu! writes them; only the announcement
     // around them is translated.
@@ -170,7 +174,7 @@ function announceNewMedals(summary, mode) {
       );
     }
   }
-  lastEarned = { mode, slugs };
+  lastEarned = { key, slugs };
 }
 
 /* ------------------------------------------------------------ medal card */
