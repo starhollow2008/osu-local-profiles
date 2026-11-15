@@ -934,6 +934,17 @@
   "scoreList.remove": "Fjern {filter}",
   "scoreList.reset": "Nulstil",
   "scoreList.atATime": "ad gangen",
+  "scoreList.customSort": "Brugerdefineret sortering…",
+  "scoreList.customSortTitle": "Brugerdefineret sortering",
+  "scoreList.sortBy": "Sortér efter",
+  "scoreList.thenBy": "Derefter efter",
+  "scoreList.order": "Rækkefølge",
+  "scoreList.addLevel": "Tilføj niveau",
+  "scoreList.deleteLevel": "Slet niveau",
+  "scoreList.moveUp": "Flyt op",
+  "scoreList.moveDown": "Flyt ned",
+  "scoreList.sortCancel": "Annuller",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Førstepladser",
   "import.firstPlaces": "Førstepladser henter de resultater, du har #1 med, i alle spiltilstande. De tæller som bedste præstationer, og listen holdes opdateret. Mange kan tage et stykke tid."
 }

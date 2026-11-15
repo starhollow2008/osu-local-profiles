@@ -934,6 +934,17 @@
   "scoreList.remove": "Ta bort {filter}",
   "scoreList.reset": "Återställ",
   "scoreList.atATime": "åt gången",
+  "scoreList.customSort": "Anpassad sortering…",
+  "scoreList.customSortTitle": "Anpassad sortering",
+  "scoreList.sortBy": "Sortera efter",
+  "scoreList.thenBy": "Sedan efter",
+  "scoreList.order": "Ordning",
+  "scoreList.addLevel": "Lägg till nivå",
+  "scoreList.deleteLevel": "Ta bort nivå",
+  "scoreList.moveUp": "Flytta upp",
+  "scoreList.moveDown": "Flytta ned",
+  "scoreList.sortCancel": "Avbryt",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Förstaplatser",
   "import.firstPlaces": "Förstaplatser hämtar resultaten du har #1 med i varje spelläge. De räknas som bästa prestationer, och listan hålls uppdaterad. Många kan ta en stund."
 }

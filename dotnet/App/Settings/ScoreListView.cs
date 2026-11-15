@@ -15,7 +15,7 @@ namespace OsuLocalProfiles.Settings;
 internal sealed class ScoreListView
 {
     /// <summary>What can be sorted by: each a column of the table.</summary>
-    public static readonly string[] Sorts = ["pp", "score", "accuracy", "grade", "combo", "stars", "misses", "playcount", "date", "beatmap"];
+    public static readonly string[] Sorts = ["pp", "score", "accuracy", "grade", "mods", "combo", "stars", "misses", "playcount", "date", "beatmap"];
     /// <summary>Best to worst: the grade filter's order, and the grade sort's.</summary>
     public static readonly string[] GradeNames = ["XH", "X", "SH", "S", "A", "B", "C", "D", "F"];
     /// <summary>How many rows a page can hold: the first shown, and each show more.</summary>
@@ -28,6 +28,11 @@ internal sealed class ScoreListView
     public string Sort { get; set; } = "pp";
     /// <summary><c>desc</c> or <c>asc</c>.</summary>
     public string Order { get; set; } = "desc";
+    /// <summary>
+    /// A custom sort's further levels, each applied to the rows the ones before it leave tied, as
+    /// Excel's Sort dialog does. Empty for a single sort. No sort appears twice, <see cref="Sort"/> included.
+    /// </summary>
+    public List<SortLevel> Then { get; set; } = [];
     public string Search { get; set; } = "";
     /// <summary>Every one of these on the play; <c>NM</c> is no mod at all.</summary>
     public List<string> Mods { get; set; } = [];
@@ -54,6 +59,7 @@ internal sealed class ScoreListView
         view.Uncounted = Js.IsTrue(Js.Get(raw, "uncounted"));
         if (Js.IsString(Js.Get(raw, "sort"), out var sort) && Sorts.Contains(sort)) view.Sort = sort;
         if (Js.IsString(Js.Get(raw, "order"), out var order) && order is "asc" or "desc") view.Order = order;
+        view.Then = Levels(Js.Get(raw, "then"), view.Sort);
         if (Js.IsString(Js.Get(raw, "search"), out var search)) view.Search = Js.Slice(Js.Trim(search), 200);
         view.Mods = Words(Js.Get(raw, "mods"), m => m.Length is >= 2 and <= 3 && m.All(char.IsAsciiLetterOrDigit), upper: true);
         view.Grades = Words(Js.Get(raw, "grades"), GradeNames.Contains, upper: true);
@@ -68,6 +74,21 @@ internal sealed class ScoreListView
             view.PageSize = (int)Js.NumberOf(size);
         }
         return view;
+    }
+
+    /// <summary>A custom sort's further levels: known sorts only, each once and never the first level's.</summary>
+    private static List<SortLevel> Levels(JsonElement? raw, string first)
+    {
+        var levels = new List<SortLevel>();
+        if (!Js.IsArray(raw)) return levels;
+        var used = new HashSet<string> { first };
+        foreach (var item in raw!.Value.EnumerateArray())
+        {
+            if (!Js.IsString(Js.Get(item, "sort"), out var sort) || !Sorts.Contains(sort) || !used.Add(sort)) continue;
+            var order = Js.IsString(Js.Get(item, "order"), out var o) && o == "asc" ? "asc" : "desc";
+            levels.Add(new SortLevel { Sort = sort, Order = order });
+        }
+        return levels;
     }
 
     private static List<string> Words(JsonElement? raw, Func<string, bool> allowed, bool upper)
@@ -87,4 +108,12 @@ internal sealed class ScoreListView
 
     private static double? Number(JsonElement? raw, double min, double max) =>
         raw is { ValueKind: JsonValueKind.Number } n && Js.NumberOf(n) is var v && double.IsFinite(v) && v >= min && v <= max ? v : null;
+}
+
+/// <summary>One level of a custom sort: what it sorts by, and which way.</summary>
+internal sealed class SortLevel
+{
+    public string Sort { get; set; } = "pp";
+    /// <summary><c>desc</c> or <c>asc</c>.</summary>
+    public string Order { get; set; } = "desc";
 }

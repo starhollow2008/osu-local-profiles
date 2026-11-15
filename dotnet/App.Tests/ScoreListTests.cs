@@ -173,6 +173,70 @@ public sealed class ScoreListTests : IDisposable
     }
 
     [Fact]
+    public void Mods_sort_into_groups_in_osus_mod_select_order_best_pp_first_within_one()
+    {
+        static string Mods(params string[] acronyms) => JsonText.Stringify(acronyms.Select(a => new { acronym = a }).ToList());
+        var hddt = Score("aaa", 300, mods: Mods("HD", "DT"));
+        // The same combination, in another order and with a setting: the same group.
+        var dthd = Score("bbb", 400, mods: """[{"acronym":"DT","settings":{"speed_change":1.3}},{"acronym":"HD"}]""");
+        var hr = Score("ccc", 200, mods: Mods("HR"));
+        var nm = Score("aaa", 100, at: 2000);
+        var neo = Score("bbb", 150, mods: Mods("NEO"), at: 2000);
+        var hrMc = Score("ccc", 250, mods: Mods("HR", "MC"), at: 2000);
+        var every = new { show = "every", sort = "mods", order = "asc" };
+
+        // No mod, single mods, then combinations, each by its first mod (HR before DT), with
+        // neomod's own after osu!'s.
+        Assert.Equal([nm, hr, neo, hrMc, dthd, hddt], Ids(List(View(every))));
+        // The other way round, groups reversed but still best pp first within one.
+        Assert.Equal([dthd, hddt, hrMc, neo, hr, nm], Ids(List(View(new { show = "every", sort = "mods", order = "desc" }))));
+
+        // A play osu! scores as stable shows Classic, and sorts with it: after HR, before NEO,
+        // and the same group whether its Classic was stored or not.
+        var stable = Score("aaa", 120, client: "stable", at: 3000);
+        var stableCl = Score("bbb", 110, mods: Mods("CL"), client: "neki", at: 3000);
+        Assert.Equal([nm, hr, stable, stableCl, neo, hrMc, dthd, hddt], Ids(List(View(every))));
+    }
+
+    [Fact]
+    public void A_custom_sort_applies_each_level_to_the_rows_the_ones_before_leave_tied()
+    {
+        var a = Score("aaa", 300, grade: "A", accuracy: 0.90, at: 1000);
+        var b = Score("bbb", 200, grade: "S", accuracy: 0.97, at: 3000);
+        var c = Score("ccc", 100, grade: "S", accuracy: 0.97, at: 2000);
+        var d = Score("aaa", 50, grade: "S", accuracy: 0.99, at: 4000);
+        var every = new { show = "every", sort = "grade" };
+
+        // Grade alone breaks ties by accuracy, then the newest.
+        Assert.Equal([d, b, c, a], Ids(List(View(every))));
+        // Grade, then pp lowest first: S's by pp, then A.
+        Assert.Equal([d, c, b, a], Ids(List(View(new { show = "every", sort = "grade", then = new[] { new { sort = "pp", order = "asc" } } }))));
+        // Grade, then date oldest first.
+        Assert.Equal([c, b, d, a], Ids(List(View(new { show = "every", sort = "grade", then = new[] { new { sort = "date", order = "asc" } } }))));
+    }
+
+    [Fact]
+    public void A_custom_sort_keeps_known_sorts_once_each()
+    {
+        var view = View(new
+        {
+            sort = "grade",
+            then = new object[]
+            {
+                new { sort = "grade", order = "asc" }, new { sort = "accuracy", order = "asc" }, new { sort = "DROP", order = "asc" },
+                new { sort = "accuracy" }, new { sort = "date", order = "sideways" }, "pp",
+            },
+        });
+        Assert.Equal([("accuracy", "asc"), ("date", "desc")], view.Then.Select(l => (l.Sort, l.Order)));
+        Assert.Empty(View(new { sort = "pp" }).Then);
+
+        // Saved with the profile.
+        SettingsStore.Update(h.Db, h.ProfileId, JsonText.From(new { scoreList = new { sort = "mods", then = new[] { new { sort = "pp", order = "asc" } } } }));
+        var saved = SettingsStore.Get(h.Db, h.ProfileId).ScoreList;
+        Assert.Equal(("mods", "pp", "asc"), (saved.Sort, saved.Then.Single().Sort, saved.Then.Single().Order));
+    }
+
+    [Fact]
     public void A_page_is_a_slice_of_the_whole_list_and_says_how_long_it_is()
     {
         for (var i = 0; i < 7; i++) Score(i % 2 == 0 ? "aaa" : "bbb", 100 + i);

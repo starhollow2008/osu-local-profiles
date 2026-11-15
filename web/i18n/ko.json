@@ -934,6 +934,17 @@
   "scoreList.remove": "{filter} 제거",
   "scoreList.reset": "초기화",
   "scoreList.atATime": "개씩",
+  "scoreList.customSort": "사용자 지정 정렬…",
+  "scoreList.customSortTitle": "사용자 지정 정렬",
+  "scoreList.sortBy": "정렬 기준",
+  "scoreList.thenBy": "다음 기준",
+  "scoreList.order": "순서",
+  "scoreList.addLevel": "기준 추가",
+  "scoreList.deleteLevel": "기준 삭제",
+  "scoreList.moveUp": "위로",
+  "scoreList.moveDown": "아래로",
+  "scoreList.sortCancel": "취소",
+  "scoreList.sortApply": "확인",
   "heading.firstPlaceRanks": "1위 기록",
   "import.firstPlaces": "1위 기록은 모든 게임 모드에서 1위인 점수를 가져옵니다. 최고 성과와 같이 계산되며, 목록은 계속 최신으로 유지됩니다. 많으면 시간이 걸릴 수 있습니다."
 }

@@ -23,6 +23,8 @@ export const DEFAULT_VIEW = Object.freeze({
   uncounted: false,
   sort: 'pp',
   order: 'desc',
+  // A custom sort's further levels, each { sort, order }: none for a single sort.
+  then: [],
   search: '',
   mods: [],
   grades: [],
@@ -45,16 +47,51 @@ const DISPLAY_KEYS = new Set(['layout', 'pageSize']);
 const MOST_AT_ONCE = 10000;
 
 /** Every sort, as the Sort menu lists them. */
-export const SORTS = ['pp', 'score', 'accuracy', 'grade', 'combo', 'stars', 'misses', 'playcount', 'date', 'beatmap'];
+export const SORTS = ['pp', 'score', 'accuracy', 'grade', 'mods', 'combo', 'stars', 'misses', 'playcount', 'date', 'beatmap'];
 
-/** Sorts that read naturally smallest first: a new one starts that way. */
-const ASCENDING_FIRST = new Set(['misses', 'beatmap']);
+/** Sorts that read naturally smallest first: a new one starts that way. No mod first, for mods. */
+const ASCENDING_FIRST = new Set(['misses', 'beatmap', 'mods']);
+
+/** Which way a sort starts when it is picked. */
+export const startingOrder = (sort) => (ASCENDING_FIRST.has(sort) ? 'asc' : 'desc');
 
 /** A saved or partial view, with every field there. */
 export function normaliseView(view) {
   const v = { ...DEFAULT_VIEW, ...(view ?? {}) };
   for (const key of ['mods', 'grades', 'clients']) v[key] = Array.isArray(v[key]) ? [...v[key]] : [];
+  v.then = cleanLevels(v.then, v.sort);
   return v;
+}
+
+/** A custom sort's further levels: known sorts only, each once and never the first level's. */
+function cleanLevels(levels, first) {
+  if (!Array.isArray(levels)) return [];
+  const used = new Set([first]);
+  const clean = [];
+  for (const level of levels) {
+    if (!level || !SORTS.includes(level.sort) || used.has(level.sort)) continue;
+    used.add(level.sort);
+    clean.push({ sort: level.sort, order: level.order === 'asc' ? 'asc' : 'desc' });
+  }
+  return clean;
+}
+
+/** Every level of the view's sort, the first one included, as the custom sort dialog lists them. */
+export function sortLevels(view) {
+  const v = normaliseView(view);
+  return [{ sort: v.sort, order: v.order }, ...v.then];
+}
+
+/** The view sorted by these levels: the first is the sort, the rest its further levels. */
+export function withSortLevels(view, levels) {
+  const [first, ...rest] = levels.length ? levels : [{ sort: DEFAULT_VIEW.sort, order: DEFAULT_VIEW.order }];
+  return normaliseView({ ...view, sort: first.sort, order: first.order === 'asc' ? 'asc' : 'desc', then: rest });
+}
+
+/** The levels with one more: the first sort none of them uses yet, or the same levels when every one is used. */
+export function addSortLevel(levels) {
+  const sort = SORTS.find((s) => !levels.some((l) => l.sort === s));
+  return sort ? [...levels, { sort, order: startingOrder(sort) }] : levels;
 }
 
 /** Whether anything Reset would change is off its default. The layout and page size never count. */
@@ -120,13 +157,17 @@ export function withoutFilter(view, key, value) {
   return v;
 }
 
-/** Sorting by a column: the other way round when it is the one already sorted by. */
+/**
+ * Sorting by a column: the other way round when it is the one already sorted by, which keeps a
+ * custom sort's further levels; any other column is a sort by that alone.
+ */
 export function sortedBy(view, sort) {
   const v = normaliseView(view);
   if (v.sort === sort) v.order = v.order === 'desc' ? 'asc' : 'desc';
   else {
     v.sort = sort;
-    v.order = ASCENDING_FIRST.has(sort) ? 'asc' : 'desc';
+    v.order = startingOrder(sort);
+    v.then = [];
   }
   return v;
 }
@@ -170,7 +211,7 @@ const COLUMNS = [
   { key: 'place', label: '', className: 'score-table__place' },
   { key: 'grade', label: () => t('scoreList.colGrade'), sort: 'grade' },
   { key: 'beatmap', label: () => t('scoreList.colBeatmap'), sort: 'beatmap', className: 'score-table__beatmap' },
-  { key: 'mods', label: () => t('scoreList.colMods') },
+  { key: 'mods', label: () => t('scoreList.colMods'), sort: 'mods' },
   { key: 'accuracy', label: () => t('scoreList.colAccuracy'), sort: 'accuracy', className: 'num' },
   { key: 'combo', label: () => t('scoreList.colCombo'), sort: 'combo', className: 'num' },
   { key: 'stars', label: () => t('scoreList.colStars'), sort: 'stars', className: 'num' },
@@ -322,7 +363,14 @@ function renderControls() {
   for (const b of $('scoreListLayout').querySelectorAll('[data-layout]')) {
     b.setAttribute('aria-pressed', String(b.dataset.layout === view.layout));
   }
-  $('scoreListSort').value = view.sort;
+  // A custom sort shows as its levels, and has its directions in the dialog rather than the arrow.
+  const custom = view.then.length > 0;
+  const summary = sortLevels(view).map((l) => sortName(l.sort)).join(', ');
+  $('scoreListSortCustom').hidden = !custom;
+  $('scoreListSortCustom').textContent = custom ? summary : '';
+  $('scoreListSort').value = custom ? 'custom' : view.sort;
+  $('scoreListSort').title = custom ? summary : '';
+  $('scoreListOrder').hidden = custom;
   $('scoreListOrder').dataset.order = view.order;
   $('scoreListOrder').title = view.order === 'asc' ? t('scoreList.ascending') : t('scoreList.descending');
   $('scoreListOrder').setAttribute('aria-label', $('scoreListOrder').title);
@@ -376,13 +424,109 @@ function togglePopover(id) {
   $(`${id}Btn`).setAttribute('aria-expanded', String(open));
 }
 
-/** Whether a popover is open, so Escape closes that first. */
+/** Whether a popover or the custom sort dialog is open, so Escape closes that first. */
 export function scoreListPopoverOpen() {
-  return !$('scoreListFilters').hidden || !$('scoreListExport').hidden;
+  return !$('scoreListFilters').hidden || !$('scoreListExport').hidden || !$('sortModal').hidden;
 }
 
 export function closeScoreListPopovers() {
   closePopovers();
+  closeSortDialog();
+}
+
+/* ------------------------------------------------------------ custom sort */
+
+/** A sort's name, in the reader's language, as the Sort menu shows it. */
+function sortName(sort) {
+  return $('scoreListSort').querySelector(`option[value="${sort}"]`)?.textContent ?? sort;
+}
+
+/** The levels being edited, applied to the view only by OK. */
+let editingLevels = [];
+
+function openSortDialog() {
+  closePopovers();
+  editingLevels = sortLevels(view);
+  renderSortDialog();
+  $('sortModal').hidden = false;
+  $('sortLevels').querySelector('select')?.focus();
+}
+
+function closeSortDialog() {
+  $('sortModal').hidden = true;
+}
+
+/** One row per level: its column (none another level uses), its direction, and moving or removing it. */
+function renderSortDialog() {
+  const last = editingLevels.length - 1;
+  const button = (act, i, label, symbol, disabled) =>
+    `<button type="button" class="sort-level__btn" data-act="${act}" data-index="${i}" aria-label="${escapeHtml(label)}"
+      title="${escapeHtml(label)}"${disabled ? ' disabled' : ''}>${symbol}</button>`;
+  $('sortLevels').innerHTML = editingLevels.map((level, i) => {
+    const label = i === 0 ? t('scoreList.sortBy') : t('scoreList.thenBy');
+    const sorts = SORTS.filter((s) => s === level.sort || !editingLevels.some((l) => l.sort === s));
+    return `<div class="sort-level">
+      <span class="sort-level__label" id="sortLevel${i}">${escapeHtml(label)}</span>
+      <select data-act="sort" data-index="${i}" aria-labelledby="sortLevel${i}">${sorts.map((s) =>
+        `<option value="${s}"${s === level.sort ? ' selected' : ''}>${escapeHtml(sortName(s))}</option>`).join('')}</select>
+      <select data-act="order" data-index="${i}" aria-label="${escapeHtml(t('scoreList.order'))}">
+        <option value="desc"${level.order === 'desc' ? ' selected' : ''}>${escapeHtml(t('scoreList.descending'))}</option>
+        <option value="asc"${level.order === 'asc' ? ' selected' : ''}>${escapeHtml(t('scoreList.ascending'))}</option>
+      </select>
+      ${button('up', i, t('scoreList.moveUp'), '&#8593;', i === 0)}
+      ${button('down', i, t('scoreList.moveDown'), '&#8595;', i === last)}
+      ${button('delete', i, t('scoreList.deleteLevel'), '&times;', last === 0)}
+    </div>`;
+  }).join('');
+  $('sortAddLevel').disabled = editingLevels.length >= SORTS.length;
+}
+
+function bindSortDialog() {
+  $('sortLevels').onchange = (e) => {
+    const el = e.target.closest('select[data-act]');
+    if (!el) return;
+    const i = Number(el.dataset.index);
+    editingLevels = editingLevels.map((l, j) => {
+      if (j !== i) return l;
+      return el.dataset.act === 'sort' ? { sort: el.value, order: startingOrder(el.value) } : { ...l, order: el.value };
+    });
+    renderSortDialog();
+    $('sortLevels').querySelector(`select[data-act="${el.dataset.act}"][data-index="${i}"]`)?.focus();
+  };
+  $('sortLevels').onclick = (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b || b.disabled) return;
+    const i = Number(b.dataset.index);
+    const levels = [...editingLevels];
+    let focus = i;
+    if (b.dataset.act === 'delete') {
+      levels.splice(i, 1);
+      focus = Math.min(i, levels.length - 1);
+    } else {
+      const j = b.dataset.act === 'up' ? i - 1 : i + 1;
+      [levels[i], levels[j]] = [levels[j], levels[i]];
+      focus = j;
+    }
+    editingLevels = levels;
+    renderSortDialog();
+    // Keep the keyboard where it was: on the same button of the row that moved, or the row after one removed.
+    const again = $('sortLevels').querySelector(`button[data-act="${b.dataset.act}"][data-index="${focus}"]:not(:disabled)`);
+    (again ?? $('sortLevels').querySelector(`select[data-index="${focus}"]`))?.focus();
+  };
+  $('sortAddLevel').onclick = () => {
+    editingLevels = addSortLevel(editingLevels);
+    renderSortDialog();
+    $('sortLevels').querySelector(`select[data-index="${editingLevels.length - 1}"]`)?.focus();
+  };
+  $('sortCancel').onclick = closeSortDialog;
+  $('sortApply').onclick = () => {
+    closeSortDialog();
+    change(withSortLevels(view, editingLevels));
+  };
+  // Clicking the dimmed background cancels; clicking inside the dialog does not.
+  $('sortModal').onclick = (e) => {
+    if (e.target === $('sortModal')) closeSortDialog();
+  };
 }
 
 /** Show the view, with the profile's saved setup, and ask for its first page. */
@@ -398,6 +542,7 @@ export function openScoreList() {
 
 export function closeScoreList() {
   closePopovers();
+  closeSortDialog();
   document.body.classList.remove('view-scores');
   renderViewTabs();
 }
@@ -438,8 +583,16 @@ export function bindScoreList(context) {
   };
   $('scoreListSort').onchange = () => {
     const sort = $('scoreListSort').value;
-    change({ ...view, sort, order: ASCENDING_FIRST.has(sort) ? 'asc' : 'desc' });
+    if (sort === 'customEdit') {
+      // The menu goes back to what is in force; the dialog's OK changes it.
+      renderControls();
+      openSortDialog();
+      return;
+    }
+    if (sort === 'custom') return;
+    change({ ...view, sort, order: startingOrder(sort), then: [] });
   };
+  bindSortDialog();
   $('scoreListOrder').onclick = () => change({ ...view, order: view.order === 'asc' ? 'desc' : 'asc' });
   $('scoreListSearch').oninput = () => {
     clearTimeout(searchTimer);

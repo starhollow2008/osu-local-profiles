@@ -1127,7 +1127,7 @@ document.addEventListener('click', () => setMenuOpen(false));
 $('optionsMenu').onclick = (e) => e.stopPropagation();
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  // The Scores view's Filters or Export first, as any menu.
+  // The Scores view's Filters, Export or Custom sort first, as any menu.
   if (scoreListPopoverOpen()) return closeScoreListPopovers();
   // These two open over Import scores: Escape closes the one on top, not both.
   if (!$('scoreLinkModal').hidden) return closeScoreLink();

@@ -934,6 +934,17 @@
   "scoreList.remove": "{filter} verwijderen",
   "scoreList.reset": "Herstellen",
   "scoreList.atATime": "tegelijk",
+  "scoreList.customSort": "Aangepast sorteren…",
+  "scoreList.customSortTitle": "Aangepast sorteren",
+  "scoreList.sortBy": "Sorteren op",
+  "scoreList.thenBy": "Daarna op",
+  "scoreList.order": "Volgorde",
+  "scoreList.addLevel": "Niveau toevoegen",
+  "scoreList.deleteLevel": "Niveau verwijderen",
+  "scoreList.moveUp": "Omhoog",
+  "scoreList.moveDown": "Omlaag",
+  "scoreList.sortCancel": "Annuleren",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Eerste plaatsen",
   "import.firstPlaces": "Eerste plaatsen haalt de scores op waarmee je #1 staat, in elke spelmodus. Ze tellen mee zoals beste prestaties, en de lijst blijft bijgewerkt. Veel kan even duren."
 }

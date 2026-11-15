@@ -934,6 +934,17 @@
   "scoreList.remove": "Quitar {filter}",
   "scoreList.reset": "Restablecer",
   "scoreList.atATime": "a la vez",
+  "scoreList.customSort": "Orden personalizado…",
+  "scoreList.customSortTitle": "Orden personalizado",
+  "scoreList.sortBy": "Ordenar por",
+  "scoreList.thenBy": "Luego por",
+  "scoreList.order": "Orden",
+  "scoreList.addLevel": "Añadir nivel",
+  "scoreList.deleteLevel": "Eliminar nivel",
+  "scoreList.moveUp": "Subir",
+  "scoreList.moveDown": "Bajar",
+  "scoreList.sortCancel": "Cancelar",
+  "scoreList.sortApply": "Aceptar",
   "heading.firstPlaceRanks": "Primeros puestos",
   "import.firstPlaces": "Primeros puestos trae las puntuaciones con las que tienes el #1 en cada modo de juego. Cuentan como las mejores actuaciones, y la lista se mantiene al día. Muchas pueden tardar un rato."
 }

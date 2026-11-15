@@ -934,6 +934,17 @@
   "scoreList.remove": "{filter} entfernen",
   "scoreList.reset": "Zurücksetzen",
   "scoreList.atATime": "auf einmal",
+  "scoreList.customSort": "Benutzerdefiniertes Sortieren…",
+  "scoreList.customSortTitle": "Benutzerdefiniertes Sortieren",
+  "scoreList.sortBy": "Sortieren nach",
+  "scoreList.thenBy": "Dann nach",
+  "scoreList.order": "Reihenfolge",
+  "scoreList.addLevel": "Ebene hinzufügen",
+  "scoreList.deleteLevel": "Ebene löschen",
+  "scoreList.moveUp": "Nach oben",
+  "scoreList.moveDown": "Nach unten",
+  "scoreList.sortCancel": "Abbrechen",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Erste Plätze",
   "import.firstPlaces": "Erste Plätze holt die Scores, mit denen du #1 bist, in jedem Spielmodus. Sie zählen wie beste Leistungen, und die Liste bleibt aktuell. Viele können eine Weile dauern."
 }

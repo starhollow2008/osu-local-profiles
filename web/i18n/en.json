@@ -951,6 +951,17 @@
   "scoreList.remove": "Remove {filter}",
   "scoreList.reset": "Reset",
   "scoreList.atATime": "at a time",
+  "scoreList.customSort": "Custom sort…",
+  "scoreList.customSortTitle": "Custom sort",
+  "scoreList.sortBy": "Sort by",
+  "scoreList.thenBy": "Then by",
+  "scoreList.order": "Order",
+  "scoreList.addLevel": "Add level",
+  "scoreList.deleteLevel": "Delete level",
+  "scoreList.moveUp": "Move up",
+  "scoreList.moveDown": "Move down",
+  "scoreList.sortCancel": "Cancel",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "First Place Ranks",
   "import.firstPlaces": "First place ranks brings in the scores you hold #1 with in every game mode. They count as best performances do, and the list stays up to date. Many can take a while."
 }

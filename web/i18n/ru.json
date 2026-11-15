@@ -934,6 +934,17 @@
   "scoreList.remove": "Убрать {filter}",
   "scoreList.reset": "Сбросить",
   "scoreList.atATime": "за раз",
+  "scoreList.customSort": "Настраиваемая сортировка…",
+  "scoreList.customSortTitle": "Настраиваемая сортировка",
+  "scoreList.sortBy": "Сортировать по",
+  "scoreList.thenBy": "Затем по",
+  "scoreList.order": "Порядок",
+  "scoreList.addLevel": "Добавить уровень",
+  "scoreList.deleteLevel": "Удалить уровень",
+  "scoreList.moveUp": "Вверх",
+  "scoreList.moveDown": "Вниз",
+  "scoreList.sortCancel": "Отмена",
+  "scoreList.sortApply": "ОК",
   "heading.firstPlaceRanks": "Первые места",
   "import.firstPlaces": "Первые места загружает результаты, с которыми вы на #1, во всех режимах игры. Они учитываются как лучшие результаты, а список остаётся актуальным. Если их много, это может занять время."
 }

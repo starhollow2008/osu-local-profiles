@@ -934,6 +934,17 @@
   "scoreList.remove": "Rimuovi {filter}",
   "scoreList.reset": "Reimposta",
   "scoreList.atATime": "alla volta",
+  "scoreList.customSort": "Ordinamento personalizzato…",
+  "scoreList.customSortTitle": "Ordinamento personalizzato",
+  "scoreList.sortBy": "Ordina per",
+  "scoreList.thenBy": "Poi per",
+  "scoreList.order": "Ordine",
+  "scoreList.addLevel": "Aggiungi livello",
+  "scoreList.deleteLevel": "Elimina livello",
+  "scoreList.moveUp": "Sposta su",
+  "scoreList.moveDown": "Sposta giù",
+  "scoreList.sortCancel": "Annulla",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Primi posti",
   "import.firstPlaces": "Primi posti importa i punteggi con cui sei #1 in ogni modalità di gioco. Contano come le migliori prestazioni, e la lista resta aggiornata. Molti possono richiedere un po’ di tempo."
 }

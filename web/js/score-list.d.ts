@@ -5,6 +5,7 @@ export interface ScoreListView {
   uncounted: boolean;
   sort: string;
   order: 'asc' | 'desc';
+  then: SortLevel[];
   search: string;
   mods: string[];
   grades: string[];
@@ -17,8 +18,17 @@ export interface ScoreListView {
   pageSize: number;
 }
 
+export interface SortLevel {
+  sort: string;
+  order: 'asc' | 'desc';
+}
+
 export const DEFAULT_VIEW: Readonly<ScoreListView>;
 export const SORTS: string[];
+export function startingOrder(sort: string): 'asc' | 'desc';
+export function sortLevels(view: Partial<ScoreListView>): SortLevel[];
+export function withSortLevels(view: Partial<ScoreListView>, levels: SortLevel[]): ScoreListView;
+export function addSortLevel(levels: SortLevel[]): SortLevel[];
 export const PAGE_SIZES: number[];
 export function normaliseView(view: Partial<ScoreListView> | null | undefined): ScoreListView;
 export function viewChanged(view: Partial<ScoreListView> | null | undefined): boolean;

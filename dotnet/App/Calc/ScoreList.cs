@@ -17,9 +17,23 @@ internal sealed record ScoreListChoices(List<string> Mods, List<string> Grades, 
 /// </summary>
 internal static partial class Stats
 {
-    /// <summary>The mods in the order osu!'s mod select groups them, the rest after, alphabetically.</summary>
+    /// <summary>
+    /// The mods in the order osu!lazer's mod select lists them (difficulty reduction, difficulty
+    /// increase, conversion, automation, fun, system), every ruleset's together, then McOsu's and
+    /// neomod's own; anything else after, alphabetically. The filter's order, and the mods sort's.
+    /// </summary>
     private static readonly string[] ModOrder =
-        ["EZ", "NF", "HT", "DC", "HR", "SD", "PF", "DT", "NC", "HD", "FI", "FL", "BL", "ST", "AC", "RX", "AP", "SO", "TD", "MR"];
+    [
+        "EZ", "NF", "HT", "DC", "NR",
+        "HR", "SD", "PF", "DT", "NC", "HD", "FI", "CO", "FL", "BL", "ST", "AC",
+        "TP", "DA", "CL", "RD", "MR", "AL", "SG", "SW", "SR", "CS", "HO", "IN", "DS",
+        "1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K",
+        "AT", "CN", "RX", "AP", "SO",
+        "TR", "WG", "SI", "GR", "DF", "WU", "WD", "TC", "BR", "AD", "MU", "NS", "MG", "RP", "AS", "FR", "BU", "SY",
+        "DP", "BM", "FF", "MF",
+        "TD", "SV2",
+        "MC", "NEO",
+    ];
 
     /// <summary>The most search words that are each looked for.</summary>
     private const int SearchWords = 10;
@@ -42,12 +56,31 @@ internal static partial class Stats
         "date" => "played_at",
         "beatmap" => "COALESCE(title, '') COLLATE NOCASE",
         "grade" => GradeRank,
+        "mods" => ModsKey,
         _ => "pp",
     };
 
     /// <summary>A grade's place, silver SS highest and F lowest; anything else has none and goes last.</summary>
     private static readonly string GradeRank =
         $"CASE grade {string.Join(" ", ScoreListView.GradeNames.Select((g, i) => $"WHEN '{g}' THEN {ScoreListView.GradeNames.Length - i}"))} END";
+
+    /// <summary>
+    /// A play's mods as text that sorts them into groups: how many there are, then each one's place
+    /// in <see cref="ModOrder"/>, so no mod comes first, then single mods, then combinations, and the
+    /// same combination in any order or with any settings is one group. McOsu's and neomod's own
+    /// mods are one each (MC, NEO), as the filter has them. Classic counts wherever a play shows it,
+    /// so on every play osu! scores as stable (<see cref="Mods.WithClassicMod"/>).
+    /// </summary>
+    private static readonly string ModsKey = $"""
+        (SELECT printf('%03d', COUNT(*)) || COALESCE(group_concat(k, '' ORDER BY k), '')
+           FROM (SELECT printf('%03d%-4s',
+                        CASE a {string.Join(" ", ModOrder.Select((m, i) => $"WHEN '{m}' THEN {i}"))} ELSE 999 END, a) AS k
+                   FROM (SELECT json_extract(j.value, '$.acronym') AS a
+                           FROM json_each(CASE WHEN json_valid(mods_json) THEN mods_json ELSE '[]' END) j
+                          WHERE a IS NOT NULL
+                          UNION
+                         SELECT 'CL' WHERE client IN ({string.Join(", ", Mods.StableScoredClients.Select(c => $"'{c}'"))}))))
+        """;
 
     /// <summary>
     /// The listed rows, unordered: each visible score that counts toward pp (or any, when the view
@@ -117,14 +150,24 @@ internal static partial class Stats
         return (sql, args);
     }
 
+    /// <summary>
+    /// The sort, then each further level of a custom one, then what the first level breaks ties
+    /// with on its own, then the newest first. Within a level, rows with nothing to sort by go last
+    /// either way round.
+    /// </summary>
     private static string ListOrder(ScoreListView view)
     {
-        var by = SortExpression(view.Sort);
-        var direction = view.Order == "asc" ? "ASC" : "DESC";
-        // Many scores share a grade: within one, by accuracy the same way round.
-        var within = view.Sort == "grade" ? $", accuracy {direction}" : "";
-        // Rows with nothing to sort by go last either way, then the newest first.
-        return $"ORDER BY {by} IS NULL, {by} {direction}{within}, played_at DESC, id DESC";
+        var terms = new List<string>();
+        foreach (var (sort, order) in new[] { (view.Sort, view.Order) }.Concat(view.Then.Select(l => (l.Sort, l.Order))))
+        {
+            var by = SortExpression(sort);
+            terms.Add($"{by} IS NULL, {by} {(order == "asc" ? "ASC" : "DESC")}");
+        }
+        // Many scores share a grade, or a set of mods: within one, by accuracy the same way round,
+        // or by pp, best first.
+        if (view.Sort == "grade") terms.Add($"accuracy {(view.Order == "asc" ? "ASC" : "DESC")}");
+        if (view.Sort == "mods") terms.Add("pp IS NULL, pp DESC");
+        return $"ORDER BY {string.Join(", ", terms)}, played_at DESC, id DESC";
     }
 
     /// <summary>One page of the Scores view.</summary>

@@ -934,6 +934,17 @@
   "scoreList.remove": "{filter} を外す",
   "scoreList.reset": "リセット",
   "scoreList.atATime": "件ずつ",
+  "scoreList.customSort": "ユーザー設定の並べ替え…",
+  "scoreList.customSortTitle": "ユーザー設定の並べ替え",
+  "scoreList.sortBy": "最優先",
+  "scoreList.thenBy": "次に優先",
+  "scoreList.order": "順序",
+  "scoreList.addLevel": "レベルの追加",
+  "scoreList.deleteLevel": "レベルの削除",
+  "scoreList.moveUp": "上へ移動",
+  "scoreList.moveDown": "下へ移動",
+  "scoreList.sortCancel": "キャンセル",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "1位ランク",
   "import.firstPlaces": "1位ランクは、すべてのゲームモードで1位を取っているスコアを取り込みます。ベストパフォーマンスと同じように数えられ、リストは最新に保たれます。数が多いと時間がかかることがあります。"
 }

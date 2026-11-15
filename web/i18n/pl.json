@@ -946,6 +946,17 @@
   "scoreList.remove": "Usuń {filter}",
   "scoreList.reset": "Resetuj",
   "scoreList.atATime": "naraz",
+  "scoreList.customSort": "Sortowanie niestandardowe…",
+  "scoreList.customSortTitle": "Sortowanie niestandardowe",
+  "scoreList.sortBy": "Sortuj według",
+  "scoreList.thenBy": "Następnie według",
+  "scoreList.order": "Kolejność",
+  "scoreList.addLevel": "Dodaj poziom",
+  "scoreList.deleteLevel": "Usuń poziom",
+  "scoreList.moveUp": "Przesuń w górę",
+  "scoreList.moveDown": "Przesuń w dół",
+  "scoreList.sortCancel": "Anuluj",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Pierwsze miejsca",
   "import.firstPlaces": "Pierwsze miejsca pobiera wyniki, którymi zajmujesz #1, w każdym trybie gry. Liczą się jak najlepsze wyniki, a lista jest na bieżąco aktualizowana. Wiele może chwilę potrwać."
 }

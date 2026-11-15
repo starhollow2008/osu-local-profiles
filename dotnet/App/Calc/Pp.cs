@@ -179,8 +179,11 @@ internal static class Mods
             ? [.. mods.Where(m => Acronym(m) != "CL")]
             : null;
 
+    /// <summary>The clients whose plays osu! scores as osu!stable plays.</summary>
+    public static readonly string[] StableScoredClients = ["stable", "mcosu", "neki", "neomod"];
+
     /// <summary>Whether osu! scores a client's plays as osu!stable plays (McOsu's, neki's and neomod's included).</summary>
-    public static bool ScoredAsStable(string? client) => client is "stable" or "mcosu" or "neki" or "neomod";
+    public static bool ScoredAsStable(string? client) => client is not null && StableScoredClients.Contains(client);
 
     /// <summary>
     /// osu! scores every stable play with Classic on, and shows it that way: for display only,

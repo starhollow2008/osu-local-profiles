@@ -7098,6 +7098,72 @@ s.bbcode-editor__glyph {
   background-color: hsl(var(--hsl-b3));
 }
 
+/* The custom sort dialog: a row per level, as Excel's Sort dialog has them. */
+.modal--sort {
+  max-width: 520px;
+}
+
+/* One grid, so every row's choices line up under the longest label, in any language. */
+.sort-levels {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) minmax(0, max-content) repeat(3, max-content);
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.sort-level {
+  display: contents;
+}
+
+.sort-level__label {
+  color: hsl(var(--hsl-f1));
+  white-space: nowrap;
+}
+
+.sort-level select {
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-c1));
+  font: inherit;
+  color-scheme: dark;
+}
+
+.sort-level__btn {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+  cursor: pointer;
+}
+
+.sort-level__btn:hover:not(:disabled) {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.sort-level__btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* On a phone, each level's label sits above its choices. */
+@media (max-width: 480px) {
+  .sort-levels {
+    grid-template-columns: minmax(0, 1fr) minmax(0, max-content) repeat(3, max-content);
+  }
+
+  .sort-level__label {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+}
+
 .score-list__search {
   flex: 1 1 200px;
   min-width: 160px;

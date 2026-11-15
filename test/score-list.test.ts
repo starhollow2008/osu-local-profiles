@@ -3,15 +3,19 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_VIEW,
+  SORTS,
   activeFilters,
+  addSortLevel,
   normaliseView,
   playsText,
   resetView,
   rowsHtml,
   scoreListUrl,
+  sortLevels,
   sortedBy,
   tableHtml,
   viewChanged,
+  withSortLevels,
   withoutFilter,
 } from '../web/js/score-list.js';
 import type { ScoreListView } from '../web/js/score-list.js';
@@ -74,6 +78,37 @@ test('a column sorts by itself, then the other way round', () => {
   // Fewest misses and A to Z read first.
   assert.equal(sortedBy(DEFAULT_VIEW, 'misses').order, 'asc');
   assert.equal(sortedBy(DEFAULT_VIEW, 'beatmap').order, 'asc');
+  // No mod first.
+  assert.equal(sortedBy(DEFAULT_VIEW, 'mods').order, 'asc');
+});
+
+test('a custom sort is levels, each sort once, and a column or Reset puts it back to one', () => {
+  const custom = withSortLevels(DEFAULT_VIEW, [
+    { sort: 'grade', order: 'desc' },
+    { sort: 'accuracy', order: 'asc' },
+    { sort: 'grade', order: 'asc' },
+  ]);
+  assert.deepEqual([custom.sort, custom.order, custom.then], ['grade', 'desc', [{ sort: 'accuracy', order: 'asc' }]]);
+  assert.deepEqual(sortLevels(custom), [{ sort: 'grade', order: 'desc' }, { sort: 'accuracy', order: 'asc' }]);
+  assert.equal(viewChanged(withSortLevels(DEFAULT_VIEW, [{ sort: 'pp', order: 'desc' }, { sort: 'date', order: 'desc' }])), true);
+  // A saved view with junk in it keeps only what it can sort by.
+  const junk = { sort: 'pp', then: [{ sort: 'pp' }, { sort: 'nope' }, null, { sort: 'date', order: 'x' }] };
+  assert.deepEqual(normaliseView(junk as unknown as Partial<ScoreListView>).then, [{ sort: 'date', order: 'desc' }]);
+  assert.deepEqual(normaliseView(null).then, []);
+
+  // Its first column's head turns it round and keeps the rest; any other is a sort by that alone.
+  assert.deepEqual(sortedBy(custom, 'grade').then, custom.then);
+  assert.equal(sortedBy(custom, 'grade').order, 'asc');
+  assert.deepEqual(sortedBy(custom, 'pp').then, []);
+  assert.deepEqual(resetView(custom).then, []);
+
+  // A new level is the first sort not used yet, starting its natural way round.
+  assert.deepEqual(addSortLevel([{ sort: 'pp', order: 'desc' }]).at(-1), { sort: 'score', order: 'desc' });
+  const every = SORTS.map((sort) => ({ sort, order: 'desc' as const }));
+  assert.equal(addSortLevel(every).length, SORTS.length);
+  // The list and its export are asked for with the levels.
+  const params = new URLSearchParams(scoreListUrl('/x', custom, 0).split('?')[1]);
+  assert.deepEqual(JSON.parse(params.get('view') ?? '{}').then, custom.then);
 });
 
 test('the list is asked for with the view, how it is looked at left out', () => {
@@ -94,6 +129,7 @@ test('the table numbers its rows, sorts from its heads, and escapes what came fr
   assert.match(html, /aria-sort="descending"><button[^>]*data-sort="pp"/);
   assert.match(html, /data-sort="playcount"/);
   assert.match(html, /data-sort="grade"/);
+  assert.match(html, /data-sort="mods"/);
   assert.ok(html.includes('Artist &lt;b&gt;'));
   assert.ok(!html.includes('<b>'));
   assert.match(html, /data-score-id="7"/);

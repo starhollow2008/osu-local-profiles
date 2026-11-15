@@ -934,6 +934,17 @@
   "scoreList.remove": "Poista {filter}",
   "scoreList.reset": "Palauta",
   "scoreList.atATime": "kerrallaan",
+  "scoreList.customSort": "Mukautettu järjestys…",
+  "scoreList.customSortTitle": "Mukautettu järjestys",
+  "scoreList.sortBy": "Järjestä",
+  "scoreList.thenBy": "Sitten",
+  "scoreList.order": "Järjestys",
+  "scoreList.addLevel": "Lisää taso",
+  "scoreList.deleteLevel": "Poista taso",
+  "scoreList.moveUp": "Siirrä ylös",
+  "scoreList.moveDown": "Siirrä alas",
+  "scoreList.sortCancel": "Peruuta",
+  "scoreList.sortApply": "OK",
   "heading.firstPlaceRanks": "Ensimmäiset sijat",
   "import.firstPlaces": "Ensimmäiset sijat tuo tulokset, joilla olet #1, jokaisessa pelimuodossa. Ne lasketaan kuten parhaat suoritukset, ja lista pysyy ajan tasalla. Monen tuonti voi kestää hetken."
 }
