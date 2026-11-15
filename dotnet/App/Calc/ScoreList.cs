@@ -41,8 +41,13 @@ internal static partial class Stats
         "playcount" => "playcount",
         "date" => "played_at",
         "beatmap" => "COALESCE(title, '') COLLATE NOCASE",
+        "grade" => GradeRank,
         _ => "pp",
     };
+
+    /// <summary>A grade's place, silver SS highest and F lowest; anything else has none and goes last.</summary>
+    private static readonly string GradeRank =
+        $"CASE grade {string.Join(" ", ScoreListView.GradeNames.Select((g, i) => $"WHEN '{g}' THEN {ScoreListView.GradeNames.Length - i}"))} END";
 
     /// <summary>
     /// The listed rows, unordered: each visible score that counts toward pp (or any, when the view
@@ -116,8 +121,10 @@ internal static partial class Stats
     {
         var by = SortExpression(view.Sort);
         var direction = view.Order == "asc" ? "ASC" : "DESC";
+        // Many scores share a grade: within one, by accuracy the same way round.
+        var within = view.Sort == "grade" ? $", accuracy {direction}" : "";
         // Rows with nothing to sort by go last either way, then the newest first.
-        return $"ORDER BY {by} IS NULL, {by} {direction}, played_at DESC, id DESC";
+        return $"ORDER BY {by} IS NULL, {by} {direction}{within}, played_at DESC, id DESC";
     }
 
     /// <summary>One page of the Scores view.</summary>

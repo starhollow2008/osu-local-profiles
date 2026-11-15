@@ -159,6 +159,14 @@ public sealed class ScoreListTests : IDisposable
         Assert.Equal([a, c, b], Ids(List(View(new { sort = "beatmap", order = "asc" }))));
         Assert.Equal(c, List(View(new { sort = "playcount" }))[0].Id);
 
+        // Silver SS to D, and by accuracy within a grade.
+        h.Db.Run("UPDATE scores SET grade = 'A' WHERE id IN (?, ?)", a, c);
+        h.Db.Run("UPDATE scores SET grade = 'XH' WHERE id = ?", b);
+        Assert.Equal([b, c, a], Ids(List(View(new { sort = "grade" }))));
+        Assert.Equal([a, c, b], Ids(List(View(new { sort = "grade", order = "asc" }))));
+        h.Db.Run("UPDATE scores SET grade = 'SH' WHERE id = ?", a);
+        Assert.Equal([b, a, c], Ids(List(View(new { sort = "grade" }))));
+
         // Uncounted scores have no pp: last, whichever way pp runs.
         var failed = Score("bbb", 0, passed: false);
         Assert.Equal(failed, List(View(new { show = "every", uncounted = true, order = "asc" })).Last().Id);

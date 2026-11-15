@@ -45,7 +45,7 @@ const DISPLAY_KEYS = new Set(['layout', 'pageSize']);
 const MOST_AT_ONCE = 10000;
 
 /** Every sort, as the Sort menu lists them. */
-export const SORTS = ['pp', 'score', 'accuracy', 'combo', 'stars', 'misses', 'playcount', 'date', 'beatmap'];
+export const SORTS = ['pp', 'score', 'accuracy', 'grade', 'combo', 'stars', 'misses', 'playcount', 'date', 'beatmap'];
 
 /** Sorts that read naturally smallest first: a new one starts that way. */
 const ASCENDING_FIRST = new Set(['misses', 'beatmap']);
@@ -168,7 +168,7 @@ export function playsText(n) {
 /** The table's columns: the sort each one is, where it is one. */
 const COLUMNS = [
   { key: 'place', label: '', className: 'score-table__place' },
-  { key: 'grade', label: () => t('scoreList.colGrade') },
+  { key: 'grade', label: () => t('scoreList.colGrade'), sort: 'grade' },
   { key: 'beatmap', label: () => t('scoreList.colBeatmap'), sort: 'beatmap', className: 'score-table__beatmap' },
   { key: 'mods', label: () => t('scoreList.colMods') },
   { key: 'accuracy', label: () => t('scoreList.colAccuracy'), sort: 'accuracy', className: 'num' },

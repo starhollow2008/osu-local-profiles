@@ -15,7 +15,8 @@ namespace OsuLocalProfiles.Settings;
 internal sealed class ScoreListView
 {
     /// <summary>What can be sorted by: each a column of the table.</summary>
-    public static readonly string[] Sorts = ["pp", "score", "accuracy", "combo", "stars", "misses", "playcount", "date", "beatmap"];
+    public static readonly string[] Sorts = ["pp", "score", "accuracy", "grade", "combo", "stars", "misses", "playcount", "date", "beatmap"];
+    /// <summary>Best to worst: the grade filter's order, and the grade sort's.</summary>
     public static readonly string[] GradeNames = ["XH", "X", "SH", "S", "A", "B", "C", "D", "F"];
     /// <summary>How many rows a page can hold: the first shown, and each show more.</summary>
     public static readonly int[] PageSizes = [25, 50, 100, 250, 500, 1000];

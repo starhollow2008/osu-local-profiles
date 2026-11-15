@@ -93,6 +93,7 @@ test('the table numbers its rows, sorts from its heads, and escapes what came fr
   assert.match(html, /<td class="score-table__place">27<\/td>/);
   assert.match(html, /aria-sort="descending"><button[^>]*data-sort="pp"/);
   assert.match(html, /data-sort="playcount"/);
+  assert.match(html, /data-sort="grade"/);
   assert.ok(html.includes('Artist &lt;b&gt;'));
   assert.ok(!html.includes('<b>'));
   assert.match(html, /data-score-id="7"/);
