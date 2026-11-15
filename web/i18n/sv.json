@@ -945,6 +945,7 @@
   "scoreList.moveDown": "Flytta ned",
   "scoreList.sortCancel": "Avbryt",
   "scoreList.sortApply": "OK",
+  "scoreList.rankGlobal": "#{rank} globalt",
   "heading.firstPlaceRanks": "Förstaplatser",
   "import.firstPlaces": "Förstaplatser hämtar resultaten du har #1 med i varje spelläge. De räknas som bästa prestationer, och listan hålls uppdaterad. Många kan ta en stund."
 }

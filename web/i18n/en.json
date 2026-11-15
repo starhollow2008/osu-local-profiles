@@ -962,6 +962,7 @@
   "scoreList.moveDown": "Move down",
   "scoreList.sortCancel": "Cancel",
   "scoreList.sortApply": "OK",
+  "scoreList.rankGlobal": "#{rank} global",
   "heading.firstPlaceRanks": "First Place Ranks",
   "import.firstPlaces": "First place ranks brings in the scores you hold #1 with in every game mode. They count as best performances do, and the list stays up to date. Many can take a while."
 }

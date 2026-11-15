@@ -945,6 +945,7 @@
   "scoreList.moveDown": "Siirrä alas",
   "scoreList.sortCancel": "Peruuta",
   "scoreList.sortApply": "OK",
+  "scoreList.rankGlobal": "#{rank} maailmassa",
   "heading.firstPlaceRanks": "Ensimmäiset sijat",
   "import.firstPlaces": "Ensimmäiset sijat tuo tulokset, joilla olet #1, jokaisessa pelimuodossa. Ne lasketaan kuten parhaat suoritukset, ja lista pysyy ajan tasalla. Monen tuonti voi kestää hetken."
 }

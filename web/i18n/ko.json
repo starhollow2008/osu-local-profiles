@@ -945,6 +945,7 @@
   "scoreList.moveDown": "아래로",
   "scoreList.sortCancel": "취소",
   "scoreList.sortApply": "확인",
+  "scoreList.rankGlobal": "전체 #{rank}",
   "heading.firstPlaceRanks": "1위 기록",
   "import.firstPlaces": "1위 기록은 모든 게임 모드에서 1위인 점수를 가져옵니다. 최고 성과와 같이 계산되며, 목록은 계속 최신으로 유지됩니다. 많으면 시간이 걸릴 수 있습니다."
 }

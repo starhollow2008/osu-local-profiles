@@ -3302,6 +3302,15 @@ const scoresView = JSON.parse(await evaluate(`(async () => {
       const t = document.querySelector('#scoreListBody .score-table__scroll');
       return !b || (b.getBoundingClientRect().right <= t.getBoundingClientRect().right + 1);
     })(),
+    who: [document.getElementById('scoreListName').textContent === s.profile.name,
+      /^[\\d,.\\s]+ pp$/.test(document.getElementById('scoreListPp').textContent),
+      document.querySelector('#scoreListAvatar img, #scoreListAvatar *') !== null].join(),
+    // The strip ends where the heading's row does, on the right.
+    whoRight: (() => {
+      const who = document.querySelector('.score-list__who').getBoundingClientRect();
+      const row = document.querySelector('.score-list__head').getBoundingClientRect();
+      return Math.abs(who.right - row.right) <= 1;
+    })(),
     reset: document.getElementById('scoreListReset') !== null,
     pageSize: document.getElementById('scoreListPageSize').value,
     savedPageSize: String(s.settings.scoreList.pageSize),
@@ -3316,6 +3325,8 @@ const scoresView = JSON.parse(await evaluate(`(async () => {
 check('its tab opens it, and the address says so', scoresView.address, '?view=scores');
 check('it shows in place of the profile', [scoresView.view, scoresView.cover, scoresView.profile].join(), 'block,none,none');
 check('its tab is the one marked open', scoresView.active, 'scores');
+check('beside its heading, the profile\'s picture, name and pp', scoresView.who, 'true,true,true');
+check('at the right end of the heading\'s row', scoresView.whoRight, true);
 check('it is drawn as the profile last chose', scoresView.drawn === 'empty' ? SKIP : scoresView.drawn, scoresView.layout);
 check('the table marks the column it is sorted by', scoresView.drawn === 'table' ? scoresView.sorted : SKIP, scoresView.sort);
 check('each row keeps its menu inside the table', scoresView.menuInRow, true);

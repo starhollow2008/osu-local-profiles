@@ -945,6 +945,7 @@
   "scoreList.moveDown": "Flyt ned",
   "scoreList.sortCancel": "Annuller",
   "scoreList.sortApply": "OK",
+  "scoreList.rankGlobal": "#{rank} globalt",
   "heading.firstPlaceRanks": "Førstepladser",
   "import.firstPlaces": "Førstepladser henter de resultater, du har #1 med, i alle spiltilstande. De tæller som bedste præstationer, og listen holdes opdateret. Mange kan tage et stykke tid."
 }

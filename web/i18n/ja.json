@@ -945,6 +945,7 @@
   "scoreList.moveDown": "下へ移動",
   "scoreList.sortCancel": "キャンセル",
   "scoreList.sortApply": "OK",
+  "scoreList.rankGlobal": "世界 #{rank}",
   "heading.firstPlaceRanks": "1位ランク",
   "import.firstPlaces": "1位ランクは、すべてのゲームモードで1位を取っているスコアを取り込みます。ベストパフォーマンスと同じように数えられ、リストは最新に保たれます。数が多いと時間がかかることがあります。"
 }

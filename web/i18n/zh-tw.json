@@ -945,6 +945,7 @@
   "scoreList.moveDown": "下移",
   "scoreList.sortCancel": "取消",
   "scoreList.sortApply": "確定",
+  "scoreList.rankGlobal": "全球 #{rank}",
   "heading.firstPlaceRanks": "第一名",
   "import.firstPlaces": "第一名會匯入你在每個遊戲模式中拿到第一名的成績。它們會像最佳表現一樣計算，清單也會保持最新。數量多時可能需要一段時間。"
 }

@@ -395,7 +395,16 @@
 -->
 <main class="user-profile-pages score-list-view" id="scoreListView">
   <section class="score-list">
-    <h2 class="title" data-i18n="scoreList.title">Scores</h2>
+    <!-- Whose scores these are, with this mode's estimated global rank and total pp (issue #19). -->
+    <div class="title-row score-list__head">
+      <h2 class="title" data-i18n="scoreList.title">Scores</h2>
+      <div class="score-list__who">
+        <span class="score-list__avatar" id="scoreListAvatar"></span>
+        <span class="score-list__name u-ellipsis" id="scoreListName"></span>
+        <span class="score-list__figure" id="scoreListRank" hidden></span>
+        <span class="score-list__figure" id="scoreListPp"></span>
+      </div>
+    </div>
     <div class="score-list__toolbar">
       <div class="score-list__seg" id="scoreListShow" role="group">
         <button type="button" data-show="best" aria-pressed="true" data-i18n="scoreList.best">Best per beatmap</button>

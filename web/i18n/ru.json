@@ -945,6 +945,7 @@
   "scoreList.moveDown": "Вниз",
   "scoreList.sortCancel": "Отмена",
   "scoreList.sortApply": "ОК",
+  "scoreList.rankGlobal": "#{rank} в мире",
   "heading.firstPlaceRanks": "Первые места",
   "import.firstPlaces": "Первые места загружает результаты, с которыми вы на #1, во всех режимах игры. Они учитываются как лучшие результаты, а список остаётся актуальным. Если их много, это может занять время."
 }

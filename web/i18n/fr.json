@@ -945,6 +945,7 @@
   "scoreList.moveDown": "Descendre",
   "scoreList.sortCancel": "Annuler",
   "scoreList.sortApply": "OK",
+  "scoreList.rankGlobal": "#{rank} mondial",
   "heading.firstPlaceRanks": "Premières places",
   "import.firstPlaces": "Premières places importe les scores avec lesquels tu es #1 dans chaque mode de jeu. Ils comptent comme les meilleures performances, et la liste reste à jour. Beaucoup peuvent prendre un moment."
 }

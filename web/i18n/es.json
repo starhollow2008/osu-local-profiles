@@ -945,6 +945,7 @@
   "scoreList.moveDown": "Bajar",
   "scoreList.sortCancel": "Cancelar",
   "scoreList.sortApply": "Aceptar",
+  "scoreList.rankGlobal": "#{rank} global",
   "heading.firstPlaceRanks": "Primeros puestos",
   "import.firstPlaces": "Primeros puestos trae las puntuaciones con las que tienes el #1 en cada modo de juego. Cuentan como las mejores actuaciones, y la lista se mantiene al día. Muchas pueden tardar un rato."
 }

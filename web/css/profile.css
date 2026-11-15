@@ -7002,6 +7002,51 @@ s.bbcode-editor__glyph {
   display: none;
 }
 
+/* The heading's row: whose scores these are, at its right end. */
+.score-list__head {
+  margin-bottom: 14px;
+}
+
+.score-list__who {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.score-list__avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  overflow: hidden;
+  background-color: hsl(var(--hsl-b5));
+}
+
+.score-list__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.score-list__name {
+  min-width: 0;
+  font-weight: 700;
+  color: hsl(var(--hsl-c1));
+}
+
+.score-list__figure {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-c1));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 .score-list__toolbar {
   display: flex;
   flex-wrap: wrap;

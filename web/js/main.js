@@ -274,6 +274,9 @@ function renderIdentity() {
   $('avatar').innerHTML = profile.hasAvatar
     ? `<img src="${assetUrl('/api/image/avatar')}" alt="${escapeHtml(profile.name)}">`
     : guestAvatar(profile.name);
+  // The Scores view says whose scores they are, as the profile's header does.
+  $('scoreListAvatar').innerHTML = $('avatar').innerHTML;
+  $('scoreListName').textContent = profile.name;
 
   const bits = [];
   if (profile.country) {
@@ -421,6 +424,9 @@ function renderStats(next, medalTotal, imported) {
     pp: fmt(stats.weightedPp, 0),
     bonus,
   });
+  // The Scores view's own copy, beside the profile's name.
+  $('scoreListPp').textContent = `${fmt(stats.totalPp, 0)} pp`;
+  $('scoreListPp').title = $('totalPp').title;
 
   const playTime = playTimeStrings(stats.playTime);
   $('playTime').textContent = playTime.value;
@@ -485,6 +491,10 @@ function renderRank(data) {
       ? t('rank.noCurve')
       : t('rank.noPp');
   }
+  // The Scores view's copy, left out when there is no rank to give.
+  $('scoreListRank').hidden = !data.rank;
+  $('scoreListRank').textContent = data.rank ? t('scoreList.rankGlobal', { rank: fmt(data.rank.rank) }) : '';
+  $('scoreListRank').title = data.rank ? el.title : '';
 }
 
 /**
