@@ -186,6 +186,19 @@ internal static partial class Server
                 failures.Add("me!: that account's me! is empty");
             }
         }
+        if (Want("profileHue", true))
+        {
+            // An account on osu!'s own colour leaves this one's alone, as an empty me! does.
+            if (user.ProfileHue is { } hue)
+            {
+                patch["profileHue"] = hue;
+                done.Add("colour");
+            }
+            else
+            {
+                failures.Add("colour: that account uses osu!'s default");
+            }
+        }
         Settings.SettingsStore.Update(db, id, JsonText.From(patch), fallbacks);
 
         foreach (var (kind, source, label) in new[] { ("avatar", user.AvatarUrl, "avatar"), ("cover", user.CoverUrl, "banner") })

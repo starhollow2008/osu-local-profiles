@@ -58,6 +58,12 @@ score pages use 200), and each token is an HSL fragment, used as `hsl(var(--hsl-
 alpha as `hsla(var(--hsl-b6), 0.5)`. The values are in `web/css/tokens.css`, taken from osu-web's
 `colors.less`, `variables.less` and `bootstrap-variables.less`.
 
+A profile's own colour works as osu-web's `profile_hue` does (`layout.less`, `hue-selector.tsx`):
+`--base-hue` is `var(--base-hue-override, var(--base-hue-default))`, and the profile's `profileHue`
+setting (1-360, or null for the default) is `--base-hue-override` on `<html>`. The banner pencil's
+popup sets it. Import from osu! copies it from the account, which osu.ppy.sh's profile page carries
+as `profile_hue`. The score card keeps hue 200, since osu! shows a score on a beatmaps page.
+
 **The profile page is built on the `b*` family, not `d*`.** The first version of the page used
 `d*`, which is why it looked too saturated. By depth:
 

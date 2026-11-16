@@ -19,9 +19,14 @@
  * element changes nothing inside it unless the tokens are re-declared there too. That is how
  * a part of the page can take another of osu!'s section hues: the View Details card is 200,
  * osu!'s beatmaps section, because that is where osu! puts its score page.
+ *
+ * A profile's own colour is `--base-hue-override` on <html>, set from its `profileHue` by
+ * applyProfileHue() in main.js, as osu-web's `layout.less` and `master.blade.php` do with
+ * `profile_hue`. The re-hued parts keep their own hue, as they do on osu!.
  */
 :root {
-  --base-hue: 333; /* osu! pink */
+  --base-hue-default: 333; /* osu! pink */
+  --base-hue: var(--base-hue-override, var(--base-hue-default));
 }
 
 :root,

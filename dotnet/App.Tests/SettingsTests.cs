@@ -288,6 +288,24 @@ public class SettingsTests
     }
 
     [Fact]
+    public void A_profile_hue_is_a_whole_degree_from_1_to_360_and_anything_else_is_the_default()
+    {
+        using var h = new TempDb();
+        Assert.Null(SettingsStore.Get(h.Db, h.ProfileId).ProfileHue);
+        Assert.Equal(42, SettingsStore.Update(h.Db, h.ProfileId, Patch(("profileHue", 42))).ProfileHue);
+        Assert.Equal(42, SettingsStore.Get(h.Db, h.ProfileId).ProfileHue);
+        Assert.Equal(201, SettingsStore.Update(h.Db, h.ProfileId, Patch(("profileHue", 200.5))).ProfileHue);
+        Assert.Equal(360, SettingsStore.Update(h.Db, h.ProfileId, Patch(("profileHue", 360))).ProfileHue);
+        foreach (var bad in new object?[] { 0, 361, -5, "120", true, null })
+        {
+            SettingsStore.Update(h.Db, h.ProfileId, Patch(("profileHue", 120)));
+            Assert.Null(SettingsStore.Update(h.Db, h.ProfileId, Patch(("profileHue", bad))).ProfileHue);
+        }
+        // Reset is a stored null, and reads back as the default.
+        Assert.Contains("\"profileHue\":null", Json(SettingsStore.Get(h.Db, h.ProfileId)));
+    }
+
+    [Fact]
     public void Settings_are_written_in_the_order_the_TypeScript_lists_them()
     {
         var keys = JsonText.From(SettingsStore.Defaults()).EnumerateObject().Select(p => p.Name);

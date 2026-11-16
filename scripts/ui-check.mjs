@@ -1344,6 +1344,99 @@ check('the chevron then offers to show the cover again', /^Show/i.test(folded.af
 check('and unfolding puts everything back', folded.restored.avatar, 120);
 
 /*
+ * The banner pencil opens osu-web's popup of banner and colour (`profile-edit-popup.tsx`,
+ * `hue-selector.tsx`). Dragging the slider re-hues the whole page at once, but not the score
+ * card, which keeps osu!'s beatmaps hue. Escape puts the saved colour back, Save keeps the new one.
+ * The slider is dragged with real mouse events, because it captures the pointer. The profile's
+ * own colour is put back at the end.
+ */
+console.log('\nthe banner pencil opens the banner and the colour');
+const mouse = (type, x, y) =>
+  send('Input.dispatchMouseEvent', { type, x, y, button: 'left', buttons: type === 'mouseReleased' ? 0 : 1, clickCount: 1 });
+const hueBefore = await evaluate("fetch('/api/state').then((r) => r.json()).then((s) => s.settings.profileHue ?? null)");
+const tokenHue = (selector) =>
+  `Number(getComputedStyle(document.querySelector('${selector}')).getPropertyValue('--hsl-h1').split(',')[0])`;
+const huePopup = JSON.parse(
+  await evaluate(`(() => {
+    scrollTo(0, 0);
+    document.getElementById('coverEdit').click();
+    const popup = document.getElementById('profileEditPopup');
+    const p = popup.getBoundingClientRect();
+    const pencil = document.getElementById('coverEdit').getBoundingClientRect();
+    const bar = document.getElementById('hueSelector').getBoundingClientRect();
+    return JSON.stringify({
+      open: getComputedStyle(popup).display !== 'none',
+      left: Math.round(p.right) <= Math.round(pencil.left) && Math.round(p.top) === Math.round(pencil.top),
+      onTop: popup.contains(document.elementFromPoint(p.left + p.width / 2, p.bottom - 5)),
+      headings: [...popup.querySelectorAll('.title')].map((h) => h.textContent).join(' / '),
+      saveOff: document.getElementById('hueSave').disabled,
+      removeOff: document.getElementById('coverPopupRemove').disabled,
+      bar: { left: bar.left, width: bar.width, y: bar.top + bar.height / 2 },
+      outside: { x: p.left - 40, y: p.bottom + 40 },
+    });
+  })()`),
+);
+check('the pencil opens the popup', huePopup.open, true);
+check('to its left, level with its top, as osu-web\'s is', huePopup.left, true);
+check('and over whatever is below the cover', huePopup.onTop, true);
+check('with the banner, then the colour', huePopup.headings, 'Banner / Colour');
+check('Save waits for a change', huePopup.saveOff, true);
+check('Remove is only there for a banner', huePopup.removeOff, await evaluate("fetch('/api/state').then((r) => r.json()).then((s) => !s.profile.hasCover)"));
+
+const { bar } = huePopup;
+await mouse('mousePressed', bar.left + bar.width / 3, bar.y);
+await mouse('mouseMoved', bar.left + (bar.width * 2) / 3, bar.y);
+await mouse('mouseReleased', bar.left + (bar.width * 2) / 3, bar.y);
+const dragged = JSON.parse(
+  await evaluate(`JSON.stringify({
+    page: ${tokenHue(':root')},
+    handle: Number(document.getElementById('hueHandle').getAttribute('aria-valuenow')),
+    card: ${tokenHue('.score-modal')},
+    saveOn: !document.getElementById('hueSave').disabled,
+  })`),
+);
+check('dragging two thirds along picks about 240', Math.abs(dragged.handle - 240) <= 2, true);
+check('and the page takes that colour at once', dragged.page, dragged.handle);
+check('but the score card keeps osu!\'s beatmaps hue', dragged.card, 200);
+check('and Save is offered', dragged.saveOn, true);
+
+await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+check(
+  'Escape closes it and puts the saved colour back',
+  await evaluate(`JSON.stringify([document.getElementById('profileEditPopup').hidden, ${tokenHue(':root')}])`),
+  JSON.stringify([true, hueBefore ?? 333]),
+);
+
+const saved = JSON.parse(
+  await evaluate(`(async () => {
+    document.getElementById('coverEdit').click();
+    document.getElementById('hueHandle').dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    document.getElementById('hueHandle').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    document.getElementById('hueSave').click();
+    for (let i = 0; i < 40 && document.getElementById('hueSave').disabled === false; i++) await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 200));
+    const stored = (await (await fetch('/api/state')).json()).settings.profileHue;
+    return JSON.stringify({ stored, page: ${tokenHue(':root')} });
+  })()`),
+);
+check('Home then an arrow is 2, and Save keeps it', saved.stored, 2);
+await mouse('mousePressed', huePopup.outside.x, huePopup.outside.y);
+await mouse('mouseReleased', huePopup.outside.x, huePopup.outside.y);
+check(
+  'a click elsewhere closes it, keeping the saved colour',
+  await evaluate(`JSON.stringify([document.getElementById('profileEditPopup').hidden, ${tokenHue(':root')}])`),
+  JSON.stringify([true, 2]),
+);
+
+// The profile's own colour back, and the page in it.
+await evaluate(
+  `fetch('/api/settings', { method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ profileHue: ${JSON.stringify(hueBefore)} }) })`,
+);
+await sleep(500);
+check('putting the colour back re-hues the page', await evaluate(tokenHue(':root')), hueBefore ?? 333);
+
+/*
  * The game modes, which live in two places by width. Below osu-web's breakpoint they are
  * `.header-nav-mobile` at the top of the header, not the right-hand end of the name's row --
  * because that row also holds the cover's chevron, and the two overlapped there: mania sat
@@ -2070,7 +2163,7 @@ check(
   true,
 );
 check(
-  'the four decorative choices are ticked; the five that write plays, lists or medals are not',
+  'the five decorative choices are ticked; the five that write plays, lists or medals are not',
   await evaluate(`JSON.stringify(Object.fromEntries(
     [...document.querySelectorAll('#importSection [data-import]')].map((b) => [b.dataset.import, b.checked])))`),
   // Favorites, best performances, pinned scores, first places and medals all start off: the first
@@ -2081,6 +2174,7 @@ check(
     cover: true,
     country: true,
     aboutMe: true,
+    profileHue: true,
     favorites: false,
     bestPerformances: false,
     pinnedScores: false,

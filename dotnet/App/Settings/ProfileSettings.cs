@@ -16,6 +16,11 @@ internal sealed class ProfileSettings
 {
     public string Country { get; set; } = "";
     public string Tagline { get; set; } = "";
+    /// <summary>
+    /// The page's colour, as osu-web's <c>profile_hue</c>: a hue from 1 to 360 that the whole
+    /// palette is built from, or null for osu!'s pink (333).
+    /// </summary>
+    public int? ProfileHue { get; set; }
     public bool IncludeUnrankedMods { get; set; } = true;
     public string UnrankedModPp { get; set; } = "as-played";
     public string AboutMe { get; set; } = "";
@@ -125,7 +130,7 @@ internal static partial class SettingsStore
     /* ------------------------------------------------------------ definitions */
 
     /// <summary>A setting: how to clean any value into it, and how to read it back out.</summary>
-    private sealed record Def(string Key, Action<ProfileSettings, JsonElement?> Coerce, Func<ProfileSettings, object> Read);
+    private sealed record Def(string Key, Action<ProfileSettings, JsonElement?> Coerce, Func<ProfileSettings, object?> Read);
 
     private static readonly Def[] Defs =
     [
@@ -137,6 +142,12 @@ internal static partial class SettingsStore
             s.Country = CountryCode().IsMatch(code) ? code : "";
         }, s => s.Country),
         new("tagline", (s, raw) => s.Tagline = CleanText(raw, 120), s => s.Tagline),
+        // osu-web's slider runs 1-360 in whole degrees. Anything else, null included, is the default.
+        new("profileHue", (s, raw) =>
+        {
+            var hue = raw is { ValueKind: JsonValueKind.Number } number ? Js.Round(Js.NumberOf(number)) : double.NaN;
+            s.ProfileHue = hue is >= 1 and <= 360 ? (int)hue : null;
+        }, s => s.ProfileHue),
         new("includeUnrankedMods", (s, raw) => s.IncludeUnrankedMods = Js.IsTrue(raw), s => s.IncludeUnrankedMods),
         new("unrankedModPp", (s, raw) =>
             s.UnrankedModPp = Js.IsString(raw, out var v) && v == "without-the-mod" ? "without-the-mod" : "as-played",

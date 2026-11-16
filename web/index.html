@@ -116,15 +116,40 @@
   <div class="profile-info__bg" id="cover">
     <!--
       osu-web's `.profile-page-cover-editor-button` (`profile-edit-button.tsx`): a pencil on the
-      cover's own bottom right, which opens the banner picker. Here it opens the profile's
-      Banner field, which is where this app keeps the same picture.
+      cover's own bottom right, which opens `profile-edit-popup.tsx` beside it: the cover, then
+      the colour (`hue-selector.tsx`). The cover is the profile's banner, the same picture as
+      Profiles -> Banner.
     -->
-    <div class="profile-page-cover-editor-button">
-      <button class="btn-circle btn-circle--page-toggle" id="coverEdit" type="button"
-              title="Change the banner" data-i18n-attr="title:coverEdit.title"
-              aria-label="Change the banner" data-i18n-attr="aria-label:coverEdit.title">
+    <div class="profile-page-cover-editor-button" id="profileEditButton">
+      <button class="btn-circle btn-circle--page-toggle" id="coverEdit" type="button" aria-expanded="false"
+              title="Change banner and colour" data-i18n-attr="title:coverEdit.title"
+              aria-label="Change banner and colour" data-i18n-attr="aria-label:coverEdit.title">
         <svg viewBox="0 0 512 512" aria-hidden="true"><path fill="currentColor" d="M497.9 142.1l-46.1 46.1c-4.7 4.7-12.3 4.7-17 0l-111-111c-4.7-4.7-4.7-12.3 0-17l46.1-46.1c18.7-18.7 49.1-18.7 67.9 0l60.1 60.1c18.8 18.7 18.8 49.1 0 67.9zM284.2 99.8L21.6 362.4.4 483.9c-2.9 16.4 11.4 30.6 27.8 27.8l121.5-21.3 262.6-262.6c4.7-4.7 4.7-12.3 0-17l-111-111c-4.8-4.7-12.4-4.7-17.1 0zM124.1 339.9c-5.5-5.5-5.5-14.3 0-19.8l154-154c5.5-5.5 14.3-5.5 19.8 0s5.5 14.3 0 19.8l-154 154c-5.5 5.5-14.3 5.5-19.8 0zM88 424h48v36.3l-64.5 11.3-31.1-31.1L51.7 376H88v48z"/></svg>
       </button>
+
+      <div class="profile-edit-popup" id="profileEditPopup" hidden>
+        <div class="profile-cover-change-popup">
+          <h2 class="title title--profile-edit-popup" data-i18n="profileHue.banner">Banner</h2>
+          <div class="profile-hue__buttons">
+            <button type="button" class="btn-osu-big btn-osu-big--rounded" id="coverPopupUpload" data-i18n="profileHue.upload">Upload…</button>
+            <button type="button" class="btn-osu-big btn-osu-big--rounded" id="coverPopupRemove" data-i18n="profileHue.remove">Remove</button>
+          </div>
+        </div>
+        <div class="profile-hue">
+          <h2 class="title title--profile-edit-popup" id="hueTitle" data-i18n="profileHue.colour">Colour</h2>
+          <!-- `profile-hue-selector`: jQuery UI's slider there, a pointer and keyboard one here. -->
+          <div class="profile-hue-selector" id="hueSelector">
+            <div class="profile-hue-selector__range"></div>
+            <div class="profile-hue-selector__handle" id="hueHandle" role="slider" tabindex="0"
+                 aria-valuemin="1" aria-valuemax="360" aria-labelledby="hueTitle"></div>
+          </div>
+          <div class="profile-hue__buttons">
+            <button type="button" class="btn-osu-big btn-osu-big--rounded" id="hueReset" data-i18n="profileHue.reset">Reset</button>
+            <button type="button" class="btn-osu-big btn-osu-big--rounded" id="hueSave" data-i18n="profileHue.save">Save</button>
+          </div>
+          <div class="profile-hint" id="profileEditHint" role="status">&nbsp;</div>
+        </div>
+      </div>
     </div>
 
     <!--
@@ -1115,6 +1140,7 @@
         <label class="checkgroup__item"><input type="checkbox" data-import="cover"> Banner</label>
         <label class="checkgroup__item"><input type="checkbox" data-import="country"> Flag</label>
         <label class="checkgroup__item"><input type="checkbox" data-import="aboutMe"> me!</label>
+        <label class="checkgroup__item"><input type="checkbox" data-import="profileHue"> Colour</label>
         <label class="checkgroup__item"><input type="checkbox" data-import="favorites"> Favorite beatmaps</label>
         <label class="checkgroup__item"><input type="checkbox" data-import="bestPerformances"> Best performances</label>
         <label class="checkgroup__item"><input type="checkbox" data-import="pinnedScores"> Pinned scores</label>

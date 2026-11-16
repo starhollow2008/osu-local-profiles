@@ -99,6 +99,112 @@
   }
 }
 
+/* Open, over everything after the cover, as osu-web's `@z-index--profile-page-cover-selector`. */
+.profile-page-cover-editor-button:has(> .profile-edit-popup:not([hidden])) {
+  z-index: 100;
+}
+
+/*
+ * osu-web's `profile-edit-popup.less`: the banner and the colour, to the pencil's left, its top
+ * level with the pencil's.
+ */
+.profile-edit-popup {
+  position: absolute;
+  top: 0;
+  right: 100%;
+  width: 400px;
+  max-width: calc(100vw - 50px);
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--radius-base);
+  box-shadow: var(--box-shadow);
+  background: hsl(var(--hsl-b6));
+}
+
+/* osu-web's `.title--profile-edit-popup`. Doubled, because `.title` comes later in this file. */
+.title.title--profile-edit-popup {
+  margin: 0;
+}
+
+/* osu-web's `profile-cover-change-popup.less`, holding only this app's two buttons. */
+.profile-cover-change-popup {
+  display: grid;
+  gap: 10px;
+}
+
+/* osu-web's `profile-hue.less`. */
+.profile-hue {
+  display: grid;
+  gap: 10px;
+}
+
+.profile-hue__buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Where osu-web says colours are for supporters: here, what Save or an upload did. */
+.profile-edit-popup .profile-hint {
+  margin: 0;
+  text-align: center;
+}
+
+/*
+ * osu-web's `profile-hue-selector.less`, on jQuery UI's slider: a bar of every hue at
+ * `--c-saturation-3`/`--c-lightness-3` (60%, 50%), and an 18px handle the full 36px high in the
+ * chosen hue at `-2` (80%, 60%), white-edged, or edged in b1 while it shows the default.
+ */
+.profile-hue-selector {
+  position: relative;
+  height: 36px;
+  margin: 0 9px;
+  display: grid;
+  touch-action: none;
+  cursor: pointer;
+}
+
+.profile-hue-selector__range {
+  margin: 7px 0;
+  border-radius: var(--radius-base);
+  --start-colour: hsl(0, 60%, 50%);
+  /* The stops by hand for a browser without `in hsl longer hue`, which then reads the next line. */
+  background: linear-gradient(to right,
+    hsl(0, 60%, 50%), hsl(60, 60%, 50%), hsl(120, 60%, 50%), hsl(180, 60%, 50%),
+    hsl(240, 60%, 50%), hsl(300, 60%, 50%), hsl(360, 60%, 50%));
+  background: linear-gradient(to right in hsl longer hue, var(--start-colour), var(--start-colour));
+}
+
+.profile-hue-selector__handle {
+  --border-colour: hsl(var(--hsl-c1));
+  position: absolute;
+  top: 0;
+  width: 18px;
+  height: 100%;
+  margin-left: -9px;
+  border: 2px solid var(--border-colour);
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hue, 333), 80%, 60%);
+}
+
+.profile-hue-selector__handle--default {
+  --border-colour: hsl(var(--hsl-b1));
+}
+
+.profile-hue-selector__handle:focus-visible {
+  outline: 2px solid hsl(var(--hsl-c1));
+  outline-offset: 2px;
+}
+
+/* osu-web's `btn-osu-big[disabled]`. */
+.btn-osu-big:disabled,
+.btn-osu-big:disabled:hover {
+  cursor: default;
+  background: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-f1));
+}
+
 /* Folded, the cover is gone rather than a strip of it: osu-web drops the element outright. */
 .profile-info--cover-collapsed .profile-info__bg {
   display: none;

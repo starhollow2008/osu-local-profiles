@@ -108,13 +108,14 @@ public class OsuWebTests
     [Fact]
     public async Task A_lookup_says_what_went_wrong_in_words_worth_showing()
     {
-        var html = """<div data-initial-data="{&quot;user&quot;:{&quot;id&quot;:3119700,&quot;username&quot;:&quot;Tangy&quot;,&quot;country&quot;:{&quot;code&quot;:&quot;NZ&quot;},&quot;page&quot;:{&quot;raw&quot;:&quot;  &quot;},&quot;previous_usernames&quot;:[&quot;old&quot;,&quot;&quot;,5]}}"></div>""";
+        var html = """<div data-initial-data="{&quot;user&quot;:{&quot;id&quot;:3119700,&quot;username&quot;:&quot;Tangy&quot;,&quot;profile_hue&quot;:42,&quot;country&quot;:{&quot;code&quot;:&quot;NZ&quot;},&quot;page&quot;:{&quot;raw&quot;:&quot;  &quot;},&quot;previous_usernames&quot;:[&quot;old&quot;,&quot;&quot;,5]}}"></div>""";
         var osu = new FakeOsu(url => url.EndsWith("/Tangy", StringComparison.Ordinal) ? FakeOsu.Answer(html)
             : url.EndsWith("/broken", StringComparison.Ordinal) ? FakeOsu.Answer("<html></html>")
             : FakeOsu.Answer("", HttpStatusCode.NotFound));
         var user = await osu.Client().LookupUser("https://osu.ppy.sh/users/Tangy/mania");
         Assert.Equal(3119700, user.Id);
         Assert.Equal("NZ", user.CountryCode);
+        Assert.Equal(42, user.ProfileHue);
         Assert.Null(user.PageRaw);
         Assert.Equal(["old"], user.PreviousUsernames);
         Assert.Equal("https://osu.ppy.sh/users/Tangy", osu.Asked[0]);

@@ -344,9 +344,164 @@ $('coverToggle').onclick = () => {
   renderCoverToggle();
 };
 
-// osu-web's pencil opens the cover picker; this app's banner is the profile's, so it opens
-// the dialog that already holds it, scrolled to the Banner field.
-$('coverEdit').onclick = () => openProfiles({ banner: true });
+/* ---------------------------------------------------------- profile colour */
+
+/*
+ * osu-web's profile edit popup (`profile-edit-button.tsx`, `profile-edit-popup.tsx`): the
+ * cover's pencil opens the banner and the colour beside it, and a click anywhere else or
+ * Escape closes it.
+ *
+ * The colour is `hue-selector.tsx`. The profile's `profileHue` (1-360, or null for osu!'s pink)
+ * is `--base-hue-override` on <html>, which every token is built from (tokens.css). Moving the
+ * slider shows the page in that colour at once, Save keeps it, Reset goes back to osu!'s and
+ * keeps that, and closing without saving puts back the saved one, as osu-web does.
+ */
+const HUE_MIN = 1;
+const HUE_MAX = 360;
+
+/** The colour the popup is showing, null being the default; only read while it is open. */
+let selectedHue = null;
+/** The profile the popup was opened on: switching profiles closes it. */
+let hueProfileId = null;
+let hueSaving = false;
+/** Where a click started: one that began in the popup and ended outside it does not close it. */
+let clickStartedIn = false;
+
+const profileEditOpen = () => !$('profileEditPopup').hidden;
+const profileEditHint = (message, isError) => hint('profileEditHint', message, isError);
+const savedHue = () => settings.profileHue ?? null;
+
+function applyProfileHue(hue) {
+  if (hue == null) document.documentElement.style.removeProperty('--base-hue-override');
+  else document.documentElement.style.setProperty('--base-hue-override', String(hue));
+}
+
+/** tokens.css's `--base-hue-default`, which the slider sits at when there is no colour. */
+const defaultHue = () =>
+  Number(getComputedStyle(document.documentElement).getPropertyValue('--base-hue-default')) || 333;
+
+/** The page in the saved colour, or in the one being picked while the popup is open. */
+function renderProfileHue() {
+  if (profileEditOpen() && profile?.id !== hueProfileId) {
+    $('profileEditPopup').hidden = true;
+    $('coverEdit').setAttribute('aria-expanded', 'false');
+  }
+  if (!profileEditOpen()) {
+    applyProfileHue(savedHue());
+    return;
+  }
+  const hue = selectedHue ?? defaultHue();
+  const handle = $('hueHandle');
+  handle.style.setProperty('--hue', String(hue));
+  handle.style.left = `${((hue - HUE_MIN) / (HUE_MAX - HUE_MIN)) * 100}%`;
+  handle.classList.toggle('profile-hue-selector__handle--default', selectedHue == null);
+  handle.setAttribute('aria-valuenow', String(hue));
+  $('hueReset').disabled = hueSaving || selectedHue == null;
+  $('hueSave').disabled = hueSaving || selectedHue === savedHue();
+  $('coverPopupRemove').disabled = !profile?.hasCover;
+  applyProfileHue(selectedHue);
+}
+
+function setSelectedHue(hue) {
+  selectedHue = Math.min(HUE_MAX, Math.max(HUE_MIN, Math.round(hue)));
+  renderProfileHue();
+}
+
+function openProfileEdit() {
+  selectedHue = savedHue();
+  hueProfileId = profile?.id ?? null;
+  profileEditHint(' ');
+  $('profileEditPopup').hidden = false;
+  $('coverEdit').setAttribute('aria-expanded', 'true');
+  renderProfileHue();
+}
+
+function closeProfileEdit() {
+  if (!profileEditOpen()) return;
+  $('profileEditPopup').hidden = true;
+  $('coverEdit').setAttribute('aria-expanded', 'false');
+  renderProfileHue();
+}
+
+$('coverEdit').onclick = () => (profileEditOpen() ? closeProfileEdit() : openProfileEdit());
+
+// pointerdown, not mousedown: the slider cancels the mouse events its drag would send.
+document.addEventListener('pointerdown', (e) => {
+  clickStartedIn = $('profileEditButton').contains(e.target);
+});
+document.addEventListener('click', (e) => {
+  if (e.button !== 0 || clickStartedIn || $('profileEditButton').contains(e.target)) return;
+  closeProfileEdit();
+});
+
+/* osu-web's slider: 1 to 360 across the bar, a whole degree at a time. */
+function hueAt(clientX) {
+  const bar = $('hueSelector').getBoundingClientRect();
+  const fraction = bar.width > 0 ? (clientX - bar.left) / bar.width : 0;
+  return HUE_MIN + Math.min(1, Math.max(0, fraction)) * (HUE_MAX - HUE_MIN);
+}
+
+$('hueSelector').onpointerdown = (e) => {
+  if (e.button !== 0 || hueSaving) return;
+  e.preventDefault();
+  $('hueSelector').setPointerCapture(e.pointerId);
+  $('hueHandle').focus();
+  setSelectedHue(hueAt(e.clientX));
+};
+$('hueSelector').onpointermove = (e) => {
+  if ($('hueSelector').hasPointerCapture(e.pointerId)) setSelectedHue(hueAt(e.clientX));
+};
+
+// jQuery UI's keys: a degree for an arrow, a fifth of the bar for Page Up and Page Down.
+$('hueHandle').onkeydown = (e) => {
+  if (hueSaving) return;
+  const hue = selectedHue ?? defaultHue();
+  const page = (HUE_MAX - HUE_MIN) / 5;
+  const next = {
+    ArrowLeft: hue - 1, ArrowDown: hue - 1, ArrowRight: hue + 1, ArrowUp: hue + 1,
+    PageDown: hue - page, PageUp: hue + page, Home: HUE_MIN, End: HUE_MAX,
+  }[e.key];
+  if (next === undefined) return;
+  e.preventDefault();
+  setSelectedHue(next);
+};
+
+async function saveHue(hue) {
+  hueSaving = true;
+  renderProfileHue();
+  try {
+    const d = await postJson('/api/settings', { profileHue: hue }, 'saving failed');
+    settings = d.settings;
+    selectedHue = savedHue();
+    profileEditHint(t('common.saved'));
+  } catch (err) {
+    profileEditHint(err.message, true);
+  } finally {
+    hueSaving = false;
+    renderProfileHue();
+  }
+}
+
+$('hueSave').onclick = () => saveHue(selectedHue);
+$('hueReset').onclick = () => saveHue(null);
+
+// The banner's own buttons, as Profiles -> Banner has them.
+$('coverPopupUpload').onclick = () => {
+  uploadKind = 'cover';
+  $('identityFile').value = '';
+  $('identityFile').click();
+};
+$('coverPopupRemove').onclick = async () => {
+  try {
+    await identityAction({ action: 'clear-image', kind: 'cover' });
+    await loadState();
+    renderIdentityPreviews();
+    await loadProfile();
+    profileEditHint(t('identity.removed'));
+  } catch (err) {
+    profileEditHint(err.message, true);
+  }
+};
 const RULESETS = ['osu', 'taiko', 'fruits', 'mania'];
 
 /*
@@ -797,6 +952,7 @@ async function loadState() {
   profile = s.profile;
   profiles = s.profiles ?? [];
   settings = s.settings ?? {};
+  renderProfileHue();
   staleScores = s.staleScores ?? 0;
   ppCalculator = s.ppCalculator ?? ppCalculator;
   renderPpCalculator();
@@ -1139,6 +1295,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   // The Scores view's Filters, Export or Custom sort first, as any menu.
   if (scoreListPopoverOpen()) return closeScoreListPopovers();
+  if (profileEditOpen()) return closeProfileEdit();
   // These two open over Import scores: Escape closes the one on top, not both.
   if (!$('scoreLinkModal').hidden) return closeScoreLink();
   if (!$('manualModal').hidden) return closeManual();
@@ -2332,7 +2489,12 @@ $('identityFile').onchange = async () => {
   const kind = uploadKind;
   if (!file || !kind) return;
 
-  identityHint(t('identity.uploading', { file: file.name }));
+  // Said in Profiles and in the cover's popup, whichever it was chosen from.
+  const say = (message, isError) => {
+    identityHint(message, isError);
+    profileEditHint(message, isError);
+  };
+  say(t('identity.uploading', { file: file.name }));
   try {
     const r = await fetch(`/api/image/${kind}`, { method: 'PUT', body: file });
     const d = await r.json();
@@ -2340,9 +2502,9 @@ $('identityFile').onchange = async () => {
     await loadState();
     renderIdentityPreviews();
     await loadProfile();
-    identityHint(t('common.saved'));
+    say(t('common.saved'));
   } catch (err) {
-    identityHint(err.message, true);
+    say(err.message, true);
   }
 };
 
@@ -2353,21 +2515,21 @@ $('identityFile').onchange = async () => {
  * happens until a button is pressed. It was once never a prompt at start-up, at the user's
  * request; later, at the user's request, a brand-new install shows this section once by itself
  * as the welcome (dotnet/App/ProfileWrites.cs), and closing that in any way ends it for good.
- * Avatar, banner, flag and me! are ticked by default; favorites are not, because they add
+ * Avatar, banner, flag, me! and colour are ticked by default; favorites are not, because they add
  * to a list rather than replacing one thing.
  */
 /*
- * Best performances and pinned scores start unticked, like favorites and unlike the four
+ * Best performances and pinned scores start unticked, like favorites and unlike the five
  * decorative ones. They are the only part of an import that writes *plays*: they move pp,
  * accuracy and the play count, and a profile is meant to be a record of what was played
  * while it was tracking. Wanting that overruled is a decision worth ticking a box for.
  */
 const IMPORT_DEFAULTS = {
-  avatar: true, cover: true, country: true, aboutMe: true,
+  avatar: true, cover: true, country: true, aboutMe: true, profileHue: true,
   favorites: false, bestPerformances: false, pinnedScores: false, firstPlaces: false, medals: false,
 };
 const IMPORT_FAVORITES_ONLY = {
-  avatar: false, cover: false, country: false, aboutMe: false,
+  avatar: false, cover: false, country: false, aboutMe: false, profileHue: false,
   favorites: true, bestPerformances: false, pinnedScores: false, firstPlaces: false, medals: false,
 };
 
@@ -3781,7 +3943,7 @@ async function profileAction(payload) {
  * avatar and the name open it at the first, the favorites reminder at the second, with only
  * favorites ticked.
  */
-function openProfiles({ section = null, favoritesOnly = false, banner = false } = {}) {
+function openProfiles({ section = null, favoritesOnly = false } = {}) {
   // A shared copy is read-only.
   if (isStatic) return;
   setMenuOpen(false);
@@ -3797,12 +3959,6 @@ function openProfiles({ section = null, favoritesOnly = false, banner = false } 
   $('profilesModal').querySelector('.modal').scrollTop = 0;
   $('profilesClose').focus({ preventScroll: true });
   if (section) $(section === 'import' ? 'importSection' : 'profileEdit').scrollIntoView({ block: 'start' });
-  if (banner) {
-    // The cover's pencil: show the Banner field itself, and put the cursor on its Upload, so
-    // the press that opened this dialog is one click from being finished.
-    $('identityCover').closest('.identity-image').scrollIntoView({ block: 'center' });
-    $('identityCover').closest('.identity-image').querySelector('[data-upload="cover"]').focus();
-  }
   void loadSuggestions();
 }
 

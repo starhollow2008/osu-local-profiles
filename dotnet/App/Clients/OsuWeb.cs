@@ -80,12 +80,14 @@ internal sealed class RequestGate(double intervalMs, Func<double>? now = null, F
 internal sealed record EarnedMedal(string Slug, double AchievedAt);
 
 /// <summary>An osu! account as its public profile page shows it.</summary>
+/// <param name="ProfileHue">osu-web's <c>profile_hue</c>: the colour the account chose (1-360), or null for osu!'s own.</param>
 internal sealed record OsuWebUser(
     double Id,
     string Username,
     string? AvatarUrl,
     string? CoverUrl,
     string? CountryCode,
+    double? ProfileHue,
     string? PageRaw,
     List<string> PreviousUsernames,
     List<EarnedMedal> Medals);
@@ -364,6 +366,7 @@ internal sealed partial class OsuWeb
             Str(Js.Get(user, "avatar_url")),
             Str(Js.Get(user, "cover_url")),
             Str(Js.Get(user, "country_code")) ?? Str(Js.Get(country, "code")),
+            Num(Js.Get(user, "profile_hue")),
             pageRaw is not null && Js.Trim(pageRaw) != "" ? pageRaw : null,
             Js.Get(user, "previous_usernames") is { ValueKind: JsonValueKind.Array } previous
                 ? [.. previous.EnumerateArray().Select(n => Str(n)).Where(n => !string.IsNullOrEmpty(n)).Select(n => n!)]
