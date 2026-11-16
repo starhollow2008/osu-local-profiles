@@ -463,6 +463,33 @@ internal static partial class Server
         }
     });
 
+    /// <summary>Options -> pp calculator: one play priced, nothing stored.</summary>
+    private static Task PpCalculate(HttpContext context, ServerOptions opts, Tracker.PlayTracker tracker, long profileId) => WithBody(context, async body =>
+    {
+        try
+        {
+            await Json(context, await PpCalculation.Calculate(EntryFor(opts, tracker, profileId), body));
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            await Json(context, new { error = e.Message }, 400);
+        }
+    });
+
+    /// <summary>A .osu file for the pp calculator, as a raw upload.</summary>
+    private static async Task PpCalculatorBeatmap(HttpContext context, ServerOptions opts, Tracker.PlayTracker tracker, long profileId)
+    {
+        if (await ReadUpload(context, PpCalculation.MaxBeatmapBytes, "that file is too large to be a beatmap") is not { } bytes) return;
+        try
+        {
+            await Json(context, PpCalculation.Upload(EntryFor(opts, tracker, profileId), bytes));
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            await Json(context, new { error = e.Message }, 400);
+        }
+    }
+
     /// <summary>
     /// Recalculate every score of every profile: the imported best performances first, each built
     /// into a replay priced here (a beatmap not installed is downloaded), then the same run a new

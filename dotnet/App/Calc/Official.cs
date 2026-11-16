@@ -184,6 +184,23 @@ internal sealed class OfficialCalculator : IDisposable
             : [];
         return (ranked.ValueKind == JsonValueKind.True, unranked);
     }
+
+    /// <summary>
+    /// A perfect play's judgements on a beatmap, by the replay counter that holds each, as osu!
+    /// converts the beatmap for the ruleset and mods. Null when it cannot answer, which a helper
+    /// built from a player's source before this request existed cannot.
+    /// </summary>
+    public async Task<Dictionary<string, double>?> Judgements(string beatmapPath, int ruleset, IReadOnlyList<JsonElement> mods)
+    {
+        var response = await Send(new { type = "judgements", beatmapPath, ruleset, mods });
+        if (Js.Get(response, "ok") is not { ValueKind: JsonValueKind.True } || Js.Get(response, "counts") is not { ValueKind: JsonValueKind.Object } counts)
+        {
+            if (Js.IsString(Js.Get(response, "error"), out var error)) LastError = error;
+            return null;
+        }
+        return Js.Entries(counts).Where(e => e.Value.ValueKind == JsonValueKind.Number)
+            .ToDictionary(e => e.Key, e => Js.NumberOf(e.Value), StringComparer.Ordinal);
+    }
 }
 
 /// <summary>How to start a helper: a program and its arguments (src/calc/official.ts).</summary>

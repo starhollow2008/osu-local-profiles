@@ -74,6 +74,7 @@ import {
   saveTrackingFilter,
   trackingFilterOpen,
 } from './tracking-filter.js';
+import { closePpCalculator, openPpCalculator, ppCalculatorOpen } from './pp-calculator.js';
 import { syncPlayers } from './audio-player.js';
 import {
   activityList,
@@ -1305,6 +1306,7 @@ document.addEventListener('keydown', (e) => {
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
   if (trackingFilterOpen()) closeTrackingFilter();
+  if (ppCalculatorOpen()) closePpCalculator();
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
   if (osuFoldersOpen()) closeOsuFolders();
@@ -5041,6 +5043,12 @@ $('optFilter').onclick = async () => {
       await loadState();
     },
   });
+};
+
+/* Options -> pp calculator. The dialog lives in web/js/pp-calculator.js. */
+$('optPpCalc').onclick = () => {
+  setMenuOpen(false);
+  openPpCalculator();
 };
 
 $('filterCancel').onclick = closeTrackingFilter;

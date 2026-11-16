@@ -1944,6 +1944,56 @@ check(
 );
 
 /*
+ * Options -> pp calculator, on the first beatmap a search for "a" finds: it opens at a perfect
+ * full combo, the 300s are whatever the other judgements leave, a miss costs pp, and choosing
+ * Double Time takes Half Time off. Skipped on a machine with no beatmaps.
+ */
+console.log('\npp calculator');
+const ppCalc = JSON.parse(
+  await evaluate(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const until = async (test) => { for (let i = 0; i < 80 && !test(); i++) await wait(100); return test(); };
+    const $ = (id) => document.getElementById(id);
+    const pp = () => Number(($('ppCalcResult').querySelector('.pp-calc__pp')?.firstChild?.textContent ?? 'NaN').replace(/[^0-9.]/g, ''));
+    $('optionsBtn').click();
+    $('optPpCalc').click();
+    const out = { opens: !$('ppCalcModal').hidden };
+    $('ppCalcQuery').value = 'a';
+    $('ppCalcQuery').dispatchEvent(new Event('input'));
+    if (!(await until(() => $('ppCalcResults').querySelector('[data-found]')))) {
+      $('ppCalcClose').click();
+      return JSON.stringify({ ...out, none: true });
+    }
+    $('ppCalcResults').querySelector('[data-found]').click();
+    await until(() => $('ppCalcResult').querySelector('.pp-calc__pp'));
+    const best = $('ppCalcCounts').querySelector('[readonly]');
+    out.perfect = pp() > 0 && $('ppCalcResult').textContent.includes('100.00%');
+    out.auto = best?.dataset.count ?? null;
+    const before = Number(best?.value);
+    const miss = $('ppCalcCounts').querySelector('[data-count="miss"]');
+    miss.value = '1';
+    miss.dispatchEvent(new Event('input', { bubbles: true }));
+    out.remainder = Number(best?.value) === before - 1;
+    const full = pp();
+    await until(() => pp() < full);
+    out.missCosts = pp() < full;
+    $('ppCalcMods').querySelector('[data-mod="HT"]')?.click();
+    $('ppCalcMods').querySelector('[data-mod="DT"]')?.click();
+    out.exclusive = [...$('ppCalcMods').querySelectorAll('.mod-chip--required')].map((c) => c.dataset.mod).join(',');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    out.escape = $('ppCalcModal').hidden;
+    return JSON.stringify(out);
+  })()`),
+);
+check('Options -> pp calculator opens it', ppCalc.opens, true);
+check('a beatmap opens at a perfect play', ppCalc.none ? SKIP : ppCalc.perfect, true);
+check('the best judgement is the one worked out', ppCalc.none ? SKIP : ['c300', 'geki'].includes(ppCalc.auto), true);
+check('a miss comes out of it', ppCalc.none ? SKIP : ppCalc.remainder, true);
+check('and costs pp', ppCalc.none ? SKIP : ppCalc.missCosts, true);
+check('Double Time takes Half Time off', ppCalc.none ? SKIP : ppCalc.exclusive, 'DT');
+check('Escape closes it', ppCalc.escape ?? SKIP, true);
+
+/*
  * The options menu, as the user asked for it: no trailing ellipses, Settings called Other
  * settings, and Edit profile and Import from osu! folded into Profiles.
  */
@@ -1963,8 +2013,9 @@ check(
   false,
 );
 
-// Seven, and Auto-update, its own row at the user's request (roadmap 5.66).
-check('the menu is eight entries', menuLabels.length, 8);
+// Seven, Auto-update and Launch on startup on rows of their own at the user's request (roadmap
+// 5.66, 5.77), and the pp calculator.
+check('the menu is ten entries', menuLabels.length, 10);
 check('Auto-update is one of them', menuLabels.includes('Auto-update'), true);
 // The way out when auto-detection missed an install. It has to be reachable from the menu,
 // because the person who needs it is the one the app has already failed.

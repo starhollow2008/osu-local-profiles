@@ -559,6 +559,18 @@ internal static partial class Server
             return;
         }
 
+        if (pathname == "/api/pp-calculator" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PpCalculate(context, opts, t, Current());
+            return;
+        }
+
+        if (pathname == "/api/pp-calculator/beatmap" && method == "POST")
+        {
+            if (await TrackerOrRefuse() is { } t) await PpCalculatorBeatmap(context, opts, t, Current());
+            return;
+        }
+
         if (pathname == "/api/identity" && method == "POST")
         {
             await PostIdentity(context, opts, Current());

@@ -726,6 +726,27 @@ every score repriced here, offline, by one calculator.
   against osu!'s own maximum for the beatmap, priced first without writing (`Tracker.priceReplay`).
   No calculator, no entry: pp is never typed.
 
+## The pp calculator
+
+Options -> pp calculator (`web/js/pp-calculator.js`, `dotnet/App/PpCalculation.cs`) prices a play
+described by its numbers and **stores nothing**. It is a hand entry that is never imported:
+
+- **Same calculator as the scores.** It goes through `Tracker.PriceReplay` on the tracker's queue,
+  so it uses whichever calculator is in force, osu!'s release or the player's own source (roadmap
+  5.70), and never interleaves with an ingest or a source helper's pipe.
+- **Scored as stable, with any osu! mod.** The play is a built stable replay with no mods of its own,
+  and the mods (with their settings: a custom speed, Difficulty Adjust) go beside it as `mods`, as
+  McOsu's do, with `ignoreLegacyTotalScore`. Classic is osu!'s own and never offered. The grade comes
+  back as osu! decoded the replay, before those mods, so `Silvered` applies Hidden, Flashlight and
+  Fade In.
+- **It starts at a perfect play.** The helper's `judgements` request counts a perfect play on osu!'s
+  converted beatmap for the ruleset and mods, in stable's counters: osu! and mania by object (a hold
+  is one), taiko and catch by osu!'s own judgements (notes; fruits, drops and droplets). The page
+  keeps the best judgement as whatever the others leave, so the total always matches. A source build
+  older than the request can't answer it, and then every judgement is typed.
+- **Beatmaps**: searched across every client's index (artist, title, mapper, difficulty), a link
+  downloaded as for a score link, or a `.osu` file, which is kept in `data/beatmaps/` and indexed.
+
 ## McOsu
 
 McOsu writes **no replays and no log** (roadmap 5.58), only its own `scores.db` (and `scoresvr.db`

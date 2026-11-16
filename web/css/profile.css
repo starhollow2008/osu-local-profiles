@@ -3984,6 +3984,143 @@
   width: 100%;
 }
 
+/* ------------------------------------------------------------- pp calculator */
+
+/* The inputs on the left and what they come to on the right; one above the other when narrow. */
+.pp-calc__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 230px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 720px) {
+  .pp-calc__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pp-calc__find {
+  margin-top: 0;
+}
+
+.pp-calc .manual-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 0 12px;
+}
+
+/* The judgement worked out from the others: shown, not typed. */
+.pp-calc__auto {
+  color: hsl(var(--hsl-f1)) !important;
+}
+
+.pp-calc__mods {
+  margin-top: 4px;
+}
+
+/* Like osu!'s mod select: every mod dimmed until it is chosen. */
+.pp-calc .mod-chip {
+  border: 1px solid transparent;
+  opacity: 0.5;
+}
+
+.pp-calc .mod-chip:hover {
+  opacity: 0.8;
+}
+
+.pp-calc .mod-chip--required,
+.pp-calc .mod-chip--required:hover {
+  border-color: hsl(var(--hsl-h1));
+  opacity: 1;
+}
+
+.pp-calc__combo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-calc__combo input {
+  width: 100px;
+}
+
+.pp-calc__combo span {
+  color: hsl(var(--hsl-f1));
+  white-space: nowrap;
+}
+
+.pp-calc__result {
+  position: sticky;
+  top: 0;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: var(--radius-large);
+  background-color: hsl(var(--hsl-b5));
+}
+
+.pp-calc__result:empty {
+  display: none;
+}
+
+.pp-calc__pp {
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: hsl(var(--hsl-h1));
+}
+
+.pp-calc__pp span {
+  margin-left: 4px;
+  font-size: 18px;
+}
+
+.pp-calc__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 8px;
+  font-size: var(--fs-normal-2);
+}
+
+.pp-calc__facts .score-rank {
+  font-size: 16px;
+}
+
+.pp-calc__parts {
+  display: grid;
+  gap: 2px;
+  margin: 12px 0 0;
+  font-size: var(--fs-normal-2);
+}
+
+.pp-calc__part {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pp-calc__part dt {
+  color: hsl(var(--hsl-f1));
+}
+
+.pp-calc__part dd {
+  margin: 0;
+}
+
+.pp-calc__note {
+  margin: 10px 0 0;
+  color: hsl(var(--hsl-orange-1));
+  font-size: var(--fs-normal);
+}
+
+.pp-calc__version {
+  margin: 10px 0 0;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+}
+
 /*
  * Replay files dragged over the dialog: it outlines itself and says what dropping will do, so a
  * drop is never a guess. The words come from the page's language (`data-drop-label`).

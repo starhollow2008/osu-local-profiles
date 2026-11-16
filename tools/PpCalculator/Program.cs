@@ -14,8 +14,9 @@
 // Staying resident avoids paying ~150ms of runtime startup for every score. The first line
 // out announces readiness and the osu! version whose calculators these are.
 //
-// Two kinds of request: a pp calculation (the default), and `"type": "ranked"`, which asks
-// osu!'s own mod classes whether a mod combination is ranked.
+// Three kinds of request: a pp calculation (the default), `"type": "ranked"`, which asks
+// osu!'s own mod classes whether a mod combination is ranked, and `"type": "judgements"`, the
+// judgement counts of a perfect play on a beatmap, for the app's pp calculator.
 //
 // A McOsu play has no replay of its own, so the app builds an osu!stable one from McOsu's
 // scores.db and hands that over like any other: the decoder still does all of the stable
@@ -69,7 +70,7 @@ public sealed class Request
     /// </remarks>
     [JsonPropertyName("stripMods")] public string[]? StripMods { get; set; }
 
-    /// <summary>Ranked request: the ruleset's legacy id (0 osu!, 1 taiko, 2 catch, 3 mania).</summary>
+    /// <summary>Ranked and judgements requests: the ruleset's legacy id (0 osu!, 1 taiko, 2 catch, 3 mania).</summary>
     [JsonPropertyName("ruleset")] public int Ruleset { get; set; }
 
     /// <summary>
@@ -145,6 +146,7 @@ public static class Program
             {
                 null => Calculate(request),
                 "ranked" => Ranked(request),
+                "judgements" => Judgements(request),
                 _ => throw new ArgumentException($"unknown request type {request.Type}"),
             };
             return JsonSerializer.Serialize(result, JsonOptions);
@@ -268,6 +270,58 @@ public static class Program
             version = OsuVersion,
         };
     }
+
+    /// <summary>
+    /// The judgements of a perfect play, counted as osu!stable's results screen counts them, on the
+    /// beatmap as osu! converts it for the ruleset and mods: the pp calculator's starting point.
+    /// </summary>
+    /// <remarks>
+    /// osu! and mania judge each object once in stable, a hold note included, so it is the object
+    /// count. taiko and catch are counted from osu!'s own judgements, nested objects included: a
+    /// taiko note is Great (drumroll ticks and swells are bonus), and catch's fruits, drops and
+    /// droplets are Great, LargeTickHit and SmallTickHit, stable's 300s, 100s and 50s.
+    /// </remarks>
+    private static object Judgements(Request request)
+    {
+        var ruleset = RulesetFor(request.Ruleset);
+        var working = new ProcessorWorkingBeatmap(request.BeatmapPath);
+        var mods = BuildMods(ruleset, request.Mods ?? Array.Empty<ModRequest>());
+        var playable = working.GetPlayableBeatmap(ruleset.RulesetInfo, mods);
+
+        int great = 0, largeTicks = 0, smallTicks = 0;
+        if (request.Ruleset is 0 or 3)
+        {
+            great = playable.HitObjects.Count;
+        }
+        else
+        {
+            foreach (var hitObject in playable.HitObjects.SelectMany(Flatten))
+            {
+                switch (hitObject.CreateJudgement().MaxResult)
+                {
+                    case HitResult.Great: great++; break;
+                    case HitResult.LargeTickHit: largeTicks++; break;
+                    case HitResult.SmallTickHit: smallTicks++; break;
+                }
+            }
+        }
+
+        return new
+        {
+            ok = true,
+            // By the replay counter each sits in: mania's perfect judgement is stable's MAX, its geki.
+            counts = request.Ruleset switch
+            {
+                2 => new Dictionary<string, int> { ["c300"] = great, ["c100"] = largeTicks, ["c50"] = smallTicks },
+                3 => new Dictionary<string, int> { ["geki"] = great },
+                _ => new Dictionary<string, int> { ["c300"] = great },
+            },
+            version = OsuVersion,
+        };
+    }
+
+    private static IEnumerable<osu.Game.Rulesets.Objects.HitObject> Flatten(osu.Game.Rulesets.Objects.HitObject hitObject) =>
+        hitObject.NestedHitObjects.SelectMany(Flatten).Prepend(hitObject);
 
     /// <summary>
     /// osu!'s own mod objects, built the way osu! builds them from a lazer replay. An acronym

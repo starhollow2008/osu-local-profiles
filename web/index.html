@@ -70,6 +70,7 @@
               <button id="optProfiles" type="button" data-i18n="optProfiles">Profiles</button>
               <button id="optFolders" type="button" data-i18n="optFolders">osu! folders</button>
               <button id="optSettings" type="button" data-i18n="optSettings">Other settings</button>
+              <button id="optPpCalc" type="button" data-i18n="optPpCalc">pp calculator</button>
               <div class="sep"></div>
               <div class="menu__heading" data-i18n="optionsMenu.tracking">Tracking</div>
               <button id="optBackfill" type="button" data-i18n="optBackfill">Import scores</button>
@@ -1365,6 +1366,55 @@
     <div class="actions">
       <button id="manualCancel" type="button" data-i18n="manualCancel">Cancel</button>
       <button id="manualAdd" class="primary" type="button" data-i18n="manualAdd" disabled>Add score</button>
+    </div>
+  </div>
+</div>
+
+<!--
+  Options -> pp calculator (web/js/pp-calculator.js): a play on any beatmap here, described by its
+  mods and judgements, priced by the calculator the app prices with. Nothing is stored. See
+  dotnet/App/PpCalculation.cs.
+-->
+<div class="backdrop" id="ppCalcModal" hidden>
+  <div class="modal modal--wide pp-calc" role="dialog" aria-modal="true" aria-labelledby="ppCalcTitle">
+    <h3 id="ppCalcTitle" data-i18n="ppCalcTitle">pp calculator</h3>
+
+    <div class="field field--wide" id="ppCalcFind">
+      <span data-i18n="ppCalc.beatmap">Beatmap</span>
+      <div class="identity-link pp-calc__find">
+        <input type="text" id="ppCalcQuery" autocomplete="off" spellcheck="false"
+               data-i18n-attr="placeholder:ppCalc.beatmapPlaceholder"
+               placeholder="Search by title, artist or mapper, or paste a beatmap link">
+        <button type="button" id="ppCalcOpenFile" data-i18n="ppCalcOpenFile">Open .osu file…</button>
+      </div>
+      <input type="file" id="ppCalcFile" accept=".osu" hidden>
+    </div>
+    <div class="manual-beatmaps" id="ppCalcResults" hidden></div>
+    <div class="manual-chosen" id="ppCalcChosen" hidden></div>
+
+    <div class="pp-calc__body" id="ppCalcForm" hidden>
+      <div class="pp-calc__inputs">
+        <label class="field">
+          <span data-i18n="ppCalc.ruleset">Ruleset</span>
+          <select id="ppCalcMode"></select>
+        </label>
+        <div class="field field--wide">
+          <span data-i18n="ppCalc.mods">Mods</span>
+          <div class="mod-grid pp-calc__mods" id="ppCalcMods"></div>
+        </div>
+        <div class="manual-grid" id="ppCalcModSettings"></div>
+        <div class="manual-counts" id="ppCalcCounts"></div>
+        <label class="field">
+          <span data-i18n="ppCalc.combo">Max combo</span>
+          <span class="pp-calc__combo"><input type="number" id="ppCalcCombo" min="0" step="1"><span id="ppCalcMaxCombo"></span></span>
+        </label>
+      </div>
+      <div class="pp-calc__result" id="ppCalcResult" aria-live="polite"></div>
+    </div>
+
+    <div class="profile-hint" id="ppCalcHint">&nbsp;</div>
+    <div class="actions">
+      <button id="ppCalcClose" type="button" data-i18n="ppCalcClose">Close</button>
     </div>
   </div>
 </div>

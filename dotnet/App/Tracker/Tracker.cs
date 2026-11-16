@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json;
 using OsuLocalProfiles.Calc;
 using OsuLocalProfiles.Clients;
 using OsuLocalProfiles.Db;
@@ -482,14 +483,25 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         return attached;
     });
 
-    /// <summary>A replay priced as played, without storing anything.</summary>
-    public Task<PpResult?> PriceReplay(string file) => Enqueue(async () =>
+    /// <summary>
+    /// A replay priced as played, without storing anything: as a stored one would be, or with
+    /// <paramref name="pricing"/> in place of that (the pp calculator's mods).
+    /// </summary>
+    public Task<PpResult?> PriceReplay(string file, PriceOptions? pricing = null) => Enqueue(async () =>
     {
         if (calculator is null) return null;
         var score = Osr.Parse(File.ReadAllBytes(file));
         var beatmap = resolver.Resolve(score.BeatmapMD5);
-        return await Pricing.PriceAsPlayed(file, beatmap, calculator, Mods.ScorePricing(score, beatmap.OsuPath));
+        return await Pricing.PriceAsPlayed(file, beatmap, calculator, pricing ?? Mods.ScorePricing(score, beatmap.OsuPath));
     });
+
+    /// <summary>A perfect play's judgements on a beatmap, from the calculator in use; null when it cannot say.</summary>
+    public Task<Dictionary<string, double>?> PerfectJudgements(string osuPath, int mode, IReadOnlyList<JsonElement> mods) =>
+        Enqueue(async () => calculator is null ? null : await calculator.Judgements(osuPath, mode, mods));
+
+    /// <summary>Whether osu! ranks these mods, from the calculator in use; null when it cannot say.</summary>
+    public Task<bool?> ModsRanked(int mode, JsonElement mods) =>
+        Enqueue(async () => calculator is null ? null : (await calculator.Ranked(mode, mods, null))?.Ranked);
 
     /// <summary>
     /// Import what was played while the app was closed, when the profile asked for it and there is a

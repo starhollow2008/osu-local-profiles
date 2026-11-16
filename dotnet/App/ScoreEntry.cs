@@ -113,15 +113,19 @@ internal sealed record EntryDeps(
     PlayerIdentity Identity,
     OsuWeb Osu,
     Func<string, long?, Task<IngestOutcome>> ImportBuiltReplay,
-    Func<string, Task<PpResult?>> PriceReplay,
-    bool CanPrice)
+    Func<string, PriceOptions?, Task<PpResult?>> PriceReplay,
+    bool CanPrice,
+    Func<string, int, IReadOnlyList<JsonElement>, Task<Dictionary<string, double>?>> PerfectJudgements,
+    Func<int, JsonElement, Task<bool?>> ModsRanked)
 {
     /// <summary>The deps for a profile, from the running tracker: one place for the server and startup.</summary>
     public static EntryDeps Of(PlayTracker tracker, Database db, string dataDir, long profileId, OsuWeb osu) => new(
         db, tracker.Beatmaps, dataDir, profileId, tracker.PlayerIdentity, osu,
         (file, target) => tracker.ImportBuiltReplay(file, target ?? profileId),
         tracker.PriceReplay,
-        tracker.CalculatorVersion is not null);
+        tracker.CalculatorVersion is not null,
+        tracker.PerfectJudgements,
+        tracker.ModsRanked);
 }
 
 /// <summary>A score as the link check shows it, before anything is written.</summary>
@@ -303,7 +307,7 @@ internal static partial class ScoreEntry
     [GeneratedRegex(@"\r?\n")]
     private static partial Regex LineBreak();
 
-    private static EntryBeatmap? Describe(EntryDeps deps, string md5)
+    internal static EntryBeatmap? Describe(EntryDeps deps, string md5)
     {
         var beatmap = deps.Resolver.Resolve(md5);
         if (beatmap.OsuPath is not { } path || !File.Exists(path)) return null;
@@ -351,7 +355,7 @@ internal static partial class ScoreEntry
     }
 
     [GeneratedRegex(@"^[0-9a-f]{32}\z")]
-    private static partial Regex Md5Shape();
+    internal static partial Regex Md5Shape();
 
     /// <summary>
     /// A beatmap by its link or id, or by the MD5 a search returned. An installed one is used as it
@@ -457,7 +461,7 @@ internal static partial class ScoreEntry
     }
 
     /// <summary>A whole number from 0 to <paramref name="max"/>, from a number or the text of one; null otherwise.</summary>
-    private static double? Whole(JsonElement? v, double max)
+    internal static double? Whole(JsonElement? v, double max)
     {
         double n;
         if (v is { ValueKind: JsonValueKind.String } s && Js.Trim(s.GetString()!) != "") n = Js.StringToNumber(s.GetString()!);
@@ -469,7 +473,7 @@ internal static partial class ScoreEntry
     /// <summary>1 October 2007: osu!'s first public release. No play is older.</summary>
     private static readonly double OsuEpoch = Js.DateUtc(2007, 9, 1);
 
-    private static bool Blank(JsonElement? v) => v is null or { ValueKind: JsonValueKind.Null } || (v is { ValueKind: JsonValueKind.String } s && s.GetString() == "");
+    internal static bool Blank(JsonElement? v) => v is null or { ValueKind: JsonValueKind.Null } || (v is { ValueKind: JsonValueKind.String } s && s.GetString() == "");
 
     /// <summary>
     /// Enter a score by hand. Everything typed is checked against the beatmap first, and the pp
@@ -525,7 +529,7 @@ internal static partial class ScoreEntry
 
         // The combo is the one thing the beatmap alone cannot check: its maximum is osu!'s to say.
         var file = UploadedReplays.Store(deps.DataDir, bytes) ?? throw new InvalidOperationException("the score could not be built into a replay");
-        var priced = await deps.PriceReplay(file);
+        var priced = await deps.PriceReplay(file, null);
         if (priced is null || priced.MaxCombo <= 0)
         {
             UploadedReplays.Release(deps.Db, file);
