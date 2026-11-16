@@ -87,8 +87,8 @@ when osu! reworks pp:
 
 ## Refreshing the rank curves
 
-osu!'s rankings API only covers the top 10,000, so rank comes from a curve built from data.ppy.sh's
-random sample of the whole ladder:
+osu!'s rankings API only covers the top 10,000, so rank comes from a curve built from two of
+data.ppy.sh's dumps per mode, a random sample of the whole ladder and its top 10,000:
 
 ```
 npm run rank:refresh                                # all four modes, newest dump
@@ -96,16 +96,17 @@ node scripts/build-rank-table.mjs osu --latest      # one mode
 node scripts/build-rank-table.mjs osu --dump 2026_11_05
 ```
 
-The script streams each ~1GB archive through `bzip2` and `tar`, keeps only the user-stats table,
-and deletes it once the curve is written. The result is about 3KB per mode. All four modes
-currently use the 2026_11_05 dump.
+The script streams each archive through `bzip2` and `tar`, stops once it has the user-stats table,
+and deletes the table once the curve is written. The archives are large: the 2026_11_05 random
+samples were 0.2-1GB per mode and the top 10,000 1.2-5.3GB (osu! the largest). The result is about
+15-20KB per mode. All four modes currently use the 2026_11_05 dump.
 
 It's a multi-gigabyte download, so nothing in the app runs it. The owner's daily maintenance job
 (`docs/automated-maintenance.md`) runs it when data.ppy.sh publishes a newer dump, and releases
 the result. By hand, run it when osu! reworks pp (the curve maps pp to rank, so a rework breaks it
 at once) and when a new dump is out, since the same pp slowly buys a worse rank. data.ppy.sh
 publishes monthly, re-running against a dump you already used just rewrites the same curve, and it
-takes roughly 15-30 minutes per mode, mostly download.
+takes from about 15 minutes (taiko) to the better part of an hour (osu!) per mode, mostly download.
 
 ## Recalculating
 

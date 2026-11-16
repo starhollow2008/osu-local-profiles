@@ -647,11 +647,19 @@ unknown, never guessed.
 ## Global rank: estimated from a sampled curve
 
 Rank comes from `dotnet/App/Calc/rank-tables/<mode>.json`, built by `scripts/build-rank-table.mjs` from
-data.ppy.sh's `performance_<mode>_random_10000` dump: a random sample across the whole ladder in
-which every user carries their real rank, so nothing needs modelling. Interpolation is linear in
-log rank (6 orders of magnitude, against 3 for pp). It's labelled as an estimate. It's allowed where
-a second pp calculator isn't, because a stale curve degrades gradually. Refresh it with a newer
-`--dump` (see `docs/maintaining.md`).
+two data.ppy.sh dumps per mode, in which every user carries their real rank, so nothing needs
+modelling: `performance_<mode>_random_10000`, a random sample across the whole ladder, and
+`performance_<mode>_top_10000`, its top. The random sample alone stopped at its best player (#376 in
+osu!standard, issue #23).
+
+- **The best 1,000 are exact** to the dump: one point per player (`exact` in the table), read as a
+  step, the rank of the best player the pp matches or beats.
+- **The rest is thinned** to about 300 points: the top dump down to #10,000, then the random
+  sample. Interpolation is linear in log rank (6 orders of magnitude, against 3 for pp).
+
+About 15-20KB per mode. It's labelled as an estimate. It's allowed where a second pp calculator
+isn't, because a stale curve degrades gradually. Refresh it with a newer `--dump` (see
+`docs/maintaining.md`).
 
 **Country rank is deliberately not shown.** 10,000 sampled users over about 200 countries is far
 too thin, and a made-up number would be worse than a dash.

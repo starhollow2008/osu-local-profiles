@@ -156,9 +156,11 @@ two tags so the changelog can say what changed.
 node scripts/build-rank-table.mjs all --dump <rank.latest>
 ```
 
-This streams roughly 1GB per mode and takes a while. Afterwards, each of
-`dotnet/App/Calc/rank-tables/*.json` must name the new dump, with about as many points as before and
-rank falling as pp rises. Set `DEFAULT_DUMP` in `scripts/build-rank-table.mjs` and the dump named
+This streams two archives per mode, a random sample and the top 10,000, up to their stats tables:
+several gigabytes in all (osu!'s top dump alone was 5.3GB in 2026_11_05), so it takes a while.
+Afterwards, each of `dotnet/App/Calc/rank-tables/*.json` must name the new dump, with `exact`
+1000, about as many points as before (roughly 1,300), rank falling as pp rises, and its last
+point at #1. Set `DEFAULT_DUMP` in `scripts/build-rank-table.mjs` and the dump named
 in `docs/maintaining.md` (the examples and "All four modes currently use ...") to it. Nothing of
 the download may be left behind: check that `git status` shows only those files changed.
 

@@ -87,6 +87,21 @@ public class CalcTests
         Assert.Null(Ranks.Interpolate([[100, 1000]], 500));
     }
 
+    [Fact]
+    public void Among_the_exact_top_a_pp_takes_the_place_of_the_best_player_it_matches_or_beats()
+    {
+        // Thinned down to #100, then every player from #3 to #1.
+        double[][] curve = [[1000, 100_000], [9000, 100], [9500, 3], [9600, 2], [9800, 1]];
+        Assert.Equal(3, Ranks.Interpolate(curve, 9500, exact: 3));
+        Assert.Equal(3, Ranks.Interpolate(curve, 9599, exact: 3));
+        Assert.Equal(2, Ranks.Interpolate(curve, 9600, exact: 3));
+        Assert.Equal(1, Ranks.Interpolate(curve, 12_000, exact: 3));
+        // Below the exact stretch it is still the curve, not a step.
+        Assert.InRange(Ranks.Interpolate(curve, 9250, exact: 3)!.Value, 4, 99);
+        // Without exact ranks, the same points interpolate.
+        Assert.Equal(2, Ranks.Interpolate(curve, 9599));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1)]
@@ -98,6 +113,10 @@ public class CalcTests
         Assert.NotNull(table);
         Assert.Matches(@"^\d{4}_\d{2}_\d{2}\z", table.Dump);
         Assert.True(table.Points.Length >= 2);
+        // Built with the top dump: it reaches #1, and every one of the best 1,000 is a point (issue #23).
+        Assert.Equal(1, table.Points[^1][1]);
+        Assert.Equal(1000, table.Exact);
+        Assert.True(table.Points.Count(p => p[1] <= table.Exact) >= 950, $"{table.Points.Count(p => p[1] <= table.Exact)} exact points");
         Assert.Null(Ranks.Table(4));
         Assert.Null(Ranks.Table(1.5));
     }

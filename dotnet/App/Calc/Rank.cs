@@ -3,8 +3,11 @@ using System.Text.Json;
 
 namespace OsuLocalProfiles.Calc;
 
-/// <summary>A pp-to-rank curve built offline from a data.ppy.sh sample (scripts/build-rank-table.mjs).</summary>
-internal sealed record RankTable(string Mode, string Dump, string Source, double Sampled, string GeneratedAt, double[][] Points);
+/// <summary>A pp-to-rank curve built offline from data.ppy.sh's dumps (scripts/build-rank-table.mjs).</summary>
+/// <param name="Sampled">How many players the curve was built from: the random sample and the top together.</param>
+/// <param name="Exact">The ranks this good or better are one point per player, read as exact; 0 for none.</param>
+internal sealed record RankTable(string Mode, string Dump, string Source, double Sampled, string GeneratedAt, double[][] Points,
+    string? TopSource = null, double Exact = 0);
 
 /// <summary>The global rank a pp total would sit at, and the dump the curve came from.</summary>
 internal sealed record RankEstimate(long Rank, string Dump);
@@ -41,14 +44,19 @@ internal static class Ranks
     public static RankEstimate? Estimate(double pp, double mode)
     {
         if (Table(mode) is not { } table) return null;
-        return Interpolate(table.Points, pp) is { } rank ? new RankEstimate(rank, table.Dump) : null;
+        return Interpolate(table.Points, pp, table.Exact) is { } rank ? new RankEstimate(rank, table.Dump) : null;
     }
 
     /// <summary>
     /// The curve lookup, linear in log(rank): rank spans six orders of magnitude where pp spans
     /// three, so interpolating rank directly would distort the long tail a new profile sits in.
     /// </summary>
-    public static long? Interpolate(double[][] points, double pp)
+    /// <remarks>
+    /// Among the best <paramref name="exact"/> ranks every player is a point, so there it is a step
+    /// rather than a line: the rank of the best player whose pp this matches or beats, whose place
+    /// it would take, as on osu!. Interpolating there could round to the wrong neighbour.
+    /// </remarks>
+    public static long? Interpolate(double[][] points, double pp, double exact = 0)
     {
         // A profile with no pp is not on the ladder at all, which is what osu! shows too.
         if (!double.IsFinite(pp) || pp <= 0) return null;
@@ -66,6 +74,8 @@ internal static class Ranks
             if (points[mid][0] <= pp) lo = mid;
             else hi = mid;
         }
+
+        if (exact > 0 && points[lo][1] <= exact) return (long)points[lo][1];
 
         double ppLo = points[lo][0], rankLo = points[lo][1], ppHi = points[hi][0], rankHi = points[hi][1];
         var span = ppHi - ppLo;

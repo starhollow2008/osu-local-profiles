@@ -2,21 +2,26 @@
  * Build the pp -> global rank curve that `dotnet/App/Calc/Rank.cs` interpolates.
  *
  * osu!'s rankings API only exposes the top 10,000, which is useless for a new profile
- * sitting near the bottom of the ladder. data.ppy.sh instead publishes
- * `performance_<mode>_random_10000`: a random sample of users from across the whole
- * distribution, each carrying both their pp and their actual global rank. Those pairs are
- * the curve -- no modelling, no assumption that the sample is representative, because
- * every point states its own rank.
+ * sitting near the bottom of the ladder. data.ppy.sh instead publishes, per mode,
+ * `performance_<mode>_random_10000`, a random sample of users from across the whole
+ * distribution, and `performance_<mode>_top_10000`, the top of the ladder. Every user in
+ * them carries both their pp and their actual global rank, and those pairs are the curve --
+ * no modelling, because every point states its own rank.
+ *
+ * The random sample alone stopped at its best user (#376 in osu!standard, issue #23), so the
+ * top dump supplies everything above that. Its best 1,000 are kept one point each and read
+ * as exact ranks; the rest of the curve is thinned (`buildCurve`).
  *
  *   npm run rank:refresh                                all four modes, newest dump
  *   node scripts/build-rank-table.mjs osu --latest      one mode, newest dump
  *   node scripts/build-rank-table.mjs osu --dump 2026_09_01
- *   node scripts/build-rank-table.mjs osu --from path/to/osu_user_stats.sql
+ *   node scripts/build-rank-table.mjs osu --from random/osu_user_stats.sql [--from-top top/osu_user_stats.sql]
  *
- * Without `--from` the archive is streamed straight through `bzip2` and `tar`, so the
- * ~1 GB never lands on disk: only the one table inside it is kept, and only for as long
- * as it takes to reduce it to a few KB of curve, after which it is deleted. Needs curl,
- * bzip2 and tar on PATH (all three ship with Git for Windows).
+ * Without `--from` each archive is streamed straight through `bzip2` and `tar`, so nothing
+ * large lands on disk: only the one table inside it is kept, and only for as long as it
+ * takes to reduce it to a few KB of curve, after which it is deleted. The download stops once
+ * the table is out, ahead of the scores most of an archive is. Needs curl, bzip2 and GNU tar
+ * on PATH (all three ship with Git for Windows).
  *
  * Nothing in the app ever triggers it: refreshing means a multi-gigabyte download. The
  * owner's weekly maintenance job runs it when data.ppy.sh publishes a newer dump
@@ -42,8 +47,10 @@ const STATS_TABLE = {
   mania: 'osu_user_stats_mania',
 };
 const DEFAULT_DUMP = '2026_11_05';
-/** How many points to keep. The curve is smooth; this is far more than it needs. */
+/** How many points to thin the curve below the exact top to. It is smooth; this is far more than it needs. */
 const SAMPLES = 300;
+/** The best ranks kept one point each, so a pp among them gets its exact rank in the dump. */
+const EXACT = 1000;
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.join(here, '..', 'dotnet', 'App', 'Calc', 'rank-tables');
@@ -78,7 +85,9 @@ if (requested !== 'all' && !MODES.includes(requested)) {
 
 const modes = requested === 'all' ? MODES : [requested];
 const fromFile = args.includes('--from') ? args[args.indexOf('--from') + 1] : null;
+const fromTop = args.includes('--from-top') ? args[args.indexOf('--from-top') + 1] : null;
 if (fromFile && modes.length > 1) usage('--from builds one mode, not "all"');
+if (fromTop && !fromFile) usage('--from-top goes with --from');
 
 const dumpDate = args.includes('--dump')
   ? args[args.indexOf('--dump') + 1]
@@ -95,24 +104,28 @@ function toPosixPath(p) {
   return `/${win[1].toLowerCase()}/${win[2].replace(/\\/g, '/')}`;
 }
 
-function streamTable(url, dir) {
+function streamTable(url, dir, member) {
   /*
-   * One pipeline: download, decompress, and extract only the member we need. tar reads to
-   * the end of the stream, so this pays the whole archive once and keeps nothing else.
+   * One pipeline: download, decompress, and extract only the member we need. The member is
+   * named exactly and `--occurrence` makes tar stop once it has it, which closes the pipe and
+   * ends the download there: the stats table comes before the lazer `scores.sql`, which is
+   * most of a top-10,000 archive. Nothing else is kept.
    *
-   * Both the URL and the output directory are passed as *arguments* to bash rather than
-   * pasted into the command string, because the shell strips the backslashes out of a
+   * The URL, the output directory and the member are passed as *arguments* to bash rather
+   * than pasted into the command string, because the shell strips the backslashes out of a
    * Windows path. The directory is also rewritten to the /c/... form the bundled tar
    * expects. Using it as the child's cwd instead would work, but then Windows refuses to
    * delete it afterwards -- it is a running process's working directory.
    */
+  // bzip2's complaint when tar closes the pipe early is the plan working, so it is silenced;
+  // a real failure still shows as no table, which the caller checks.
   const pipeline =
-    'curl -sL --fail "$0" | bzip2 -dc | tar -x --wildcards --strip-components=1 -C "$1" "*user_stats*"';
+    'curl -sL --fail "$0" | bzip2 -dc 2>/dev/null | tar -x --occurrence=1 --strip-components=1 -C "$1" "$2"';
   console.log(`  streaming ${url}`);
-  console.log('  (this reads the whole archive; nothing large is written to disk)');
+  console.log('  (read up to the stats table only; nothing large is written to disk)');
 
   return new Promise((resolve, reject) => {
-    const child = spawn('bash', ['-c', pipeline, url, toPosixPath(dir)], {
+    const child = spawn('bash', ['-c', pipeline, url, toPosixPath(dir), member], {
       stdio: ['ignore', 'inherit', 'inherit'],
     });
     child.on('error', reject);
@@ -202,42 +215,64 @@ function pairsFrom(sql) {
 /* ------------------------------------------------------------------ curve */
 
 /**
- * Reduce the raw pairs to a monotonic curve.
- *
- * The sample is noisy at the level of individual users, so it is sorted by pp, forced
- * monotonic (more pp can never mean a worse rank), and then thinned to evenly spaced
- * points in log-rank -- which is where the resolution is actually needed, since rank spans
- * six orders of magnitude while pp spans three.
+ * Ascending pp, forced monotonic: walking up the pp axis a rank may never get worse. A
+ * running minimum, so it is the identity on clean data and only nudges genuine inversions.
+ * Among equal pp the best rank comes last, so it is the one kept.
  */
-function buildCurve(pairs) {
-  const sorted = [...pairs].sort((a, b) => a[0] - b[0]);
-
-  // Walking up the pp axis, a rank may never get worse. This is a running minimum, so it
-  // is the identity on clean data and only nudges genuine inversions.
+function monotonic(pairs) {
+  const sorted = [...pairs].sort((a, b) => a[0] - b[0] || b[1] - a[1]);
   let best = Infinity;
-  const monotonic = sorted.map(([pp, rank]) => {
+  return sorted.map(([pp, rank]) => {
     best = Math.min(best, rank);
     return [pp, best];
   });
+}
 
-  const lo = Math.log(monotonic[0][1]);
-  const hi = Math.log(monotonic[monotonic.length - 1][1]);
+/**
+ * Thin to evenly spaced points in log-rank, which is where the resolution is needed, since
+ * rank spans six orders of magnitude while pp spans three. The extremes are always kept.
+ */
+function thin(points) {
+  if (points.length === 0) return [];
+  const lo = Math.log(points[0][1]);
+  const hi = Math.log(points[points.length - 1][1]);
   const picked = new Map();
-  for (let i = 0; i < monotonic.length; i++) {
-    const t = (Math.log(monotonic[i][1]) - lo) / (hi - lo || 1);
-    picked.set(Math.round(t * (SAMPLES - 1)), monotonic[i]);
+  for (let i = 0; i < points.length; i++) {
+    const t = (Math.log(points[i][1]) - lo) / (hi - lo || 1);
+    picked.set(Math.round(t * (SAMPLES - 1)), points[i]);
   }
-  // Always keep the extremes, whatever the bucketing did.
-  picked.set(-1, monotonic[0]);
-  picked.set(SAMPLES, monotonic[monotonic.length - 1]);
+  picked.set(-1, points[0]);
+  picked.set(SAMPLES, points[points.length - 1]);
+  return [...picked.entries()].sort((a, b) => a[0] - b[0]).map(([, point]) => point);
+}
 
-  // Pinning the extremes can re-add a point the bucketing already picked, so drop any
-  // repeat: the lookup needs strictly ascending pp to binary-search over.
+/**
+ * The curve, from the random sample and the top players.
+ *
+ * The top players' own ranks are exact, so the best `EXACT` are kept one point each, and
+ * `dotnet/App/Calc/Rank.cs` reads that stretch as a step rather than interpolating it. The
+ * rest of the top dump, and the random sample below where the top dump ends, are thinned:
+ * the random sample is noisy at the level of individual users, and the top dump says
+ * everything about the ranks it covers.
+ */
+function buildCurve(randomPairs, topPairs = []) {
+  const topWorst = topPairs.reduce((worst, [, rank]) => Math.max(worst, rank), 0);
+  const exact = topPairs.filter(([, rank]) => rank <= EXACT);
+  const rest = [
+    ...topPairs.filter(([, rank]) => rank > EXACT),
+    ...randomPairs.filter(([, rank]) => rank > topWorst),
+  ];
+
+  // Rounding can make two players' pp equal; the lookup needs strictly ascending pp, and
+  // an equal pp keeps the better rank, as a tie on osu! does.
   const out = [];
-  for (const [, point] of [...picked.entries()].sort((a, b) => a[0] - b[0])) {
-    const entry = [Number(point[0].toFixed(2)), point[1]];
+  for (const [pp, rank] of monotonic([...thin(monotonic(rest)), ...exact])) {
+    const entry = [Number(pp.toFixed(2)), rank];
     const previous = out[out.length - 1];
-    if (previous && entry[0] <= previous[0]) continue;
+    if (previous && entry[0] <= previous[0]) {
+      previous[1] = Math.min(previous[1], rank);
+      continue;
+    }
     out.push(entry);
   }
   return out;
@@ -245,35 +280,46 @@ function buildCurve(pairs) {
 
 /* ------------------------------------------------------------------- main */
 
+const archiveUrl = (mode, dump) => `https://data.ppy.sh/${dumpDate}_performance_${mode}_${dump}.tar.bz2`;
+
+/** One archive's [pp, rank] pairs: its stats table streamed out, or read from `--from`/`--from-top`. */
+async function pairsOf(mode, dump, tmp) {
+  // Only this mode's own ladder, never a key-count variant.
+  const wanted = `${STATS_TABLE[mode]}.sql`;
+  const local = dump === 'top_10000' ? fromTop : fromFile;
+  let file = local;
+  if (!fromFile) {
+    const dir = fs.mkdtempSync(path.join(tmp, `${dump}-`));
+    const files = await streamTable(archiveUrl(mode, dump), dir, `${dumpDate}_performance_${mode}_${dump}/${wanted}`);
+    file = files.find((f) => path.basename(f) === wanted);
+    if (!file) throw new Error(`expected ${wanted}; the archive yielded: ${files.map((f) => path.basename(f)).join(', ')}`);
+  }
+  if (!file) return [];
+  const pairs = pairsFrom(fs.readFileSync(file, 'utf8'));
+  if (pairs.length < 100) throw new Error(`only ${pairs.length} usable rows in ${dump}; refusing to build a curve`);
+  return pairs;
+}
+
 async function buildMode(mode) {
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `rank-${mode}-`));
 try {
-  let files;
-  if (fromFile) {
-    files = [fromFile];
-  } else {
-    const url = `https://data.ppy.sh/${dumpDate}_performance_${mode}_random_10000.tar.bz2`;
-    files = await streamTable(url, tmp);
+  const randomPairs = await pairsOf(mode, 'random_10000', tmp);
+  const topPairs = await pairsOf(mode, 'top_10000', tmp);
+  const exactRanks = new Set(topPairs.filter(([, rank]) => rank <= EXACT).map(([, rank]) => rank)).size;
+  // The exact stretch is only exact if the top dump has every one of those ranks.
+  if (topPairs.length > 0 && exactRanks < EXACT * 0.95) {
+    throw new Error(`the top dump has only ${exactRanks} of the best ${EXACT} ranks; refusing to call them exact`);
   }
 
-  // Take only this mode's own ladder, never a key-count variant that happened to match.
-  const wanted = `${STATS_TABLE[mode]}.sql`;
-  const exact = files.filter((f) => path.basename(f) === wanted);
-  if (exact.length === 0) {
-    throw new Error(
-      `expected ${wanted}; the archive yielded: ${files.map((f) => path.basename(f)).join(', ')}`,
-    );
-  }
-
-  const pairs = exact.flatMap((f) => pairsFrom(fs.readFileSync(f, 'utf8')));
-  if (pairs.length < 100) throw new Error(`only ${pairs.length} usable rows; refusing to build a curve`);
-
-  const points = buildCurve(pairs);
+  const points = buildCurve(randomPairs, topPairs);
   const table = {
     mode,
     dump: dumpDate,
-    source: `https://data.ppy.sh/${dumpDate}_performance_${mode}_random_10000.tar.bz2`,
-    sampled: pairs.length,
+    source: archiveUrl(mode, 'random_10000'),
+    topSource: topPairs.length > 0 ? archiveUrl(mode, 'top_10000') : null,
+    sampled: randomPairs.length + topPairs.length,
+    // Ranks this good or better are one point per player, read as a step (dotnet/App/Calc/Rank.cs).
+    exact: topPairs.length > 0 ? EXACT : 0,
     generatedAt: new Date().toISOString().slice(0, 10),
     // [pp, global rank], ascending by pp.
     points,
@@ -283,7 +329,7 @@ try {
   const out = path.join(outDir, `${mode}.json`);
   fs.writeFileSync(out, `${JSON.stringify(table, null, 0)}\n`);
 
-  console.log(`\n  ${pairs.length} sampled users -> ${points.length} curve points`);
+  console.log(`\n  ${randomPairs.length} sampled + ${topPairs.length} top users -> ${points.length} curve points (${exactRanks} exact)`);
   // Print the shape of the curve: a silently inverted or collapsed one is otherwise very
   // easy to ship, since the JSON looks perfectly well formed either way.
   for (const at of [0, 0.25, 0.5, 0.75, 0.9, 0.99, 1]) {

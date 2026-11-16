@@ -35,8 +35,9 @@ What this project is built against, and where some of the rules in `CLAUDE.md` c
 ## data.ppy.sh
 
 The pp-to-rank curves in `dotnet/App/Calc/rank-tables/` are built from the public
-`performance_<mode>_random_10000` sample by `scripts/build-rank-table.mjs`. osu!'s rankings API
-only goes to the top 10,000, which never covers a new profile.
+`performance_<mode>_random_10000` sample and the `performance_<mode>_top_10000` dump by
+`scripts/build-rank-table.mjs`. osu!'s rankings API only goes to the top 10,000, which never covers
+a new profile.
 
 ## Why nothing polls osu!
 

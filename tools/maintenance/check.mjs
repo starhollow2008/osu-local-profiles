@@ -89,16 +89,16 @@ function currentDumps() {
   );
 }
 
-/** The newest dump date with a random sample for every mode, or null. */
+/** The newest dump date with both archives the curves are built from, a random sample and the top, for every mode; or null. */
 async function latestCompleteDump() {
   const index = await text('https://data.ppy.sh/');
   const modesByDate = new Map();
-  for (const m of index.matchAll(/(\d{4}_\d{2}_\d{2})_performance_(osu|taiko|catch|mania)_random_10000\.tar\.bz2/g)) {
+  for (const m of index.matchAll(/(\d{4}_\d{2}_\d{2})_performance_(osu|taiko|catch|mania)_(random_10000|top_10000)\.tar\.bz2/g)) {
     const date = m[1];
     if (!modesByDate.has(date)) modesByDate.set(date, new Set());
-    modesByDate.get(date).add(m[2]);
+    modesByDate.get(date).add(`${m[2]} ${m[3]}`);
   }
-  const complete = [...modesByDate].filter(([, modes]) => modes.size === MODES.length).map(([date]) => date);
+  const complete = [...modesByDate].filter(([, archives]) => archives.size === MODES.length * 2).map(([date]) => date);
   return complete.sort().at(-1) ?? null;
 }
 
