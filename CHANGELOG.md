@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.36.0
+
+- **A pp calculator.** **Options → pp calculator** works out what a play would be worth on any
+  beatmap you have, one from its osu! link, or a .osu file. Choose the mods, a custom speed and
+  Difficulty Adjust included, then the judgements and combo: it starts at an SS and prices with the
+  same calculator as your scores, your own osu! source included. Nothing is saved.
+
+- **Your profile's colour, as on osu!.** The pencil on the banner now changes the banner and the
+  page's colour, with osu!'s colour slider. Import from osu! brings in an account's colour too.
+  Reported in [#21](https://github.com/jonathant09/osu-local-profiles/issues/21).
+
+- **Global rank no longer stops at #376.** The estimate now also reads the top 10,000 players of
+  each mode, so it reaches #1, and in the top 1,000 it's the exact rank your pp would have.
+  Reported in [#23](https://github.com/jonathant09/osu-local-profiles/issues/23).
+
+- **Sort the Scores view by grade or by mods, or by several columns at once.** **Custom sort…** at
+  the top of the Sort menu sorts by one column, then another, as a spreadsheet's sort does.
+  Reported in [#20](https://github.com/jonathant09/osu-local-profiles/issues/20).
+
+- **The Scores view says whose scores they are.** The profile's picture and name, its global rank
+  and its pp sit beside the Scores heading.
+  Reported in [#19](https://github.com/jonathant09/osu-local-profiles/issues/19).
+
+- **Switching profiles no longer announces medals the other profile already had.**
+
+- **A replay saved the moment a folder started being watched is no longer missed.**
+
 ## 1.35.0
 
 - **First Place Ranks, as on osu!.** Import from osu! can bring in the scores you hold #1 with,
