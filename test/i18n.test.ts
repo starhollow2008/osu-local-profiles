@@ -163,7 +163,7 @@ test('only a literal key is collected, because only a literal one can be checked
 /* ---------------------------------------------------------- translations */
 
 /**
- * The app has one name (CLAUDE.md, roadmap 5.18). A translation may translate the sentence
+ * The app has one name (AGENTS.md, roadmap 5.18). A translation may translate the sentence
  * around it, never the name itself -- and never reintroduce the one that was scrubbed.
  */
 test('every language keeps the app’s own name', () => {

@@ -263,7 +263,7 @@ mode=publish
 prompt="You are this repository's daily maintenance job, running unattended on the owner's VM.
 Nobody will answer questions: decide from the documents, or stop and report a failure.
 
-Follow docs/automated-maintenance.md exactly, from \"The procedure\" on. CLAUDE.md applies too.
+Follow docs/automated-maintenance.md exactly, from \"The procedure\" on. AGENTS.md applies too.
 
 Mode: $mode
 Result file: $result

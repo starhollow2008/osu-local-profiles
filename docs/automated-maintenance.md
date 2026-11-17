@@ -90,7 +90,7 @@ there's no pp step to do.
 
 ### Rules
 
-- CLAUDE.md applies. This job is the owner's standing decision to refresh the rank curves and
+- AGENTS.md applies. This job is the owner's standing decision to refresh the rank curves and
   follow pp reworks without asking, which is the exception to "never run it automatically" in
   `docs/maintaining.md`.
 - Change only what these steps name. Fix nothing else you notice; mention it in the summary.

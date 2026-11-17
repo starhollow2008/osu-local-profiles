@@ -1,6 +1,6 @@
 # Reference links
 
-What this project is built against, and where some of the rules in `CLAUDE.md` come from.
+What this project is built against, and where some of the rules in `AGENTS.md` come from.
 
 ## Inspiration
 

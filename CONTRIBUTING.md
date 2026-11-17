@@ -41,7 +41,7 @@ You'll be credited on the entry, so there's no need to add that yourself.
 
 ## Where the rules are
 
-- [`CLAUDE.md`](CLAUDE.md): the rules that must not break, the code conventions and the key entry
+- [`AGENTS.md`](AGENTS.md): the rules that must not break, the code conventions and the key entry
   points. It's written for AI coding tools but applies to everyone.
 - [`docs/architecture.md`](docs/architecture.md): why each of those rules exists.
 - [`docs/roadmap.md`](docs/roadmap.md): what's planned and what's done. Rules often cite an entry
@@ -59,7 +59,7 @@ A few worth knowing before you start:
 ## UI text
 
 Option descriptions and hints are short and plain: say what the option does in one sentence, or
-in a couple of words. [`CLAUDE.md`](CLAUDE.md) has examples under "UI text". Add every new string
+in a couple of words. [`AGENTS.md`](AGENTS.md) has examples under "UI text". Add every new string
 to `web/i18n/en.json`. Translations in the other files are welcome, and a key missing from one
 shows in English.
 
@@ -78,6 +78,6 @@ by hand.
 
 ## AI tools
 
-AI-assisted contributions are fine. Claude Code reads [`CLAUDE.md`](CLAUDE.md) on its own, and
-other tools read [`AGENTS.md`](AGENTS.md), which points to it. Please review and test what a tool
-writes before you submit it.
+AI-assisted contributions are fine. AI tools read [`AGENTS.md`](AGENTS.md) on their own, and
+Claude Code reads it through [`CLAUDE.md`](CLAUDE.md), which imports it. Please review and test
+what a tool writes before you submit it.

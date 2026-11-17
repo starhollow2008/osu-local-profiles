@@ -102,7 +102,7 @@ does not have to make it again.
 
 ## Constraints on every item
 
-These come from `CLAUDE.md`, and nothing below may break them:
+These come from `AGENTS.md`, and nothing below may break them:
 
 - No native modules in the Node process.
 - No API polling. Detection is local, and the app works with no credentials and no network.

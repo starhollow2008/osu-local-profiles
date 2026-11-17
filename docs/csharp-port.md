@@ -19,7 +19,7 @@ that names a `src/...ts` file names the module it was ported from.
   The page only talks to `/api/...`, so the API is the contract.
 - **Same data.** The new app opens the same `data/` folder: `profiles.db` with the same schema,
   `config.json`, the images. Nobody migrates anything.
-- **Same rules.** Every rule in `CLAUDE.md` holds for the C# code, and the reasons in
+- **Same rules.** Every rule in `AGENTS.md` holds for the C# code, and the reasons in
   `docs/architecture.md` still apply. A rule that is about Node itself (no native modules,
   type stripping, `node:sqlite`) stops applying at the switch-over, not before.
 - **Same pp.** osu!'s own packages, now called in-process. The calculator built from the
