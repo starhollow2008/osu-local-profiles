@@ -80,6 +80,11 @@ document.addEventListener('click', (e) => {
     else closeMenu();
     return;
   }
+  // The calculator lives on the profile's page, which opens it on this score.
+  if (e.target.closest('[data-pp-calc]')) {
+    location.href = `/?ppcalc=${id}`;
+    return;
+  }
   const replay = e.target.closest('[data-replay-download]');
   if (replay) {
     e.preventDefault();

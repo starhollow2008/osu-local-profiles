@@ -575,6 +575,7 @@
   <button type="button" data-act="unpin" role="menuitem" data-i18n="playMenu.unpin">Unpin</button>
   <button type="button" data-act="details" role="menuitem" data-i18n="playMenu.viewDetails">View Details</button>
   <button type="button" data-act="replay" role="menuitem" data-i18n="playMenu.downloadReplay">Download Replay</button>
+  <button type="button" data-act="pp-calc" role="menuitem" data-i18n="playMenu.openInPpCalculator">Open in pp calculator</button>
   <button type="button" data-act="osu" role="menuitem" data-i18n="playMenu.viewOnOsu">View osu! score link</button>
   <button type="button" data-act="copy-link" role="menuitem" data-i18n="playMenu.copyLink">Copy link</button>
   <button type="button" data-act="save-image" role="menuitem" data-i18n="playMenu.saveScreenshot">Save screenshot</button>
@@ -1377,9 +1378,17 @@
 -->
 <div class="backdrop" id="ppCalcModal" hidden>
   <div class="modal modal--wide pp-calc" role="dialog" aria-modal="true" aria-labelledby="ppCalcTitle">
-    <h3 id="ppCalcTitle" data-i18n="ppCalcTitle">pp calculator</h3>
+    <!-- Whether a play starts with Classic: a player of osu!stable wants it, a player of lazer does not. Kept per profile. -->
+    <div class="pp-calc__head">
+      <h3 id="ppCalcTitle" data-i18n="ppCalcTitle">pp calculator</h3>
+      <label class="checkgroup__item pp-calc__default">
+        <input type="checkbox" id="ppCalcClassicDefault">
+        <span data-i18n="ppCalc.classicDefault">Classic by default</span>
+      </label>
+    </div>
 
-    <div class="field field--wide" id="ppCalcFind">
+    <!-- No beatmap yet: the search is the empty slot at the top, and the rest waits for it. -->
+    <div class="field field--wide pp-calc__find-field" id="ppCalcFind">
       <span data-i18n="ppCalc.beatmap">Beatmap</span>
       <div class="identity-link pp-calc__find">
         <input type="text" id="ppCalcQuery" autocomplete="off" spellcheck="false"
@@ -1390,24 +1399,43 @@
       <input type="file" id="ppCalcFile" accept=".osu" hidden>
     </div>
     <div class="manual-beatmaps" id="ppCalcResults" hidden></div>
-    <div class="manual-chosen" id="ppCalcChosen" hidden></div>
+    <div class="manual-chosen pp-calc__beatmap pp-calc__chosen" id="ppCalcChosen" hidden></div>
 
-    <div class="pp-calc__body" id="ppCalcForm" hidden>
+    <div class="pp-calc__body" id="ppCalcForm">
       <div class="pp-calc__inputs">
-        <label class="field">
-          <span data-i18n="ppCalc.ruleset">Ruleset</span>
-          <select id="ppCalcMode"></select>
-        </label>
+        <!-- The rulesets as osu! draws them: only those the beatmap can be played in, the one chosen lit. -->
+        <div class="field">
+          <span id="ppCalcModesLabel" data-i18n="ppCalc.ruleset">Ruleset</span>
+          <div class="pp-calc__modes" id="ppCalcModes" role="radiogroup" aria-labelledby="ppCalcModesLabel"></div>
+        </div>
         <div class="field field--wide">
           <span data-i18n="ppCalc.mods">Mods</span>
           <div class="mod-grid pp-calc__mods" id="ppCalcMods"></div>
         </div>
         <div class="manual-grid" id="ppCalcModSettings"></div>
         <div class="manual-counts" id="ppCalcCounts"></div>
-        <label class="field">
-          <span data-i18n="ppCalc.combo">Max combo</span>
-          <span class="pp-calc__combo"><input type="number" id="ppCalcCombo" min="0" step="1"><span id="ppCalcMaxCombo"></span></span>
-        </label>
+        <!-- Typed, or dragged: a slider prices the play again as it moves. -->
+        <div class="pp-calc__totals">
+          <div class="field">
+            <label for="ppCalcAccuracy" data-i18n="ppCalc.accuracy">Accuracy</label>
+            <span class="pp-calc__combo"><input type="number" id="ppCalcAccuracy" min="0" max="100" step="0.01"><span>%</span></span>
+            <input type="range" class="pp-calc__slider" id="ppCalcAccuracySlider" min="0" max="100" step="0.01" value="100"
+                   data-i18n-attr="aria-label:ppCalc.accuracy" aria-label="Accuracy">
+          </div>
+          <div class="field">
+            <label for="ppCalcCombo" data-i18n="ppCalc.combo">Max combo</label>
+            <span class="pp-calc__combo"><input type="number" id="ppCalcCombo" min="0" step="1"><span id="ppCalcMaxCombo"></span></span>
+            <input type="range" class="pp-calc__slider" id="ppCalcComboSlider" min="0" max="1" step="1" value="1"
+                   data-i18n-attr="aria-label:ppCalc.combo" aria-label="Max combo">
+          </div>
+          <!-- osu! with Classic: osu!stable's score, which osu! works out the combo breaks from. -->
+          <div class="field" id="ppCalcScoreField" hidden>
+            <label for="ppCalcScore" data-i18n="ppCalc.stableScore">osu!stable score</label>
+            <input type="number" id="ppCalcScore" min="0" step="1"
+                   data-i18n-attr="placeholder:profileEdit.optional" placeholder="Optional">
+            <span class="setting__hint" id="ppCalcScoreUnused" data-i18n="ppCalc.stableScoreUnused" hidden>Only used with osu!stable's own mods.</span>
+          </div>
+        </div>
       </div>
       <div class="pp-calc__result" id="ppCalcResult" aria-live="polite"></div>
     </div>

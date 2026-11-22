@@ -166,6 +166,8 @@ internal static class StateApi
                 source = opts.PpSource?.State(),
                 recalculating = tracker?.IsRecalculating ?? false,
                 outdated = opts.CalculatorVersion is { } current ? OutdatedPp(db, profileId, current) : 0,
+                // Options -> pp calculator: the mods it shows dimmed, by ruleset.
+                noPp = PpCalculation.NoPp,
             },
             // The tracker's profile, as the Node app reads it.
             staleScores = tracker is null ? StaleScores(db, profileId) : tracker.StaleScores,

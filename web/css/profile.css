@@ -4004,6 +4004,109 @@
   margin-top: 0;
 }
 
+/* The rulesets, left to right: the one chosen lit, the others dimmed as the profile's mode switcher dims them. */
+.pp-calc__modes {
+  display: flex;
+  gap: 4px;
+}
+
+.pp-calc__mode {
+  display: flex;
+  padding: 4px;
+  border-radius: var(--radius-base);
+  color: hsl(var(--hsl-c1));
+  font-size: 22px;
+  opacity: 0.35;
+}
+
+.pp-calc__mode:hover {
+  opacity: 0.7;
+}
+
+.pp-calc__mode--active,
+.pp-calc__mode--active:hover {
+  color: #fff;
+  opacity: 1;
+}
+
+.pp-calc__mode:focus-visible {
+  outline: 2px solid hsl(var(--hsl-h1));
+}
+
+/*
+ * A beatmap found, or the one chosen, as favourite beatmaps are shown: its cover as a thumbnail,
+ * and again behind the row, faded into the row's colour (`--bg`, set on the row). One never
+ * submitted to osu! has no cover, and is the row's colour alone.
+ */
+.pp-calc__beatmap {
+  --row-bg: var(--hsl-b5);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 48px;
+  padding: 4px 10px 4px 4px;
+  background-color: hsl(var(--row-bg));
+}
+
+.pp-calc__beatmap:hover {
+  --row-bg: var(--hsl-b3);
+}
+
+.pp-calc__chosen:hover {
+  --row-bg: var(--hsl-b5);
+}
+
+.pp-calc__beatmap::before,
+.pp-calc__beatmap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pp-calc__beatmap::before {
+  z-index: -2;
+  background-image: image-set(var(--bg) 1x, var(--bg-2x, var(--bg)) 2x);
+  background-position: center;
+  background-size: cover;
+}
+
+.pp-calc__beatmap::after {
+  z-index: -1;
+  background: linear-gradient(0.25turn, hsl(var(--row-bg)) 20%, hsla(var(--row-bg), 0.7));
+}
+
+.pp-calc__beatmap .pp-calc__thumb {
+  position: relative;
+  inset: auto;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: var(--radius-base);
+}
+
+.pp-calc__name {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
+}
+
+/* Who mapped it: smaller and quieter than the name, as the profile's secondary text is. */
+.pp-calc__mapper {
+  color: hsl(var(--hsl-l1));
+  font-size: var(--fs-small);
+  font-weight: 400;
+}
+
+.pp-calc__beatmap-mode {
+  flex: none;
+  font-size: 18px;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.75));
+}
+
 .pp-calc .manual-counts {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
@@ -4033,6 +4136,127 @@
 .pp-calc .mod-chip--required:hover {
   border-color: hsl(var(--hsl-h1));
   opacity: 1;
+}
+
+/* A mod that leaves the pp as it is: there, greyed past the unchosen ones, and never chosen. */
+.pp-calc .mod-chip--inert,
+.pp-calc .mod-chip--inert:hover {
+  background: none;
+  filter: grayscale(1);
+  opacity: 0.2;
+  cursor: not-allowed;
+}
+
+/* No beatmap yet: its empty slot at the top is what to fill in first. */
+.pp-calc--empty .pp-calc__find input {
+  border-color: hsl(var(--hsl-h1));
+}
+
+.pp-calc__waiting {
+  margin: 0;
+  color: hsl(var(--hsl-f1));
+}
+
+.pp-calc__more {
+  padding: 4px 8px;
+}
+
+/* The title, and beside it whether a play starts with Classic. */
+.pp-calc__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.pp-calc__default {
+  font-size: var(--fs-normal-2);
+  color: hsl(var(--hsl-l1));
+}
+
+/* Accuracy, combo and stable's score: each a label over its box, the first two with a slider under it. */
+.pp-calc__totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0 16px;
+}
+
+.pp-calc__totals .field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.pp-calc__totals input[type="number"] {
+  width: 100px;
+}
+
+.pp-calc__totals #ppCalcScore {
+  width: 130px;
+}
+
+.pp-calc__totals .setting__hint {
+  margin: 0;
+}
+
+/* One handle on a track filled up to it (`--fill`, set as it moves). */
+.pp-calc__totals .pp-calc__slider {
+  --fill: 100%;
+  width: 100%;
+  height: 18px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.pp-calc__slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, hsl(var(--hsl-h2)) var(--fill), hsl(var(--hsl-b6)) var(--fill));
+}
+
+.pp-calc__slider::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, hsl(var(--hsl-h2)) var(--fill), hsl(var(--hsl-b6)) var(--fill));
+}
+
+.pp-calc__slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--hsl-b6));
+  background-color: hsl(var(--hsl-c1));
+}
+
+.pp-calc__slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid hsl(var(--hsl-b6));
+  background-color: hsl(var(--hsl-c1));
+}
+
+.pp-calc__slider:focus-visible {
+  outline: none;
+}
+
+.pp-calc__slider:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid hsl(var(--hsl-h1));
+  outline-offset: 1px;
+}
+
+.pp-calc__totals .pp-calc__slider:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .pp-calc__combo {
@@ -6290,7 +6514,7 @@ s.bbcode-editor__glyph {
 
 .static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #importNotice, #favoritesNote,
   #starRatingNotice, #aboutEdit, #aboutActions, #coverEdit, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
-  [data-play-menu][data-context="card"], a[href*="/replay"]) {
+  [data-play-menu][data-context="card"], a[href*="/replay"], [data-pp-calc]) {
   display: none !important;
 }
 

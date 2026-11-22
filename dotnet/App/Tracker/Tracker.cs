@@ -496,7 +496,7 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     });
 
     /// <summary>A perfect play's judgements on a beatmap, from the calculator in use; null when it cannot say.</summary>
-    public Task<Dictionary<string, double>?> PerfectJudgements(string osuPath, int mode, IReadOnlyList<JsonElement> mods) =>
+    public Task<Calc.PerfectPlay?> PerfectJudgements(string osuPath, int mode, IReadOnlyList<JsonElement> mods) =>
         Enqueue(async () => calculator is null ? null : await calculator.Judgements(osuPath, mode, mods));
 
     /// <summary>Whether osu! ranks these mods, from the calculator in use; null when it cannot say.</summary>

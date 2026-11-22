@@ -116,6 +116,7 @@ test('the card escapes what came from files, and offers a download only when the
 
   const none = scoreCard({ ...detail, replayAvailable: false }, owner);
   assert.ok(!none.includes('data-replay-download'), 'no button for a replay that is not there');
+  assert.ok(none.includes(`data-pp-calc="${detail.id}"`), 'the pp calculator is a click away either way');
 
   // A stable score gets its letter instead, except F, which osu! has no letter for.
   assert.ok(scoreCard({ ...detail, client: 'stable' }, owner).includes('legacy-rank'));

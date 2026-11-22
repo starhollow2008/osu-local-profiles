@@ -63,6 +63,27 @@ internal static class BuiltReplays
             new ReplayHeader(mode, Clients.Mcosu.BuiltReplayVersion, beatmapMD5, player, null, counts, totalScore ?? 0, maxCombo, false,
                 legacyMods, playedAt, 0),
             [AppBlocks.Write(AppBlocks.BuiltBlock, new { origin = "manual", legacyTotal = totalScore is not null })]);
+
+    /// <summary>
+    /// A play typed into the pp calculator without Classic, as lazer scores it: a lazer replay whose
+    /// block carries the mods and lazer's statistics, with the maximum ones beside them. osu! works
+    /// out the accuracy and the grade from those, as it does for any lazer replay.
+    /// </summary>
+    /// <remarks>
+    /// The maximum is written rather than left to the decoder, which would count a slider end as
+    /// worth a 300.
+    /// </remarks>
+    public static byte[] ManualLazer(int mode, string beatmapMD5, LegacyCounts counts, IReadOnlyDictionary<string, double> statistics,
+        IReadOnlyDictionary<string, double> maximumStatistics, IReadOnlyList<JsonElement> mods, double maxCombo, double playedAt) =>
+        ReplayWriter.Encode(
+            new ReplayHeader(mode, LazerBuiltVersion, beatmapMD5, "", null, counts, 0, maxCombo, false, 0, playedAt, 0),
+            [ReplayWriter.LazerBlock(new Dictionary<string, object?>
+             {
+                 ["mods"] = mods,
+                 ["statistics"] = statistics,
+                 ["maximum_statistics"] = maximumStatistics,
+             }),
+             AppBlocks.Write(AppBlocks.BuiltBlock, new { origin = "manual", legacyTotal = false })]);
 }
 
 /// <summary>
@@ -115,7 +136,7 @@ internal sealed record EntryDeps(
     Func<string, long?, Task<IngestOutcome>> ImportBuiltReplay,
     Func<string, PriceOptions?, Task<PpResult?>> PriceReplay,
     bool CanPrice,
-    Func<string, int, IReadOnlyList<JsonElement>, Task<Dictionary<string, double>?>> PerfectJudgements,
+    Func<string, int, IReadOnlyList<JsonElement>, Task<Calc.PerfectPlay?>> PerfectJudgements,
     Func<int, JsonElement, Task<bool?>> ModsRanked)
 {
     /// <summary>The deps for a profile, from the running tracker: one place for the server and startup.</summary>
@@ -134,7 +155,9 @@ internal sealed record LinkPreview(
     double? OsuPp, double PlayedAt, string Player, bool? Yours, bool Already);
 
 /// <summary>A beatmap a score can be entered on: one whose file is here, installed or downloaded.</summary>
-internal sealed record EntryBeatmap(string Md5, object? BeatmapId, string Title, string? TitleOriginal, int Mode, int Objects);
+/// <summary>A beatmap to enter a score on or price: with its set, for its cover, and its mapper.</summary>
+internal sealed record EntryBeatmap(string Md5, object? BeatmapId, string Title, string? TitleOriginal, int Mode, int Objects,
+    object? BeatmapsetId = null, string? Creator = null);
 
 /// <summary>What converting a profile's imported best performances came to.</summary>
 internal sealed record Conversion(int Converted, int Left);
@@ -318,7 +341,8 @@ internal static partial class ScoreEntry
         var original = Metadata.BeatmapNameOriginal(n);
         var name = Metadata.BeatmapName(n);
         return new EntryBeatmap(md5, beatmap.BeatmapId, WithVersion(name.Length > 0 ? name : md5[..Math.Min(12, md5.Length)]),
-            original is null ? null : WithVersion(original), Clients.Beatmaps.Mode(path), objects);
+            original is null ? null : WithVersion(original), Clients.Beatmaps.Mode(path), objects,
+            beatmap.BeatmapsetId, string.IsNullOrEmpty(beatmap.Creator) ? null : beatmap.Creator);
     }
 
     /// <summary>JavaScript's <c>split(/\s+/)</c> with the empty pieces dropped.</summary>
@@ -341,17 +365,24 @@ internal static partial class ScoreEntry
     }
 
     /// <summary>Installed beatmaps whose name has every word typed, for picking one to enter a score on.</summary>
-    public static List<EntryBeatmap> Search(EntryDeps deps, string query, int limit = 20)
+    public static List<EntryBeatmap> Search(EntryDeps deps, string query, int limit = 20) => SearchPage(deps, query, 0, limit).Beatmaps;
+
+    /// <summary>
+    /// One page of <see cref="Search"/>: <paramref name="limit"/> names from <paramref name="offset"/>,
+    /// and whether there are more after them, for a list that loads more as it is scrolled.
+    /// </summary>
+    public static (List<EntryBeatmap> Beatmaps, bool More) SearchPage(EntryDeps deps, string query, int offset, int limit = 20)
     {
         var words = Words(Js.ToLower(Js.Trim(query))).Take(8).ToList();
-        if (words.Count == 0) return [];
+        if (words.Count == 0) return ([], false);
         static string Like(string w) => $"%{Regex.Replace(w, @"[\\%_]", m => $"\\{m.Value}")}%";
         var rows = deps.Db.All($"""
             SELECT DISTINCT md5 FROM osu_files
              WHERE {string.Join(" AND ", words.Select(_ => "LOWER(name) LIKE ? ESCAPE '\\'"))}
-             ORDER BY name LIMIT ?
-            """, r => r.GetString(0), [.. words.Select(Like), limit]);
-        return [.. rows.Select(md5 => Describe(deps, md5)).Where(b => b is not null).Select(b => b!)];
+             ORDER BY name LIMIT ? OFFSET ?
+            """, r => r.GetString(0), [.. words.Select(Like), limit + 1, Math.Max(0, offset)]);
+        var more = rows.Count > limit;
+        return ([.. rows.Take(limit).Select(md5 => Describe(deps, md5)).Where(b => b is not null).Select(b => b!)], more);
     }
 
     [GeneratedRegex(@"^[0-9a-f]{32}\z")]

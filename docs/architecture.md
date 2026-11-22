@@ -742,11 +742,23 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
 - **Same calculator as the scores.** It goes through `Tracker.PriceReplay` on the tracker's queue,
   so it uses whichever calculator is in force, osu!'s release or the player's own source (roadmap
   5.70), and never interleaves with an ingest or a source helper's pipe.
-- **Scored as stable, with any osu! mod.** The play is a built stable replay with no mods of its own,
-  and the mods (with their settings: a custom speed, Difficulty Adjust) go beside it as `mods`, as
-  McOsu's do, with `ignoreLegacyTotalScore`. Classic is osu!'s own and never offered. The grade comes
-  back as osu! decoded the replay, before those mods, so `Silvered` applies Hidden, Flashlight and
-  Fade In.
+- **With Classic, scored as stable, with any osu! mod.** The play is a built stable replay with no
+  mods of its own, and the mods (with their settings: a custom speed, Difficulty Adjust) go beside it
+  as `mods`, as McOsu's do. The grade comes back as osu! decoded the replay, before those mods, so
+  `Silvered` applies Hidden, Flashlight and Fade In.
+- **Without Classic (osu! and taiko), scored as lazer.** A built lazer replay whose block carries
+  the mods, lazer's statistics and `maximum_statistics`, written out because the decoder would count
+  a slider end as a 300. osu! adds slider ends and ticks missed. The helper's `judgements` answer
+  gives the beatmap's slider ends and ticks (`PerfectPlay.Lazer`). Catch and mania are always Classic,
+  which changes nothing there.
+- **Classic starts as the profile says** (`ppCalcClassic`, off by default, ticked from the
+  calculator). A score opened in it brings its own.
+- **osu!stable's score** (osu! with Classic, and only stable's own mods: `EncodeLegacy`) goes in the
+  replay's total, and `ignoreLegacyTotalScore` is dropped, so osu! works out the slider breaks from it
+  (`OsuLegacyScoreMissCalculator`) as it does for a stable score. Without it, osu! guesses them from
+  the combo. A stable score's detail carries it (`stableScore`), so opening one prices it as stored.
+- **Mods that change no pp** (`PpCalculation.NoPp`, measured and re-checked by a test) are shown
+  dimmed and can't be chosen.
 - **It starts at a perfect play.** The helper's `judgements` request counts a perfect play on osu!'s
   converted beatmap for the ruleset and mods, in stable's counters: osu! and mania by object (a hold
   is one), taiko and catch by osu!'s own judgements (notes; fruits, drops and droplets). The page

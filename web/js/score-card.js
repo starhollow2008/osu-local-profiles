@@ -312,6 +312,8 @@ function buttons(score) {
     ? `<a class="btn-osu-big btn-osu-big--rounded" href="/api/scores/${score.id}/replay"
          data-replay-download="${score.id}">${escapeHtml(t('score.downloadReplay'))}</a>`
     : '';
+  // One click from the details, as the download is: the play in the pp calculator.
+  const calculate = `<button type="button" class="btn-osu-big btn-osu-big--rounded" data-pp-calc="${score.id}">${escapeHtml(t('score.openInPpCalculator'))}</button>`;
   // The same menu as the row's, so pinning and the rest behave identically in both places.
   const menu = `<div class="score-buttons__menu">
     <button class="score-buttons__menu-button" type="button" data-play-menu data-kind="score" data-context="card"
@@ -320,7 +322,7 @@ function buttons(score) {
             aria-haspopup="true" aria-label="${escapeHtml(t('score.optionsFor'))}"
             title="${escapeHtml(t('score.options'))}">&#8943;</button>
   </div>`;
-  return `<div class="score-buttons">${download}${menu}</div>`;
+  return `<div class="score-buttons">${download}${calculate}${menu}</div>`;
 }
 
 /**

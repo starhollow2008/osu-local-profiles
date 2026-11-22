@@ -181,6 +181,16 @@ public class SettingsTests
     }
 
     [Fact]
+    public void The_pp_calculator_starts_without_Classic_until_a_profile_asks_for_it()
+    {
+        using var h = new TempDb();
+        Assert.False(SettingsStore.Get(h.Db, h.ProfileId).PpCalcClassic);
+        Assert.True(SettingsStore.Update(h.Db, h.ProfileId, Patch(("ppCalcClassic", true))).PpCalcClassic);
+        Assert.True(SettingsStore.Get(h.Db, h.ProfileId).PpCalcClassic);
+        Assert.False(SettingsStore.Update(h.Db, h.ProfileId, Patch(("ppCalcClassic", "yes"))).PpCalcClassic);
+    }
+
+    [Fact]
     public void A_new_profile_counts_every_unranked_mod_and_beatmap_status_by_default()
     {
         using var h = new TempDb();

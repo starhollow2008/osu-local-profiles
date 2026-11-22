@@ -35,6 +35,8 @@ internal sealed class ProfileSettings
     /// <summary>The medals section's note on plays from before maximum combos were recorded, until closed.</summary>
     public bool ShowFcUnknownNote { get; set; } = true;
     public string Scoring { get; set; } = "lazer";
+    /// <summary>Whether the pp calculator starts with Classic on, for a player of osu!stable. Off by default.</summary>
+    public bool PpCalcClassic { get; set; }
     public TrackingFilter TrackingFilter { get; set; } = TrackingFilter.Default();
     /// <summary>How the Scores view was last set up (roadmap 5.86).</summary>
     public ScoreListView ScoreList { get; set; } = ScoreListView.Default();
@@ -173,6 +175,7 @@ internal static partial class SettingsStore
         new("showStableNote", (s, raw) => s.ShowStableNote = Js.NotFalse(raw), s => s.ShowStableNote),
         new("showFcUnknownNote", (s, raw) => s.ShowFcUnknownNote = Js.NotFalse(raw), s => s.ShowFcUnknownNote),
         new("scoring", (s, raw) => s.Scoring = Js.IsString(raw, out var v) && v == "classic" ? "classic" : "lazer", s => s.Scoring),
+        new("ppCalcClassic", (s, raw) => s.PpCalcClassic = Js.IsTrue(raw), s => s.PpCalcClassic),
         new("trackingFilter", (s, raw) => s.TrackingFilter = TrackingFilter.Coerce(raw), s => s.TrackingFilter),
         new("scoreList", (s, raw) => s.ScoreList = ScoreListView.Coerce(raw), s => s.ScoreList),
         new("sectionOrder", (s, raw) => s.SectionOrder = SectionIds(raw), s => s.SectionOrder),

@@ -74,7 +74,15 @@ import {
   saveTrackingFilter,
   trackingFilterOpen,
 } from './tracking-filter.js';
-import { closePpCalculator, openPpCalculator, ppCalculatorOpen } from './pp-calculator.js';
+import {
+  closePpCalculator,
+  openPpCalculator,
+  openPpCalculatorFor,
+  ppCalculatorOpen,
+  scorePlay,
+  setClassicDefault,
+  setNoPpMods,
+} from './pp-calculator.js';
 import { syncPlayers } from './audio-player.js';
 import {
   activityList,
@@ -956,6 +964,8 @@ async function loadState() {
   renderProfileHue();
   staleScores = s.staleScores ?? 0;
   ppCalculator = s.ppCalculator ?? ppCalculator;
+  setNoPpMods(ppCalculator.noPp);
+  setClassicDefault(settings.ppCalcClassic === true, savePpCalcClassic);
   renderPpCalculator();
   hiddenScoreCount = s.hiddenScores ?? 0;
   declinedPlayCount = s.declinedPlays ?? 0;
@@ -3454,6 +3464,9 @@ function openPlayMenu(button) {
   // a replay, which an unfinished play never does.
   menu.querySelector('[data-act="details"]').hidden = !isScore || inCard;
   menu.querySelector('[data-act="replay"]').hidden = !isScore || inCard || button.dataset.replay !== '1';
+  // The card has it as a button. An unfinished play opens its beatmap, when it has one.
+  menu.dataset.md5 = button.dataset.md5 ?? '';
+  menu.querySelector('[data-act="pp-calc"]').hidden = isStatic || inCard || (!isScore && menu.dataset.md5 === '');
   // The score's own page on osu!, for any score osu! has -- in a shared copy too.
   menu.dataset.osuUrl = isScore ? (button.dataset.osuUrl ?? '') : '';
   menu.querySelector('[data-act="osu"]').hidden = menu.dataset.osuUrl === '';
@@ -3527,6 +3540,12 @@ $('playMenu').onclick = async (e) => {
   }
   if (act === 'replay') {
     void downloadReplay(id);
+    return;
+  }
+  if (act === 'pp-calc') {
+    // An unfinished play has no score to read: its beatmap, in the ruleset on show, as a perfect play.
+    if (kind === 'incomplete') void openPpCalculatorFor({ md5: $('playMenu').dataset.md5, mode });
+    else void openScoreInPpCalculator(id);
     return;
   }
   if (act === 'osu') {
@@ -5046,10 +5065,45 @@ $('optFilter').onclick = async () => {
 };
 
 /* Options -> pp calculator. The dialog lives in web/js/pp-calculator.js. */
+
+/** Whether the calculator starts a play with Classic: this profile's, changed from the calculator itself. */
+async function savePpCalcClassic(on) {
+  settings = { ...settings, ppCalcClassic: on };
+  try {
+    const d = await postJson('/api/settings', { ppCalcClassic: on }, 'saving that failed');
+    settings = d.settings;
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
 $('optPpCalc').onclick = () => {
   setMenuOpen(false);
-  openPpCalculator();
+  openPpCalculator(mode);
 };
+
+/**
+ * A score in the calculator, from its menu or its card: its beatmap, mods and judgements. The
+ * card closes first, since the calculator is the next thing to read and Escape closes the top one.
+ */
+async function openScoreInPpCalculator(id) {
+  try {
+    const r = await fetch(`/api/scores/${id}`);
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error ?? t('play.notLoaded'));
+    if (!$('scoreModal').hidden) closeScoreCard();
+    await openPpCalculatorFor(scorePlay(d.score));
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const button = e.target.closest('[data-pp-calc]');
+  if (!button || isStatic) return;
+  e.preventDefault();
+  void openScoreInPpCalculator(Number(button.dataset.ppCalc));
+});
 
 $('filterCancel').onclick = closeTrackingFilter;
 $('filterReset').onclick = resetTrackingFilter;
@@ -5455,6 +5509,15 @@ await loadProfile();
 // Nunito has loaded, its text is not drawn at all (font-display: block).
 await document.fonts.ready;
 document.body.dataset.rendered = 'true';
+
+// A score's own page sends its calculator button here: /?ppcalc=<score id>, taken off the address once read.
+const ppCalcScore = isStatic ? null : Number(new URLSearchParams(location.search).get('ppcalc'));
+if (ppCalcScore) {
+  const address = new URL(location.href);
+  address.searchParams.delete('ppcalc');
+  history.replaceState(history.state, '', address);
+  void openScoreInPpCalculator(ppCalcScore);
+}
 
 // A brand-new install is offered the account import once. Never on a shared copy, and never
 // under ?export=1, which is what the Share image is rendered from.

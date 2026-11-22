@@ -896,6 +896,7 @@ check(
 );
 
 // An unfinished play has no score to pin or view: its menu is its beatmap's, and removing it.
+// Its beatmap opens in the pp calculator when the play has one.
 check(
   "an unfinished play's menu offers its beatmap and removing it",
   await evaluate(`(() => {
@@ -905,7 +906,7 @@ check(
     const visible = [...document.querySelectorAll('#playMenu [data-act]')]
       .filter((b) => !b.hidden).map((b) => b.dataset.act).join(',');
     document.body.click();
-    return ['hide', 'favorite,hide', 'unfavorite,hide'].includes(visible);
+    return ['hide', 'favorite,hide', 'unfavorite,hide'].some((v) => visible === v || visible === 'pp-calc,' + v);
   })()`),
   true,
 );
@@ -1946,7 +1947,12 @@ check(
 /*
  * Options -> pp calculator, on the first beatmap a search for "a" finds: it opens at a perfect
  * full combo, the 300s are whatever the other judgements leave, a miss costs pp, and choosing
- * Double Time takes Half Time off. Skipped on a machine with no beatmaps.
+ * Double Time takes Half Time off. Before a beatmap it is laid out already, waiting for one; a
+ * mod that changes no pp is there but cannot be chosen; the search loads more as it scrolls; an
+ * accuracy typed in becomes judgements; and osu! without Classic has slider ends to miss. A play
+ * starts with Classic as the profile's "Classic by default" says, which is saved from there and
+ * put back afterwards; osu!stable's score is asked for only with Classic; and the accuracy and
+ * combo sliders price the play as they move. Skipped on a machine with no beatmaps.
  */
 console.log('\npp calculator');
 const ppCalc = JSON.parse(
@@ -1958,16 +1964,37 @@ const ppCalc = JSON.parse(
     $('optionsBtn').click();
     $('optPpCalc').click();
     const out = { opens: !$('ppCalcModal').hidden };
+    const chosenMode = () => $('ppCalcModes').querySelector('[aria-checked="true"]')?.dataset.mode;
+    // Every ruleset before a beatmap, as osu!'s icons, one of them chosen.
+    out.modeIcons = $('ppCalcModes').querySelectorAll('[data-mode] .mode-icon').length === 4 && chosenMode() !== undefined;
+    $('ppCalcModes').querySelector('[data-mode="0"]').click();
+    out.laidOut = !$('ppCalcForm').hidden && $('ppCalcMods').querySelectorAll('[data-mod]').length > 0
+      && [...$('ppCalcCounts').querySelectorAll('input')].every((i) => i.disabled) && Boolean($('ppCalcResult').querySelector('.pp-calc__waiting'));
+    const sudden = $('ppCalcMods').querySelector('[data-mod="SD"]');
+    sudden?.click();
+    out.inert = Boolean(sudden?.hasAttribute('data-inert')) && !sudden.classList.contains('mod-chip--required')
+      && Boolean(sudden.title) && !$('ppCalcMods').querySelector('[data-mod="NF"]').hasAttribute('data-inert');
     $('ppCalcQuery').value = 'a';
     $('ppCalcQuery').dispatchEvent(new Event('input'));
     if (!(await until(() => $('ppCalcResults').querySelector('[data-found]')))) {
       $('ppCalcClose').click();
       return JSON.stringify({ ...out, none: true });
     }
-    $('ppCalcResults').querySelector('[data-found]').click();
+    const first = $('ppCalcResults').querySelectorAll('[data-found]').length;
+    $('ppCalcResults').scrollTop = $('ppCalcResults').scrollHeight;
+    $('ppCalcResults').dispatchEvent(new Event('scroll'));
+    out.more = first < 20 || (await until(() => $('ppCalcResults').querySelectorAll('[data-found]').length > first));
+    const row = $('ppCalcResults').querySelector('[data-found]');
+    out.rowShows = Boolean(row.querySelector('.mode-icon')) && (row.querySelector('.pp-calc__mapper')?.textContent ?? '').trim().length > 0;
+    row.click();
     await until(() => $('ppCalcResult').querySelector('.pp-calc__pp'));
     const best = $('ppCalcCounts').querySelector('[readonly]');
     out.perfect = pp() > 0 && $('ppCalcResult').textContent.includes('100.00%');
+    const clOn = () => $('ppCalcMods').querySelector('[data-mod="CL"]')?.getAttribute('aria-pressed') === 'true';
+    // Only the rulesets the beatmap can be played in: all four for osu!'s, its own for any other.
+    const offered = [...$('ppCalcModes').querySelectorAll('[data-mode]')].map((b) => b.dataset.mode).join(',');
+    out.modesFit = offered === '0,1,2,3' || (offered.length === 1 && offered === chosenMode());
+    if (chosenMode() === '0') out.classicStarts = clOn() === $('ppCalcClassicDefault').checked;
     out.auto = best?.dataset.count ?? null;
     const before = Number(best?.value);
     const miss = $('ppCalcCounts').querySelector('[data-count="miss"]');
@@ -1980,6 +2007,64 @@ const ppCalc = JSON.parse(
     $('ppCalcMods').querySelector('[data-mod="HT"]')?.click();
     $('ppCalcMods').querySelector('[data-mod="DT"]')?.click();
     out.exclusive = [...$('ppCalcMods').querySelectorAll('.mod-chip--required')].map((c) => c.dataset.mod).join(',');
+    out.exclusiveWanted = 'DT' + (clOn() ? ',CL' : '');
+    $('ppCalcMods').querySelector('[data-mod="DT"]')?.click();
+    if (chosenMode() === '0') {
+      miss.value = '0';
+      miss.dispatchEvent(new Event('input', { bubbles: true }));
+      $('ppCalcAccuracy').focus();
+      $('ppCalcAccuracy').value = '97';
+      $('ppCalcAccuracy').dispatchEvent(new Event('input'));
+      const hundreds = Number($('ppCalcCounts').querySelector('[data-count="c100"]').value);
+      // Whole judgements come as near 97% as they can.
+      const near = () => /9[67][.,][0-9]{2}%/.test($('ppCalcResult').textContent);
+      await until(near);
+      out.accuracy = hundreds > 0 && near();
+      $('ppCalcAccuracy').blur();
+      const state = () => ({
+        on: clOn(),
+        tail: Boolean($('ppCalcCounts').querySelector('[data-count="tailMiss"]')),
+        score: !$('ppCalcScoreField').hidden,
+      });
+      const was = state();
+      $('ppCalcMods').querySelector('[data-mod="CL"]').click();
+      const now = state();
+      out.lazer = was.on !== now.on && [was, now].every((s) => s.tail === !s.on);
+      out.stableScore = [was, now].every((s) => s.score === s.on);
+      await wait(800);
+
+      // Each slider prices the play as it moves, and its box follows it.
+      const accuracy = $('ppCalcAccuracySlider');
+      const atAccuracy = pp();
+      accuracy.focus();
+      accuracy.value = String(Math.max(Number(accuracy.min), 90));
+      accuracy.dispatchEvent(new Event('input'));
+      await until(() => pp() < atAccuracy);
+      // The box shows osu!'s accuracy once it is priced, which whole judgements only come near.
+      out.accuracySlider = pp() < atAccuracy && Number($('ppCalcCounts').querySelector('[data-count="c100"]').value) > 0
+        && Math.abs(Number($('ppCalcAccuracy').value) - Number(accuracy.value)) < 0.5;
+      accuracy.blur();
+      await wait(500);
+      const combo = $('ppCalcComboSlider');
+      const atCombo = pp();
+      combo.focus();
+      combo.value = String(Math.floor(Number(combo.max) / 2));
+      combo.dispatchEvent(new Event('input'));
+      await until(() => pp() < atCombo);
+      out.comboSlider = pp() < atCombo && $('ppCalcCombo').value === combo.value;
+      combo.blur();
+
+      // "Classic by default" is the profile's, saved as it is ticked, and this play takes it too.
+      const saved = async () => (await (await fetch('/api/state')).json()).settings?.ppCalcClassic === true;
+      const box = $('ppCalcClassicDefault');
+      const original = box.checked;
+      box.click();
+      let stored = null;
+      for (let i = 0; i < 40 && stored !== !original; i++) { stored = await saved(); if (stored !== !original) await wait(100); }
+      out.defaultSaved = stored === !original && clOn() === !original;
+      box.click();
+      for (let i = 0; i < 40 && (await saved()) !== original; i++) await wait(100);
+    }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     out.escape = $('ppCalcModal').hidden;
     return JSON.stringify(out);
@@ -1990,7 +2075,20 @@ check('a beatmap opens at a perfect play', ppCalc.none ? SKIP : ppCalc.perfect, 
 check('the best judgement is the one worked out', ppCalc.none ? SKIP : ['c300', 'geki'].includes(ppCalc.auto), true);
 check('a miss comes out of it', ppCalc.none ? SKIP : ppCalc.remainder, true);
 check('and costs pp', ppCalc.none ? SKIP : ppCalc.missCosts, true);
-check('Double Time takes Half Time off', ppCalc.none ? SKIP : ppCalc.exclusive, 'DT');
+check('Double Time takes Half Time off', ppCalc.none ? SKIP : ppCalc.exclusive, ppCalc.exclusiveWanted);
+check('a play starts with Classic as the profile says', ppCalc.none || ppCalc.classicStarts === undefined ? SKIP : ppCalc.classicStarts, true);
+check('it is laid out before a beatmap is chosen, waiting for one', ppCalc.laidOut, true);
+check('the rulesets are their icons', ppCalc.modeIcons, true);
+check('a beatmap found shows its ruleset and who mapped it', ppCalc.none ? SKIP : ppCalc.rowShows, true);
+check('only the rulesets a beatmap can be played in are offered', ppCalc.none ? SKIP : ppCalc.modesFit, true);
+check('a mod that changes no pp is shown and cannot be chosen', ppCalc.inert, true);
+check('the search loads more as it is scrolled', ppCalc.none ? SKIP : ppCalc.more, true);
+check('an accuracy typed in becomes 100s', ppCalc.none || ppCalc.accuracy === undefined ? SKIP : ppCalc.accuracy, true);
+check('osu! without Classic has slider ends to miss', ppCalc.none || ppCalc.lazer === undefined ? SKIP : ppCalc.lazer, true);
+check("osu!stable's score is asked for only with Classic", ppCalc.none || ppCalc.stableScore === undefined ? SKIP : ppCalc.stableScore, true);
+check('the accuracy slider prices the play as it moves', ppCalc.none || ppCalc.accuracySlider === undefined ? SKIP : ppCalc.accuracySlider, true);
+check('so does the combo slider', ppCalc.none || ppCalc.comboSlider === undefined ? SKIP : ppCalc.comboSlider, true);
+check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defaultSaved === undefined ? SKIP : ppCalc.defaultSaved, true);
 check('Escape closes it', ppCalc.escape ?? SKIP, true);
 
 /*

@@ -57,6 +57,11 @@ internal sealed class ScoreDetail(Play play)
     public bool ReplayAvailable { get; init; }
     public List<JsonElement>? PpBreakdown { get; init; }
     public object? PpVersion { get; init; }
+    /// <summary>
+    /// The score osu!stable gave an osu! play, which osu!'s calculator works out its combo breaks
+    /// from: for the pp calculator. Null for any other score.
+    /// </summary>
+    public double? StableScore { get; init; }
 }
 
 /// <summary>One score's views: its page and its replay (src/scores.ts, the reading half).</summary>
@@ -166,7 +171,7 @@ internal static partial class Scores
         var row = db.FirstRow("""
             SELECT mode, client, statistics_json, max_statistics_json, beatmap_max_combo, replay_path,
                    count300, count100, count50, count_geki, count_katu, count_miss,
-                   pp_parts, pp_nomod_parts, pp_version
+                   pp_parts, pp_nomod_parts, pp_version, total_score
               FROM scores WHERE id = ?
             """, id)!;
 
@@ -192,6 +197,7 @@ internal static partial class Scores
             ReplayAvailable = play.HasReplay && replayPath is not null && File.Exists(replayPath),
             PpBreakdown = ParseBreakdown(parts),
             PpVersion = row["pp_version"],
+            StableScore = client == "stable" && row.Num("mode") == 0 && row.Num("total_score") is > 0 and var total ? total : null,
         };
     }
 

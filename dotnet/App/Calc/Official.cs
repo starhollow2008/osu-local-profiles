@@ -190,7 +190,7 @@ internal sealed class OfficialCalculator : IDisposable
     /// converts the beatmap for the ruleset and mods. Null when it cannot answer, which a helper
     /// built from a player's source before this request existed cannot.
     /// </summary>
-    public async Task<Dictionary<string, double>?> Judgements(string beatmapPath, int ruleset, IReadOnlyList<JsonElement> mods)
+    public async Task<PerfectPlay?> Judgements(string beatmapPath, int ruleset, IReadOnlyList<JsonElement> mods)
     {
         var response = await Send(new { type = "judgements", beatmapPath, ruleset, mods });
         if (Js.Get(response, "ok") is not { ValueKind: JsonValueKind.True } || Js.Get(response, "counts") is not { ValueKind: JsonValueKind.Object } counts)
@@ -198,10 +198,18 @@ internal sealed class OfficialCalculator : IDisposable
             if (Js.IsString(Js.Get(response, "error"), out var error)) LastError = error;
             return null;
         }
-        return Js.Entries(counts).Where(e => e.Value.ValueKind == JsonValueKind.Number)
+        static Dictionary<string, double> Numbers(JsonElement o) => Js.Entries(o).Where(e => e.Value.ValueKind == JsonValueKind.Number)
             .ToDictionary(e => e.Key, e => Js.NumberOf(e.Value), StringComparer.Ordinal);
+        // None from a helper built from a player's source before a play without Classic could be priced.
+        return new PerfectPlay(Numbers(counts), Js.Get(response, "lazer") is { ValueKind: JsonValueKind.Object } lazer ? Numbers(lazer) : null);
     }
 }
+
+/// <summary>
+/// A perfect play on a beatmap: its judgements by replay counter, and for osu! what lazer judges
+/// besides them (<c>slider_tail_hit</c>, <c>large_tick_hit</c>), which a play without Classic is priced with.
+/// </summary>
+internal sealed record PerfectPlay(Dictionary<string, double> Counts, Dictionary<string, double>? Lazer);
 
 /// <summary>How to start a helper: a program and its arguments (src/calc/official.ts).</summary>
 internal sealed record HelperCandidate(string Command, IReadOnlyList<string> Args);

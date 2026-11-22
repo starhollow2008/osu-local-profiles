@@ -334,7 +334,7 @@ export function incompleteRow(play, { actions = false } = {}) {
       actions
         ? `<button class="play-detail__menu" type="button" data-play-menu data-kind="incomplete"
              data-id="${play.id}" data-ids="${(play.ids ?? [play.id]).join(',')}"
-             data-set="${play.beatmapsetId ?? ''}"
+             data-set="${play.beatmapsetId ?? ''}" data-md5="${escapeHtml(play.beatmapMd5 ?? '')}"
              aria-haspopup="true" aria-label="Options for this play" title="Options">${MORE_ICON}</button>`
         : ''
     }

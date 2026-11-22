@@ -542,7 +542,10 @@ internal static partial class Server
             if (await TrackerOrRefuse() is { } t)
             {
                 var q = request.Query.TryGetValue("q", out var asked) && asked.Count > 0 ? asked[0] ?? "" : "";
-                await Json(context, new { beatmaps = ScoreEntry.Search(EntryFor(opts, t, Current()), q) });
+                // The page after the ones already listed, for a list that loads more as it scrolls.
+                var offset = request.Query.TryGetValue("offset", out var from) && int.TryParse(from.ToString(), out var n) && n is >= 0 and <= 100_000 ? n : 0;
+                var (beatmaps, more) = ScoreEntry.SearchPage(EntryFor(opts, t, Current()), q, offset);
+                await Json(context, new { beatmaps, more });
             }
             return;
         }

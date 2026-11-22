@@ -10,6 +10,10 @@ namespace OsuLocalProfiles;
 /// <param name="Counts">The judgements it was priced with: what was typed, or a perfect play's.</param>
 /// <param name="Perfect">A perfect play's judgements on this beatmap, ruleset and mods; null when the calculator cannot say.</param>
 /// <param name="Ranked">Whether osu! ranks the mods; null when the calculator cannot say.</param>
+/// <param name="Classic">Whether it was scored as osu!stable scores it, or without Classic as lazer does.</param>
+/// <param name="SliderEnds">osu! without Classic: the beatmap's slider ends, which lazer judges.</param>
+/// <param name="SliderTicks">osu! without Classic: its slider ticks and repeats.</param>
+/// <param name="StableScoreUsed">Whether osu!stable's score typed in was priced with; null when none was.</param>
 internal sealed record CalculatedPlay(
     double Pp,
     double Stars,
@@ -21,7 +25,11 @@ internal sealed record CalculatedPlay(
     string? Version,
     bool? Ranked,
     Dictionary<string, double> Counts,
-    Dictionary<string, double>? Perfect);
+    Dictionary<string, double>? Perfect,
+    bool Classic,
+    double? SliderEnds,
+    double? SliderTicks,
+    bool? StableScoreUsed);
 
 /// <summary>
 /// Options -> pp calculator: a play described by its numbers on any beatmap here, priced by the
@@ -31,7 +39,15 @@ internal sealed record CalculatedPlay(
 /// <remarks>
 /// The play is built into an osu!stable replay as a score entered by hand is
 /// (<see cref="BuiltReplays.Manual"/>), and osu!'s mods with their settings go beside it, as McOsu's
-/// custom speeds do, so it is scored as stable whatever the mods.
+/// custom speeds do, so it is scored as stable whatever the mods. Without Classic, an osu! or taiko
+/// play is built into a lazer replay instead (<see cref="BuiltReplays.ManualLazer"/>), with lazer's
+/// statistics, so osu! scores it as lazer does: in osu! that is slider head accuracy, and the
+/// slider ends and ticks missed.
+/// <para>
+/// With Classic, osu! guesses an osu! play's slider breaks from its combo, unless it has the score
+/// osu!stable gave it, as a stable score does, from which it works them out
+/// (<c>OsuLegacyScoreMissCalculator</c>). That score can be typed in, and a stable score brings its own.
+/// </para>
 /// </remarks>
 internal static partial class PpCalculation
 {
@@ -48,6 +64,21 @@ internal static partial class PpCalculation
 
     [GeneratedRegex(@"^[a-z_]{1,40}\z")]
     private static partial Regex SettingShape();
+
+    /// <summary>
+    /// The mods that leave a play's pp and stars as they are, by ruleset, which the page shows dimmed
+    /// and cannot choose. Measured with osu!'s calculator (<c>PpCalculationTests</c> checks every one
+    /// again on each osu! release): what they change is what is seen, heard or allowed, not what osu!
+    /// prices. Wind Up, Wind Down and Adaptive Speed are priced at their starting speed, which is the
+    /// beatmap's own. Classic changes nothing in catch and mania.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<int, string[]> NoPp = new Dictionary<int, string[]>
+    {
+        [0] = ["AC", "AD", "AL", "AS", "BM", "BR", "BU", "DF", "DP", "GR", "MU", "NS", "PF", "RP", "SD", "SG", "SI", "SY", "TR", "WD", "WG", "WU"],
+        [1] = ["AC", "AS", "CS", "MU", "NF", "PF", "SD", "SG", "WD", "WU"],
+        [2] = ["AC", "CL", "FF", "MF", "MU", "NS", "PF", "RX", "SD", "SY", "WD", "WU"],
+        [3] = ["AC", "AS", "CL", "CO", "CS", "FI", "FL", "HD", "HR", "MU", "PF", "SD", "WD", "WU"],
+    };
 
     /// <summary>Mods no play can be calculated with: Autoplay and Cinema have no player, ScoreV2 is a system mod.</summary>
     private static readonly HashSet<string> Refused = ["AT", "CN", "SV2"];
@@ -108,8 +139,8 @@ internal static partial class PpCalculation
     }
 
     /// <summary>
-    /// Price one play: <c>{ md5, mode, mods, counts?, combo? }</c>. With no counts it is a perfect
-    /// play, and with no combo a full one. Everything is checked against the beatmap first, as a
+    /// Price one play: <c>{ md5, mode, mods, classic?, counts?, combo?, score? }</c>. With no counts it
+    /// is a perfect play, and with no combo a full one. <c>score</c> is osu!stable's, for osu! with Classic. Everything is checked against the beatmap first, as a
     /// score entered by hand is.
     /// </summary>
     public static async Task<CalculatedPlay> Calculate(EntryDeps deps, JsonElement input)
@@ -124,7 +155,17 @@ internal static partial class PpCalculation
         if (beatmap.Mode != 0 && mode != beatmap.Mode) throw new InvalidOperationException("this beatmap can only be played in its own ruleset");
 
         if (ParseMods(Js.Get(input, "mods"), out var modsError) is not { } mods) throw new InvalidOperationException(modsError);
-        var perfect = await deps.PerfectJudgements(osuPath, mode, mods);
+        // Without Classic, osu! and taiko are scored as lazer scores them. Catch and mania give the same pp either way.
+        var classic = mode is 2 or 3 || Js.Get(input, "classic") is not { ValueKind: JsonValueKind.False };
+        var perfectPlay = await deps.PerfectJudgements(osuPath, mode, mods);
+        var perfect = perfectPlay?.Counts;
+        Dictionary<string, double>? ends = null;
+        if (!classic && mode == 0)
+        {
+            ends = perfectPlay?.Lazer is { } lazer && lazer.ContainsKey(SliderTails) && lazer.ContainsKey(SliderTicks)
+                ? lazer
+                : throw new InvalidOperationException("this calculator can only price osu! with Classic");
+        }
 
         var counts = new Dictionary<string, double>(StringComparer.Ordinal) { ["c300"] = 0, ["c100"] = 0, ["c50"] = 0, ["geki"] = 0, ["katu"] = 0, ["miss"] = 0 };
         var given = Js.Get(input, "counts");
@@ -142,6 +183,20 @@ internal static partial class PpCalculation
                     ?? throw new InvalidOperationException("each judgement is a whole number from 0");
             }
         }
+        // lazer's slider ends and ticks that were missed, which only a play without Classic has.
+        double tailMiss = 0, tickMiss = 0;
+        if (ends is not null && given is { ValueKind: JsonValueKind.Object })
+        {
+            double Missed(string key, double most, string what)
+            {
+                var value = Js.Get(given.Value, key);
+                var n = ScoreEntry.Whole(value is null or { ValueKind: JsonValueKind.Null } ? JsonText.From(0) : value, 65535)
+                    ?? throw new InvalidOperationException("each judgement is a whole number from 0");
+                return n <= most ? n : throw new InvalidOperationException($"this beatmap has {Js.NumberToString(most)} {what}");
+            }
+            tailMiss = Missed("tailMiss", ends[SliderTails], "slider ends");
+            tickMiss = Missed("tickMiss", ends[SliderTicks], "slider ticks");
+        }
         var judged = ScoreEntry.Judgements[mode].Sum(key => counts[key]);
         if (judged == 0) throw new InvalidOperationException("enter the play’s judgements");
         // Every object is judged once. Without osu!'s count, an osu! or mania play on its own beatmap is still checked.
@@ -155,12 +210,23 @@ internal static partial class PpCalculation
         var combo = ScoreEntry.Blank(typedCombo) ? null : ScoreEntry.Whole(typedCombo, 65535);
         if (combo is null && !ScoreEntry.Blank(typedCombo)) throw new InvalidOperationException("the combo is a whole number");
 
+        // osu!stable's score, which osu! works out an osu! play's combo breaks from. Only for a play
+        // with Classic and stable's own mods: with any other, stable could not have scored it.
+        var typedScore = Js.Get(input, "score");
+        var stableScore = ScoreEntry.Blank(typedScore) ? null : ScoreEntry.Whole(typedScore, 0x7fffffff);
+        if (stableScore is null && !ScoreEntry.Blank(typedScore)) throw new InvalidOperationException("the score is a whole number");
+        var stableTotal = classic && mode == 0 && stableScore > 0 && Mods.EncodeLegacy(mods) is not null ? stableScore : null;
+
         var legacy = new LegacyCounts(counts["c300"], counts["c100"], counts["c50"], counts["geki"], counts["katu"], counts["miss"]);
-        var pricing = new PriceOptions(mods, IgnoreLegacyTotalScore: true);
+        var pricing = new PriceOptions(mods, IgnoreLegacyTotalScore: stableTotal is null);
+        var statistics = classic ? null : LazerStatistics(mode, counts, ends, tailMiss, tickMiss);
+        var maximum = classic ? null : MaximumStatistics(judged, ends);
         async Task<PpResult> Price(double withCombo)
         {
             var file = Path.Combine(Path.GetTempPath(), $"olp-calc-{Guid.NewGuid():N}.osr");
-            File.WriteAllBytes(file, BuiltReplays.Manual(mode, beatmap.Md5, "", legacy, withCombo, 0, null, Js.Now()));
+            File.WriteAllBytes(file, statistics is null
+                ? BuiltReplays.Manual(mode, beatmap.Md5, "", legacy, withCombo, 0, stableTotal, Js.Now())
+                : BuiltReplays.ManualLazer(mode, beatmap.Md5, legacy, statistics, maximum!, mods, withCombo, Js.Now()));
             try
             {
                 return await deps.PriceReplay(file, pricing) is { MaxCombo: > 0 } priced
@@ -175,15 +241,61 @@ internal static partial class PpCalculation
 
         // The beatmap's maximum combo is osu!'s to say, so a full combo is priced once it has.
         var result = await Price(combo ?? 0);
-        if (combo is null) result = await Price(result.MaxCombo);
+        // A missed slider end or tick is one less in the combo: a full one is what the rest make.
+        var full = Math.Max(0, result.MaxCombo - tailMiss - tickMiss);
+        if (combo is null) result = await Price(full);
         else if (combo > result.MaxCombo)
         {
             throw new InvalidOperationException($"a combo of {Js.NumberToString(combo.Value)} is more than this beatmap's maximum of {Js.NumberToString(result.MaxCombo)}");
         }
 
-        return new CalculatedPlay(result.Value, result.Stars, combo ?? result.MaxCombo, result.MaxCombo, result.Accuracy, Silvered(result.Rank, mods),
-            result.Breakdown, result.Version, await deps.ModsRanked(mode, JsonText.From(mods)),
-            ScoreEntry.Judgements[mode].ToDictionary(key => key, key => counts[key], StringComparer.Ordinal), perfect);
+        var priced = ScoreEntry.Judgements[mode].ToDictionary(key => key, key => counts[key], StringComparer.Ordinal);
+        if (ends is not null)
+        {
+            priced["tailMiss"] = tailMiss;
+            priced["tickMiss"] = tickMiss;
+        }
+        return new CalculatedPlay(result.Value, result.Stars, combo ?? full, result.MaxCombo, result.Accuracy, Silvered(result.Rank, mods),
+            result.Breakdown, result.Version, await deps.ModsRanked(mode, JsonText.From(mods)), priced, perfect, classic,
+            ends?[SliderTails], ends?[SliderTicks], stableScore is > 0 ? stableTotal is not null : null);
+    }
+
+    private const string SliderTails = "slider_tail_hit";
+    private const string SliderTicks = "large_tick_hit";
+
+    /// <summary>
+    /// The judgements as lazer's statistics: for osu!, its sliders' ends and ticks too, every one hit
+    /// but those missed. Zero counts are left out, as lazer leaves them out.
+    /// </summary>
+    internal static Dictionary<string, double> LazerStatistics(int mode, Dictionary<string, double> counts, Dictionary<string, double>? ends,
+        double tailMiss, double tickMiss)
+    {
+        var statistics = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["great"] = counts["c300"],
+            ["ok"] = counts["c100"],
+            ["meh"] = mode == 0 ? counts["c50"] : 0,
+            ["miss"] = counts["miss"],
+        };
+        if (ends is not null)
+        {
+            statistics[SliderTails] = ends[SliderTails] - tailMiss;
+            statistics[SliderTicks] = ends[SliderTicks] - tickMiss;
+            statistics["large_tick_miss"] = tickMiss;
+        }
+        return statistics.Where(s => s.Value > 0).ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal);
+    }
+
+    /// <summary>A perfect play's statistics, as lazer writes them: a Great for every object, and every slider end and tick.</summary>
+    internal static Dictionary<string, double> MaximumStatistics(double objects, Dictionary<string, double>? ends)
+    {
+        var maximum = new Dictionary<string, double>(StringComparer.Ordinal) { ["great"] = objects };
+        if (ends is not null)
+        {
+            maximum[SliderTails] = ends[SliderTails];
+            maximum[SliderTicks] = ends[SliderTicks];
+        }
+        return maximum.Where(s => s.Value > 0).ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal);
     }
 
     /// <summary>

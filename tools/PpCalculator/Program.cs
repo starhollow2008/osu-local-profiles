@@ -288,8 +288,8 @@ public static class Program
         var mods = BuildMods(ruleset, request.Mods ?? Array.Empty<ModRequest>());
         var playable = working.GetPlayableBeatmap(ruleset.RulesetInfo, mods);
 
-        int great = 0, largeTicks = 0, smallTicks = 0;
-        if (request.Ruleset is 0 or 3)
+        int great = 0, largeTicks = 0, smallTicks = 0, sliderTails = 0;
+        if (request.Ruleset is 3)
         {
             great = playable.HitObjects.Count;
         }
@@ -302,8 +302,11 @@ public static class Program
                     case HitResult.Great: great++; break;
                     case HitResult.LargeTickHit: largeTicks++; break;
                     case HitResult.SmallTickHit: smallTicks++; break;
+                    case HitResult.SliderTailHit: sliderTails++; break;
                 }
             }
+            // osu!stable judges each object once, a slider included: the head is Great only without Classic.
+            if (request.Ruleset is 0) great = playable.HitObjects.Count;
         }
 
         return new
@@ -316,6 +319,10 @@ public static class Program
                 3 => new Dictionary<string, int> { ["geki"] = great },
                 _ => new Dictionary<string, int> { ["c300"] = great },
             },
+            // osu! without Classic: what lazer judges besides each object, its sliders' ends and ticks (repeats included).
+            lazer = request.Ruleset is 0
+                ? new Dictionary<string, int> { ["slider_tail_hit"] = sliderTails, ["large_tick_hit"] = largeTicks }
+                : null,
             version = OsuVersion,
         };
     }
