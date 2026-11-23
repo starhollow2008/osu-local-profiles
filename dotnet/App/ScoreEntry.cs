@@ -394,6 +394,30 @@ internal static partial class ScoreEntry
     internal static partial Regex Md5Shape();
 
     /// <summary>
+    /// The beatmaps this profile played most recently, latest first, a page at a time: what the pp
+    /// calculator suggests before anything is typed. Finished and unfinished plays both, as the
+    /// profile counts them (removed ones never, unsubmitted ones as it says), and only beatmaps
+    /// whose file is here.
+    /// </summary>
+    public static (List<EntryBeatmap> Beatmaps, bool More) RecentPage(EntryDeps deps, int offset, int limit = 20)
+    {
+        var e = Calc.Eligibility.Of(SettingsStore.Get(deps.Db, deps.ProfileId));
+        var rows = deps.Db.All($"""
+            SELECT md5 FROM (
+              SELECT s.beatmap_md5 AS md5, MAX(s.played_at) AS at FROM scores s
+               WHERE s.profile_id = ? AND {Calc.Eligibility.VisibleSql()} AND s.beatmap_md5 IS NOT NULL
+               GROUP BY s.beatmap_md5
+              UNION ALL
+              SELECT s.beatmap_md5, MAX(s.played_at) FROM incomplete_plays s
+               WHERE s.profile_id = ? AND {Calc.Eligibility.IncompleteSql(e)} AND s.beatmap_md5 IS NOT NULL
+               GROUP BY s.beatmap_md5
+            ) GROUP BY md5 ORDER BY MAX(at) DESC LIMIT ? OFFSET ?
+            """, r => r.GetString(0), [deps.ProfileId, deps.ProfileId, limit + 1, Math.Max(0, offset)]);
+        var more = rows.Count > limit;
+        return ([.. rows.Take(limit).Select(md5 => Describe(deps, md5)).Where(b => b is not null).Select(b => b!)], more);
+    }
+
+    /// <summary>
     /// A beatmap by its link or id, or by the MD5 a search returned. An installed one is used as it
     /// is; otherwise osu!'s current file is downloaded and kept.
     /// </summary>

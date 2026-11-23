@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "Puntuación de osu!stable",
   "ppCalc.stableScoreUnused": "Solo se usa con los mods propios de osu!stable.",
   "ppCalc.rebuildSource": "Recompila tu código de osu! en Otros ajustes para que se rellenen los aciertos y poder usar la precisión.",
+  "ppCalc.recentlyPlayed": "Jugados recientemente",
   "ppCalc.tooMany": "Los juicios suman más que los {total} de este beatmap.",
   "ppCalc.unranked": "Mods no clasificados",
   "ppCalcClose": "Cerrar",

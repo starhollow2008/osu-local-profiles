@@ -55,9 +55,12 @@ const STABLE_CLIENTS = new Set(['stable', 'mcosu', 'neki', 'neomod']);
 let beatmap = null;
 /** The ruleset chosen. */
 let ruleset = 0;
-/** The search's results so far, and what is needed to load the next page of them. */
+/**
+ * The search's results so far, and what is needed to load the next page of them. With nothing
+ * typed, `recent`: the beatmaps played most recently, suggested until something is.
+ */
 let found = [];
-let search = { q: '', more: false, loading: false };
+let search = { q: '', recent: false, more: false, loading: false };
 /** Chosen mods: acronym -> its settings. Classic is `classic`, not one of these. */
 let mods = new Map();
 /** osu! and taiko only: false scores the play as lazer does, without Classic. */
@@ -123,7 +126,7 @@ export function openPpCalculator(ruleset = 0, { fresh = false } = {}) {
   }
   beatmap = null;
   found = [];
-  search = { q: '', more: false, loading: false };
+  search = { q: '', recent: false, more: false, loading: false };
   mods = new Map();
   classic = classicDefault;
   $('ppCalcClassicDefault').checked = classicDefault;
@@ -209,8 +212,9 @@ export function closePpCalculator() {
 function renderFound(message) {
   // A row's ruleset tooltip would outlast the row.
   hideTooltip();
+  const heading = message ?? (search.recent ? t('ppCalc.recentlyPlayed') : null);
   $('ppCalcResults').innerHTML =
-    (message ? `<div class="setting__hint">${escapeHtml(message)}</div>` : '') +
+    (heading ? `<div class="setting__hint">${escapeHtml(heading)}</div>` : '') +
     foundRows(found) +
     (search.more ? `<div class="setting__hint pp-calc__more">${escapeHtml(t('ppCalc.loadingMore'))}</div>` : '');
   $('ppCalcResults').hidden = false;
@@ -220,11 +224,14 @@ function renderFound(message) {
 /** The next page of the search, once the list is scrolled near its end. */
 async function loadMore() {
   if (!search.more || search.loading) return;
-  const q = search.q;
+  const asking = search;
   search.loading = true;
   try {
-    const d = await (await fetch(`/api/beatmaps/search?q=${encodeURIComponent(q)}&offset=${found.length}`)).json();
-    if (search.q !== q) return;
+    const url = asking.recent
+      ? `/api/beatmaps/recent?offset=${found.length}`
+      : `/api/beatmaps/search?q=${encodeURIComponent(asking.q)}&offset=${found.length}`;
+    const d = await (await fetch(url)).json();
+    if (search !== asking) return;
     found = found.concat(d.beatmaps ?? []);
     search.more = d.more === true;
     const top = $('ppCalcResults').scrollTop;
@@ -234,9 +241,36 @@ async function loadMore() {
     search.more = false;
     renderFound(err.message);
   } finally {
-    search.loading = false;
+    asking.loading = false;
   }
 }
+
+/**
+ * With nothing typed, the beatmaps this profile played most recently, latest first: what a player
+ * pricing a play most often wants. None played yet suggests nothing.
+ */
+async function showRecent() {
+  // Asked for afresh each time: what was played changes while the app runs. Not twice at once.
+  if ($('ppCalcQuery').value.trim() || (search.recent && search.loading)) return;
+  clearTimeout(searchTimer);
+  const asking = (search = { q: '', recent: true, more: false, loading: true });
+  found = [];
+  try {
+    const d = await (await fetch('/api/beatmaps/recent')).json();
+    if (search !== asking) return;
+    found = d.beatmaps ?? [];
+    asking.more = d.more === true;
+    if (found.length) renderFound(null);
+    else $('ppCalcResults').hidden = true;
+  } catch {
+    // Only a suggestion: the search is there all the same.
+    if (search === asking) $('ppCalcResults').hidden = true;
+  } finally {
+    asking.loading = false;
+  }
+}
+
+$('ppCalcQuery').addEventListener('focus', () => void showRecent());
 
 $('ppCalcResults').addEventListener('scroll', () => {
   const list = $('ppCalcResults');
@@ -305,9 +339,10 @@ $('ppCalcQuery').oninput = () => {
   clearTimeout(searchTimer);
   const q = $('ppCalcQuery').value.trim();
   found = [];
-  search = { q, more: false, loading: false };
+  search = { q, recent: false, more: false, loading: false };
   if (!q) {
     $('ppCalcResults').hidden = true;
+    void showRecent();
     return;
   }
   if (looksLikeLink(q)) {

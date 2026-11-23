@@ -2013,6 +2013,11 @@ const ppCalc = JSON.parse(
     $('ppCalcQuery').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
     $('ppCalcModal').dispatchEvent(new MouseEvent('click', { bubbles: true }));
     out.dragStaysOpen = !$('ppCalcModal').hidden;
+    // Nothing typed yet: the beatmaps played most recently, on a profile that has played any.
+    for (let i = 0; i < 30 && $('ppCalcResults').hidden; i++) await wait(100);
+    out.recent = $('ppCalcResults').hidden ? null
+      : $('ppCalcResults').querySelector('.setting__hint')?.textContent.trim() === 'Recently played'
+        && Boolean($('ppCalcResults').querySelector('[data-found]'));
     const chosenMode = () => $('ppCalcModes').querySelector('[aria-checked="true"]')?.dataset.mode;
     // Every ruleset before a beatmap, as osu!'s icons, one of them chosen.
     out.modeIcons = $('ppCalcModes').querySelectorAll('[data-mode] .mode-icon').length === 4 && chosenMode() !== undefined;
@@ -2188,6 +2193,7 @@ check('combo is asked for in osu! and catch only', ppCalc.none || ppCalc.comboRu
 check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defaultSaved === undefined ? SKIP : ppCalc.defaultSaved, true);
 check('Escape closes it', ppCalc.escape ?? SKIP, true);
 check('selecting text and letting go outside it leaves it open', ppCalc.dragStaysOpen, true);
+check('with nothing typed, it suggests the beatmaps played most recently', ppCalc.recent ?? SKIP, true);
 check('each beatmap found shows its star rating', ppCalc.none ? SKIP : Boolean(ppCalc.rowStars), true);
 check("the beatmap's length, BPM, circles, sliders and settings are shown as osu-web shows them", ppCalc.none ? SKIP : ppCalc.stats, true);
 check('a full combo is priced at 100, 99, 98 and 95%', ppCalc.none ? SKIP : ppCalc.fc, true);

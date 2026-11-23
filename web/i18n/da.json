@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "osu!stable-score",
   "ppCalc.stableScoreUnused": "Bruges kun med osu!stables egne mods.",
   "ppCalc.rebuildSource": "Byg din osu!-kilde igen under Øvrige indstillinger for at få udfyldt bedømmelserne og bruge præcision.",
+  "ppCalc.recentlyPlayed": "Senest spillet",
   "ppCalc.tooMany": "Bedømmelserne giver tilsammen mere end dette beatmaps {total}.",
   "ppCalc.unranked": "Mods uden rangering",
   "ppCalcClose": "Luk",

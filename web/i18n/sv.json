@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "osu!stable-poäng",
   "ppCalc.stableScoreUnused": "Används bara med osu!stables egna mods.",
   "ppCalc.rebuildSource": "Bygg om din osu!-källkod under Övriga inställningar för att få bedömningarna ifyllda och kunna använda träffsäkerhet.",
+  "ppCalc.recentlyPlayed": "Nyligen spelade",
   "ppCalc.tooMany": "Bedömningarna blir fler än beatmapens {total}.",
   "ppCalc.unranked": "Orankade mods",
   "ppCalcClose": "Stäng",

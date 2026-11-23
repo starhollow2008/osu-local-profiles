@@ -215,6 +215,39 @@ public sealed class PpCalculationTests : IDisposable
     }
 
     [Fact]
+    public async Task The_beatmaps_played_most_recently_come_first_and_a_removed_play_does_not()
+    {
+        var deps = Deps();
+        var older = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap("Older"))).Md5;
+        var newer = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap("Newer"))).Md5;
+        var unfinished = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap("Unfinished"))).Md5;
+        string[] Recent() => [.. ScoreEntry.RecentPage(deps, 0).Beatmaps.Select(b => b.Md5)];
+        Assert.Empty(Recent());
+
+        var now = Js.Now();
+        async Task Played(string md5, double at) => Assert.Equal("added", (await ScoreEntry.Enter(deps, JsonText.From(new
+        {
+            md5, mode = 0, counts = new { c300 = 21 }, maxCombo = 10, mods = "", playedAt = at,
+        }), "tester"))!.Status);
+        await Played(older, now - 3_600_000);
+        await Played(newer, now - 60_000);
+        Assert.Equal([newer, older], Recent());
+
+        // An unfinished play counts as playing it, and a removed one does not.
+        h.Db.Run("INSERT INTO incomplete_plays (profile_id, dedupe_key, mode, beatmap_md5, played_at) VALUES (?,?,0,?,?)",
+            h.ProfileId, "unfinished-1", unfinished, now - 1_000);
+        Assert.Equal([unfinished, newer, older], Recent());
+        h.Db.Run("UPDATE scores SET hidden_at = ? WHERE beatmap_md5 = ?", now, newer);
+        Assert.Equal([unfinished, older], Recent());
+
+        // A page at a time.
+        var first = ScoreEntry.RecentPage(deps, 0, 1);
+        Assert.Equal([unfinished], first.Beatmaps.Select(b => b.Md5));
+        Assert.True(first.More);
+        Assert.Equal([older], ScoreEntry.RecentPage(deps, 1, 1).Beatmaps.Select(b => b.Md5));
+    }
+
+    [Fact]
     public void Manual_entry_offers_each_rulesets_osu_stable_mods()
     {
         var offered = JsonText.From(ScoreEntry.ManualMods);

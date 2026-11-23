@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "osu!stable-score",
   "ppCalc.stableScoreUnused": "Alleen gebruikt met de eigen mods van osu!stable.",
   "ppCalc.rebuildSource": "Bouw je osu!-broncode opnieuw in Overige instellingen om de beoordelingen in te vullen en nauwkeurigheid te gebruiken.",
+  "ppCalc.recentlyPlayed": "Onlangs gespeeld",
   "ppCalc.tooMany": "De beoordelingen tellen op tot meer dan de {total} van deze beatmap.",
   "ppCalc.unranked": "Niet-gerankte mods",
   "ppCalcClose": "Sluiten",

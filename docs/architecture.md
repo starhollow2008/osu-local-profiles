@@ -798,6 +798,9 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   to rebuild, and osu! without Classic says to rebuild (`PpCalculation.NeedsRebuild`).
 - **Beatmaps**: searched across every client's index (artist, title, mapper, difficulty), a link
   downloaded as for a score link, or a `.osu` file, which is kept in `data/beatmaps/` and indexed.
+- **With nothing typed, it suggests the beatmaps played most recently** (`GET /api/beatmaps/recent`,
+  `ScoreEntry.RecentPage`): this profile's finished and unfinished plays, latest first, as the profile
+  counts them (`VisibleSql`, `IncompleteSql`), a page at a time, only those whose file is here.
 - **Each beatmap found has its star rating** without mods, in its own ruleset
   (`POST /api/beatmaps/stars`), from the calculator in use and never the index's (osu!'s API knows
   only some): filled in after the rows are drawn, a few at a time, and kept by the tracker for as long

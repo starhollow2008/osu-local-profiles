@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "osu!stable 점수",
   "ppCalc.stableScoreUnused": "osu!stable 자체 모드에서만 쓰입니다.",
   "ppCalc.rebuildSource": "판정 수를 자동으로 채우고 정확도를 쓰려면 기타 설정에서 osu! 소스를 다시 빌드하세요.",
+  "ppCalc.recentlyPlayed": "최근 플레이한 비트맵",
   "ppCalc.tooMany": "판정 합계가 이 비트맵의 {total}보다 많습니다.",
   "ppCalc.unranked": "랭크되지 않는 모드",
   "ppCalcClose": "닫기",

@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "Очки osu!stable",
   "ppCalc.stableScoreUnused": "Используется только с модами самого osu!stable.",
   "ppCalc.rebuildSource": "Пересоберите свой исходный код osu! в разделе «Прочие настройки», чтобы попадания заполнялись сами и работала точность.",
+  "ppCalc.recentlyPlayed": "Недавно сыгранные",
   "ppCalc.tooMany": "Сумма оценок больше, чем {total} у этой карты.",
   "ppCalc.unranked": "Нерейтинговые моды",
   "ppCalcClose": "Закрыть",

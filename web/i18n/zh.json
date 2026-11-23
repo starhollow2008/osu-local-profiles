@@ -608,6 +608,7 @@
   "ppCalc.stableScore": "osu!stable 分数",
   "ppCalc.stableScoreUnused": "只在使用 osu!stable 本身的 Mod 时使用。",
   "ppCalc.rebuildSource": "请在“其他设置”中重新构建你的 osu! 源代码，以自动填入判定数量并使用准确率。",
+  "ppCalc.recentlyPlayed": "最近游玩",
   "ppCalc.tooMany": "判定总数超过此谱面的 {total}。",
   "ppCalc.unranked": "不计排名的模组",
   "ppCalcClose": "关闭",

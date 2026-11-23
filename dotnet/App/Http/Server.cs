@@ -550,6 +550,18 @@ internal static partial class Server
             return;
         }
 
+        // The pp calculator's suggestions before anything is typed: the beatmaps played most recently.
+        if (pathname == "/api/beatmaps/recent" && method == "GET")
+        {
+            if (await TrackerOrRefuse() is { } t)
+            {
+                var offset = request.Query.TryGetValue("offset", out var from) && int.TryParse(from.ToString(), out var n) && n is >= 0 and <= 100_000 ? n : 0;
+                var (beatmaps, more) = ScoreEntry.RecentPage(EntryFor(opts, t, Current()), offset);
+                await Json(context, new { beatmaps, more });
+            }
+            return;
+        }
+
         if (pathname == "/api/beatmaps/find" && method == "POST")
         {
             if (await TrackerOrRefuse() is { } t) await BeatmapFind(context, opts, t, Current());
