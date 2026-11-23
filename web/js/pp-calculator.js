@@ -302,6 +302,7 @@ $('ppCalcModes').onclick = (e) => {
 function renderEmpty() {
   const empty = !beatmap;
   $('ppCalcModal').querySelector('.pp-calc').classList.toggle('pp-calc--empty', empty);
+  $('ppCalcReset').disabled = empty;
   for (const input of $('ppCalcForm').querySelectorAll('#ppCalcCounts input, .pp-calc__totals input')) input.disabled = empty;
   if (empty) $('ppCalcResult').innerHTML = `<p class="pp-calc__waiting">${escapeHtml(t('ppCalc.chooseBeatmap'))}</p>`;
 }
@@ -586,6 +587,18 @@ $('ppCalcAccuracy').onblur = () => {
 };
 
 /* ------------------------------------------------------------ calculating */
+
+/**
+ * Reset: the play a beatmap opens with, whatever a score brought along. No mods but the profile's
+ * Classic choice, and a perfect, full-combo play. The beatmap and the ruleset stay.
+ */
+$('ppCalcReset').onclick = () => {
+  if (!beatmap) return;
+  mods = new Map();
+  classic = classicDefault;
+  renderMods();
+  void startOver();
+};
 
 /** A perfect, full-combo play: the judgements osu! counts on the beatmap, and no combo typed. */
 async function startOver() {
