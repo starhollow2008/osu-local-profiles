@@ -568,8 +568,9 @@ The same dialog has three ways to add plays osu! no longer has a replay for:
   nothing.
 - **Import from a score link...** takes a score's link on osu.ppy.sh. **Check** shows the score and
   who set it, and **Import** brings it in.
-- **Enter a score by hand...** is the last resort: pick the beatmap, then type the judgements, max
-  combo, mods and date. Everything is checked against the beatmap.
+- **Manually enter a score...** is the last resort: pick the beatmap, and it starts at a perfect,
+  full-combo play. Change the judgements and combo, press the mods it was set with, and set the date.
+  Everything is checked against the beatmap.
 
 For all of these, and for best performances imported from your osu! account, pp is calculated here
 from the score's numbers exactly as osu! calculates it, and recalculated here after a pp rework with

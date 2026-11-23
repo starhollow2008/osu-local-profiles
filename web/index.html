@@ -1271,7 +1271,7 @@
       </span>
       <button type="button" id="backfillScoreLink" data-i18n="backfillScoreLink">Import from a score link…</button>
       <span class="setting__hint backfill-files__no-replay" data-i18n="backfillModal.noReplayHint">No replay? Use its link on osu.ppy.sh, or type it in as a last resort.</span>
-      <button type="button" id="backfillManual" data-i18n="backfillManual">Enter a score by hand…</button>
+      <button type="button" id="backfillManual" data-i18n="backfillManual">Manually enter a score…</button>
     </div>
 
     <div class="backfill-summary" id="backfillSummary">
@@ -1326,41 +1326,48 @@
 </div>
 
 <!--
-  Import scores -> Enter a score by hand. The last resort, for a play with no replay and no
-  link. Every number is checked against the beatmap, the pp comes from osu!'s calculator and never
-  from the form, and the score says "Manually entered by hand" everywhere it is shown.
+  Import scores -> Manually enter a score (web/js/manual-entry.js). The last resort, for a play with
+  no replay and no link. Laid out as the pp calculator is: every number is checked against the
+  beatmap, the pp comes from osu!'s calculator and never from the form, and the score says
+  "Manually entered by hand" everywhere it is shown.
 -->
 <div class="backdrop" id="manualModal" hidden>
-  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="manualTitle">
-    <h3 id="manualTitle" data-i18n="manualTitle">Enter a score by hand</h3>
+  <div class="modal modal--wide pp-calc" role="dialog" aria-modal="true" aria-labelledby="manualTitle">
+    <h3 id="manualTitle" data-i18n="manualTitle">Manually enter a score</h3>
     <div class="warn" data-i18n="manualModal.lastResort">
       A last resort, for a play with no replay and no score link. Nothing can check what you type,
       so the score is marked "Manually entered by hand" everywhere it appears, shared copies included. Its
       pp is calculated from the numbers you enter.
     </div>
 
-    <label class="field field--wide">
+    <label class="field field--wide pp-calc__find-field" id="manualFind">
       <span data-i18n="manualModal.beatmap">Beatmap</span>
       <input type="text" id="manualBeatmapQuery" autocomplete="off" spellcheck="false"
              data-i18n-attr="placeholder:manualModal.beatmapPlaceholder"
              placeholder="Search your beatmaps, or paste a beatmap link">
     </label>
     <div class="manual-beatmaps" id="manualBeatmapResults" hidden></div>
-    <div class="manual-chosen" id="manualChosen" hidden></div>
+    <div class="manual-chosen pp-calc__beatmap pp-calc__chosen" id="manualChosen" hidden></div>
 
     <div id="manualForm" hidden>
-      <label class="field">
-        <span data-i18n="manualModal.ruleset">Ruleset</span>
-        <select id="manualMode"></select>
-      </label>
+      <div class="field">
+        <span id="manualModesLabel" data-i18n="manualModal.ruleset">Ruleset</span>
+        <div class="pp-calc__modes" id="manualModes" role="radiogroup" aria-labelledby="manualModesLabel"></div>
+      </div>
+      <div class="field field--wide">
+        <span data-i18n="manualModal.mods">Mods</span>
+        <div class="mod-grid pp-calc__mods" id="manualMods"></div>
+      </div>
       <div class="manual-counts" id="manualCounts"></div>
       <div class="manual-grid">
-        <label class="field"><span data-i18n="manualModal.maxCombo">Max combo</span><input type="number" id="manualCombo" min="0" step="1"></label>
-        <label class="field"><span data-i18n="manualModal.mods">Mods</span><input type="text" id="manualMods" placeholder="HDDT" autocomplete="off" spellcheck="false"></label>
+        <label class="field">
+          <span data-i18n="manualModal.maxCombo">Max combo</span>
+          <span class="pp-calc__combo"><input type="number" id="manualCombo" min="0" step="1"><span id="manualMaxCombo"></span></span>
+        </label>
         <label class="field"><span data-i18n="manualModal.score">Score (optional)</span><input type="number" id="manualTotal" min="0" step="1"></label>
         <label class="field"><span data-i18n="manualModal.playedAt">Played</span><input type="datetime-local" id="manualPlayedAt"></label>
       </div>
-      <p class="setting__hint" id="manualAccuracy"></p>
+      <p class="setting__hint"><span id="manualAccuracy"></span> <span id="manualWorth"></span></p>
     </div>
 
     <div class="profile-hint" id="manualHint">&nbsp;</div>

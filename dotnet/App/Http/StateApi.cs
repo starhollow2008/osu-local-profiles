@@ -169,6 +169,8 @@ internal static class StateApi
                 // Options -> pp calculator: the mods it shows dimmed, by ruleset.
                 noPp = PpCalculation.NoPp,
             },
+            // Manually enter a score: each ruleset's osu!stable mods, and the pairs never on together.
+            manualEntry = ScoreEntry.ManualMods,
             // The tracker's profile, as the Node app reads it.
             staleScores = tracker is null ? StaleScores(db, profileId) : tracker.StaleScores,
             // Removed scores, and each attempt of a removed unfinished play.

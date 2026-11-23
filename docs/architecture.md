@@ -742,6 +742,12 @@ every score repriced here, offline, by one calculator.
   the objects, mods that are the ruleset's stable mods, a date after osu!'s release, and the combo
   against osu!'s own maximum for the beatmap, priced first without writing (`Tracker.priceReplay`).
   No calculator, no entry: pp is never typed.
+- **Manually enter a score** (`web/js/manual-entry.js`) is built from the pp calculator's parts
+  (`web/js/beatmap-pick.js`): the same beatmap rows and ruleset icons, and judgements that start at
+  a perfect play from the same `/api/pp-calculator` request, the best one worked out from the rest,
+  with the combo full. Its mods are chips for each ruleset's osu!stable mods, as the server checks
+  them (`ScoreEntry.ManualMods`, sent in `/api/state`), sent as the text it has always taken. The
+  pp it shows as you type is the pp calculator's with Classic; the pp stored is the built replay's.
 
 ## The pp calculator
 

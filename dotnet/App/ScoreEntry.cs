@@ -439,6 +439,19 @@ internal static partial class ScoreEntry
         ["geki", "c300", "katu", "c100", "c50", "miss"],
     ];
 
+    /// <summary>
+    /// What Manually enter a score offers: each ruleset's osu!stable mods a play could be entered
+    /// with (not Autoplay or Cinema, which <see cref="ParseMods"/> refuses, nor ScoreV2, which the pp
+    /// calculator pricing the form refuses), and the pairs never on together.
+    /// </summary>
+    public static object ManualMods => new
+    {
+        modes = Enumerable.Range(0, 4).ToDictionary(
+            m => m.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            m => Mods.LegacyModsIn(m).Where(a => a is not ("AT" or "CN" or "SV2")).ToArray()),
+        exclusive = Exclusive.Select(p => new[] { p.A, p.B }).ToArray(),
+    };
+
     /// <summary>Pairs osu!stable never allowed together, so a typed-in play cannot have had them.</summary>
     private static readonly (string A, string B)[] Exclusive =
         [("EZ", "HR"), ("DT", "HT"), ("NC", "HT"), ("NF", "SD"), ("NF", "PF"), ("RX", "AP"), ("NF", "RX"), ("NF", "AP")];

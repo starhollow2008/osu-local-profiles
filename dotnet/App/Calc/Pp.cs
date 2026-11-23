@@ -36,6 +36,13 @@ internal static class Mods
         "4K", "5K", "6K", "7K", "8K", "FI", "RD", "CN", "TP", "9K", "DS", "1K", "3K", "2K", "SV2", "MR",
     ];
 
+    /// <summary>osu!stable's mods in a ruleset, by lazer's acronym, in bit order.</summary>
+    public static string[] LegacyModsIn(int ruleset)
+    {
+        var absent = NotInRuleset.TryGetValue(ruleset, out var a) ? a : NotInRuleset[0];
+        return [.. LegacyModBits.Where(m => !absent.Contains(m))];
+    }
+
     /// <summary>Everything a bit can mean in every ruleset, so each one lists only what it does not have.</summary>
     private static readonly Dictionary<int, HashSet<string>> NotInRuleset = new()
     {

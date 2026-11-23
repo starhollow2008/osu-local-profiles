@@ -448,6 +448,31 @@ const entry = JSON.parse(await evaluate(`(async () => {
   $('manualBeatmapQuery').dispatchEvent(new Event('input'));
   await wait(700);
   out.noneFound = $('manualBeatmapResults').textContent.trim();
+  // A beatmap found is chosen as the pp calculator chooses one: rulesets, osu!stable's mods, a perfect play.
+  $('manualBeatmapQuery').value = 'a';
+  $('manualBeatmapQuery').dispatchEvent(new Event('input'));
+  for (let i = 0; i < 60 && !$('manualBeatmapResults').querySelector('[data-found]'); i++) await wait(100);
+  const found = $('manualBeatmapResults').querySelector('[data-found]');
+  if (found) {
+    out.rowLooks = Boolean(found.querySelector('.pp-calc__thumb') && found.querySelector('.mode-icon'));
+    found.click();
+    for (let i = 0; i < 80 && !$('manualCounts').querySelector('[readonly]'); i++) await wait(100);
+    const best = $('manualCounts').querySelector('[readonly]');
+    out.prefilled = Number(best?.value) > 0 && $('manualCombo').value !== '' && !$('manualAdd').disabled;
+    out.rulesets = $('manualModes').querySelectorAll('[data-mode] .mode-icon').length > 0
+      && Boolean($('manualModes').querySelector('[aria-checked="true"]'));
+    const hidden = $('manualMods').querySelector('[data-mod="HD"]');
+    hidden?.click();
+    out.chips = Boolean(hidden) && hidden.getAttribute('aria-pressed') === 'true' && !$('manualMods').querySelector('[data-mod="AT"]');
+    for (let i = 0; i < 80 && !$('manualCounts').querySelector('[readonly]'); i++) await wait(100);
+    const miss = $('manualCounts').querySelector('[data-count="miss"]');
+    const before = Number($('manualCounts').querySelector('[readonly]').value);
+    miss.value = '1';
+    miss.dispatchEvent(new Event('input', { bubbles: true }));
+    out.remainder = Number($('manualCounts').querySelector('[readonly]').value) === before - 1;
+    for (let i = 0; i < 60 && !$('manualWorth').textContent.trim(); i++) await wait(100);
+    out.worth = /pp/.test($('manualWorth').textContent);
+  }
   escape();
   out.manualClosed = !visible('manualModal');
   return JSON.stringify(out);
@@ -457,9 +482,15 @@ check('and Import waits for the link to be checked', entry.importWaits, true);
 check('a link that is not a score’s is refused', entry.refused, 'that is not a link to a score on osu.ppy.sh');
 check('and Import still waits', entry.stillWaits, true);
 check('Escape closes only the score link dialog', `${entry.linkClosed}|${entry.importStays}`, 'true|true');
-check('entering a score by hand opens with its warning', `${entry.manualOpen}|${entry.warns}`, 'true|true');
+check('Manually enter a score opens with its warning', `${entry.manualOpen}|${entry.warns}`, 'true|true');
 check('the form waits for a beatmap', entry.formWaits, true);
 check('a search that matches nothing says so', entry.noneFound, 'No installed beatmap matches. Paste its link instead.');
+check('a beatmap found shows its cover and ruleset, as in the pp calculator', entry.rowLooks ?? SKIP, true);
+check('choosing one starts at a perfect, full-combo play', entry.prefilled ?? SKIP, true);
+check('its rulesets are icons, one of them chosen', entry.rulesets ?? SKIP, true);
+check("osu!stable's mods are chips to press, and Autoplay is not one", entry.chips ?? SKIP, true);
+check('a miss comes out of the 300s', entry.remainder ?? SKIP, true);
+check('what the play is worth is shown', entry.worth ?? SKIP, true);
 check('Escape closes only that one', entry.manualClosed, true);
 
 await evaluate("document.getElementById('backfillCancel').click()");

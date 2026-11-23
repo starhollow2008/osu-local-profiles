@@ -137,6 +137,25 @@ public sealed class PpCalculationTests : IDisposable
     }
 
     [Fact]
+    public void Manual_entry_offers_each_rulesets_osu_stable_mods()
+    {
+        var offered = JsonText.From(ScoreEntry.ManualMods);
+        string[] Modes(int m) => [.. Js.Get(Js.Get(offered, "modes"), m.ToString(System.Globalization.CultureInfo.InvariantCulture))!.Value.EnumerateArray().Select(e => e.GetString()!)];
+        Assert.Subset(Modes(0).ToHashSet(), new HashSet<string> { "NF", "EZ", "HD", "HR", "DT", "NC", "HT", "FL", "SO", "RX", "AP", "TD" });
+        Assert.DoesNotContain("4K", Modes(0));
+        Assert.Subset(Modes(3).ToHashSet(), new HashSet<string> { "4K", "7K", "FI", "RD", "MR", "DS" });
+        for (var m = 0; m < 4; m++)
+        {
+            Assert.DoesNotContain("AT", Modes(m));
+            Assert.DoesNotContain("CN", Modes(m));
+            Assert.DoesNotContain("SV2", Modes(m));
+        }
+        var pairs = Js.Get(offered, "exclusive")!.Value.EnumerateArray().Select(p => $"{p[0].GetString()}+{p[1].GetString()}").ToList();
+        Assert.Contains("EZ+HR", pairs);
+        Assert.Contains("RX+AP", pairs);
+    }
+
+    [Fact]
     public async Task Random_prices_the_same_with_the_same_seed()
     {
         var deps = Deps();
