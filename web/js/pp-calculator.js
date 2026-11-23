@@ -114,7 +114,7 @@ export function setNoPpMods(list) {
  * Open it laid out for `ruleset` (the profile's). The beatmap chosen last is still there, with the
  * play as it was left, and priced again; with none yet, or `fresh`, it opens with the beatmap to pick.
  */
-export function openPpCalculator(ruleset = 0, { fresh = false } = {}) {
+export function openPpCalculator(ruleset = 0, { fresh = false, searching = true } = {}) {
   if (beatmap && !fresh) {
     $('ppCalcModal').hidden = false;
     showChosen();
@@ -150,7 +150,8 @@ export function openPpCalculator(ruleset = 0, { fresh = false } = {}) {
   renderEmpty();
   say(' ');
   $('ppCalcModal').hidden = false;
-  $('ppCalcQuery').focus();
+  // Focusing the search suggests recent beatmaps, which a beatmap on its way has no use for (issue #33).
+  if (searching) $('ppCalcQuery').focus();
 }
 
 /**
@@ -159,7 +160,7 @@ export function openPpCalculator(ruleset = 0, { fresh = false } = {}) {
  * `classic` it is the profile's choice.
  */
 export async function openPpCalculatorFor(play) {
-  openPpCalculator(play.mode, { fresh: true });
+  openPpCalculator(play.mode, { fresh: true, searching: false });
   say(t('manual.lookingUp'));
   try {
     await choose(await postJson('/api/beatmaps/find', { md5: play.md5 }, t('ppCalc.failed')), play);
@@ -312,6 +313,9 @@ function renderEmpty() {
 async function choose(chosen, play = null) {
   beatmap = chosen;
   clearTimeout(searchTimer);
+  // The recent beatmaps, or a search, still on their way would show their list under this one (issue
+  // #33). A search already answered stays, for Change to show again.
+  if (search.recent || search.loading) search = { q: $('ppCalcQuery').value.trim(), recent: false, more: false, loading: false };
   $('ppCalcResults').hidden = true;
   $('ppCalcFind').hidden = true;
   $('ppCalcChosen').innerHTML = `${beatmapLine(chosen)}
@@ -350,14 +354,19 @@ $('ppCalcQuery').oninput = () => {
     return;
   }
   searchTimer = setTimeout(async () => {
+    // This search, not just this text: a beatmap chosen meanwhile replaces it (choose).
+    const asking = search;
+    asking.loading = true;
     try {
       const d = await (await fetch(`/api/beatmaps/search?q=${encodeURIComponent(q)}`)).json();
-      if (search.q !== q) return;
+      if (search !== asking) return;
       found = d.beatmaps ?? [];
       search.more = d.more === true;
       renderFound(found.length ? null : t('manual.noneFound'));
     } catch (err) {
-      renderFound(err.message);
+      if (search === asking) renderFound(err.message);
+    } finally {
+      asking.loading = false;
     }
   }, 250);
 };
