@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "Modalità",
   "ppCalc.sliderEndsMissed": "Fine slider mancate",
   "ppCalc.sliderTicksMissed": "Tick degli slider mancati",
+  "ppCalc.seed": "Seed di {mod}",
   "ppCalc.speed": "Velocità di {mod}",
   "ppCalc.stableScore": "Punteggio osu!stable",
   "ppCalc.stableScoreUnused": "Usato solo con le mod di osu!stable.",

@@ -78,6 +78,23 @@ public sealed class PpCalculationTests : IDisposable
         Assert.Equal("DA's settings are not readable", Parse(new[] { new { acronym = "DA", settings = new { approach_rate = "ten" } } }));
         Assert.Equal("a mod has no acronym", Parse(new[] { new { acronym = "<b>" } }));
         Assert.Equal("the mods are not a list of mods", Parse("HDDT"));
+        Assert.Equal("""[{"acronym":"RD","settings":{"seed":727}}]""", Parse(new[] { new { acronym = "RD", settings = new { seed = 727 } } }));
+        Assert.Equal("RD's seed is a whole number", Parse(new[] { new { acronym = "RD", settings = new { seed = 7.5 } } }));
+        Assert.Equal("TP's seed is a whole number", Parse(new[] { new { acronym = "TP", settings = new { seed = 3e10 } } }));
+        Assert.Equal("RD's seed is a whole number", Parse(new[] { new { acronym = "RD", settings = new { seed = true } } }));
+    }
+
+    [Fact]
+    public async Task Random_prices_the_same_with_the_same_seed()
+    {
+        var deps = Deps();
+        var md5 = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap())).Md5;
+        object Random(int seed) => new { md5, mode = 0, mods = new[] { new { acronym = "RD", settings = new { seed } } } };
+
+        // Without a seed osu! rolls a new layout each time, which is why the page always sends one.
+        var first = await Calculate(deps, Random(727));
+        Assert.Equal(first.Pp, (await Calculate(deps, Random(727))).Pp);
+        Assert.Equal(first.Stars, (await Calculate(deps, Random(727))).Stars);
     }
 
     [Fact]

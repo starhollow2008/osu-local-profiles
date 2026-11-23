@@ -130,6 +130,12 @@ internal static partial class PpCalculation
                         error = $"{acronym}'s settings are not readable";
                         return null;
                     }
+                    // osu!'s seeds are ints: anything else would fail in the calculator, not here.
+                    if (key == "seed" && (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out _)))
+                    {
+                        error = $"{acronym}'s seed is a whole number";
+                        return null;
+                    }
                     settings[key] = value;
                 }
             }

@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "게임 모드",
   "ppCalc.sliderEndsMissed": "놓친 슬라이더 끝",
   "ppCalc.sliderTicksMissed": "놓친 슬라이더 틱",
+  "ppCalc.seed": "{mod} 시드",
   "ppCalc.speed": "{mod} 속도",
   "ppCalc.stableScore": "osu!stable 점수",
   "ppCalc.stableScoreUnused": "osu!stable 자체 모드에서만 쓰입니다.",

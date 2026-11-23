@@ -770,6 +770,10 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   their combo field and slider are hidden and no combo is sent (`comboCounts`).
 - **Mods that change no pp** (`PpCalculation.NoPp`, measured and re-checked by a test) are shown
   dimmed and can't be chosen.
+- **A mod with a seed** (Random, Target Practice) always has one. Without it osu! rolls a new layout
+  every time it prices, so the pp changed with every request. Choosing one picks a seed as osu! does,
+  shown and editable beside the mod's other settings; a score opened brings its own, and a cleared one
+  gets a new one. The server takes a seed only as a whole number in osu!'s int range.
 - **It starts at a perfect play.** The helper's `judgements` request counts a perfect play on osu!'s
   converted beatmap for the ruleset and mods, in stable's counters: osu! and mania by object (a hold
   is one), taiko and catch by osu!'s own judgements (notes; fruits, drops and droplets). The page

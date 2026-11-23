@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "Spelmodus",
   "ppCalc.sliderEndsMissed": "Gemiste slider-einden",
   "ppCalc.sliderTicksMissed": "Gemiste slider-ticks",
+  "ppCalc.seed": "{mod}-seed",
   "ppCalc.speed": "{mod}-snelheid",
   "ppCalc.stableScore": "osu!stable-score",
   "ppCalc.stableScoreUnused": "Alleen gebruikt met de eigen mods van osu!stable.",

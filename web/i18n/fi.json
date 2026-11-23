@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "Pelimuoto",
   "ppCalc.sliderEndsMissed": "Ohitetut sliderien päät",
   "ppCalc.sliderTicksMissed": "Ohitetut sliderien tikit",
+  "ppCalc.seed": "{mod}-siemen",
   "ppCalc.speed": "{mod}-nopeus",
   "ppCalc.stableScore": "osu!stable-pisteet",
   "ppCalc.stableScoreUnused": "Käytetään vain osu!stablen omien modien kanssa.",

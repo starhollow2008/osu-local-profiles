@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "モード",
   "ppCalc.sliderEndsMissed": "逃したスライダーの終点",
   "ppCalc.sliderTicksMissed": "逃したスライダーティック",
+  "ppCalc.seed": "{mod} のシード",
   "ppCalc.speed": "{mod} の速度",
   "ppCalc.stableScore": "osu!stable のスコア",
   "ppCalc.stableScoreUnused": "osu!stable 自体の Mod でのみ使われます。",

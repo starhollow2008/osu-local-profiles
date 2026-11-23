@@ -599,6 +599,7 @@
   "ppCalc.ruleset": "Tryb gry",
   "ppCalc.sliderEndsMissed": "Pominięte końce sliderów",
   "ppCalc.sliderTicksMissed": "Pominięte ticki sliderów",
+  "ppCalc.seed": "Ziarno {mod}",
   "ppCalc.speed": "Prędkość {mod}",
   "ppCalc.stableScore": "Wynik z osu!stable",
   "ppCalc.stableScoreUnused": "Używany tylko z modami osu!stable.",

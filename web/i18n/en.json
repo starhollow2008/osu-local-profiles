@@ -602,6 +602,7 @@
   "ppCalc.ruleset": "Ruleset",
   "ppCalc.sliderEndsMissed": "Slider ends missed",
   "ppCalc.sliderTicksMissed": "Slider ticks missed",
+  "ppCalc.seed": "{mod} seed",
   "ppCalc.speed": "{mod} speed",
   "ppCalc.stableScore": "osu!stable score",
   "ppCalc.stableScoreUnused": "Only used with osu!stable's own mods.",

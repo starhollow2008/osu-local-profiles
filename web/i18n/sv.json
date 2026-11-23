@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "Spelläge",
   "ppCalc.sliderEndsMissed": "Missade sliderslut",
   "ppCalc.sliderTicksMissed": "Missade slider-ticks",
+  "ppCalc.seed": "{mod}-seed",
   "ppCalc.speed": "{mod}-hastighet",
   "ppCalc.stableScore": "osu!stable-poäng",
   "ppCalc.stableScoreUnused": "Används bara med osu!stables egna mods.",

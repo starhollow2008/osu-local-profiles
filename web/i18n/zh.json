@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "游戏模式",
   "ppCalc.sliderEndsMissed": "漏掉的滑条尾",
   "ppCalc.sliderTicksMissed": "漏掉的滑条点",
+  "ppCalc.seed": "{mod} 种子",
   "ppCalc.speed": "{mod} 速度",
   "ppCalc.stableScore": "osu!stable 分数",
   "ppCalc.stableScoreUnused": "只在使用 osu!stable 本身的 Mod 时使用。",

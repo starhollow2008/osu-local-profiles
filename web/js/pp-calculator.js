@@ -62,6 +62,15 @@ const RATES = {
 };
 
 /** Difficulty Adjust's settings that move pp, per ruleset. */
+/**
+ * Mods osu! gives a seed (Random, Target Practice). Without one, osu! rolls a new one every time it
+ * prices, so the pp would change with every request: choosing one picks a seed, as osu! does.
+ */
+const seeded = (acronym) => Boolean(MOD_DEFINITIONS[acronym]?.settings?.seed);
+/** osu!'s seeds are ints, and it picks its own from 0 up to int's largest. */
+const MAX_SEED = 2147483647;
+const newSeed = () => Math.floor(Math.random() * MAX_SEED);
+
 const DA_SETTINGS = {
   0: ['circle_size', 'approach_rate', 'overall_difficulty', 'drain_rate'],
   1: ['overall_difficulty', 'drain_rate'],
@@ -548,6 +557,11 @@ function renderModSettings() {
                  placeholder="${escapeHtml(t('ppCalc.asMapped'))}" value="${settings[key] ?? ''}"></label>`);
       }
     }
+    if (seeded(acronym)) {
+      fields.push(`<label class="field"><span>${escapeHtml(t('ppCalc.seed', { mod: acronym }))}</span>
+        <input type="number" data-mod-setting="${acronym}" data-key="seed" min="0" max="${MAX_SEED}" step="1"
+               value="${settings.seed ?? ''}"></label>`);
+    }
   }
   $('ppCalcModSettings').innerHTML = fields.join('');
   $('ppCalcModSettings').hidden = fields.length === 0;
@@ -569,7 +583,7 @@ $('ppCalcMods').onclick = (e) => {
     mods.delete(acronym);
   } else {
     for (const set of EXCLUSIVE) if (set.includes(acronym)) for (const other of set) if (other !== acronym) mods.delete(other);
-    mods.set(acronym, {});
+    mods.set(acronym, seeded(acronym) ? { seed: newSeed() } : {});
   }
   renderModState();
   // A mod that changes how many objects there are (a mania key mod, Target Practice) starts the play again.
@@ -582,15 +596,25 @@ $('ppCalcModSettings').oninput = (e) => {
   if (!input) return;
   const settings = mods.get(input.dataset.modSetting);
   if (!settings) return;
-  const value = input.value === '' ? null : Number(input.value);
+  let value = input.value === '' ? null : Number(input.value);
+  // A seed is a whole number in osu!'s range; a blank one gets a new seed when it is priced.
+  if (value !== null && input.dataset.key === 'seed') value = Math.min(MAX_SEED, Math.max(0, Math.trunc(value)));
   if (value === null || !Number.isFinite(value)) delete settings[input.dataset.key];
   else settings[input.dataset.key] = value;
   schedule();
 };
+// Once a seed is left, it shows the seed priced with.
+$('ppCalcModSettings').addEventListener('focusout', (e) => {
+  const input = e.target.closest('[data-key="seed"]');
+  const seed = input && mods.get(input.dataset.modSetting)?.seed;
+  if (seed != null) input.value = String(seed);
+});
 
 /** The mods as osu! writes them: settings only when changed, Difficulty Adjust past 10 with its extended limits. */
 function requestMods() {
   return [...mods].map(([acronym, settings]) => {
+    // Kept on the mod, so the next price has the same one: a score opened without one, or a seed cleared.
+    if (seeded(acronym) && settings.seed == null) settings.seed = newSeed();
     const changed = { ...settings };
     if (RATES[acronym] && changed.speed_change === RATES[acronym].value) delete changed.speed_change;
     if (acronym === 'DA' && Object.values(changed).some((v) => v > 10)) changed.extended_limits = true;

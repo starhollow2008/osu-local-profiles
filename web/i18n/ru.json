@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "Режим",
   "ppCalc.sliderEndsMissed": "Пропущенные концы слайдеров",
   "ppCalc.sliderTicksMissed": "Пропущенные тики слайдеров",
+  "ppCalc.seed": "Сид {mod}",
   "ppCalc.speed": "Скорость {mod}",
   "ppCalc.stableScore": "Очки osu!stable",
   "ppCalc.stableScoreUnused": "Используется только с модами самого osu!stable.",

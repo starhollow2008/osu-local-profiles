@@ -2054,6 +2054,24 @@ const ppCalc = JSON.parse(
       out.comboSlider = pp() < atCombo && $('ppCalcCombo').value === combo.value;
       combo.blur();
 
+      // Random comes with a seed, so its pp holds still; another seed is another layout.
+      const random = $('ppCalcMods').querySelector('[data-mod="RD"]:not([data-inert])');
+      if (random) {
+        random.click();
+        await wait(1500);
+        const seed = $('ppCalcModSettings').querySelector('[data-mod-setting="RD"][data-key="seed"]');
+        const first = pp();
+        seed?.dispatchEvent(new Event('input', { bubbles: true }));
+        await wait(1500);
+        out.seedHolds = Boolean(seed) && /^[0-9]+$/.test(seed.value) && pp() === first;
+        seed.value = String((Number(seed.value) + 1) % 2147483647);
+        seed.dispatchEvent(new Event('input', { bubbles: true }));
+        await until(() => pp() !== first);
+        out.seedChanges = pp() !== first;
+        random.click();
+        await wait(1000);
+      }
+
       // "Classic by default" is the profile's, saved as it is ticked, and this play takes it too.
       const saved = async () => (await (await fetch('/api/state')).json()).settings?.ppCalcClassic === true;
       const box = $('ppCalcClassicDefault');
@@ -2098,6 +2116,8 @@ check('osu! without Classic has slider ends to miss', ppCalc.none || ppCalc.laze
 check("osu!stable's score is asked for only with Classic", ppCalc.none || ppCalc.stableScore === undefined ? SKIP : ppCalc.stableScore, true);
 check('the accuracy slider prices the play as it moves', ppCalc.none || ppCalc.accuracySlider === undefined ? SKIP : ppCalc.accuracySlider, true);
 check('so does the combo slider', ppCalc.none || ppCalc.comboSlider === undefined ? SKIP : ppCalc.comboSlider, true);
+check('Random comes with a seed, and its pp holds still', ppCalc.none || ppCalc.seedHolds === undefined ? SKIP : ppCalc.seedHolds, true);
+check('another seed prices another layout', ppCalc.none || ppCalc.seedChanges === undefined ? SKIP : ppCalc.seedChanges, true);
 check('combo is asked for in osu! and catch only', ppCalc.none || ppCalc.comboRulesets === undefined ? SKIP : ppCalc.comboRulesets, '0,2');
 check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defaultSaved === undefined ? SKIP : ppCalc.defaultSaved, true);
 check('Escape closes it', ppCalc.escape ?? SKIP, true);

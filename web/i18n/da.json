@@ -592,6 +592,7 @@
   "ppCalc.ruleset": "Spiltilstand",
   "ppCalc.sliderEndsMissed": "Missede sliderender",
   "ppCalc.sliderTicksMissed": "Missede slider-ticks",
+  "ppCalc.seed": "{mod}-seed",
   "ppCalc.speed": "{mod}-hastighed",
   "ppCalc.stableScore": "osu!stable-score",
   "ppCalc.stableScoreUnused": "Bruges kun med osu!stables egne mods.",
