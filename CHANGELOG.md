@@ -1,5 +1,38 @@
 # Changelog
 
+## 1.37.0
+
+- **The pp calculator shows the beatmap, as osu!'s website does.** Its length, BPM, circles and
+  sliders, and a bar for each setting and the star rating, all with your mods. Above them, what a
+  full combo is worth at 100%, 99%, 98% and 95%.
+
+- **Manually enter a score takes osu!lazer plays.** Enter a score by hand is now Manually enter a
+  score, laid out like the pp calculator. Choose osu!stable or osu!lazer: a lazer play can have any
+  mod, with its settings and Classic. It starts at an SS, the 300s fill in as you type the rest, and
+  it shows what the play is worth.
+
+- **The pp calculator suggests the beatmaps you played most recently.** Before you type anything in
+  its search, and every beatmap found shows its star rating.
+
+- **Random and Target Practice have a seed in the pp calculator.** Without one their pp changed
+  every time it was worked out. A seed is picked when you choose the mod, and you can type another.
+  Reported in [#28](https://github.com/jonathant09/osu-local-profiles/issues/28).
+
+- **A calculator built from your osu! source says when it needs rebuilding.** One built by an
+  earlier version of the app couldn't fill in the judgements, use accuracy or turn Classic off, and
+  Rebuild did nothing. **Other settings → pp calculator** now says so, and Rebuild builds it again.
+  Reported in [#26](https://github.com/jonathant09/osu-local-profiles/issues/26).
+
+- **Relax, Autopilot and Spun Out can be chosen in the pp calculator.**
+
+- **Dialogs no longer close when you select text and let go outside them.**
+
+- **The pp calculator keeps your beatmap when you close it and open it again.**
+
+- **The pp calculator asks for combo only in osu! and catch**, the only modes whose pp uses it.
+
+- **Score rows no longer show each beatmap's play count.** The table view still does.
+
 ## 1.36.0
 
 - **A pp calculator.** **Options → pp calculator** works out what a play would be worth on any
