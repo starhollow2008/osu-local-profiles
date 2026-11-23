@@ -144,12 +144,8 @@ internal static partial class PpCalculation
         return output;
     }
 
-    /// <summary>
-    /// Price one play: <c>{ md5, mode, mods, classic?, counts?, combo?, score? }</c>. With no counts it
-    /// is a perfect play, and with no combo a full one. <c>score</c> is osu!stable's, for osu! with Classic. Everything is checked against the beatmap first, as a
-    /// score entered by hand is.
-    /// </summary>
-    public static async Task<CalculatedPlay> Calculate(EntryDeps deps, JsonElement input)
+    /// <summary>What a request is about, checked: <c>{ md5, mode, mods }</c>, a beatmap here, a ruleset it can be played in, and mods osu! can read.</summary>
+    private static (EntryBeatmap Beatmap, string OsuPath, int Mode, List<JsonElement> Mods) Target(EntryDeps deps, JsonElement input)
     {
         if (!deps.CanPrice) throw new InvalidOperationException("the pp calculator is not available");
         var beatmap = Js.IsString(Js.Get(input, "md5"), out var md5) && ScoreEntry.Md5Shape().IsMatch(md5) ? ScoreEntry.Describe(deps, md5) : null;
@@ -161,6 +157,50 @@ internal static partial class PpCalculation
         if (beatmap.Mode != 0 && mode != beatmap.Mode) throw new InvalidOperationException("this beatmap can only be played in its own ruleset");
 
         if (ParseMods(Js.Get(input, "mods"), out var modsError) is not { } mods) throw new InvalidOperationException(modsError);
+        return (beatmap, osuPath, mode, mods);
+    }
+
+    /// <summary>
+    /// The beatmap as osu!'s song select describes it for the ruleset and mods: <c>{ md5, mode, mods }</c>,
+    /// checked as a play is. Null from a calculator that can't say: a helper built from source before it could.
+    /// </summary>
+    public static async Task<DifficultyInfo?> Describe(EntryDeps deps, JsonElement input)
+    {
+        var (_, osuPath, mode, mods) = Target(deps, input);
+        return deps.Difficulty is { } difficulty ? await difficulty(osuPath, mode, mods) : null;
+    }
+
+    /// <summary>The most beatmaps one request asks the star rating of: a page of a list, in a few requests.</summary>
+    public const int MaxStars = 25;
+
+    /// <summary>
+    /// Star ratings without mods, each in its beatmap's own ruleset, for a list of beatmaps to pick
+    /// from: <c>{ md5s }</c>. A beatmap not here, or one the calculator can't describe, is null.
+    /// </summary>
+    public static async Task<Dictionary<string, double?>> Stars(EntryDeps deps, JsonElement input)
+    {
+        if (Js.Get(input, "md5s") is not { ValueKind: JsonValueKind.Array } list || list.GetArrayLength() > MaxStars)
+        {
+            throw new InvalidOperationException($"md5s is a list of at most {MaxStars} beatmaps");
+        }
+        var stars = new Dictionary<string, double?>(StringComparer.Ordinal);
+        foreach (var item in list.EnumerateArray())
+        {
+            if (!Js.IsString(item, out var md5) || !ScoreEntry.Md5Shape().IsMatch(md5) || stars.ContainsKey(md5)) continue;
+            var path = deps.CanPrice && deps.Stars is not null ? deps.Resolver.Resolve(md5).OsuPath : null;
+            stars[md5] = path is not null && File.Exists(path) ? await deps.Stars!(path, md5, Clients.Beatmaps.Mode(path)) : null;
+        }
+        return stars;
+    }
+
+    /// <summary>
+    /// Price one play: <c>{ md5, mode, mods, classic?, counts?, combo?, score? }</c>. With no counts it
+    /// is a perfect play, and with no combo a full one. <c>score</c> is osu!stable's, for osu! with Classic. Everything is checked against the beatmap first, as a
+    /// score entered by hand is.
+    /// </summary>
+    public static async Task<CalculatedPlay> Calculate(EntryDeps deps, JsonElement input)
+    {
+        var (beatmap, osuPath, mode, mods) = Target(deps, input);
         // Without Classic, osu! and taiko are scored as lazer scores them. Catch and mania give the same pp either way.
         var classic = mode is 2 or 3 || Js.Get(input, "classic") is not { ValueKind: JsonValueKind.False };
         var perfectPlay = await deps.PerfectJudgements(osuPath, mode, mods);

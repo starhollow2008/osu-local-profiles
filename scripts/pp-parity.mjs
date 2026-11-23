@@ -216,6 +216,14 @@ async function buildRequests({ replays, maps }, scratch) {
         counts.synthetic++;
       }
     }
+    // The pp calculator's own questions about a beatmap: a perfect play on it, and how song select
+    // describes it (GetBeatmapAttributesForDisplay, which reaches code no pp request does).
+    for (const mods of [[], [{ acronym: 'HR' }], [{ acronym: 'DT' }], [{ acronym: 'EZ' }, { acronym: 'HT' }],
+      [{ acronym: 'DA', settings: { approach_rate: 9, overall_difficulty: 7 } }], ...(ruleset === 3 ? [[{ acronym: '4K' }]] : [])]) {
+      add(`${tag} judgements ${JSON.stringify(mods)}`, { type: 'judgements', beatmapPath: map.file, ruleset, mods });
+      add(`${tag} difficulty ${JSON.stringify(mods)}`, { type: 'difficulty', beatmapPath: map.file, ruleset, mods });
+      counts.synthetic += 2;
+    }
     add(`${tag} mods RX stripped`, { replayPath: nomod, beatmapPath: map.file, mods: [{ acronym: 'RX' }, { acronym: 'DT' }], stripMods: ['RX'] });
     add(`${tag} mods HR then DA`, { replayPath: nomod, beatmapPath: map.file, mods: [{ acronym: 'HR' }, { acronym: 'DA', settings: { approach_rate: 9 } }] });
     counts.synthetic += 2;

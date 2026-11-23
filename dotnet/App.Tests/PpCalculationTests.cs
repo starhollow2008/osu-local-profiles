@@ -85,6 +85,58 @@ public sealed class PpCalculationTests : IDisposable
     }
 
     [Fact]
+    public async Task A_beatmap_is_described_as_song_select_describes_it_with_the_mods()
+    {
+        var deps = Deps();
+        var md5 = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap())).Md5;
+        static DisplaySetting Setting(DifficultyInfo d, string acronym) => d.Settings.Single(s => s.Acronym == acronym);
+
+        var nomod = (await PpCalculation.Describe(deps, JsonText.From(new { md5, mode = 0 })))!;
+        // The test beatmap: a beat every 250ms, CS 4, AR 9, OD 8, HP 5.
+        Assert.Equal(240, nomod.Bpm, 6);
+        Assert.True(nomod.LengthMs > 0);
+        Assert.Equal(["CS", "AR", "OD", "HP"], nomod.Settings.Select(s => s.Acronym));
+        Assert.Equal((4d, 4d), (Setting(nomod, "CS").Original, Setting(nomod, "CS").Adjusted));
+        Assert.Equal((9d, 9d), (Setting(nomod, "AR").Original, Setting(nomod, "AR").Adjusted));
+        // The same star rating a play on it is priced with.
+        Assert.Equal((await Calculate(deps, new { md5, mode = 0 })).Stars, nomod.Stars, 9);
+
+        // Double Time: faster and shorter, and AR as it feels at that speed.
+        var dt = (await PpCalculation.Describe(deps, JsonText.From(new { md5, mode = 0, mods = new[] { new { acronym = "DT" } } })))!;
+        Assert.Equal(360, dt.Bpm, 6);
+        Assert.Equal(nomod.LengthMs / 1.5, dt.LengthMs, 6);
+        Assert.Equal(9, Setting(dt, "AR").Original);
+        Assert.True(Setting(dt, "AR").Adjusted > 10, $"{Setting(dt, "AR").Adjusted}");
+        Assert.True(dt.Stars > nomod.Stars);
+
+        // Mania counts keys, which song select shows in place of circle size.
+        var mania = (await PpCalculation.Describe(deps, JsonText.From(new { md5, mode = 3 })))!;
+        Assert.Contains(mania.Settings, s => s.Acronym == "KC");
+        Assert.DoesNotContain(mania.Settings, s => s.Acronym == "CS");
+
+        Assert.Equal("choose a ruleset",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => PpCalculation.Describe(deps, JsonText.From(new { md5, mode = 9 })))).Message);
+        // A calculator that can't describe one: a source build from before it could.
+        Assert.Null(await PpCalculation.Describe(deps with { Difficulty = null }, JsonText.From(new { md5, mode = 0 })));
+    }
+
+    [Fact]
+    public async Task A_list_of_beatmaps_gets_their_star_ratings_without_mods()
+    {
+        var deps = Deps();
+        var md5 = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap())).Md5;
+        var missing = new string('0', 32);
+        var stars = await PpCalculation.Stars(deps, JsonText.From(new { md5s = new[] { md5, md5, missing, "not an md5" } }));
+        Assert.Equal([md5, missing], stars.Keys);
+        Assert.Equal((await PpCalculation.Describe(deps, JsonText.From(new { md5, mode = 0 })))!.Stars, stars[md5]!.Value, 9);
+        Assert.Null(stars[missing]);
+        // Asked again, it is the same, already worked out.
+        Assert.Equal(stars[md5], (await PpCalculation.Stars(deps, JsonText.From(new { md5s = new[] { md5 } })))[md5]);
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            PpCalculation.Stars(deps, JsonText.From(new { md5s = Enumerable.Repeat(md5, PpCalculation.MaxStars + 1).ToArray() })));
+    }
+
+    [Fact]
     public async Task Random_prices_the_same_with_the_same_seed()
     {
         var deps = Deps();

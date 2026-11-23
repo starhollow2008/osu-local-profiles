@@ -203,7 +203,40 @@ internal sealed class OfficialCalculator : IDisposable
         // None from a helper built from a player's source before a play without Classic could be priced.
         return new PerfectPlay(Numbers(counts), Js.Get(response, "lazer") is { ValueKind: JsonValueKind.Object } lazer ? Numbers(lazer) : null);
     }
+
+    /// <summary>
+    /// A beatmap as song select describes it for the ruleset and mods (the helper's `difficulty`).
+    /// Null when it cannot answer, which a helper built from a player's source before this request
+    /// existed cannot.
+    /// </summary>
+    public async Task<DifficultyInfo?> Difficulty(string beatmapPath, int ruleset, IReadOnlyList<JsonElement> mods)
+    {
+        var response = await Send(new { type = "difficulty", beatmapPath, ruleset, mods });
+        if (Js.Get(response, "ok") is not { ValueKind: JsonValueKind.True } || NumberOrNull(response, "stars") is not { } stars)
+        {
+            if (Js.IsString(Js.Get(response, "error"), out var error)) LastError = error;
+            return null;
+        }
+        var settings = Js.Get(response, "settings") is { ValueKind: JsonValueKind.Array } list
+            ? list.EnumerateArray()
+                .Where(s => Js.IsString(Js.Get(s, "acronym"), out _))
+                .Select(s => new DisplaySetting(Js.Get(s, "acronym")!.Value.GetString()!, NumberOrNull(s, "original") ?? 0,
+                    NumberOrNull(s, "adjusted") ?? 0, NumberOrNull(s, "max") ?? 10))
+                .ToList()
+            : [];
+        return new DifficultyInfo(stars, NumberOrNull(response, "maxCombo") ?? 0, NumberOrNull(response, "lengthMs") ?? 0,
+            NumberOrNull(response, "bpm") ?? 0, settings);
+    }
 }
+
+/// <summary>
+/// A beatmap as osu!'s song select describes it for a ruleset and mods: its star rating, maximum
+/// combo, length and BPM (both at the mods' rate), and the ruleset's own settings.
+/// </summary>
+internal sealed record DifficultyInfo(double Stars, double MaxCombo, double LengthMs, double Bpm, List<DisplaySetting> Settings);
+
+/// <summary>One of a ruleset's settings as song select shows it (<c>CS</c>, <c>AR</c>, <c>OD</c>, <c>HP</c>, mania's <c>KC</c>...).</summary>
+internal sealed record DisplaySetting(string Acronym, double Original, double Adjusted, double Max);
 
 /// <summary>
 /// A perfect play on a beatmap: its judgements by replay counter, and for osu! what lazer judges

@@ -14,9 +14,10 @@
 // Staying resident avoids paying ~150ms of runtime startup for every score. The first line
 // out announces readiness and the osu! version whose calculators these are.
 //
-// Three kinds of request: a pp calculation (the default), `"type": "ranked"`, which asks
-// osu!'s own mod classes whether a mod combination is ranked, and `"type": "judgements"`, the
-// judgement counts of a perfect play on a beatmap, for the app's pp calculator.
+// Four kinds of request: a pp calculation (the default), `"type": "ranked"`, which asks
+// osu!'s own mod classes whether a mod combination is ranked, `"type": "judgements"`, the
+// judgement counts of a perfect play on a beatmap, for the app's pp calculator, and
+// `"type": "difficulty"`, which describes a beatmap for the ruleset and mods as song select does.
 //
 // A McOsu play has no replay of its own, so the app builds an osu!stable one from McOsu's
 // scores.db and hands that over like any other: the decoder still does all of the stable
@@ -147,6 +148,7 @@ public static class Program
                 null => Calculate(request),
                 "ranked" => Ranked(request),
                 "judgements" => Judgements(request),
+                "difficulty" => Difficulty(request),
                 _ => throw new ArgumentException($"unknown request type {request.Type}"),
             };
             return JsonSerializer.Serialize(result, JsonOptions);
@@ -267,6 +269,42 @@ public static class Program
             ok = true,
             ranked = unranked.Length == 0,
             unranked,
+            version = OsuVersion,
+        };
+    }
+
+    /// <summary>
+    /// A beatmap as osu!'s song select describes it for the ruleset and mods: its star rating, length,
+    /// BPM, and the ruleset's own difficulty settings (<c>GetBeatmapAttributesForDisplay</c>: mania's
+    /// key count, and AR and OD as a rate mod makes them feel), each before and after the mods.
+    /// </summary>
+    private static object Difficulty(Request request)
+    {
+        var ruleset = RulesetFor(request.Ruleset);
+        var working = new ProcessorWorkingBeatmap(request.BeatmapPath);
+        var mods = BuildMods(ruleset, request.Mods ?? Array.Empty<ModRequest>());
+        var attributes = ruleset.CreateDifficultyCalculator(working).Calculate(mods);
+        var playable = working.GetPlayableBeatmap(ruleset.RulesetInfo, mods);
+        double rate = osu.Game.Utils.ModUtils.CalculateRateWithMods(mods);
+
+        // What osu! records of a beatmap when it imports one (BeatmapUpdater), which mania's key count
+        // for a converted beatmap is worked out from.
+        var info = working.BeatmapInfo;
+        var source = working.Beatmap;
+        info.TotalObjectCount = source.HitObjects.Count;
+        info.EndTimeObjectCount = source.HitObjects.Count(h => h is osu.Game.Rulesets.Objects.Types.IHasDuration);
+
+        return new
+        {
+            ok = true,
+            stars = attributes.StarRating,
+            maxCombo = attributes.MaxCombo,
+            // As osu-web's beatmapset page has it: from the start of the song to the end of its last object.
+            lengthMs = BeatmapExtensions.CalculatePlayableBounds(playable.HitObjects).end / rate,
+            bpm = 60000 / playable.GetMostCommonBeatLength() * rate,
+            settings = ruleset.GetBeatmapAttributesForDisplay(info, mods)
+                .Select(a => new { acronym = a.Acronym, original = a.OriginalValue, adjusted = a.AdjustedValue, max = a.MaxValue })
+                .ToList(),
             version = OsuVersion,
         };
     }

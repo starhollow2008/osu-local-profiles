@@ -123,6 +123,9 @@ const GRADES = {
  */
 const LEGACY = ['XH', 'X', 'SH', 'S', 'A', 'B', 'C', 'D'];
 
+/* The beatmapset page's basic stats the pp calculator shows: not its circle and slider counts. */
+const BASIC_STATS = ['total_length', 'bpm'];
+
 /* ------------------------------------------------------------------ writing */
 
 const files = [];
@@ -135,6 +138,10 @@ for (const rank of LEGACY) {
   files.push([`resources/images/scores/legacy-ranking-${rank}@2x.png`, `scores/legacy-ranking-${rank}@2x.png`]);
 }
 files.push(['public/images/layout/avatar-guest@2x.png', 'layout/avatar-guest@2x.png']);
+// The beatmapset page's length and BPM icons (`beatmap-basic-stats.tsx`), for the pp calculator.
+for (const stat of BASIC_STATS) {
+  files.push([`public/images/layout/beatmapset-page/${stat}.svg`, `layout/beatmapset-page/${stat}.svg`]);
+}
 
 // Read everything before touching the folder, so a failed download leaves the old set whole.
 const contents = [];
@@ -216,7 +223,7 @@ by ppy.
 | \`mods/\` | \`${MODS}/\` | the glyph in each mod badge, and the badge blanks |
 | \`grades/\` | \`public/images/badges/score-ranks-v2019/\` | the small grade badges |
 | \`scores/\` | \`resources/images/scores/\` | a stable score's big grade letter |
-| \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture |
+| \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture, and the pp calculator's length and BPM icons |
 | \`covers/\` | \`${DEFAULT_COVER}\` at commit \`${COVERS_COMMIT}\` | the banner of a profile with none of its own |
 | \`modes/\` | \`${EXTRA_FONT}\`, glyphs ${Object.values(MODE_GLYPHS).join(', ')} | the mode switcher's ruleset icons |
 
@@ -257,6 +264,9 @@ ${Object.entries(GRADES).map(([grade, value]) => `.score-rank--${grade} { backgr
 ${LEGACY.map((rank) => `.legacy-rank--${rank} { background-image: ${url(`scores/legacy-ranking-${rank}@2x.png`)}; }`).join('\n')}
 
 .avatar-guest { background-image: ${url('layout/avatar-guest@2x.png')}; }
+
+/* osu-web's beatmap-basic-stats icons, as its beatmap-basic-stats.tsx sets them. */
+${BASIC_STATS.map((stat) => `.beatmap-basic-stats__entry-icon--${stat} { background-image: ${url(`layout/beatmapset-page/${stat}.svg`)}; }`).join('\n')}
 
 /* osu-web's default profile banner, for a profile with none of its own. */
 .cover-default { background-image: ${url('covers/c3.jpg')}; }

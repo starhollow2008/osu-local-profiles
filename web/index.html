@@ -1400,6 +1400,8 @@
     </div>
     <div class="manual-beatmaps" id="ppCalcResults" hidden></div>
     <div class="manual-chosen pp-calc__beatmap pp-calc__chosen" id="ppCalcChosen" hidden></div>
+    <!-- What a full combo is worth at a few accuracies, with these mods, as the osu! pp extension shows it. -->
+    <div class="pp-calc__fc" id="ppCalcFc" hidden></div>
 
     <div class="pp-calc__body" id="ppCalcForm">
       <div class="pp-calc__inputs">
@@ -1440,7 +1442,11 @@
           </div>
         </div>
       </div>
-      <div class="pp-calc__result" id="ppCalcResult" aria-live="polite"></div>
+      <div class="pp-calc__side">
+        <div class="pp-calc__result" id="ppCalcResult" aria-live="polite"></div>
+        <!-- The beatmap with these mods, as osu-web's beatmapset page shows one (stats.tsx). -->
+        <div class="pp-calc__stats" id="ppCalcStats" hidden></div>
+      </div>
     </div>
 
     <div class="profile-hint" id="ppCalcHint">&nbsp;</div>

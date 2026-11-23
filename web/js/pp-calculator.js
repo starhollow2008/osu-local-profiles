@@ -17,10 +17,25 @@
  * brings its own. In osu! with Classic, osu!stable's score can be given, which osu! works out the
  * combo breaks from (a stable score brings it). Nothing is stored.
  */
-import { escapeHtml, fmt, MODE_NAMES, pct } from './format.js';
-import { coverUrl, gradeBadge, modDefinition, modPill } from './badges.js';
+import { escapeHtml, fmt, pct } from './format.js';
+import { gradeBadge, modDefinition } from './badges.js';
+import { difficultyBadge } from './beatmapsets.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
-import { original } from './metadata.js';
+import {
+  beatmapLine,
+  coverVars,
+  foundRows,
+  JUDGEMENT_FIELDS as FIELDS,
+  loadStars,
+  looksLikeLink,
+  markMode,
+  markMods,
+  modeButtons,
+  modesFor,
+  modGrid,
+  remainderOf,
+  REMAINDER,
+} from './beatmap-pick.js';
 import { accuracyOf, countsFromStatistics, judgementsForAccuracy, sliderMisses } from './pp-accuracy.js';
 import { closeOnBackdrop, hint, postJson } from './ui.js';
 import { hideTooltip } from './tooltip.js';
@@ -30,15 +45,6 @@ const $ = (id) => document.getElementById(id);
 
 /** Not offered: Autoplay and Cinema have no player, and ScoreV2 is a system mod. */
 const LEFT_OUT = new Set(['AT', 'CN', 'SV2']);
-
-/** osu!'s mod groups, in lazer's order, as the play tracking filter shows them. */
-const MOD_GROUPS = [
-  ['DifficultyReduction', () => t('mods.difficultyReduction')],
-  ['DifficultyIncrease', () => t('mods.difficultyIncrease')],
-  ['Conversion', () => t('mods.conversion')],
-  ['Fun', () => t('mods.fun')],
-  ['System', () => t('mods.system')],
-];
 
 /** Mods that cannot be on together, as in osu!'s mod select: choosing one takes off the others in its set. */
 const EXCLUSIVE = [
@@ -61,7 +67,6 @@ const RATES = {
   DC: { value: 0.75, min: 0.5, max: 0.99 },
 };
 
-/** Difficulty Adjust's settings that move pp, per ruleset. */
 /**
  * Mods osu! gives a seed (Random, Target Practice). Without one, osu! rolls a new one every time it
  * prices, so the pp would change with every request: choosing one picks a seed, as osu! does.
@@ -71,6 +76,7 @@ const seeded = (acronym) => Boolean(MOD_DEFINITIONS[acronym]?.settings?.seed);
 const MAX_SEED = 2147483647;
 const newSeed = () => Math.floor(Math.random() * MAX_SEED);
 
+/** Difficulty Adjust's settings that move pp, per ruleset. */
 const DA_SETTINGS = {
   0: ['circle_size', 'approach_rate', 'overall_difficulty', 'drain_rate'],
   1: ['overall_difficulty', 'drain_rate'],
@@ -78,38 +84,11 @@ const DA_SETTINGS = {
   3: ['overall_difficulty', 'drain_rate'],
 };
 
-/** Each ruleset's judgements, by the replay counter that holds them, as osu!stable labels them. */
-const FIELDS = {
-  0: [['c300', () => '300'], ['c100', () => '100'], ['c50', () => '50'], ['miss', () => t('manual.miss')]],
-  1: [['c300', () => t('manual.great')], ['c100', () => t('manual.good')], ['miss', () => t('manual.miss')]],
-  2: [
-    ['c300', () => t('manual.fruits')],
-    ['c100', () => t('manual.drops')],
-    ['c50', () => t('manual.droplets')],
-    ['katu', () => t('manual.missedDroplets')],
-    ['miss', () => t('manual.miss')],
-  ],
-  3: [
-    ['geki', () => 'MAX'],
-    ['c300', () => '300'],
-    ['katu', () => '200'],
-    ['c100', () => '100'],
-    ['c50', () => '50'],
-    ['miss', () => t('manual.miss')],
-  ],
-};
-
 /** What lazer judges besides each object in osu!, missed: only without Classic. */
 const SLIDER_FIELDS = [
   ['tailMiss', () => t('ppCalc.sliderEndsMissed')],
   ['tickMiss', () => t('ppCalc.sliderTicksMissed')],
 ];
-
-/** Each ruleset's icon, as osu-web names them (`.mode-icon`). */
-const RULESETS = ['osu', 'taiko', 'fruits', 'mania'];
-
-/** The judgement that is whatever the others leave: the best one. */
-const REMAINDER = { 0: 'c300', 1: 'c300', 2: 'c300', 3: 'geki' };
 
 /** The clients osu! scores as osu!stable: their scores are priced with Classic. */
 const STABLE_CLIENTS = new Set(['stable', 'mcosu', 'neki', 'neomod']);
@@ -144,6 +123,9 @@ let lastAccuracy = null;
 /** Requests being priced, and whether a slider moved meanwhile: it is priced again once they are back. */
 let inFlight = 0;
 let again = false;
+/** What the beatmap's stats and FC table were last asked for, and which request for them is the latest. */
+let infoKey = null;
+let infoAsked = 0;
 
 const say = (message, isError) => hint('ppCalcHint', message, isError);
 const mode = () => ruleset;
@@ -166,8 +148,20 @@ export function setNoPpMods(list) {
   if (ppCalculatorOpen()) renderMods();
 }
 
-/** Open it empty, laid out for `ruleset` (the profile's), with the beatmap still to pick. */
-export function openPpCalculator(ruleset = 0) {
+/**
+ * Open it laid out for `ruleset` (the profile's). The beatmap chosen last is still there, with the
+ * play as it was left, and priced again; with none yet, or `fresh`, it opens with the beatmap to pick.
+ */
+export function openPpCalculator(ruleset = 0, { fresh = false } = {}) {
+  if (beatmap && !fresh) {
+    $('ppCalcModal').hidden = false;
+    showChosen();
+    say(' ');
+    // The calculator in use may have changed since.
+    infoKey = null;
+    void calculate(false);
+    return;
+  }
   beatmap = null;
   found = [];
   search = { q: '', more: false, loading: false };
@@ -190,6 +184,7 @@ export function openPpCalculator(ruleset = 0) {
   $('ppCalcAccuracy').value = '';
   $('ppCalcScore').value = '';
   $('ppCalcScoreUnused').hidden = true;
+  clearInfo();
   renderEmpty();
   say(' ');
   $('ppCalcModal').hidden = false;
@@ -202,7 +197,7 @@ export function openPpCalculator(ruleset = 0) {
  * `classic` it is the profile's choice.
  */
 export async function openPpCalculatorFor(play) {
-  openPpCalculator(play.mode);
+  openPpCalculator(play.mode, { fresh: true });
   say(t('manual.lookingUp'));
   try {
     await choose(await postJson('/api/beatmaps/find', { md5: play.md5 }, t('ppCalc.failed')), play);
@@ -252,46 +247,15 @@ export function closePpCalculator() {
 
 /* ---------------------------------------------------------------- beatmap */
 
-/** A beatmap link or bare id, which osu! is asked about, rather than words to search for. */
-const looksLikeLink = (q) => /^\d+$/.test(q) || /osu\.ppy\.sh\//i.test(q);
-
-const modeIcon = (m) => `<span class="mode-icon mode-icon--${RULESETS[m]}" aria-hidden="true"></span>`;
-
-/** A beatmap's cover from osu!, as `--bg` and `--bg-2x`: nothing for one never submitted. */
-function coverVars(b, size) {
-  const set = Number(b.beatmapsetId);
-  if (!Number.isInteger(set) || set <= 0) return '';
-  return `--bg: url('${coverUrl(set, size)}'); --bg-2x: url('${coverUrl(set, `${size}@2x`)}')`;
-}
-
-/**
- * A beatmap as a row shows it, as favourite beatmaps are shown: its cover beside it and faded
- * behind it (the row's own `--bg`), its name, and who mapped it under that.
- */
-function beatmapLine(b) {
-  const thumb = coverVars(b, 'list');
-  return `<span class="beatmapset-cover pp-calc__thumb"${thumb ? ` style="${thumb}"` : ''}></span>
-    <span class="pp-calc__name">
-      <span class="u-ellipsis">${escapeHtml(original(b.title, b.titleOriginal))}</span>
-      ${b.creator ? `<span class="pp-calc__mapper u-ellipsis">${escapeHtml(t('beatmap.mappedBy', { mapper: b.creator }))}</span>` : ''}
-    </span>`;
-}
-
 function renderFound(message) {
   // A row's ruleset tooltip would outlast the row.
   hideTooltip();
   $('ppCalcResults').innerHTML =
     (message ? `<div class="setting__hint">${escapeHtml(message)}</div>` : '') +
-    found
-      .map(
-        (b, i) => `<button type="button" class="manual-beatmap pp-calc__beatmap" data-found="${i}" style="${coverVars(b, 'card')}">
-          ${beatmapLine(b)}
-          <span class="pp-calc__beatmap-mode" data-tooltip="${escapeHtml(MODE_NAMES[b.mode])}">${modeIcon(b.mode)}</span>
-        </button>`,
-      )
-      .join('') +
+    foundRows(found) +
     (search.more ? `<div class="setting__hint pp-calc__more">${escapeHtml(t('ppCalc.loadingMore'))}</div>` : '');
   $('ppCalcResults').hidden = false;
+  void loadStars(found);
 }
 
 /** The next page of the search, once the list is scrolled near its end. */
@@ -320,27 +284,15 @@ $('ppCalcResults').addEventListener('scroll', () => {
   if (list.scrollTop + list.clientHeight >= list.scrollHeight - 60) void loadMore();
 }, { passive: true });
 
-/** The rulesets a beatmap can be played in: one made for osu! in any, the others only in their own. */
-const modesFor = (b) => (!b || b.mode === 0 ? [0, 1, 2, 3] : [b.mode]);
-
 /** The rulesets the beatmap can be played in, left to right as osu! orders them, the one chosen lit. */
 function renderModes(modes, selected) {
   hideTooltip();
   ruleset = modes.includes(selected) ? selected : modes[0];
-  $('ppCalcModes').innerHTML = modes
-    .map((m) => `<button type="button" class="pp-calc__mode" data-mode="${m}" role="radio"
-      aria-label="${escapeHtml(MODE_NAMES[m])}" data-tooltip="${escapeHtml(MODE_NAMES[m])}">${modeIcon(m)}</button>`)
-    .join('');
+  $('ppCalcModes').innerHTML = modeButtons(modes);
   renderModeState();
 }
 
-function renderModeState() {
-  for (const button of $('ppCalcModes').querySelectorAll('[data-mode]')) {
-    const on = Number(button.dataset.mode) === ruleset;
-    button.classList.toggle('pp-calc__mode--active', on);
-    button.setAttribute('aria-checked', String(on));
-  }
-}
+const renderModeState = () => markMode($('ppCalcModes'), ruleset);
 
 // Another ruleset: its own mods, and a perfect play on the beatmap as that ruleset converts it.
 $('ppCalcModes').onclick = (e) => {
@@ -373,6 +325,7 @@ async function choose(chosen, play = null) {
     <button type="button" id="ppCalcChange">${escapeHtml(t('manual.change'))}</button>`;
   $('ppCalcChosen').style.cssText = coverVars(chosen, 'card');
   $('ppCalcChosen').hidden = false;
+  void loadStars([chosen]);
   renderModes(modesFor(chosen), play?.mode ?? mode());
   if (play) {
     mods = new Map((play.mods ?? []).map((m) => [m.acronym, { ...(m.settings ?? {}) }]));
@@ -491,32 +444,12 @@ function renderMods() {
   const available = offered(mode());
   // A mod the ruleset does not have, or one that changes nothing in it, goes when the ruleset changes.
   for (const acronym of [...mods.keys()]) if (!available.includes(acronym) || inert(acronym)) mods.delete(acronym);
-  $('ppCalcMods').innerHTML = MOD_GROUPS.map(([type, label]) => {
-    const inGroup = available.filter((a) => modDefinition(a).type === type).sort();
-    if (inGroup.length === 0) return '';
-    return `<div class="mod-grid__group">
-      <div class="mod-grid__label">${escapeHtml(label())}</div>
-      <div class="mod-grid__row">${inGroup
-        .map((a) => {
-          const name = modDefinition(a).name;
-          return inert(a)
-            ? `<button type="button" class="mod-chip mod-chip--inert" data-mod="${escapeHtml(a)}" data-inert
-                aria-disabled="true" title="${escapeHtml(t('ppCalc.noPpChange', { mod: name }))}">${modPill(a)}</button>`
-            : `<button type="button" class="mod-chip" data-mod="${escapeHtml(a)}" aria-pressed="false"
-                title="${escapeHtml(name)}">${modPill(a)}</button>`;
-        })
-        .join('')}</div>
-    </div>`;
-  }).join('');
+  $('ppCalcMods').innerHTML = modGrid(available, (a) => (inert(a) ? t('ppCalc.noPpChange', { mod: modDefinition(a).name }) : null));
   renderModState();
 }
 
 function renderModState() {
-  for (const chip of $('ppCalcMods').querySelectorAll('[data-mod]:not([data-inert])')) {
-    const on = chip.dataset.mod === 'CL' ? classic : mods.has(chip.dataset.mod);
-    chip.classList.toggle('mod-chip--required', on);
-    chip.setAttribute('aria-pressed', String(on));
-  }
+  markMods($('ppCalcMods'), (a) => (a === 'CL' ? classic : mods.has(a)));
   // osu!stable's score says where an osu! play broke its combo, and only with Classic.
   $('ppCalcScoreField').hidden = !(mode() === 0 && classic);
   $('ppCalcComboField').hidden = !comboCounts(mode());
@@ -648,11 +581,7 @@ function typedCounts() {
 /** The best judgement is whatever the others leave of a perfect play's. Slider ends and ticks are apart from these. */
 function fillRemainder() {
   if (!perfect) return true;
-  const key = REMAINDER[mode()];
-  const total = Object.values(perfect).reduce((a, b) => a + b, 0);
-  const counts = typedCounts();
-  const others = (FIELDS[mode()] ?? []).reduce((sum, [k]) => (k === key ? sum : sum + (counts[k] ?? 0)), 0);
-  const left = total - others;
+  const { key, total, left } = remainderOf(mode(), perfect, typedCounts());
   $('ppCalcCounts').querySelector(`[data-count="${key}"]`).value = String(Math.max(0, left));
   if (left < 0) {
     say(t('ppCalc.tooMany', { total: fmt(total) }), true);
@@ -800,6 +729,7 @@ async function calculate(fresh) {
     renderSliders(d);
     $('ppCalcScoreUnused').hidden = d.stableScoreUsed !== false;
     renderResult(d);
+    void refreshInfo(d);
     if (!typingAccuracy) say(' ');
   } catch (err) {
     if (mine !== asked) return;
@@ -809,7 +739,10 @@ async function calculate(fresh) {
       return;
     }
     // With no count of the beatmap's judgements, they are typed in full.
-    if (fresh) renderCounts(null);
+    if (fresh) {
+      renderCounts(null);
+      clearInfo();
+    }
     $('ppCalcResult').innerHTML = '';
     say(err.message, true);
   } finally {
@@ -841,6 +774,153 @@ function renderResult(d) {
     ${parts ? `<dl class="pp-calc__parts">${parts}</dl>` : ''}
     ${d.ranked === false ? `<p class="pp-calc__note">${escapeHtml(t('ppCalc.unranked'))}</p>` : ''}
     <p class="pp-calc__version">${escapeHtml(version)}</p>`;
+}
+
+/* ------------------------------------------------- the beatmap, and an FC */
+
+/** The accuracies a full combo is priced at, as the osu! pp extension's table has them. */
+const FC_ACCURACIES = [100, 99, 98, 95];
+
+/** The settings song select shows, in the order osu-web's beatmapset page lists them (stats.tsx). */
+const STATS = [
+  ['CS', () => t('ppCalc.statCircleSize')],
+  ['KC', () => t('ppCalc.statKeyCount')],
+  ['HP', () => t('ppCalc.statDrain')],
+  ['OD', () => t('ppCalc.statAccuracy')],
+  ['AR', () => t('ppCalc.statApproachRate')],
+];
+
+function clearInfo() {
+  infoKey = null;
+  infoAsked++;
+  $('ppCalcFc').hidden = true;
+  $('ppCalcStats').hidden = true;
+}
+
+/** What the stats and the FC table depend on: the beatmap, ruleset, mods and Classic, never the judgements typed. */
+const infoKeyOf = () => JSON.stringify([beatmap?.md5, mode(), requestMods(), classic]);
+
+/** How long the beatmap, ruleset and mods stay as they are before the stats and FC table are asked for. */
+const INFO_SETTLE_MS = 400;
+
+/**
+ * The beatmap as osu!'s song select describes it with these mods, and what a full combo is worth
+ * at each of `FC_ACCURACIES`. Asked for again only when what they depend on changes, once it has
+ * stopped changing, and one at a time: every request waits its turn on the app's one queue, so a
+ * pile of them would hold up the play being priced. A change stops the rest.
+ */
+async function refreshInfo(d) {
+  const key = infoKeyOf();
+  if (key === infoKey || !beatmap) return;
+  infoKey = key;
+  const mine = ++infoAsked;
+  const target = { md5: beatmap.md5, mode: mode(), mods: requestMods() };
+  const full = perfect;
+  const fcEnds = accuracyEnds();
+  const withClassic = classic;
+  // A full combo at each accuracy needs the beatmap's perfect play, which an old source build can't count.
+  if (full) renderFc(d.stars, []);
+  else $('ppCalcFc').hidden = true;
+
+  await new Promise((r) => setTimeout(r, INFO_SETTLE_MS));
+  if (mine !== infoAsked) return;
+  try {
+    const r = await postJson('/api/pp-calculator/describe', target, t('ppCalc.failed'));
+    if (mine !== infoAsked) return;
+    renderStats(r.beatmap);
+  } catch {
+    if (mine === infoAsked) renderStats(null);
+  }
+
+  if (!full) return;
+  const pp = [];
+  for (const acc of FC_ACCURACIES) {
+    if (mine !== infoAsked) return;
+    const { counts } = judgementsForAccuracy(mode(), acc / 100, { perfect: full, counts: { miss: 0, tailMiss: 0, tickMiss: 0 }, ends: fcEnds });
+    try {
+      pp.push((await postJson('/api/pp-calculator', { ...target, classic: withClassic, counts, combo: '', score: '' }, t('ppCalc.failed'))).pp);
+    } catch {
+      pp.push(null);
+    }
+    if (mine === infoAsked) renderFc(d.stars, pp);
+  }
+}
+
+/** The pp of a full combo at each accuracy, or a dash for each while they are worked out. */
+function renderFc(stars, pp) {
+  const head = FC_ACCURACIES.map((acc) => `<th scope="col">${escapeHtml(pct(acc / 100, 0))}</th>`).join('');
+  const cells = FC_ACCURACIES.map((_, i) => {
+    const value = pp?.[i];
+    return value == null
+      ? `<td${i < (pp?.length ?? 0) ? '' : ' class="pp-calc__fc-waiting"'}>–</td>`
+      : `<td title="${escapeHtml(`${fmt(value, 2)}pp`)}">${escapeHtml(fmt(value, 0))}</td>`;
+  }).join('');
+  $('ppCalcFc').innerHTML = `<table aria-label="${escapeHtml(t('ppCalc.fcTable'))}">
+    <thead><tr><th scope="col">FC</th>${head}</tr></thead>
+    <tbody><tr><td>${difficultyBadge(stars)}</td>${cells}</tr></tbody>
+  </table>`;
+  $('ppCalcFc').hidden = false;
+}
+
+/** A setting's value as osu-web writes one: up to two decimals, none when it is whole. */
+function statValue(n) {
+  const r = Math.round(n * 100) / 100;
+  return fmt(r, Number.isInteger(r) ? 0 : Number.isInteger(r * 10) ? 1 : 2);
+}
+
+/** A length as osu-web writes one: m:ss, or h:mm:ss. */
+function duration(ms) {
+  const total = Math.max(0, Math.round(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = String(total % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+}
+
+/** One row of osu-web's stats table: the setting, its bar out of 10, and its value. */
+function statRow(label, value, original, stars = false) {
+  const changed = original != null && Math.abs(original - value) > 0.005;
+  const title = changed ? ` title="${escapeHtml(`${statValue(original)} → ${statValue(value)}`)}"` : '';
+  const fill = Math.min(100, Math.max(0, value * 10));
+  return `<tr>
+    <th class="beatmap-stats-table__label" scope="row">${escapeHtml(label)}</th>
+    <td class="beatmap-stats-table__bar">
+      <div class="bar bar--beatmap-stats${stars ? ' bar--beatmap-stats-stars' : ''}" style="--fill: ${fill}%"><div class="bar__fill"></div></div>
+    </td>
+    <td class="beatmap-stats-table__value${changed ? ' beatmap-stats-table__value--changed' : ''}"${title}>${stars ? escapeHtml(fmt(value, 2)) : escapeHtml(statValue(value))}</td>
+  </tr>`;
+}
+
+/** The beatmap with these mods, as osu-web's beatmapset page shows one: length and BPM, then each setting. */
+function renderStats(info) {
+  const box = $('ppCalcStats');
+  if (!info) {
+    box.hidden = true;
+    return;
+  }
+  const byAcronym = new Map(info.settings.map((x) => [x.acronym, x]));
+  const rows = STATS.filter(([acronym]) => byAcronym.has(acronym))
+    .map(([acronym, label]) => statRow(label(), byAcronym.get(acronym).adjusted, byAcronym.get(acronym).original))
+    .join('');
+  const bpm = info.bpm > 1000 ? '∞' : statValue(info.bpm);
+  box.innerHTML = `<div class="pp-calc__stats-row">
+      <div class="beatmap-basic-stats">
+        <div class="beatmap-basic-stats__entry" title="${escapeHtml(t('ppCalc.statLength'))}">
+          <div class="beatmap-basic-stats__entry-icon beatmap-basic-stats__entry-icon--total_length"></div>
+          <span>${escapeHtml(duration(info.lengthMs))}</span>
+        </div>
+        <div class="beatmap-basic-stats__entry" title="BPM">
+          <div class="beatmap-basic-stats__entry-icon beatmap-basic-stats__entry-icon--bpm"></div>
+          <span>${escapeHtml(bpm)}</span>
+        </div>
+      </div>
+    </div>
+    <div class="pp-calc__stats-row">
+      <table class="beatmap-stats-table">
+        <tbody>${rows}${statRow(t('ppCalc.statStars'), info.stars, null, true)}</tbody>
+      </table>
+    </div>`;
+  box.hidden = false;
 }
 
 $('ppCalcClose').onclick = closePpCalculator;

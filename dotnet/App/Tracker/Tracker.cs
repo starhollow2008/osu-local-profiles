@@ -499,6 +499,32 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
     public Task<Calc.PerfectPlay?> PerfectJudgements(string osuPath, int mode, IReadOnlyList<JsonElement> mods) =>
         Enqueue(async () => calculator is null ? null : await calculator.Judgements(osuPath, mode, mods));
 
+    /// <summary>A beatmap as song select describes it for a ruleset and mods, from the calculator in use; null when it cannot say.</summary>
+    public Task<Calc.DifficultyInfo?> BeatmapDifficulty(string osuPath, int mode, IReadOnlyList<JsonElement> mods) =>
+        Enqueue(async () => calculator is null ? null : await calculator.Difficulty(osuPath, mode, mods));
+
+    /// <summary>
+    /// A beatmap's star rating without mods, in its own ruleset, for a list of beatmaps to pick from.
+    /// Kept for as long as the same calculator is in use, since a list asks for the same ones again.
+    /// </summary>
+    public Task<double?> BeatmapStars(string osuPath, string md5, int mode) => Enqueue(async () =>
+    {
+        if (calculator is null) return null;
+        if (!ReferenceEquals(starsFrom, calculator))
+        {
+            starsCache.Clear();
+            starsFrom = calculator;
+        }
+        if (starsCache.TryGetValue(md5, out var known)) return known;
+        var stars = (await calculator.Difficulty(osuPath, mode, []))?.Stars;
+        starsCache[md5] = stars;
+        return stars;
+    });
+
+    /// <summary>Star ratings already worked out by <see cref="BeatmapStars"/>, and by which calculator. Only touched on the queue.</summary>
+    private readonly Dictionary<string, double?> starsCache = new(StringComparer.Ordinal);
+    private Calc.OfficialCalculator? starsFrom;
+
     /// <summary>Whether osu! ranks these mods, from the calculator in use; null when it cannot say.</summary>
     public Task<bool?> ModsRanked(int mode, JsonElement mods) =>
         Enqueue(async () => calculator is null ? null : (await calculator.Ranked(mode, mods, null))?.Ranked);

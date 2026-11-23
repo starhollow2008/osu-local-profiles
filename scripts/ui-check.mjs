@@ -1991,8 +1991,17 @@ const ppCalc = JSON.parse(
     out.more = first < 20 || (await until(() => $('ppCalcResults').querySelectorAll('[data-found]').length > first));
     const row = $('ppCalcResults').querySelector('[data-found]');
     out.rowShows = Boolean(row.querySelector('.mode-icon')) && (row.querySelector('.pp-calc__mapper')?.textContent ?? '').trim().length > 0;
+    out.rowStars = await until(() => row.querySelector('.beatmap-pick__stars .difficulty-badge'));
     row.click();
     await until(() => $('ppCalcResult').querySelector('.pp-calc__pp'));
+    // osu-web's stats beside it, and a full combo's pp at 100, 99, 98 and 95% over it.
+    const fcCells = () => [...$('ppCalcFc').querySelectorAll('tbody td:not(:first-child)')];
+    await until(() => !$('ppCalcStats').hidden && !$('ppCalcFc').hidden && fcCells().every((c) => !c.classList.contains('pp-calc__fc-waiting')));
+    out.stats = !$('ppCalcStats').hidden && $('ppCalcStats').querySelectorAll('.beatmap-stats-table tr').length >= 3
+      && $('ppCalcStats').querySelectorAll('.beatmap-basic-stats__entry').length === 2
+      && Boolean($('ppCalcStats').querySelector('.bar--beatmap-stats-stars'));
+    const fc = fcCells().map((c) => Number(c.textContent.replace(/[^0-9.]/g, '')));
+    out.fc = fc.length === 4 && fc.every((n, i) => n > 0 && (i === 0 || n <= fc[i - 1])) && Math.abs(fc[0] - pp()) <= 1;
     const best = $('ppCalcCounts').querySelector('[readonly]');
     out.perfect = pp() > 0 && $('ppCalcResult').textContent.includes('100.00%');
     const clOn = () => $('ppCalcMods').querySelector('[data-mod="CL"]')?.getAttribute('aria-pressed') === 'true';
@@ -2100,6 +2109,13 @@ const ppCalc = JSON.parse(
     }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     out.escape = $('ppCalcModal').hidden;
+    const kept = $('ppCalcChosen').textContent.trim();
+    $('optionsBtn').click();
+    $('optPpCalc').click();
+    out.keepsBeatmap = !$('ppCalcModal').hidden && !$('ppCalcChosen').hidden && $('ppCalcChosen').textContent.trim() === kept;
+    $('ppCalcModal').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    $('ppCalcModal').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    out.backdropCloses = $('ppCalcModal').hidden;
     return JSON.stringify(out);
   })()`),
 );
@@ -2127,6 +2143,11 @@ check('combo is asked for in osu! and catch only', ppCalc.none || ppCalc.comboRu
 check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defaultSaved === undefined ? SKIP : ppCalc.defaultSaved, true);
 check('Escape closes it', ppCalc.escape ?? SKIP, true);
 check('selecting text and letting go outside it leaves it open', ppCalc.dragStaysOpen, true);
+check('each beatmap found shows its star rating', ppCalc.none ? SKIP : Boolean(ppCalc.rowStars), true);
+check("the beatmap's length, BPM and settings are shown as osu-web shows them", ppCalc.none ? SKIP : ppCalc.stats, true);
+check('a full combo is priced at 100, 99, 98 and 95%', ppCalc.none ? SKIP : ppCalc.fc, true);
+check('opened again, the beatmap chosen last is still there', ppCalc.none ? SKIP : ppCalc.keepsBeatmap, true);
+check('a click on the backdrop closes it', ppCalc.none ? SKIP : ppCalc.backdropCloses, true);
 
 /*
  * The options menu, as the user asked for it: no trailing ellipses, Settings called Other

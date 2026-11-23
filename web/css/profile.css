@@ -4274,10 +4274,17 @@
   white-space: nowrap;
 }
 
-.pp-calc__result {
+/* What the play comes to, and the beatmap under it: kept in view as the inputs scroll. */
+.pp-calc__side {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   margin-top: 12px;
+}
+
+.pp-calc__result {
   padding: 14px;
   border-radius: var(--radius-large);
   background-color: hsl(var(--hsl-b5));
@@ -4343,6 +4350,157 @@
   margin: 10px 0 0;
   color: hsl(var(--hsl-f1));
   font-size: var(--fs-normal);
+}
+
+/* A beatmap row's star rating without mods, filled in once osu! has worked it out. */
+.beatmap-pick__stars {
+  flex: none;
+}
+
+.beatmap-pick__stars:empty {
+  display: none;
+}
+
+/*
+ * A full combo at 100, 99, 98 and 95%, as the osu! pp extension shows it: the star rating with
+ * these mods, then the pp at each accuracy.
+ */
+.pp-calc__fc {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b5));
+}
+
+.pp-calc__fc table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.pp-calc__fc th {
+  padding: 0 4px 4px;
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+  font-weight: 600;
+  text-align: right;
+}
+
+.pp-calc__fc td {
+  padding: 2px 4px 0;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.pp-calc__fc th:first-child,
+.pp-calc__fc td:first-child {
+  text-align: left;
+}
+
+.pp-calc__fc td:first-child {
+  font-size: var(--fs-normal);
+}
+
+.pp-calc__fc-waiting {
+  color: hsl(var(--hsl-f1));
+}
+
+/* The beatmap with these mods: osu-web's beatmapset-stats.less, its basic and advanced rows. */
+.pp-calc__stats {
+  overflow: hidden;
+  border-radius: var(--radius-large);
+  font-size: 12px;
+}
+
+.pp-calc__stats-row {
+  display: flex;
+  flex-direction: column;
+  margin-top: 1px;
+  padding: 7.5px 15px;
+  background-color: hsla(var(--hsl-b4), 0.8);
+}
+
+.pp-calc__stats-row:first-child {
+  margin-top: 0;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* osu-web's beatmap-basic-stats.less: the length and BPM, each after its icon. */
+.beatmap-basic-stats {
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: var(--fs-normal);
+  color: #ffdd55;
+}
+
+.beatmap-basic-stats__entry {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.beatmap-basic-stats__entry-icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 3px;
+  background-size: contain;
+}
+
+/* osu-web's beatmap-stats-table.less: each setting, a bar out of 10, and its value. */
+.beatmap-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.beatmap-stats-table__bar {
+  width: 100%;
+  padding: 0 10px;
+}
+
+.beatmap-stats-table__label {
+  padding: 2.5px 0;
+  font-weight: normal;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.beatmap-stats-table__value {
+  min-width: 25px;
+  text-align: center;
+}
+
+/* Changed by the mods: as osu!'s song select marks one. */
+.beatmap-stats-table__value--changed {
+  color: hsl(var(--hsl-h1));
+  font-weight: 700;
+}
+
+/* osu-web's bar.less, its beatmap-stats bars: white, and the star rating yellow. */
+.bar--beatmap-stats {
+  --fill: 0%;
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 0;
+  background-color: hsl(var(--hsl-b6));
+}
+
+.bar--beatmap-stats .bar__fill {
+  width: var(--fill);
+  height: 100%;
+  border-radius: 0;
+  background-color: #fff;
+  transition: width 0.25s cubic-bezier(0.645, 0.045, 0.355, 1);
+}
+
+.bar--beatmap-stats-stars .bar__fill {
+  background-color: #ffcc22;
 }
 
 /*

@@ -476,6 +476,32 @@ internal static partial class Server
         }
     });
 
+    /// <summary>The pp calculator's beatmap, as song select describes it for the ruleset and mods.</summary>
+    private static Task PpCalculatorDescribe(HttpContext context, ServerOptions opts, Tracker.PlayTracker tracker, long profileId) => WithBody(context, async body =>
+    {
+        try
+        {
+            await Json(context, new { beatmap = await PpCalculation.Describe(EntryFor(opts, tracker, profileId), body) });
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            await Json(context, new { error = e.Message }, 400);
+        }
+    });
+
+    /// <summary>Star ratings for a list of beatmaps to pick from, without mods.</summary>
+    private static Task BeatmapStars(HttpContext context, ServerOptions opts, Tracker.PlayTracker tracker, long profileId) => WithBody(context, async body =>
+    {
+        try
+        {
+            await Json(context, new { stars = await PpCalculation.Stars(EntryFor(opts, tracker, profileId), body) });
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            await Json(context, new { error = e.Message }, 400);
+        }
+    });
+
     /// <summary>A .osu file for the pp calculator, as a raw upload.</summary>
     private static async Task PpCalculatorBeatmap(HttpContext context, ServerOptions opts, Tracker.PlayTracker tracker, long profileId)
     {

@@ -137,7 +137,9 @@ internal sealed record EntryDeps(
     Func<string, PriceOptions?, Task<PpResult?>> PriceReplay,
     bool CanPrice,
     Func<string, int, IReadOnlyList<JsonElement>, Task<Calc.PerfectPlay?>> PerfectJudgements,
-    Func<int, JsonElement, Task<bool?>> ModsRanked)
+    Func<int, JsonElement, Task<bool?>> ModsRanked,
+    Func<string, int, IReadOnlyList<JsonElement>, Task<Calc.DifficultyInfo?>>? Difficulty = null,
+    Func<string, string, int, Task<double?>>? Stars = null)
 {
     /// <summary>The deps for a profile, from the running tracker: one place for the server and startup.</summary>
     public static EntryDeps Of(PlayTracker tracker, Database db, string dataDir, long profileId, OsuWeb osu) => new(
@@ -146,7 +148,9 @@ internal sealed record EntryDeps(
         tracker.PriceReplay,
         tracker.CalculatorVersion is not null,
         tracker.PerfectJudgements,
-        tracker.ModsRanked);
+        tracker.ModsRanked,
+        tracker.BeatmapDifficulty,
+        tracker.BeatmapStars);
 }
 
 /// <summary>A score as the link check shows it, before anything is written.</summary>
