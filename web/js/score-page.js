@@ -16,6 +16,7 @@ import {
 } from './score-share.js';
 import { postJson, toast } from './ui.js';
 import { applyConfigFont } from './font.js';
+import { knownLocale, storedLocale, useLocale } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
 const id = Number(/^\/scores\/(\d+)/.exec(location.pathname)?.[1]);
@@ -25,16 +26,22 @@ if (exporting) document.body.classList.add('export-mode');
 let owner = null;
 let score = null;
 
-// The app's typeface, which a screenshot's browser has never been told in its own storage.
-const fontChosen = fetch('/api/app-config')
+// The app's typeface, which a screenshot's browser has never been told in its own storage, and its
+// language: the card's text is translated (score-card.js), and with none loaded it showed its keys.
+const appConfig = fetch('/api/app-config')
   .then((r) => r.json())
-  .then((d) => applyConfigFont(d.config))
+  .then((d) => d.config ?? {})
+  .catch(() => ({}));
+const fontChosen = appConfig.then((config) => applyConfigFont(config)).catch(() => {});
+const languageChosen = appConfig
+  .then((config) => useLocale(knownLocale(config.language) ? config.language : storedLocale()))
   .catch(() => {});
 
 async function load() {
   try {
     const r = await fetch(`/api/scores/${id}`);
     const d = await r.json();
+    await languageChosen;
     if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
     score = d.score;
     owner = d.owner;
