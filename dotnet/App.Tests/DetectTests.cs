@@ -247,7 +247,8 @@ public sealed class DetectTests : IDisposable
 
         // Two added: both, and the found ones stay listed but untracked.
         var both = await Discover.Run([mine, server], [found, other], "", noSearch: true, env: e);
-        Assert.Equal([mine, server], both.Installs.Where(i => i.Kind == "stable").Select(i => i.Root));
+        // In the order they score, which does not matter.
+        Assert.Equal(new[] { mine, server }.Order(), both.Installs.Where(i => i.Kind == "stable").Select(i => i.Root).Order());
         Assert.Equal(4, both.Candidates.Count(c => c.Kind == "stable"));
     }
 
