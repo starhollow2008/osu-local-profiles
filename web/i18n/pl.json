@@ -479,6 +479,7 @@
   "manualCancel": "Anuluj",
   "manualModal.beatmap": "Beatmapa",
   "manualModal.beatmapPlaceholder": "Szukaj w swoich beatmapach lub wklej link do beatmapy",
+  "manualModal.client": "Zagrane na",
   "manualModal.lastResort": "Ostateczność, dla podejścia bez powtórki i bez linku do wyniku. Nic nie może sprawdzić tego, co wpiszesz, więc wynik jest wszędzie oznaczony jako \"Wpisany ręcznie\", również w udostępnionych kopiach. Jego pp są obliczane z wpisanych liczb.",
   "manualModal.maxCombo": "Maks. combo",
   "manualModal.mods": "Mody",

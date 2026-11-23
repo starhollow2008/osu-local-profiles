@@ -323,7 +323,8 @@ public static class Program
     /// osu! and mania judge each object once in stable, a hold note included, so it is the object
     /// count. taiko and catch are counted from osu!'s own judgements, nested objects included: a
     /// taiko note is Great (drumroll ticks and swells are bonus), and catch's fruits, drops and
-    /// droplets are Great, LargeTickHit and SmallTickHit, stable's 300s, 100s and 50s.
+    /// droplets are Great, LargeTickHit and SmallTickHit, stable's 300s, 100s and 50s. lazer judges a
+    /// mania hold note's head and tail apart, so a lazer play's perfect judgements are counted too.
     /// </remarks>
     private static object Judgements(Request request)
     {
@@ -332,10 +333,11 @@ public static class Program
         var mods = BuildMods(ruleset, request.Mods ?? Array.Empty<ModRequest>());
         var playable = working.GetPlayableBeatmap(ruleset.RulesetInfo, mods);
 
-        int great = 0, largeTicks = 0, smallTicks = 0, sliderTails = 0;
+        int great = 0, largeTicks = 0, smallTicks = 0, sliderTails = 0, lazerPerfect = 0;
         if (request.Ruleset is 3)
         {
             great = playable.HitObjects.Count;
+            lazerPerfect = playable.HitObjects.SelectMany(Flatten).Count(h => h.CreateJudgement().MaxResult == HitResult.Perfect);
         }
         else
         {
@@ -363,10 +365,14 @@ public static class Program
                 3 => new Dictionary<string, int> { ["geki"] = great },
                 _ => new Dictionary<string, int> { ["c300"] = great },
             },
-            // osu! without Classic: what lazer judges besides each object, its sliders' ends and ticks (repeats included).
-            lazer = request.Ruleset is 0
-                ? new Dictionary<string, int> { ["slider_tail_hit"] = sliderTails, ["large_tick_hit"] = largeTicks }
-                : null,
+            // What lazer judges otherwise: in osu!, its sliders' ends and ticks besides each object (repeats
+            // included); in mania, each note and each hold note's head and tail.
+            lazer = request.Ruleset switch
+            {
+                0 => new Dictionary<string, int> { ["slider_tail_hit"] = sliderTails, ["large_tick_hit"] = largeTicks },
+                3 => new Dictionary<string, int> { ["perfect"] = lazerPerfect },
+                _ => null,
+            },
             version = OsuVersion,
         };
     }

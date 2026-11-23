@@ -745,9 +745,18 @@ every score repriced here, offline, by one calculator.
 - **Manually enter a score** (`web/js/manual-entry.js`) is built from the pp calculator's parts
   (`web/js/beatmap-pick.js`): the same beatmap rows and ruleset icons, and judgements that start at
   a perfect play from the same `/api/pp-calculator` request, the best one worked out from the rest,
-  with the combo full. Its mods are chips for each ruleset's osu!stable mods, as the server checks
-  them (`ScoreEntry.ManualMods`, sent in `/api/state`), sent as the text it has always taken. The
-  pp it shows as you type is the pp calculator's with Classic; the pp stored is the built replay's.
+  with the combo full. A play is osu!stable's or osu!lazer's:
+  - **osu!stable**: chips for each ruleset's stable mods, as the server checks them
+    (`ScoreEntry.ManualMods`, sent in `/api/state`), sent as the text it has always taken, and kept
+    as a stable replay.
+  - **osu!lazer**: every mod the pp calculator offers, with their settings, Classic a mod in osu! and
+    taiko, and in osu! the slider ends and ticks missed. Read exactly as the pp calculator reads a
+    play with `client: "lazer"` (`PpCalculation.Read`) and kept as the lazer replay that builds
+    (`Play.Replay`), in every ruleset: catch's drops and droplets and mania's judgements are lazer's
+    own statistics, mania's perfect play counted as lazer counts it (a hold note's head and tail
+    apart, the helper's `judgements`), and their maximum left to osu!'s decoder.
+
+  The pp shown as you type is the pp calculator's for the same play, built as it will be kept.
 
 ## The pp calculator
 

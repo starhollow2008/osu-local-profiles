@@ -475,6 +475,7 @@
   "manualCancel": "キャンセル",
   "manualModal.beatmap": "ビートマップ",
   "manualModal.beatmapPlaceholder": "ビートマップを検索、またはビートマップのリンクを貼り付け",
+  "manualModal.client": "プレイしたクライアント",
   "manualModal.lastResort": "リプレイもスコアのリンクもないプレイのための最後の手段です。入力内容は確認できないため、スコアは共有したコピーも含め、表示されるすべての場所で「手入力」と表示されます。pp は入力した数値から計算されます。",
   "manualModal.maxCombo": "最大コンボ",
   "manualModal.mods": "Mod",

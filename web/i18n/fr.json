@@ -475,6 +475,7 @@
   "manualCancel": "Annuler",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Cherche dans tes beatmaps, ou colle le lien d'une beatmap",
+  "manualModal.client": "Joué sur",
   "manualModal.lastResort": "Un dernier recours, pour une partie sans replay ni lien de score. Rien ne peut vérifier ce que tu saisis, donc le score est marqué \"Saisi à la main\" partout où il apparaît, copies partagées comprises. Ses pp sont calculés à partir des nombres saisis.",
   "manualModal.maxCombo": "Combo max",
   "manualModal.mods": "Mods",

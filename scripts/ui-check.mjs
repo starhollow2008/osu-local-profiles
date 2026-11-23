@@ -472,6 +472,17 @@ const entry = JSON.parse(await evaluate(`(async () => {
     out.remainder = Number($('manualCounts').querySelector('[readonly]').value) === before - 1;
     for (let i = 0; i < 60 && !$('manualWorth').textContent.trim(); i++) await wait(100);
     out.worth = /pp/.test($('manualWorth').textContent);
+
+    // Played on osu!lazer: every mod the pp calculator has, with their settings, and no stable score.
+    $('manualClient').querySelector('[data-client="lazer"]').click();
+    for (let i = 0; i < 40 && !$('manualMods').querySelector('[data-mod="DA"]'); i++) await wait(100);
+    const osu = $('manualModes').querySelector('[aria-checked="true"]')?.dataset.mode === '0';
+    if (osu) for (let i = 0; i < 80 && !$('manualCounts').querySelector('[data-count="tailMiss"]'); i++) await wait(100);
+    out.lazerMods = Boolean($('manualMods').querySelector('[data-mod="DA"]')) && $('manualTotalField').hidden
+      && (!osu || (Boolean($('manualMods').querySelector('[data-mod="CL"]')) && Boolean($('manualCounts').querySelector('[data-count="tailMiss"]'))));
+    $('manualMods').querySelector('[data-mod="DT"]')?.click();
+    for (let i = 0; i < 40 && !$('manualModSettings').querySelector('[data-key="speed_change"]'); i++) await wait(100);
+    out.lazerSettings = Boolean($('manualModSettings').querySelector('[data-key="speed_change"]'));
   }
   escape();
   out.manualClosed = !visible('manualModal');
@@ -491,6 +502,8 @@ check('its rulesets are icons, one of them chosen', entry.rulesets ?? SKIP, true
 check("osu!stable's mods are chips to press, and Autoplay is not one", entry.chips ?? SKIP, true);
 check('a miss comes out of the 300s', entry.remainder ?? SKIP, true);
 check('what the play is worth is shown', entry.worth ?? SKIP, true);
+check('played on osu!lazer, it has lazer’s mods and no stable score', entry.lazerMods ?? SKIP, true);
+check('and their settings, such as Double Time’s speed', entry.lazerSettings ?? SKIP, true);
 check('Escape closes only that one', entry.manualClosed, true);
 
 await evaluate("document.getElementById('backfillCancel').click()");

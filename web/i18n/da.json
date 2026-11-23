@@ -475,6 +475,7 @@
   "manualCancel": "Annuller",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Søg i dine beatmaps, eller indsæt et beatmap-link",
+  "manualModal.client": "Spillet på",
   "manualModal.lastResort": "En sidste udvej, til et forsøg uden replay og uden resultatlink. Intet kan kontrollere det, du skriver, så resultatet markeres \"Indtastet i hånden\" overalt, hvor det vises, også i delte kopier. Dets pp beregnes ud fra de tal, du indtaster.",
   "manualModal.maxCombo": "Højeste combo",
   "manualModal.mods": "Mods",

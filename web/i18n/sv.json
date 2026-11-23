@@ -475,6 +475,7 @@
   "manualCancel": "Avbryt",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Sök bland dina beatmaps, eller klistra in en beatmap-länk",
+  "manualModal.client": "Spelat på",
   "manualModal.lastResort": "En sista utväg, för en omgång utan replay och utan resultatlänk. Inget kan kontrollera det du skriver, så resultatet markeras \"Angivet för hand\" överallt där det visas, även i delade kopior. Dess pp beräknas från siffrorna du anger.",
   "manualModal.maxCombo": "Högsta combo",
   "manualModal.mods": "Mods",

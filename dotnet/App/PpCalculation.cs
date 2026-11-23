@@ -194,24 +194,66 @@ internal static partial class PpCalculation
     }
 
     /// <summary>
-    /// Price one play: <c>{ md5, mode, mods, classic?, counts?, combo?, score? }</c>. With no counts it
-    /// is a perfect play, and with no combo a full one. <c>score</c> is osu!stable's, for osu! with Classic. Everything is checked against the beatmap first, as a
-    /// score entered by hand is.
+    /// A play described by its numbers and checked against the beatmap: what the pp calculator prices,
+    /// and what Manually enter a score keeps for osu!lazer.
     /// </summary>
-    public static async Task<CalculatedPlay> Calculate(EntryDeps deps, JsonElement input)
+    /// <param name="Mods">The mods it is priced with: Classic among them for a lazer play that had it.</param>
+    /// <param name="Lazer">Built as a lazer replay, scored as lazer scores it; otherwise as osu!stable's.</param>
+    /// <param name="Ends">osu! as lazer scores it: the beatmap's slider ends and ticks.</param>
+    internal sealed record Play(
+        EntryBeatmap Beatmap, int Mode, List<JsonElement> Mods, bool Classic, bool Lazer,
+        Dictionary<string, double> Counts, Dictionary<string, double>? Perfect, Dictionary<string, double>? Ends,
+        double TailMiss, double TickMiss, double? Combo, double? StableScore, double? StableTotal)
+    {
+        public LegacyCounts Legacy => new(Counts["c300"], Counts["c100"], Counts["c50"], Counts["geki"], Counts["katu"], Counts["miss"]);
+
+        public double Judged => ScoreEntry.Judgements[Mode].Sum(key => Counts[key]);
+
+        /// <summary>
+        /// The replay: osu!stable's, its mods priced beside it (<see cref="Pricing"/>); or lazer's, with
+        /// its statistics and its mods in its own block.
+        /// </summary>
+        public byte[] Replay(double combo, double playedAt, string player = "") => Lazer
+            ? BuiltReplays.ManualLazer(Mode, Beatmap.Md5, Legacy, LazerStatistics(Mode, Counts, Ends, TailMiss, TickMiss),
+                MaximumStatistics(Mode, Judged, Ends), Mods, combo, playedAt, player)
+            : BuiltReplays.Manual(Mode, Beatmap.Md5, player, Legacy, combo, 0, StableTotal, playedAt);
+
+        public PriceOptions Pricing => new(Mods, IgnoreLegacyTotalScore: StableTotal is null);
+    }
+
+    /// <summary>
+    /// A play from the page, <c>{ md5, mode, mods, client?, classic?, counts?, combo?, score? }</c>,
+    /// checked against the beatmap as a score entered by hand is. With no counts it is a perfect play.
+    /// <c>client: "lazer"</c> is an osu!lazer play in any ruleset, with Classic one of its mods in osu!
+    /// and taiko. Otherwise an osu! or taiko play without Classic is scored as lazer scores it, and
+    /// any other as osu!stable does. <c>score</c> is osu!stable's, for osu! with Classic.
+    /// </summary>
+    internal static async Task<Play> Read(EntryDeps deps, JsonElement input)
     {
         var (beatmap, osuPath, mode, mods) = Target(deps, input);
-        // Without Classic, osu! and taiko are scored as lazer scores them. Catch and mania give the same pp either way.
+        var lazerClient = Js.Get(input, "client") is { ValueKind: JsonValueKind.String } client && client.GetString() == "lazer";
+        // Classic is a toggle in osu! and taiko. Catch and mania give the same pp either way.
         var classic = mode is 2 or 3 || Js.Get(input, "classic") is not { ValueKind: JsonValueKind.False };
+        var lazer = lazerClient || (!classic && mode is 0 or 1);
+        // A lazer replay carries Classic as a mod; a stable one has it by being stable's.
+        if (lazerClient && classic && mode is 0 or 1) mods = [.. mods, JsonText.From(new { acronym = "CL" })];
+
         var perfectPlay = await deps.PerfectJudgements(osuPath, mode, mods);
         var perfect = perfectPlay?.Counts;
+        if (lazer && mode == 3)
+        {
+            // lazer judges a hold note's head and tail apart, so its perfect play has more judgements than stable's.
+            perfect = perfectPlay?.Lazer is { } lazerMania && lazerMania.TryGetValue("perfect", out var notes)
+                ? new Dictionary<string, double>(StringComparer.Ordinal) { ["geki"] = notes }
+                : throw new InvalidOperationException(CountsNeedRebuild);
+        }
         Dictionary<string, double>? ends = null;
-        if (!classic && mode == 0)
+        if (lazer && mode == 0)
         {
             // The release always counts them: only a helper built from source by an earlier version of
             // this app can't (SourceHelper.ProgramStamp), and a rebuild in Other settings is what fixes it.
-            ends = perfectPlay?.Lazer is { } lazer && lazer.ContainsKey(SliderTails) && lazer.ContainsKey(SliderTicks)
-                ? lazer
+            ends = perfectPlay?.Lazer is { } osuEnds && osuEnds.ContainsKey(SliderTails) && osuEnds.ContainsKey(SliderTicks)
+                ? osuEnds
                 : throw new InvalidOperationException(NeedsRebuild);
         }
 
@@ -232,7 +274,7 @@ internal static partial class PpCalculation
                     ?? throw new InvalidOperationException("each judgement is a whole number from 0");
             }
         }
-        // lazer's slider ends and ticks that were missed, which only a play without Classic has.
+        // lazer's slider ends and ticks that were missed.
         double tailMiss = 0, tickMiss = 0;
         if (ends is not null && given is { ValueKind: JsonValueKind.Object })
         {
@@ -264,21 +306,24 @@ internal static partial class PpCalculation
         var typedScore = Js.Get(input, "score");
         var stableScore = ScoreEntry.Blank(typedScore) ? null : ScoreEntry.Whole(typedScore, 0x7fffffff);
         if (stableScore is null && !ScoreEntry.Blank(typedScore)) throw new InvalidOperationException("the score is a whole number");
-        var stableTotal = classic && mode == 0 && stableScore > 0 && Mods.EncodeLegacy(mods) is not null ? stableScore : null;
+        var stableTotal = !lazer && classic && mode == 0 && stableScore > 0 && Mods.EncodeLegacy(mods) is not null ? stableScore : null;
 
-        var legacy = new LegacyCounts(counts["c300"], counts["c100"], counts["c50"], counts["geki"], counts["katu"], counts["miss"]);
-        var pricing = new PriceOptions(mods, IgnoreLegacyTotalScore: stableTotal is null);
-        var statistics = classic ? null : LazerStatistics(mode, counts, ends, tailMiss, tickMiss);
-        var maximum = classic ? null : MaximumStatistics(judged, ends);
+        return new Play(beatmap, mode, mods, classic, lazer, counts, perfect, ends, tailMiss, tickMiss, combo, stableScore, stableTotal);
+    }
+
+    /// <summary>
+    /// Price one play, as <see cref="Read"/> takes it. With no combo it is a full one. Nothing is stored.
+    /// </summary>
+    public static async Task<CalculatedPlay> Calculate(EntryDeps deps, JsonElement input)
+    {
+        var play = await Read(deps, input);
         async Task<PpResult> Price(double withCombo)
         {
             var file = Path.Combine(Path.GetTempPath(), $"olp-calc-{Guid.NewGuid():N}.osr");
-            File.WriteAllBytes(file, statistics is null
-                ? BuiltReplays.Manual(mode, beatmap.Md5, "", legacy, withCombo, 0, stableTotal, Js.Now())
-                : BuiltReplays.ManualLazer(mode, beatmap.Md5, legacy, statistics, maximum!, mods, withCombo, Js.Now()));
+            File.WriteAllBytes(file, play.Replay(withCombo, Js.Now()));
             try
             {
-                return await deps.PriceReplay(file, pricing) is { MaxCombo: > 0 } priced
+                return await deps.PriceReplay(file, play.Pricing) is { MaxCombo: > 0 } priced
                     ? priced
                     : throw new InvalidOperationException("osu!’s calculator could not price this play");
             }
@@ -289,24 +334,24 @@ internal static partial class PpCalculation
         }
 
         // The beatmap's maximum combo is osu!'s to say, so a full combo is priced once it has.
-        var result = await Price(combo ?? 0);
+        var result = await Price(play.Combo ?? 0);
         // A missed slider end or tick is one less in the combo: a full one is what the rest make.
-        var full = Math.Max(0, result.MaxCombo - tailMiss - tickMiss);
-        if (combo is null) result = await Price(full);
-        else if (combo > result.MaxCombo)
+        var full = Math.Max(0, result.MaxCombo - play.TailMiss - play.TickMiss);
+        if (play.Combo is null) result = await Price(full);
+        else if (play.Combo > result.MaxCombo)
         {
-            throw new InvalidOperationException($"a combo of {Js.NumberToString(combo.Value)} is more than this beatmap's maximum of {Js.NumberToString(result.MaxCombo)}");
+            throw new InvalidOperationException($"a combo of {Js.NumberToString(play.Combo.Value)} is more than this beatmap's maximum of {Js.NumberToString(result.MaxCombo)}");
         }
 
-        var priced = ScoreEntry.Judgements[mode].ToDictionary(key => key, key => counts[key], StringComparer.Ordinal);
-        if (ends is not null)
+        var priced = ScoreEntry.Judgements[play.Mode].ToDictionary(key => key, key => play.Counts[key], StringComparer.Ordinal);
+        if (play.Ends is not null)
         {
-            priced["tailMiss"] = tailMiss;
-            priced["tickMiss"] = tickMiss;
+            priced["tailMiss"] = play.TailMiss;
+            priced["tickMiss"] = play.TickMiss;
         }
-        return new CalculatedPlay(result.Value, result.Stars, combo ?? full, result.MaxCombo, result.Accuracy, Silvered(result.Rank, mods),
-            result.Breakdown, result.Version, await deps.ModsRanked(mode, JsonText.From(mods)), priced, perfect, classic,
-            ends?[SliderTails], ends?[SliderTicks], stableScore is > 0 ? stableTotal is not null : null);
+        return new CalculatedPlay(result.Value, result.Stars, play.Combo ?? full, result.MaxCombo, result.Accuracy, Silvered(result.Rank, play.Mods),
+            result.Breakdown, result.Version, await deps.ModsRanked(play.Mode, JsonText.From(play.Mods)), priced, play.Perfect, play.Classic,
+            play.Ends?[SliderTails], play.Ends?[SliderTicks], play.StableScore is > 0 ? play.StableTotal is not null : null);
     }
 
     /// <summary>Why osu! without Classic can't be priced: a calculator that can't count a beatmap's slider ends and ticks.</summary>
@@ -322,17 +367,39 @@ internal static partial class PpCalculation
 
     /// <summary>
     /// The judgements as lazer's statistics: for osu!, its sliders' ends and ticks too, every one hit
-    /// but those missed. Zero counts are left out, as lazer leaves them out.
+    /// but those missed. Catch's fruits, drops and droplets are Great, LargeTickHit and SmallTickHit;
+    /// mania's MAX, 300, 200, 100 and 50 are Perfect, Great, Good, Ok and Meh. Zero counts are left
+    /// out, as lazer leaves them out.
     /// </summary>
     internal static Dictionary<string, double> LazerStatistics(int mode, Dictionary<string, double> counts, Dictionary<string, double>? ends,
         double tailMiss, double tickMiss)
     {
-        var statistics = new Dictionary<string, double>(StringComparer.Ordinal)
+        var statistics = mode switch
         {
-            ["great"] = counts["c300"],
-            ["ok"] = counts["c100"],
-            ["meh"] = mode == 0 ? counts["c50"] : 0,
-            ["miss"] = counts["miss"],
+            2 => new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["great"] = counts["c300"],
+                ["large_tick_hit"] = counts["c100"],
+                ["small_tick_hit"] = counts["c50"],
+                ["small_tick_miss"] = counts["katu"],
+                ["miss"] = counts["miss"],
+            },
+            3 => new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["perfect"] = counts["geki"],
+                ["great"] = counts["c300"],
+                ["good"] = counts["katu"],
+                ["ok"] = counts["c100"],
+                ["meh"] = counts["c50"],
+                ["miss"] = counts["miss"],
+            },
+            _ => new Dictionary<string, double>(StringComparer.Ordinal)
+            {
+                ["great"] = counts["c300"],
+                ["ok"] = counts["c100"],
+                ["meh"] = mode == 0 ? counts["c50"] : 0,
+                ["miss"] = counts["miss"],
+            },
         };
         if (ends is not null)
         {
@@ -343,9 +410,15 @@ internal static partial class PpCalculation
         return statistics.Where(s => s.Value > 0).ToDictionary(s => s.Key, s => s.Value, StringComparer.Ordinal);
     }
 
-    /// <summary>A perfect play's statistics, as lazer writes them: a Great for every object, and every slider end and tick.</summary>
-    internal static Dictionary<string, double> MaximumStatistics(double objects, Dictionary<string, double>? ends)
+    /// <summary>
+    /// A perfect play's statistics, as lazer writes them: in osu! and taiko a Great for every object,
+    /// and every slider end and tick. Catch's and mania's are left to osu!'s decoder, which works them
+    /// out from the play's own (LegacyScoreDecoder.PopulateMaximumStatistics) as it does for any replay
+    /// that has none.
+    /// </summary>
+    internal static Dictionary<string, double> MaximumStatistics(int mode, double objects, Dictionary<string, double>? ends)
     {
+        if (mode is 2 or 3) return [];
         var maximum = new Dictionary<string, double>(StringComparer.Ordinal) { ["great"] = objects };
         if (ends is not null)
         {

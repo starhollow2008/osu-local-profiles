@@ -475,6 +475,7 @@
   "manualCancel": "Peruuta",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Hae beatmapeistasi tai liitä beatmap-linkki",
+  "manualModal.client": "Pelattu",
   "manualModal.lastResort": "Viimeinen keino suoritukselle, jolla ei ole uusintaa eikä tuloslinkkiä. Mikään ei voi tarkistaa kirjoittamaasi, joten tulos merkitään kaikkialla \"Syötetty käsin\", myös jaetuissa kopioissa. Sen pp lasketaan syöttämistäsi luvuista.",
   "manualModal.maxCombo": "Suurin combo",
   "manualModal.mods": "Modit",

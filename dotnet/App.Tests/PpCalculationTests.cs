@@ -141,6 +141,80 @@ public sealed class PpCalculationTests : IDisposable
     }
 
     [Fact]
+    public async Task An_osu_lazer_play_is_priced_in_every_ruleset_with_Classic_among_its_mods()
+    {
+        var deps = Deps();
+        var md5 = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap())).Md5;
+        for (var mode = 0; mode < 4; mode++)
+        {
+            var lazer = await Calculate(deps, new { client = "lazer", md5, mode, classic = false });
+            Assert.True(lazer.Pp > 0, $"mode {mode}: {lazer.Pp}");
+            Assert.Equal(1, lazer.Accuracy, 9);
+        }
+
+        // osu! with Classic: a lazer replay with CL, not stable's, so it keeps its slider ends.
+        var classic = await PpCalculation.Read(deps, JsonText.From(new { client = "lazer", md5, mode = 0, classic = true }));
+        Assert.True(classic.Lazer);
+        Assert.Contains(classic.Mods, m => Js.Get(m, "acronym")?.GetString() == "CL");
+        Assert.NotNull(classic.Ends);
+        Assert.DoesNotContain((await PpCalculation.Read(deps, JsonText.From(new { md5, mode = 0, classic = true }))).Mods,
+            m => Js.Get(m, "acronym")?.GetString() == "CL");
+
+        // Mania: lazer judges a hold note's head and tail apart, so a perfect play has more judgements than stable's.
+        var stableMania = await Calculate(deps, new { md5, mode = 3 });
+        var lazerMania = await Calculate(deps, new { client = "lazer", md5, mode = 3 });
+        Assert.True(lazerMania.Perfect!["geki"] >= stableMania.Perfect!["geki"], $"{lazerMania.Perfect["geki"]} {stableMania.Perfect["geki"]}");
+        Assert.True(lazerMania.Pp > 0);
+    }
+
+    [Fact]
+    public async Task An_osu_lazer_play_is_entered_by_hand_with_its_mods_and_their_settings()
+    {
+        var deps = Deps();
+        var md5 = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap())).Md5;
+        var mods = new object[]
+        {
+            new { acronym = "DT", settings = (object)new { speed_change = 1.3 } },
+            new { acronym = "DA", settings = (object)new { approach_rate = 10 } },
+            new { acronym = "RD", settings = (object)new { seed = 727 } },
+        };
+        var counts = new { c300 = 20, c100 = 1, tailMiss = 1 };
+        var calculated = await Calculate(deps, new { client = "lazer", md5, mode = 0, classic = false, mods, counts });
+
+        var added = await ScoreEntry.Enter(deps, JsonText.From(new
+        {
+            client = "lazer", md5, mode = 0, classic = false, mods, counts,
+            maxCombo = calculated.Combo, playedAt = Js.Now() - 60_000,
+        }), "tester");
+        Assert.Equal("added", added!.Status);
+        var row = h.Db.FirstRow("SELECT mods_json, pp FROM scores WHERE beatmap_md5 = ?", md5)!;
+        var stored = row.Str("mods_json")!;
+        Assert.Contains("\"DT\"", stored);
+        Assert.Contains("\"speed_change\":1.3", stored);
+        Assert.Contains("\"approach_rate\":10", stored);
+        Assert.Contains("\"seed\":727", stored);
+        Assert.DoesNotContain("\"CL\"", stored);
+        // The pp kept is the pp the form showed: the same play, built the same way.
+        Assert.Equal(calculated.Pp, row.Num("pp")!.Value, 6);
+
+        // With Classic, it is one of the play's mods. A perfect taiko play, as osu! counts it on the converted beatmap.
+        var taiko = await Calculate(deps, new { client = "lazer", md5, mode = 1, classic = true });
+        var withClassic = await ScoreEntry.Enter(deps, JsonText.From(new
+        {
+            client = "lazer", md5, mode = 1, classic = true, mods = Array.Empty<object>(), counts = taiko.Perfect,
+            maxCombo = taiko.Combo, playedAt = Js.Now() - 120_000,
+        }), "tester");
+        Assert.Equal("added", withClassic!.Status);
+        Assert.Contains("\"CL\"", h.Db.FirstRow("SELECT mods_json FROM scores WHERE beatmap_md5 = ? AND mode = 1", md5)!.Str("mods_json"));
+
+        Assert.Equal("enter the play’s judgements",
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => ScoreEntry.Enter(deps, JsonText.From(new
+            {
+                client = "lazer", md5, mode = 0, mods = Array.Empty<object>(), maxCombo = 1, playedAt = Js.Now(),
+            }), "tester"))).Message);
+    }
+
+    [Fact]
     public void Manual_entry_offers_each_rulesets_osu_stable_mods()
     {
         var offered = JsonText.From(ScoreEntry.ManualMods);

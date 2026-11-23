@@ -475,6 +475,7 @@
   "manualCancel": "取消",
   "manualModal.beatmap": "圖譜",
   "manualModal.beatmapPlaceholder": "搜尋你的圖譜，或貼上圖譜連結",
+  "manualModal.client": "遊玩用戶端",
   "manualModal.lastResort": "最後手段，用於沒有重播也沒有成績連結的遊玩。沒有任何方式能檢查你輸入的內容，因此這筆成績在所有出現的地方（包括分享的副本）都會標示為「手動輸入」。它的 pp 依你輸入的數字計算。",
   "manualModal.maxCombo": "最大連擊",
   "manualModal.mods": "模組",

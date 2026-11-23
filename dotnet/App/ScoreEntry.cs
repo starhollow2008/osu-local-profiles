@@ -65,7 +65,7 @@ internal static class BuiltReplays
             [AppBlocks.Write(AppBlocks.BuiltBlock, new { origin = "manual", legacyTotal = totalScore is not null })]);
 
     /// <summary>
-    /// A play typed into the pp calculator without Classic, as lazer scores it: a lazer replay whose
+    /// A play typed in as osu!lazer scores it, into the pp calculator or Manually enter a score: a lazer replay whose
     /// block carries the mods and lazer's statistics, with the maximum ones beside them. osu! works
     /// out the accuracy and the grade from those, as it does for any lazer replay.
     /// </summary>
@@ -74,9 +74,10 @@ internal static class BuiltReplays
     /// worth a 300.
     /// </remarks>
     public static byte[] ManualLazer(int mode, string beatmapMD5, LegacyCounts counts, IReadOnlyDictionary<string, double> statistics,
-        IReadOnlyDictionary<string, double> maximumStatistics, IReadOnlyList<JsonElement> mods, double maxCombo, double playedAt) =>
+        IReadOnlyDictionary<string, double> maximumStatistics, IReadOnlyList<JsonElement> mods, double maxCombo, double playedAt,
+        string player = "") =>
         ReplayWriter.Encode(
-            new ReplayHeader(mode, LazerBuiltVersion, beatmapMD5, "", null, counts, 0, maxCombo, false, 0, playedAt, 0),
+            new ReplayHeader(mode, LazerBuiltVersion, beatmapMD5, player, null, counts, 0, maxCombo, false, 0, playedAt, 0),
             [ReplayWriter.LazerBlock(new Dictionary<string, object?>
              {
                  ["mods"] = mods,
@@ -530,6 +531,7 @@ internal static partial class ScoreEntry
     public static async Task<IngestOutcome?> Enter(EntryDeps deps, JsonElement input, string player)
     {
         if (!deps.CanPrice) throw new InvalidOperationException("the pp calculator is not available, so a score cannot be entered by hand");
+        if (Js.Get(input, "client") is { ValueKind: JsonValueKind.String } client && client.GetString() == "lazer") return await EnterLazer(deps, input, player);
         var beatmap = Js.IsString(Js.Get(input, "md5"), out var md5) && Md5Shape().IsMatch(md5) ? Describe(deps, md5) : null;
         if (beatmap is null) throw new InvalidOperationException("choose a beatmap first");
 
@@ -565,16 +567,43 @@ internal static partial class ScoreEntry
         var typedTotal = Js.Get(input, "totalScore");
         var totalScore = Blank(typedTotal) ? null : Whole(typedTotal, 0x7fffffff);
         if (totalScore is null && !Blank(typedTotal)) throw new InvalidOperationException("the score is a whole number");
+        var playedAt = PlayedAt(input);
+
+        var bytes = BuiltReplays.Manual(mode, beatmap.Md5, player,
+            new LegacyCounts(counts["c300"], counts["c100"], counts["c50"], counts["geki"], counts["katu"], counts["miss"]),
+            maxCombo, mods.Bits, totalScore, playedAt);
+        return await Keep(deps, bytes, maxCombo);
+    }
+
+    /// <summary>
+    /// An osu!lazer play: <c>{ client: "lazer", md5, mode, mods, classic?, counts, maxCombo, playedAt }</c>,
+    /// read as the pp calculator reads one (<see cref="PpCalculation.Read"/>), with every lazer mod and
+    /// its settings, Classic one of them in osu! and taiko, and in osu! the slider ends and ticks
+    /// missed. Built into a lazer replay, priced with its own mods.
+    /// </summary>
+    private static async Task<IngestOutcome?> EnterLazer(EntryDeps deps, JsonElement input, string player)
+    {
+        if (Js.Get(input, "counts") is not { ValueKind: JsonValueKind.Object }) throw new InvalidOperationException("enter the play’s judgements");
+        var play = await PpCalculation.Read(deps, input);
+        var maxCombo = Whole(Js.Get(input, "maxCombo"), 65535) ?? throw new InvalidOperationException("enter the play’s max combo");
+        var playedAt = PlayedAt(input);
+        return await Keep(deps, play.Replay(maxCombo, playedAt, player), maxCombo);
+    }
+
+    /// <summary>When the play was set: after osu!'s release, and not in the future.</summary>
+    private static double PlayedAt(JsonElement input)
+    {
         var playedAt = Js.ToNumber(Js.Get(input, "playedAt"));
         if (!double.IsFinite(playedAt) || playedAt < OsuEpoch || playedAt > Js.Now() + 60_000)
         {
             throw new InvalidOperationException("enter when the play was set");
         }
+        return playedAt;
+    }
 
-        var bytes = BuiltReplays.Manual(mode, beatmap.Md5, player,
-            new LegacyCounts(counts["c300"], counts["c100"], counts["c50"], counts["geki"], counts["katu"], counts["miss"]),
-            maxCombo, mods.Bits, totalScore, playedAt);
-
+    /// <summary>A play built into a replay, priced first and kept only if osu!'s calculator takes it.</summary>
+    private static async Task<IngestOutcome?> Keep(EntryDeps deps, byte[] bytes, double maxCombo)
+    {
         // The combo is the one thing the beatmap alone cannot check: its maximum is osu!'s to say.
         var file = UploadedReplays.Store(deps.DataDir, bytes) ?? throw new InvalidOperationException("the score could not be built into a replay");
         var priced = await deps.PriceReplay(file, null);

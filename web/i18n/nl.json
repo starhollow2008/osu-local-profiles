@@ -475,6 +475,7 @@
   "manualCancel": "Annuleren",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Zoek in je beatmaps, of plak een beatmaplink",
+  "manualModal.client": "Gespeeld op",
   "manualModal.lastResort": "Een laatste redmiddel, voor een poging zonder replay en zonder scorelink. Niets kan controleren wat je typt, dus de score wordt overal als \"Met de hand ingevoerd\" gemarkeerd, ook in gedeelde kopieën. De pp wordt berekend uit de getallen die je invoert.",
   "manualModal.maxCombo": "Max. combo",
   "manualModal.mods": "Mods",

@@ -20,12 +20,12 @@
 import { escapeHtml, fmt, pct } from './format.js';
 import { gradeBadge, modDefinition } from './badges.js';
 import { difficultyBadge } from './beatmapsets.js';
-import { MOD_DEFINITIONS } from './mod-definitions.js';
 import {
   beatmapLine,
   coverVars,
   foundRows,
   JUDGEMENT_FIELDS as FIELDS,
+  lazerMods,
   loadStars,
   looksLikeLink,
   markMode,
@@ -33,8 +33,14 @@ import {
   modeButtons,
   modesFor,
   modGrid,
+  modSettingsFields,
+  modsForRequest,
+  readModSetting,
   remainderOf,
   REMAINDER,
+  showSeedOnLeave,
+  SLIDER_FIELDS,
+  toggleMod,
 } from './beatmap-pick.js';
 import { accuracyOf, countsFromStatistics, judgementsForAccuracy, sliderMisses } from './pp-accuracy.js';
 import { closeOnBackdrop, hint, postJson } from './ui.js';
@@ -42,53 +48,6 @@ import { hideTooltip } from './tooltip.js';
 import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
-
-/** Not offered: Autoplay and Cinema have no player, and ScoreV2 is a system mod. */
-const LEFT_OUT = new Set(['AT', 'CN', 'SV2']);
-
-/** Mods that cannot be on together, as in osu!'s mod select: choosing one takes off the others in its set. */
-const EXCLUSIVE = [
-  ['EZ', 'HR'],
-  ['HT', 'DC', 'DT', 'NC', 'WU', 'WD', 'AS'],
-  ['NF', 'SD', 'PF'],
-  ['NF', 'AC'],
-  ['RX', 'AP'],
-  ['RX', 'NF', 'SD', 'PF', 'AC'],
-  ['AP', 'NF', 'SD', 'PF', 'AC'],
-  ['HD', 'FI'],
-  ['1K', '2K', '3K', '4K', '5K', '6K', '7K', '8K', '9K', '10K'],
-];
-
-/** The rate mods' speed: osu!'s default, and the range its slider allows. */
-const RATES = {
-  DT: { value: 1.5, min: 1.01, max: 2 },
-  NC: { value: 1.5, min: 1.01, max: 2 },
-  HT: { value: 0.75, min: 0.5, max: 0.99 },
-  DC: { value: 0.75, min: 0.5, max: 0.99 },
-};
-
-/**
- * Mods osu! gives a seed (Random, Target Practice). Without one, osu! rolls a new one every time it
- * prices, so the pp would change with every request: choosing one picks a seed, as osu! does.
- */
-const seeded = (acronym) => Boolean(MOD_DEFINITIONS[acronym]?.settings?.seed);
-/** osu!'s seeds are ints, and it picks its own from 0 up to int's largest. */
-const MAX_SEED = 2147483647;
-const newSeed = () => Math.floor(Math.random() * MAX_SEED);
-
-/** Difficulty Adjust's settings that move pp, per ruleset. */
-const DA_SETTINGS = {
-  0: ['circle_size', 'approach_rate', 'overall_difficulty', 'drain_rate'],
-  1: ['overall_difficulty', 'drain_rate'],
-  2: ['circle_size', 'approach_rate', 'drain_rate'],
-  3: ['overall_difficulty', 'drain_rate'],
-};
-
-/** What lazer judges besides each object in osu!, missed: only without Classic. */
-const SLIDER_FIELDS = [
-  ['tailMiss', () => t('ppCalc.sliderEndsMissed')],
-  ['tickMiss', () => t('ppCalc.sliderTicksMissed')],
-];
 
 /** The clients osu! scores as osu!stable: their scores are priced with Classic. */
 const STABLE_CLIENTS = new Set(['stable', 'mcosu', 'neki', 'neomod']);
@@ -216,7 +175,7 @@ export function scorePlay(score) {
   const all = score.mods ?? [];
   const withClassic = ruleset > 1 || STABLE_CLIENTS.has(score.client) || all.some((m) => m.acronym === 'CL');
   const kept = all
-    .filter((m) => offered(ruleset).includes(m.acronym) && m.acronym !== 'CL' && !(noPp[ruleset] ?? []).includes(m.acronym))
+    .filter((m) => lazerMods(ruleset).includes(m.acronym) && m.acronym !== 'CL' && !(noPp[ruleset] ?? []).includes(m.acronym))
     .map((m) => ({ acronym: m.acronym, settings: plainSettings(m.settings) }));
   const play = { md5: score.beatmapMd5, mode: ruleset, mods: kept, classic: withClassic };
   if (score.passed !== false && score.statistics) {
@@ -432,16 +391,11 @@ $('ppCalcFile').onchange = async () => {
 
 /* ------------------------------------------------------------------- mods */
 
-const offered = (m) =>
-  Object.entries(MOD_DEFINITIONS)
-    .filter(([acronym, d]) => d.playable && d.modes.includes(m) && !LEFT_OUT.has(acronym))
-    .map(([acronym]) => acronym);
-
 /** A mod that leaves this ruleset's pp as it is: shown, dimmed, and not chosen. */
 const inert = (acronym) => (noPp[mode()] ?? []).includes(acronym);
 
 function renderMods() {
-  const available = offered(mode());
+  const available = lazerMods(mode());
   // A mod the ruleset does not have, or one that changes nothing in it, goes when the ruleset changes.
   for (const acronym of [...mods.keys()]) if (!available.includes(acronym) || inert(acronym)) mods.delete(acronym);
   $('ppCalcMods').innerHTML = modGrid(available, (a) => (inert(a) ? t('ppCalc.noPpChange', { mod: modDefinition(a).name }) : null));
@@ -473,31 +427,11 @@ $('ppCalcClassicDefault').onchange = () => {
   setClassic(on);
 };
 
-/** The speed of a rate mod, and Difficulty Adjust's values: blank is the beatmap's own. */
+/** The speed of a rate mod, Difficulty Adjust's values, and a seed. */
 function renderModSettings() {
-  const fields = [];
-  for (const [acronym, settings] of mods) {
-    if (RATES[acronym]) {
-      const r = RATES[acronym];
-      fields.push(`<label class="field"><span>${escapeHtml(t('ppCalc.speed', { mod: acronym }))}</span>
-        <input type="number" data-mod-setting="${acronym}" data-key="speed_change" min="${r.min}" max="${r.max}" step="0.01"
-               value="${settings.speed_change ?? r.value}"></label>`);
-    }
-    if (acronym === 'DA') {
-      for (const key of DA_SETTINGS[mode()]) {
-        fields.push(`<label class="field"><span>${escapeHtml(MOD_DEFINITIONS.DA.settings[key])}</span>
-          <input type="number" data-mod-setting="DA" data-key="${key}" min="0" max="11" step="0.1"
-                 placeholder="${escapeHtml(t('ppCalc.asMapped'))}" value="${settings[key] ?? ''}"></label>`);
-      }
-    }
-    if (seeded(acronym)) {
-      fields.push(`<label class="field"><span>${escapeHtml(t('ppCalc.seed', { mod: acronym }))}</span>
-        <input type="number" data-mod-setting="${acronym}" data-key="seed" min="0" max="${MAX_SEED}" step="1"
-               value="${settings.seed ?? ''}"></label>`);
-    }
-  }
-  $('ppCalcModSettings').innerHTML = fields.join('');
-  $('ppCalcModSettings').hidden = fields.length === 0;
+  const fields = modSettingsFields(mods, mode());
+  $('ppCalcModSettings').innerHTML = fields;
+  $('ppCalcModSettings').hidden = fields === '';
 }
 
 $('ppCalcMods').onclick = (e) => {
@@ -512,12 +446,7 @@ $('ppCalcMods').onclick = (e) => {
     setClassic(!classic);
     return;
   }
-  if (mods.has(acronym)) {
-    mods.delete(acronym);
-  } else {
-    for (const set of EXCLUSIVE) if (set.includes(acronym)) for (const other of set) if (other !== acronym) mods.delete(other);
-    mods.set(acronym, seeded(acronym) ? { seed: newSeed() } : {});
-  }
+  toggleMod(mods, acronym);
   renderModState();
   // A mod that changes how many objects there are (a mania key mod, Target Practice) starts the play again.
   modsChanged = true;
@@ -525,35 +454,11 @@ $('ppCalcMods').onclick = (e) => {
 };
 
 $('ppCalcModSettings').oninput = (e) => {
-  const input = e.target.closest('[data-mod-setting]');
-  if (!input) return;
-  const settings = mods.get(input.dataset.modSetting);
-  if (!settings) return;
-  let value = input.value === '' ? null : Number(input.value);
-  // A seed is a whole number in osu!'s range; a blank one gets a new seed when it is priced.
-  if (value !== null && input.dataset.key === 'seed') value = Math.min(MAX_SEED, Math.max(0, Math.trunc(value)));
-  if (value === null || !Number.isFinite(value)) delete settings[input.dataset.key];
-  else settings[input.dataset.key] = value;
-  schedule();
+  if (readModSetting(mods, e.target.closest('[data-mod-setting]'))) schedule();
 };
-// Once a seed is left, it shows the seed priced with.
-$('ppCalcModSettings').addEventListener('focusout', (e) => {
-  const input = e.target.closest('[data-key="seed"]');
-  const seed = input && mods.get(input.dataset.modSetting)?.seed;
-  if (seed != null) input.value = String(seed);
-});
+showSeedOnLeave($('ppCalcModSettings'), () => mods);
 
-/** The mods as osu! writes them: settings only when changed, Difficulty Adjust past 10 with its extended limits. */
-function requestMods() {
-  return [...mods].map(([acronym, settings]) => {
-    // Kept on the mod, so the next price has the same one: a score opened without one, or a seed cleared.
-    if (seeded(acronym) && settings.seed == null) settings.seed = newSeed();
-    const changed = { ...settings };
-    if (RATES[acronym] && changed.speed_change === RATES[acronym].value) delete changed.speed_change;
-    if (acronym === 'DA' && Object.values(changed).some((v) => v > 10)) changed.extended_limits = true;
-    return Object.keys(changed).length ? { acronym, settings: changed } : { acronym };
-  });
-}
+const requestMods = () => modsForRequest(mods);
 
 /* ------------------------------------------------------------- judgements */
 

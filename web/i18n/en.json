@@ -483,6 +483,7 @@
   "manualCancel": "Cancel",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Search your beatmaps, or paste a beatmap link",
+  "manualModal.client": "Played on",
   "manualModal.lastResort": "A last resort, for a play with no replay and no score link. Nothing can check what you type, so the score is marked \"Manually entered by hand\" everywhere it appears, shared copies included. Its pp is calculated from the numbers you enter.",
   "manualModal.maxCombo": "Max combo",
   "manualModal.mods": "Mods",

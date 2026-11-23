@@ -475,6 +475,7 @@
   "manualCancel": "Annulla",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Cerca tra le tue beatmap o incolla il link di una beatmap",
+  "manualModal.client": "Giocato su",
   "manualModal.lastResort": "Un'ultima risorsa, per una partita senza replay né link del punteggio. Niente può verificare ciò che scrivi, quindi il punteggio è segnato \"Inserito a mano\" ovunque compaia, copie condivise comprese. I suoi pp sono calcolati dai numeri che inserisci.",
   "manualModal.maxCombo": "Combo massima",
   "manualModal.mods": "Mod",

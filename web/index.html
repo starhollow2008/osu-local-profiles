@@ -1350,6 +1350,14 @@
     <div class="manual-chosen pp-calc__beatmap pp-calc__chosen" id="manualChosen" hidden></div>
 
     <div id="manualForm" hidden>
+      <!-- Stable's play is kept as stable's replay, with stable's mods; lazer's as lazer's, with any mod and its settings. -->
+      <div class="field">
+        <span id="manualClientLabel" data-i18n="manualModal.client">Played on</span>
+        <div class="presets manual-client" id="manualClient" role="radiogroup" aria-labelledby="manualClientLabel">
+          <button type="button" data-client="stable" role="radio">osu!stable</button>
+          <button type="button" data-client="lazer" role="radio">osu!lazer</button>
+        </div>
+      </div>
       <div class="field">
         <span id="manualModesLabel" data-i18n="manualModal.ruleset">Ruleset</span>
         <div class="pp-calc__modes" id="manualModes" role="radiogroup" aria-labelledby="manualModesLabel"></div>
@@ -1358,13 +1366,14 @@
         <span data-i18n="manualModal.mods">Mods</span>
         <div class="mod-grid pp-calc__mods" id="manualMods"></div>
       </div>
+      <div class="manual-grid" id="manualModSettings" hidden></div>
       <div class="manual-counts" id="manualCounts"></div>
       <div class="manual-grid">
         <label class="field">
           <span data-i18n="manualModal.maxCombo">Max combo</span>
           <span class="pp-calc__combo"><input type="number" id="manualCombo" min="0" step="1"><span id="manualMaxCombo"></span></span>
         </label>
-        <label class="field"><span data-i18n="manualModal.score">Score (optional)</span><input type="number" id="manualTotal" min="0" step="1"></label>
+        <label class="field" id="manualTotalField"><span data-i18n="manualModal.score">Score (optional)</span><input type="number" id="manualTotal" min="0" step="1"></label>
         <label class="field"><span data-i18n="manualModal.playedAt">Played</span><input type="datetime-local" id="manualPlayedAt"></label>
       </div>
       <p class="setting__hint"><span id="manualAccuracy"></span> <span id="manualWorth"></span></p>

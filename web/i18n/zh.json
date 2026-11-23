@@ -475,6 +475,7 @@
   "manualCancel": "取消",
   "manualModal.beatmap": "谱面",
   "manualModal.beatmapPlaceholder": "搜索你的谱面，或粘贴谱面链接",
+  "manualModal.client": "游玩客户端",
   "manualModal.lastResort": "最后手段，用于没有回放也没有成绩链接的游玩。没有任何方式能检查你输入的内容，因此这条成绩在所有出现的地方（包括分享的副本）都会标注为“手动输入”。它的 pp 根据你输入的数字计算。",
   "manualModal.maxCombo": "最大连击",
   "manualModal.mods": "模组",

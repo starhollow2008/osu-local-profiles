@@ -475,6 +475,7 @@
   "manualCancel": "Abbrechen",
   "manualModal.beatmap": "Beatmap",
   "manualModal.beatmapPlaceholder": "Deine Beatmaps durchsuchen oder einen Beatmap-Link einfügen",
+  "manualModal.client": "Gespielt auf",
   "manualModal.lastResort": "Ein letzter Ausweg, für ein Spiel ohne Replay und ohne Score-Link. Nichts kann prüfen, was du eingibst, darum wird der Score überall als \"Von Hand eingegeben\" markiert, auch in geteilten Kopien. Seine pp werden aus deinen Zahlen berechnet.",
   "manualModal.maxCombo": "Max. Combo",
   "manualModal.mods": "Mods",

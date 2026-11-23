@@ -4,12 +4,14 @@
  * (beatmap-pick.js).
  *
  * Pick a beatmap -- searched among the installed ones, or a link osu! is asked for -- then the
- * ruleset, osu!stable's mods, and the judgements, which start at a perfect play: osu! counts the
- * beatmap's judgements for the ruleset and mods, and the best one is whatever the others leave, so
- * the total always matches. The combo starts full. What the play is worth is priced as it is
- * typed, by the calculator the app prices with, as the pp calculator prices a play with Classic.
- * Everything is checked again by the server (POST /api/manual-score), and the pp stored comes from
- * osu!'s calculator, never from this form.
+ * client it was played on, the ruleset, the mods, and the judgements, which start at a perfect
+ * play: osu! counts the beatmap's judgements for the ruleset and mods, and the best one is whatever
+ * the others leave, so the total always matches. The combo starts full. An osu!stable play has
+ * stable's mods and is kept as stable's replay; an osu!lazer play has every mod the pp calculator
+ * has, with their settings and Classic, and is kept as lazer's. What the play is worth is priced
+ * as it is typed, by the pp calculator's own request, built as the score will be. Everything is
+ * checked again by the server (POST /api/manual-score), and the pp stored comes from osu!'s
+ * calculator, never from this form.
  */
 import { escapeHtml, fmt, pct } from './format.js';
 import { modDefinition } from './badges.js';
@@ -18,6 +20,7 @@ import {
   coverVars,
   foundRows,
   JUDGEMENT_FIELDS,
+  lazerMods,
   loadStars,
   looksLikeLink,
   markMode,
@@ -25,8 +28,14 @@ import {
   modeButtons,
   modesFor,
   modGrid,
+  modSettingsFields,
+  modsForRequest,
+  readModSetting,
   remainderOf,
   REMAINDER,
+  showSeedOnLeave,
+  SLIDER_FIELDS,
+  toggleMod,
 } from './beatmap-pick.js';
 import { accuracyOf } from './pp-accuracy.js';
 import { closeOnBackdrop, hint, postJson } from './ui.js';
@@ -45,8 +54,14 @@ let beatmap = null;
 let ruleset = 0;
 let found = [];
 let search = { q: '', more: false, loading: false };
-/** The osu!stable mods chosen, by acronym. */
-let mods = new Set();
+/** The client the play was set on: 'stable' or 'lazer'. */
+let client = 'stable';
+/** The mods chosen: acronym -> its settings, which only a lazer play has. Classic is `classic`. */
+let mods = new Map();
+/** A lazer play in osu! or taiko: whether Classic was one of its mods. */
+let classic = false;
+/** A lazer play's accuracy, as osu! worked it out when it was last priced. */
+let lastAccuracy = null;
 /** A perfect play's judgements on the beatmap, ruleset and mods; null until osu! has counted them. */
 let perfect = null;
 /** Which start, and which price, is the latest: an older answer arriving late is dropped. */
@@ -69,7 +84,10 @@ export function openManual(added) {
   beatmap = null;
   found = [];
   search = { q: '', more: false, loading: false };
-  mods = new Set();
+  client = 'stable';
+  mods = new Map();
+  classic = false;
+  lastAccuracy = null;
   perfect = null;
   started++;
   priced++;
@@ -216,9 +234,11 @@ async function choose(chosen) {
   ruleset = modes.includes(ruleset) ? ruleset : chosen.mode;
   $('manualModes').innerHTML = modeButtons(modes);
   markMode($('manualModes'), ruleset);
+  renderClient();
   renderMods();
   $('manualForm').hidden = false;
   say(' ');
+  perfect = null;
   await startOver();
 }
 
@@ -228,51 +248,111 @@ $('manualModes').onclick = (e) => {
   ruleset = Number(button.dataset.mode);
   markMode($('manualModes'), ruleset);
   renderMods();
+  // Another ruleset's judgements: nothing typed carries over.
+  perfect = null;
+  void startOver();
+};
+
+/* ------------------------------------------------------------- the client */
+
+/**
+ * osu!stable or osu!lazer. A stable play has stable's mods, and is kept as stable's replay; a lazer
+ * play has every mod lazer has, their settings and Classic among them, and is kept as lazer's.
+ */
+function renderClient() {
+  for (const button of $('manualClient').querySelectorAll('[data-client]')) {
+    const on = button.dataset.client === client;
+    button.classList.toggle('active', on);
+    button.setAttribute('aria-checked', String(on));
+  }
+  // osu!stable's own score, which only a stable play has.
+  $('manualTotalField').hidden = client === 'lazer';
+}
+
+$('manualClient').onclick = (e) => {
+  const button = e.target.closest('[data-client]');
+  if (!button || button.dataset.client === client) return;
+  client = button.dataset.client;
+  renderClient();
+  renderMods();
   void startOver();
 };
 
 /* ------------------------------------------------------------------- mods */
 
-const offered = () => stableMods.modes?.[ruleset] ?? [];
+/** The mods a play on this client and ruleset could have had. Classic is lazer's in osu! and taiko only. */
+const offered = () =>
+  client === 'lazer'
+    ? lazerMods(ruleset).filter((a) => a !== 'CL' || ruleset <= 1)
+    : (stableMods.modes?.[ruleset] ?? []);
 
 function renderMods() {
   const available = offered();
-  for (const acronym of [...mods]) if (!available.includes(acronym)) mods.delete(acronym);
+  for (const acronym of [...mods.keys()]) if (!available.includes(acronym)) mods.delete(acronym);
+  // A stable play's mods have no settings.
+  if (client === 'stable') for (const acronym of mods.keys()) mods.set(acronym, {});
   $('manualMods').innerHTML = modGrid(available.filter((a) => modDefinition(a)));
-  markMods($('manualMods'), (a) => mods.has(a));
+  renderModState();
+}
+
+function renderModState() {
+  markMods($('manualMods'), (a) => (a === 'CL' ? classic : mods.has(a)));
+  const fields = client === 'lazer' ? modSettingsFields(mods, ruleset) : '';
+  $('manualModSettings').innerHTML = fields;
+  $('manualModSettings').hidden = fields === '';
 }
 
 $('manualMods').onclick = (e) => {
   const chip = e.target.closest('[data-mod]');
   if (!chip) return;
   const acronym = chip.dataset.mod;
-  if (mods.has(acronym)) {
+  if (acronym === 'CL') {
+    classic = !classic;
+    renderModState();
+    schedulePrice();
+    return;
+  }
+  if (client === 'lazer') {
+    toggleMod(mods, acronym);
+  } else if (mods.has(acronym)) {
     mods.delete(acronym);
   } else {
     for (const [a, b] of [...(stableMods.exclusive ?? []), ...ALSO_APART]) {
       if (a === acronym) mods.delete(b);
       if (b === acronym) mods.delete(a);
     }
-    mods.add(acronym);
+    mods.set(acronym, {});
   }
-  markMods($('manualMods'), (a) => mods.has(a));
-  // A key mod changes a converted mania beatmap's notes, so the play starts again.
+  renderModState();
+  // A key mod changes a converted mania beatmap's notes: the judgements typed stay only while the total does.
   void startOver();
 };
 
-/** The mods as the calculator takes them, and as the server takes them: stable's acronyms, run together. */
-const requestMods = () => [...mods].map((acronym) => ({ acronym }));
-const modsText = () => [...mods].join('');
+$('manualModSettings').oninput = (e) => {
+  if (readModSetting(mods, e.target.closest('[data-mod-setting]'))) schedulePrice();
+};
+showSeedOnLeave($('manualModSettings'), () => mods);
+
+/** The play as the pp calculator and the server read it: which client, its mods, and Classic. */
+function playOf() {
+  return client === 'lazer'
+    ? { md5: beatmap.md5, mode: ruleset, client: 'lazer', classic, mods: modsForRequest(mods) }
+    : { md5: beatmap.md5, mode: ruleset, classic: true, mods: [...mods.keys()].map((acronym) => ({ acronym })) };
+}
 
 /* ------------------------------------------------------------- judgements */
 
+/** Each ruleset's judgements, and in osu! on lazer, the slider ends and ticks missed. */
+const fieldsNow = () => [...(JUDGEMENT_FIELDS[ruleset] ?? []), ...(client === 'lazer' && ruleset === 0 ? SLIDER_FIELDS : [])];
+
 function renderCounts(counts) {
   const remainder = REMAINDER[ruleset];
-  $('manualCounts').innerHTML = (JUDGEMENT_FIELDS[ruleset] ?? [])
+  $('manualCounts').innerHTML = fieldsNow()
     .map(([key, label]) => {
       const auto = perfect && key === remainder;
+      const value = counts?.[key] ?? (key.endsWith('Miss') ? 0 : '');
       return `<label class="field"><span>${escapeHtml(label())}</span>
-        <input type="number" id="manual-${key}" data-count="${key}" min="0" step="1" value="${counts?.[key] ?? ''}"${
+        <input type="number" id="manual-${key}" data-count="${key}" min="0" step="1" value="${value}"${
           auto ? ' readonly class="pp-calc__auto"' : ''}></label>`;
     })
     .join('');
@@ -296,32 +376,44 @@ function fillRemainder() {
   return true;
 }
 
-/** A perfect, full-combo play on the beatmap as this ruleset and these mods make it. */
+const totalOf = (counts) => (JUDGEMENT_FIELDS[ruleset] ?? []).reduce((sum, [key]) => sum + (counts?.[key] ?? 0), 0);
+
+/**
+ * A perfect, full-combo play on the beatmap as this client, ruleset and mods make it. Judgements
+ * already typed stay when the beatmap still has as many: only the mods changed, not the play.
+ */
 async function startOver() {
   if (!beatmap) return;
   const mine = ++started;
   // A price of the play before is no longer the play.
   priced++;
   clearTimeout(priceTimer);
-  perfect = null;
-  renderCounts(null);
-  $('manualCombo').value = '';
-  $('manualMaxCombo').textContent = '';
-  $('manualWorth').textContent = '';
-  renderSummary();
+  // The perfect play so far stays until the new one is counted, so what is typed meanwhile still adds up.
+  const kept = perfect !== null;
   try {
-    const d = await postJson('/api/pp-calculator', { md5: beatmap.md5, mode: ruleset, mods: requestMods(), classic: true, counts: null, combo: '' });
+    const d = await postJson('/api/pp-calculator', { ...playOf(), counts: null, combo: '' });
     if (mine !== started) return;
+    const typed = kept ? typedCounts() : null;
+    const typedCombo = $('manualCombo').value;
     perfect = d.perfect ?? null;
-    renderCounts(d.counts);
-    $('manualCombo').value = String(d.maxCombo);
+    const keep = typed && totalOf(typed) === totalOf(d.counts);
+    renderCounts(keep ? typed : d.counts);
+    $('manualCombo').value = keep && typedCombo !== '' ? typedCombo : String(d.maxCombo);
     $('manualMaxCombo').textContent = `/ ${fmt(d.maxCombo)}x`;
-    showWorth(d);
+    if (keep) {
+      fillRemainder();
+      renderSummary();
+      void price();
+    } else {
+      showWorth(d);
+    }
     say(' ');
   } catch (err) {
     if (mine !== started) return;
     // With no count of the beatmap's judgements, they are typed in full.
+    perfect = null;
     renderCounts(null);
+    $('manualWorth').textContent = '';
     say(err.message, true);
   }
   renderSummary();
@@ -338,13 +430,10 @@ async function price() {
   const mine = ++priced;
   try {
     const d = await postJson('/api/pp-calculator', {
-      md5: beatmap.md5,
-      mode: ruleset,
-      mods: requestMods(),
-      classic: true,
+      ...playOf(),
       counts: typedCounts(),
       combo: $('manualCombo').value,
-      score: ruleset === 0 ? $('manualTotal').value : '',
+      score: client === 'stable' && ruleset === 0 ? $('manualTotal').value : '',
     });
     if (mine !== priced) return;
     showWorth(d);
@@ -356,16 +445,20 @@ async function price() {
   }
 }
 
+/** The pp, and lazer's accuracy as osu! works it out (stable's is worked out here as it is typed). */
 function showWorth(d) {
+  lastAccuracy = d?.accuracy ?? null;
   $('manualWorth').textContent = d?.pp == null ? '' : t('manual.worth', { pp: fmt(d.pp, 2) });
+  renderSummary();
 }
 
 /** The accuracy of what is typed, and whether it can be added. True when there is a play to price. */
 function renderSummary() {
   const counts = typedCounts();
-  const judged = Object.values(counts).reduce((a, b) => a + b, 0);
-  $('manualAccuracy').textContent = judged > 0
-    ? t('manual.accuracy', { acc: pct(accuracyOf(ruleset, counts)) })
+  const judged = totalOf(counts);
+  const accuracy = client === 'lazer' ? lastAccuracy : judged > 0 ? accuracyOf(ruleset, counts) : null;
+  $('manualAccuracy').textContent = judged > 0 && accuracy != null
+    ? t('manual.accuracy', { acc: pct(accuracy) })
     : t('manual.accuracyUnknown');
   const ready = Boolean(beatmap) && judged > 0 && $('manualCombo').value !== '';
   $('manualAdd').disabled = !ready;
@@ -389,16 +482,12 @@ $('manualAdd').onclick = async () => {
   if (!beatmap) return;
   $('manualAdd').disabled = true;
   say(t('manual.adding'));
+  const when = { counts: typedCounts(), maxCombo: $('manualCombo').value, playedAt: new Date($('manualPlayedAt').value).getTime() };
   try {
-    const d = await postJson('/api/manual-score', {
-      md5: beatmap.md5,
-      mode: ruleset,
-      counts: typedCounts(),
-      maxCombo: $('manualCombo').value,
-      mods: modsText(),
-      totalScore: $('manualTotal').value,
-      playedAt: new Date($('manualPlayedAt').value).getTime(),
-    });
+    const d = await postJson('/api/manual-score', client === 'lazer'
+      ? { ...playOf(), ...when }
+      // osu!stable's mods as the server has always taken them: their acronyms, run together.
+      : { md5: beatmap.md5, mode: ruleset, mods: [...mods.keys()].join(''), totalScore: $('manualTotal').value, ...when });
     if (d.status === 'added') {
       closeManual();
       await onAdded?.(d);
