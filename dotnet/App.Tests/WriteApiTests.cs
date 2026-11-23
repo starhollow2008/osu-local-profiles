@@ -202,6 +202,24 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_rank_tiers_option_starts_on_and_takes_only_a_switch()
+    {
+        // Issue #30: on by default.
+        Assert.True((await client.GetFromJson("/api/app-config")).GetProperty("config").GetProperty("rankTiers").GetBoolean());
+        Assert.False((await Post("/api/app-config", new { rankTiers = false })).Body.GetProperty("config").GetProperty("rankTiers").GetBoolean());
+        Assert.Equal("rankTiers must be true or false", Error((await Post("/api/app-config", new { rankTiers = "yes" })).Body));
+    }
+
+    [Fact]
+    public void A_rank_curve_counts_its_players_by_its_last_place()
+    {
+        var osu = Calc.Ranks.Table(0)!;
+        Assert.Equal(osu.Points[0][1], osu.Players);
+        Assert.True(osu.Players > 100_000);
+        Assert.Equal(0, new Calc.RankTable("osu", "d", "s", 1, "g", []).Players);
+    }
+
+    [Fact]
     public async Task Sharing_favourites_switched_off_copies_the_shared_list_to_every_profile()
     {
         data.Db.Run("INSERT INTO shared_favorite_beatmapsets (beatmapset_id, favorited_at) VALUES (1830679, 5)");

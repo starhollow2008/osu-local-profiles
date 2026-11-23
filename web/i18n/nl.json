@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "Bij het starten in de browser openen",
   "installSettings.originalLanguage": "Beatmap-metadata in oorspronkelijke taal tonen",
   "installSettings.starRating": "Sterrenwaardering bij scores tonen",
+  "installSettings.rankTiers": "Globale rang kleuren naar niveau",
   "installSettings.font": "Lettertype",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "Systeemlettertype",

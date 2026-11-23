@@ -954,6 +954,25 @@
   font-size: 22px;
 }
 
+/*
+ * A global rank's tier (issue #30): osu-web's rank-value.less, with its `.fancy-text` mixin
+ * (functions.less) written out. The tier's two colours run top to bottom through the text; a
+ * rank below the top half isn't given the class and keeps the plain style.
+ */
+.rank-value {
+  --colour: hsl(var(--hsl-c2)), hsl(var(--hsl-c2));
+  --font-weight: 700;
+  background-image: linear-gradient(var(--colour));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  font-weight: var(--font-weight);
+}
+
+.rank-value--iron {
+  --font-weight: 400;
+}
+
 /* --- the key/value stats box -------------------------------------------- */
 
 .profile-stats {

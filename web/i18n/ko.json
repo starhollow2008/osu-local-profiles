@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "시작할 때 브라우저에서 열기",
   "installSettings.originalLanguage": "비트맵 메타데이터를 원어로 표시",
   "installSettings.starRating": "기록에 난이도(★) 표시",
+  "installSettings.rankTiers": "글로벌 순위를 티어별 색으로 표시",
   "installSettings.font": "글꼴",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "시스템 글꼴",

@@ -7,7 +7,14 @@ namespace OsuLocalProfiles.Calc;
 /// <param name="Sampled">How many players the curve was built from: the random sample and the top together.</param>
 /// <param name="Exact">The ranks this good or better are one point per player, read as exact; 0 for none.</param>
 internal sealed record RankTable(string Mode, string Dump, string Source, double Sampled, string GeneratedAt, double[][] Points,
-    string? TopSource = null, double Exact = 0);
+    string? TopSource = null, double Exact = 0)
+{
+    /// <summary>
+    /// How many players the ruleset ranks: the rank at the curve's lowest pp, which is last place.
+    /// osu-web divides a rank by its own count of these for a global rank's tier (issue #30).
+    /// </summary>
+    public double Players => Points.Length == 0 ? 0 : Points.Max(p => p.Length > 1 ? p[1] : 0);
+}
 
 /// <summary>The global rank a pp total would sit at, and the dump the curve came from.</summary>
 internal sealed record RankEstimate(long Rank, string Dump);

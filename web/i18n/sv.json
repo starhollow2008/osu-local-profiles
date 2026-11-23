@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "Öppna i webbläsaren vid start",
   "installSettings.originalLanguage": "Visa beatmap-metadata på originalspråk",
   "installSettings.starRating": "Visa stjärnbetyg på resultat",
+  "installSettings.rankTiers": "Färga den globala rankingen efter nivå",
   "installSettings.font": "Typsnitt",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "Systemets typsnitt",

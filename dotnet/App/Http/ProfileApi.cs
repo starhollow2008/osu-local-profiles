@@ -107,7 +107,8 @@ internal static class ProfileApi
                 ppSource = opts.PpSource is { } service && service.State().Source.Length > 0 ? opts.CalculatorVersion : null,
             },
             rank = Ranks.Estimate(stats.TotalPp, mode),
-            rankSource = table is null ? null : new { table.Dump, table.Sampled },
+            // Players: what the page divides the rank by for its tier, as osu-web does (issue #30).
+            rankSource = table is null ? null : new { table.Dump, table.Sampled, table.Players },
             imported = stats.BonusPpBorrowed ? Standing.Imported(db, profileId, mode) : null,
             medals = medalSummary,
             medalTotal,

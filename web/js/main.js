@@ -57,6 +57,7 @@ import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from 
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { forgetAnnouncedMedals, renderMedals } from './medals.js';
+import { rankTier } from './rank-tier.js';
 import {
   bindScoreList,
   closeScoreList,
@@ -642,6 +643,13 @@ function renderStats(next, medalTotal, imported) {
  */
 function renderRank(data) {
   const el = $('globalRank');
+  // osu-web's tier colour (issue #30), unless Other settings turned it off.
+  const tier = data.rank && app.config?.rankTiers !== false ? rankTier(data.rank.rank, data.rankSource?.players) : null;
+  el.classList.toggle('rank-value', tier !== null);
+  for (const name of [...el.classList]) if (name.startsWith('rank-value--')) el.classList.remove(name);
+  if (tier) el.classList.add(`rank-value--${tier}`);
+  if (tier) el.style.setProperty('--colour', `var(--level-tier-${tier})`);
+  else el.style.removeProperty('--colour');
   if (data.rank) {
     el.textContent = `#${fmt(data.rank.rank)}`;
     el.title =
@@ -3289,6 +3297,7 @@ function openSettings() {
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   $('originalMetadataSetting').checked = preferOriginalMetadata();
   $('starRatingSetting').checked = app.config?.starRating === true;
+  $('rankTiersSetting').checked = app.config?.rankTiers !== false;
   $('fontSetting').value = pageFont();
   settingsHint(' ');
   $('settingsModal').hidden = false;
@@ -3365,6 +3374,13 @@ $('settingsSave').onclick = async () => {
       app = { ...app, config: c.config };
       // The note said where this is; changing it is as good as closing the note.
       dismissStarRatingNotice();
+    }
+
+    // The global rank's tier colour (issue #30), install-level too. The reload below redraws it.
+    const rankTiers = $('rankTiersSetting').checked;
+    if (rankTiers !== (app.config?.rankTiers !== false)) {
+      const c = await postJson('/api/app-config', { rankTiers }, 'saving that failed');
+      app = { ...app, config: c.config };
     }
 
     // The typeface, install-level too. Switching it restyles the page at once.
@@ -5139,12 +5155,13 @@ on('settings', () => loadState());
 on('identity', () => loadState());
 // A second tab should read the install's options as they now are.
 on('app-config', (e) => {
-  const starRating = app.config?.starRating === true;
+  const before = app.config ?? {};
   app = { ...app, config: JSON.parse(e.data) };
   applyConfigFont(app.config);
   renderUpdate();
-  // Changed in another tab: redraw the score rows with or without it.
-  if ((app.config?.starRating === true) !== starRating) void loadProfile();
+  // Changed in another tab: redraw the score rows and the rank's colour.
+  const redraw = ['starRating', 'rankTiers'].some((key) => before[key] !== app.config?.[key]);
+  if (redraw) void loadProfile();
 });
 // Pin, unpin and remove all change what the page should be showing.
 // Another tab favouriting or unfavouriting changes this one's cards and menus.

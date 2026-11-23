@@ -433,6 +433,7 @@
   "installSettings.openInBrowserOnStart": "Open in browser on start",
   "installSettings.originalLanguage": "Show beatmap metadata in original language",
   "installSettings.starRating": "Show star rating on scores",
+  "installSettings.rankTiers": "Colour the global rank by tier",
   "installSettings.font": "Font",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "System font",

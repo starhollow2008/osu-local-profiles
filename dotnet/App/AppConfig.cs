@@ -78,6 +78,8 @@ internal sealed class AppConfig
         ["originalMetadata"] = JsonText.From(false),
         ["font"] = JsonText.From("nunito"),
         ["starRating"] = JsonText.From(false),
+        // osu-web's tier colour on the global rank (issue #30).
+        ["rankTiers"] = JsonText.From(true),
         ["country"] = JsonText.From(""),
         ["tagline"] = JsonText.From(""),
         ["checkForUpdates"] = JsonText.From(true),
@@ -191,6 +193,8 @@ internal sealed class AppConfig
         // A hand-edited value that is neither is Nunito, the default.
         ["font"] = Js.IsString(this["font"], out var font) && font == "system" ? "system" : "nunito",
         ["starRating"] = this["starRating"] is { ValueKind: JsonValueKind.True },
+        // On unless turned off; a hand-edited value that is not a switch is the default.
+        ["rankTiers"] = this["rankTiers"] is not { ValueKind: JsonValueKind.False },
         ["autoUpdate"] = this["autoUpdate"] is { ValueKind: JsonValueKind.True },
     };
 

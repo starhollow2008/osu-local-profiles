@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "Открывать в браузере при запуске",
   "installSettings.originalLanguage": "Показывать метаданные карты на языке оригинала",
   "installSettings.starRating": "Показывать звёздную сложность у результатов",
+  "installSettings.rankTiers": "Окрашивать глобальный рейтинг по уровню",
   "installSettings.font": "Шрифт",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "Системный шрифт",

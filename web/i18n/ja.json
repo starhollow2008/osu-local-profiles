@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "起動時にブラウザーで開く",
   "installSettings.originalLanguage": "ビートマップのメタデータを原語で表示",
   "installSettings.starRating": "スコアに難易度(★)を表示",
+  "installSettings.rankTiers": "グローバルランキングをティアで色分け",
   "installSettings.font": "フォント",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "システムフォント",

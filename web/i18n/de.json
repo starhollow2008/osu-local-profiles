@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "Beim Start im Browser öffnen",
   "installSettings.originalLanguage": "Beatmap-Metadaten in Originalsprache anzeigen",
   "installSettings.starRating": "Sternebewertung bei Scores anzeigen",
+  "installSettings.rankTiers": "Globalen Rang nach Stufe färben",
   "installSettings.font": "Schriftart",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "Systemschriftart",

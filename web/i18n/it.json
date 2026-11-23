@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "Apri nel browser all'avvio",
   "installSettings.originalLanguage": "Mostra i metadati della beatmap nella lingua originale",
   "installSettings.starRating": "Mostra la difficoltà in stelle sui punteggi",
+  "installSettings.rankTiers": "Colora la classifica globale per livello",
   "installSettings.font": "Carattere",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "Carattere di sistema",

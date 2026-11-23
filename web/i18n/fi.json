@@ -428,6 +428,7 @@
   "installSettings.openInBrowserOnStart": "Avaa selaimessa käynnistyksessä",
   "installSettings.originalLanguage": "Näytä beatmapin metatiedot alkuperäisellä kielellä",
   "installSettings.starRating": "Näytä tähtiluokitus tuloksissa",
+  "installSettings.rankTiers": "Väritä maailmanlaajuinen sijoitus tason mukaan",
   "installSettings.font": "Fontti",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "Järjestelmän fontti",
