@@ -13,7 +13,7 @@
  */
 
 import { escapeHtml } from './format.js';
-import { hint, postJson, toast } from './ui.js';
+import { closeOnBackdrop, hint, postJson, toast } from './ui.js';
 import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -112,9 +112,7 @@ export function osuFoldersOpen() {
 
 /** Wire the dialog up. Called once, from the page controller. */
 export function bindOsuFolders() {
-  $('foldersModal').onclick = (e) => {
-    if (e.target === $('foldersModal')) closeOsuFolders();
-  };
+  closeOnBackdrop($('foldersModal'), closeOsuFolders);
   $('foldersClose').onclick = closeOsuFolders;
 
   $('folderList').onclick = async (e) => {

@@ -49,3 +49,21 @@ export function hint(id, message, isError = false) {
   el.textContent = message;
   el.classList.toggle('profile-hint--error', isError);
 }
+
+/**
+ * Close a dialog when its backdrop is clicked, and only then: the press and the release both on
+ * the backdrop. A browser calls it a click on the backdrop too when the press was in the dialog,
+ * selecting text in a box or dragging a slider, and the release outside it, or when what was
+ * pressed went from under the pointer as the dialog changed. Neither should close it.
+ */
+export function closeOnBackdrop(backdrop, close) {
+  let pressed = false;
+  backdrop.addEventListener('pointerdown', (e) => {
+    pressed = e.target === backdrop;
+  });
+  backdrop.addEventListener('click', (e) => {
+    const outside = pressed && e.target === backdrop;
+    pressed = false;
+    if (outside) close();
+  });
+}

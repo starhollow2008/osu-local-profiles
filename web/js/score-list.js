@@ -13,7 +13,7 @@ import { gradeBadge, modList, modPill } from './badges.js';
 import { plural, t, tOwn } from './i18n.js';
 import { beatmapArtist, beatmapName, beatmapTitle } from './metadata.js';
 import { playMenuButton, playRow } from './sections.js';
-import { postJson } from './ui.js';
+import { closeOnBackdrop, postJson } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -524,9 +524,7 @@ function bindSortDialog() {
     change(withSortLevels(view, editingLevels));
   };
   // Clicking the dimmed background cancels; clicking inside the dialog does not.
-  $('sortModal').onclick = (e) => {
-    if (e.target === $('sortModal')) closeSortDialog();
-  };
+  closeOnBackdrop($('sortModal'), closeSortDialog);
 }
 
 /** Show the view, with the profile's saved setup, and ask for its first page. */

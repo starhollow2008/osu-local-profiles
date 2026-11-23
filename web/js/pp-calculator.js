@@ -22,7 +22,7 @@ import { coverUrl, gradeBadge, modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { original } from './metadata.js';
 import { accuracyOf, countsFromStatistics, judgementsForAccuracy, sliderMisses } from './pp-accuracy.js';
-import { hint, postJson } from './ui.js';
+import { closeOnBackdrop, hint, postJson } from './ui.js';
 import { hideTooltip } from './tooltip.js';
 import { t } from './i18n.js';
 
@@ -844,6 +844,4 @@ function renderResult(d) {
 }
 
 $('ppCalcClose').onclick = closePpCalculator;
-$('ppCalcModal').onclick = (e) => {
-  if (e.target === $('ppCalcModal')) closePpCalculator();
-};
+closeOnBackdrop($('ppCalcModal'), closePpCalculator);

@@ -32,7 +32,7 @@ import {
   downloadReplay,
   saveScoreImage,
 } from './score-share.js';
-import { downloadBlob, hint, postJson, toast } from './ui.js';
+import { closeOnBackdrop, downloadBlob, hint, postJson, toast } from './ui.js';
 import {
   DEFAULT_LOCALE,
   availableLocales,
@@ -1685,9 +1685,7 @@ const closeUpdate = () => { $('updateModal').hidden = true; };
 
 $('updateBtn').onclick = openUpdate;
 $('updateCancel').onclick = closeUpdate;
-$('updateModal').onclick = (e) => {
-  if (e.target === $('updateModal')) closeUpdate();
-};
+closeOnBackdrop($('updateModal'), closeUpdate);
 
 /*
  * Download: fetch the build now and let it wait, checked, for Restart to update. Nothing is
@@ -1841,9 +1839,7 @@ const closeShare = () => { $('shareModal').hidden = true; };
 
 $('optShare').onclick = openShare;
 $('shareClose').onclick = closeShare;
-$('shareModal').onclick = (e) => {
-  if (e.target === $('shareModal')) closeShare();
-};
+closeOnBackdrop($('shareModal'), closeShare);
 
 $('shareHtml').onclick = async () => {
   $('shareHtml').disabled = true;
@@ -2789,9 +2785,7 @@ function closeWelcome() {
 
 $('welcomeSkip').onclick = closeWelcome;
 $('welcomeDismiss').onclick = closeWelcome;
-$('welcomeModal').onclick = (e) => {
-  if (e.target === $('welcomeModal')) closeWelcome();
-};
+closeOnBackdrop($('welcomeModal'), closeWelcome);
 
 /* --- every profile ------------------------------------------------------ */
 
@@ -3276,9 +3270,7 @@ $('optFolders').onclick = () => {
 };
 $('optSettings').onclick = openSettings;
 $('settingsCancel').onclick = closeSettings;
-$('settingsModal').onclick = (e) => {
-  if (e.target === $('settingsModal')) closeSettings();
-};
+closeOnBackdrop($('settingsModal'), closeSettings);
 
 $('settingsSave').onclick = async () => {
   // The whole field set goes up as one patch: the server coerces each value and hands the
@@ -3635,9 +3627,7 @@ function closeScoreCard() {
 
 $('scoreClose').onclick = closeScoreCard;
 // A click beside the card -- on the backdrop itself, not anything on it -- closes it.
-$('scoreModal').onclick = (e) => {
-  if (e.target === $('scoreModal')) closeScoreCard();
-};
+closeOnBackdrop($('scoreModal'), closeScoreCard);
 // The menu is placed in page coordinates, so it cannot follow the card, which scrolls by itself.
 $('scoreModal').querySelector('.score-modal').addEventListener('scroll', () => {
   if (!$('playMenu').hidden) closePlayMenu();
@@ -3998,9 +3988,7 @@ const closeProfiles = () => {
 
 $('optProfiles').onclick = () => openProfiles();
 $('profilesClose').onclick = closeProfiles;
-$('profilesModal').onclick = (e) => {
-  if (e.target === $('profilesModal')) closeProfiles();
-};
+closeOnBackdrop($('profilesModal'), closeProfiles);
 
 $('profileList').onclick = async (e) => {
   const button = e.target.closest('[data-act]');
@@ -4359,9 +4347,7 @@ function markPreset(hours) {
 
 $('optBackfill').onclick = openBackfill;
 $('backfillCancel').onclick = closeBackfill;
-$('backfillModal').onclick = (e) => {
-  if (e.target === $('backfillModal')) closeBackfill();
-};
+closeOnBackdrop($('backfillModal'), closeBackfill);
 
 $('backfillPresets').onclick = (e) => {
   const b = e.target.closest('[data-hours], [data-all]');
@@ -4716,9 +4702,7 @@ const closeScoreLink = () => {
 
 $('backfillScoreLink').onclick = openScoreLink;
 $('scoreLinkCancel').onclick = closeScoreLink;
-$('scoreLinkModal').onclick = (e) => {
-  if (e.target === $('scoreLinkModal')) closeScoreLink();
-};
+closeOnBackdrop($('scoreLinkModal'), closeScoreLink);
 // A different link is a different score: Import waits for it to be checked.
 $('scoreLinkInput').oninput = () => {
   checkedLink = null;
@@ -4920,9 +4904,7 @@ const closeManual = () => {
 
 $('backfillManual').onclick = openManual;
 $('manualCancel').onclick = closeManual;
-$('manualModal').onclick = (e) => {
-  if (e.target === $('manualModal')) closeManual();
-};
+closeOnBackdrop($('manualModal'), closeManual);
 
 /** A beatmap link or bare id, which osu! is asked about, rather than words to search for. */
 const looksLikeBeatmapLink = (q) => /^\d+$/.test(q) || /osu\.ppy\.sh\//i.test(q);
@@ -5114,9 +5096,7 @@ document.addEventListener('click', (e) => {
 $('filterCancel').onclick = closeTrackingFilter;
 $('filterReset').onclick = resetTrackingFilter;
 $('filterSave').onclick = () => void saveTrackingFilter();
-$('filterModal').onclick = (e) => {
-  if (e.target === $('filterModal')) closeTrackingFilter();
-};
+closeOnBackdrop($('filterModal'), closeTrackingFilter);
 
 /* --------------------------------------------------------- reset profile */
 
@@ -5148,9 +5128,7 @@ $('profileReset').onclick = () => {
 };
 $('resetCancel').onclick = closeReset;
 // Clicking the dimmed background cancels; clicking inside the dialog does not.
-$('resetModal').onclick = (e) => {
-  if (e.target === $('resetModal')) closeReset();
-};
+closeOnBackdrop($('resetModal'), closeReset);
 
 $('resetConfirm').onclick = async () => {
   if (resetting) return;

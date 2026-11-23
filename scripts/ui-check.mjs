@@ -221,6 +221,7 @@ await evaluate("document.getElementById('optProfiles').click()");
 await evaluate("document.getElementById('profileReset').click()");
 await evaluate(`(() => {
   const el = document.getElementById('resetModal');
+  el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 })()`);
 check('backdrop click closes it', await shown('resetModal'), 'none');
@@ -1964,6 +1965,10 @@ const ppCalc = JSON.parse(
     $('optionsBtn').click();
     $('optPpCalc').click();
     const out = { opens: !$('ppCalcModal').hidden };
+    // Selecting text in the search, and letting go outside the dialog: the browser's click on the backdrop.
+    $('ppCalcQuery').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    $('ppCalcModal').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    out.dragStaysOpen = !$('ppCalcModal').hidden;
     const chosenMode = () => $('ppCalcModes').querySelector('[aria-checked="true"]')?.dataset.mode;
     // Every ruleset before a beatmap, as osu!'s icons, one of them chosen.
     out.modeIcons = $('ppCalcModes').querySelectorAll('[data-mode] .mode-icon').length === 4 && chosenMode() !== undefined;
@@ -2121,6 +2126,7 @@ check('another seed prices another layout', ppCalc.none || ppCalc.seedChanges ==
 check('combo is asked for in osu! and catch only', ppCalc.none || ppCalc.comboRulesets === undefined ? SKIP : ppCalc.comboRulesets, '0,2');
 check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defaultSaved === undefined ? SKIP : ppCalc.defaultSaved, true);
 check('Escape closes it', ppCalc.escape ?? SKIP, true);
+check('selecting text and letting go outside it leaves it open', ppCalc.dragStaysOpen, true);
 
 /*
  * The options menu, as the user asked for it: no trailing ellipses, Settings called Other
@@ -2556,6 +2562,7 @@ await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optSettings').click()");
 await evaluate(`(() => {
   const el = document.getElementById('settingsModal');
+  el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
   el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 })()`);
 check('backdrop click closes the settings dialog', await shown('settingsModal'), 'none');
@@ -2960,7 +2967,7 @@ if (offered === null) {
 
   await evaluate(openCard);
   // On the backdrop itself -- beside the card, not on it.
-  await evaluate("document.getElementById('scoreModal').click()");
+  await evaluate("(() => { const el = document.getElementById('scoreModal'); el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); el.click(); })()");
   check('clicking beside the card closes it', await shown('scoreModal'), 'none');
 
   await evaluate(openCard);
