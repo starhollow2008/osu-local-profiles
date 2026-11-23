@@ -118,6 +118,38 @@ const SECTIONS = [
 
 /* The five grades osu! counts on a profile. XH/X and SH/S are the silver variants. */
 const GRADE_ORDER = ['XH', 'X', 'SH', 'S', 'A'];
+/* The three it doesn't, which this app counts too (issue #31): Other settings shows them on hover, always, or not. */
+const LOWER_GRADES = ['B', 'C', 'D'];
+
+/**
+ * The grade counts. B, C and D join the row when they are always shown, which makes room by
+ * drawing Medals, pp and Total Play Time closer together; on hover they are a box over the row.
+ */
+function renderGradeCounts() {
+  if (!stats) return;
+  const where = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
+  const item = (g) => `<div class="profile-rank-count__item">
+      <div class="profile-rank-count__rank">${gradeBadge(g)}</div>
+      ${fmt(stats.grades?.[g] ?? 0)}
+    </div>`;
+  const row = (where === 'always' ? [...GRADE_ORDER, ...LOWER_GRADES] : GRADE_ORDER).map(item).join('');
+  const more = where === 'hover'
+    ? `<div class="profile-rank-count__more" role="tooltip">${LOWER_GRADES.map(item).join('')}</div>`
+    : '';
+  const box = $('gradeCounts');
+  box.innerHTML = row + more;
+  box.classList.toggle('profile-rank-count--all', where === 'always');
+  box.classList.toggle('profile-rank-count--more', where === 'hover');
+  // Reachable by keyboard and by a tap, which focuses it, when the box opens on hover.
+  if (where === 'hover') {
+    box.tabIndex = 0;
+    box.setAttribute('aria-label', LOWER_GRADES.map((g) => `${g} ${fmt(stats.grades?.[g] ?? 0)}`).join(', '));
+  } else {
+    box.removeAttribute('tabindex');
+    box.removeAttribute('aria-label');
+  }
+  box.closest('.profile-detail-stats__chart-numbers')?.classList.toggle('profile-detail-stats__chart-numbers--all-grades', where === 'always');
+}
 
 /**
  * The Other settings dialog is generated from this list, so adding a setting is one entry here
@@ -601,12 +633,7 @@ function renderStats(next, medalTotal, imported) {
   $('playTime').textContent = playTime.value;
   $('playTime').title = playTime.title;
 
-  $('gradeCounts').innerHTML = GRADE_ORDER.map(
-    (g) => `<div class="profile-rank-count__item">
-      <div class="profile-rank-count__rank">${gradeBadge(g)}</div>
-      ${fmt(stats.grades[g] ?? 0)}
-    </div>`,
-  ).join('');
+  renderGradeCounts();
 
   // osu-web's v1 stats box, minus play time (which it also omits). Replays watched is a dash
   // for now, there to give the box osu!'s width.
@@ -3298,6 +3325,7 @@ function openSettings() {
   $('originalMetadataSetting').checked = preferOriginalMetadata();
   $('starRatingSetting').checked = app.config?.starRating === true;
   $('rankTiersSetting').checked = app.config?.rankTiers !== false;
+  $('lowerGradesSetting').value = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
   $('fontSetting').value = pageFont();
   settingsHint(' ');
   $('settingsModal').hidden = false;
@@ -3376,10 +3404,15 @@ $('settingsSave').onclick = async () => {
       dismissStarRatingNotice();
     }
 
-    // The global rank's tier colour (issue #30), install-level too. The reload below redraws it.
+    // The global rank's tier colour (issue #30) and the B, C and D counts (issue #31), install-level
+    // too. The reload below redraws both.
     const rankTiers = $('rankTiersSetting').checked;
-    if (rankTiers !== (app.config?.rankTiers !== false)) {
-      const c = await postJson('/api/app-config', { rankTiers }, 'saving that failed');
+    const lowerGrades = $('lowerGradesSetting').value;
+    const looks = {};
+    if (rankTiers !== (app.config?.rankTiers !== false)) looks.rankTiers = rankTiers;
+    if (lowerGrades !== (app.config?.lowerGrades ?? 'hover')) looks.lowerGrades = lowerGrades;
+    if (Object.keys(looks).length) {
+      const c = await postJson('/api/app-config', looks, 'saving that failed');
       app = { ...app, config: c.config };
     }
 
@@ -5159,8 +5192,8 @@ on('app-config', (e) => {
   app = { ...app, config: JSON.parse(e.data) };
   applyConfigFont(app.config);
   renderUpdate();
-  // Changed in another tab: redraw the score rows and the rank's colour.
-  const redraw = ['starRating', 'rankTiers'].some((key) => before[key] !== app.config?.[key]);
+  // Changed in another tab: redraw the score rows, the rank's colour and the grade counts.
+  const redraw = ['starRating', 'rankTiers', 'lowerGrades'].some((key) => before[key] !== app.config?.[key]);
   if (redraw) void loadProfile();
 });
 // Pin, unpin and remove all change what the page should be showing.

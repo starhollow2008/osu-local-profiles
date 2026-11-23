@@ -229,6 +229,15 @@ internal static partial class Server
             }
             patch["font"] = font;
         }
+        if (Js.Get(body, "lowerGrades") is { } lowerGrades)
+        {
+            if (!Js.IsString(lowerGrades, out var where) || where is not ("off" or "hover" or "always"))
+            {
+                await Json(context, new { error = "lowerGrades must be off, hover or always" }, 400);
+                return;
+            }
+            patch["lowerGrades"] = lowerGrades;
+        }
         if (patch.Count == 0)
         {
             await Json(context, new { error = "openBrowser must be true or false" }, 400);
@@ -242,7 +251,7 @@ internal static partial class Server
             current[key] = value;
             opts.Config[key] = value;
         }
-        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "rankTiers" })
+        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "rankTiers", "lowerGrades" })
         {
             if (patch.TryGetValue(key, out var value)) Set(key, value);
         }

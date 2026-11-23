@@ -202,12 +202,27 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task The_rank_tiers_option_starts_on_and_takes_only_a_switch()
+    public async Task The_rank_tiers_and_lower_grades_options_start_on_and_on_hover_and_take_only_their_values()
     {
-        // Issue #30: on by default.
-        Assert.True((await client.GetFromJson("/api/app-config")).GetProperty("config").GetProperty("rankTiers").GetBoolean());
-        Assert.False((await Post("/api/app-config", new { rankTiers = false })).Body.GetProperty("config").GetProperty("rankTiers").GetBoolean());
+        // Issues #30 and #31: on, and on hover, by default.
+        var config = (await client.GetFromJson("/api/app-config")).GetProperty("config");
+        Assert.True(config.GetProperty("rankTiers").GetBoolean());
+        Assert.Equal("hover", config.GetProperty("lowerGrades").GetString());
+
+        var changed = (await Post("/api/app-config", new { rankTiers = false, lowerGrades = "always" })).Body.GetProperty("config");
+        Assert.False(changed.GetProperty("rankTiers").GetBoolean());
+        Assert.Equal("always", changed.GetProperty("lowerGrades").GetString());
+        Assert.Equal("off", (await Post("/api/app-config", new { lowerGrades = "off" })).Body.GetProperty("config").GetProperty("lowerGrades").GetString());
+
+        Assert.Equal("lowerGrades must be off, hover or always", Error((await Post("/api/app-config", new { lowerGrades = "sometimes" })).Body));
+        Assert.Equal("lowerGrades must be off, hover or always", Error((await Post("/api/app-config", new { lowerGrades = true })).Body));
         Assert.Equal("rankTiers must be true or false", Error((await Post("/api/app-config", new { rankTiers = "yes" })).Body));
+
+        // A hand edit that is neither reads as the default.
+        File.WriteAllText(Path.Combine(DataDir, "config.json"), """{"port": 7272, "lowerGrades": "loud", "rankTiers": 3}""");
+        var edited = AppConfig.Load(DataDir).PageView();
+        Assert.Equal("hover", edited["lowerGrades"]);
+        Assert.Equal(true, edited["rankTiers"]);
     }
 
     [Fact]

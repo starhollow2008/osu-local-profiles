@@ -955,6 +955,67 @@
 }
 
 /*
+ * B, C and D (issue #31), which osu! doesn't count on a profile. On hover: a box over the row,
+ * opened by the pointer, the keyboard or a tap (which focuses the row).
+ */
+.profile-rank-count--more {
+  position: relative;
+  border-radius: var(--radius-base);
+}
+
+.profile-rank-count--more:focus-visible {
+  outline: 2px solid hsl(var(--hsl-c1));
+  outline-offset: 4px;
+}
+
+.profile-rank-count__more {
+  display: none;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-base);
+  background-color: hsl(var(--hsl-b4));
+  box-shadow: 0 2px 10px hsla(0, 0%, 0%, 0.5);
+}
+
+.profile-rank-count--more:hover .profile-rank-count__more,
+.profile-rank-count--more:focus-within .profile-rank-count__more {
+  display: grid;
+}
+
+/* Always: all eight in the row, the numbers beside them drawn closer together to make room. */
+.profile-rank-count--all {
+  grid-template-columns: repeat(8, 1fr);
+}
+
+.profile-detail-stats__chart-numbers--all-grades .profile-detail-stats__values--grid {
+  grid-template-columns: repeat(3, auto);
+  gap: 14px;
+}
+
+.profile-detail-stats__chart-numbers--all-grades .value-display--plain-wide {
+  grid-column-end: auto;
+}
+
+/* Each number on one line; with too little room for both, the grades take a line of their own, at the right. */
+.profile-detail-stats__chart-numbers--all-grades {
+  flex-wrap: wrap;
+  row-gap: 10px;
+}
+
+.profile-detail-stats__chart-numbers--all-grades .value-display {
+  white-space: nowrap;
+}
+
+.profile-detail-stats__chart-numbers--all-grades .profile-detail-stats__values:has(.profile-rank-count--all) {
+  margin-left: auto;
+}
+
+/*
  * A global rank's tier (issue #30): osu-web's rank-value.less, with its `.fancy-text` mixin
  * (functions.less) written out. The tier's two colours run top to bottom through the text; a
  * rank below the top half isn't given the class and keeps the plain style.

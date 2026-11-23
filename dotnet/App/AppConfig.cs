@@ -78,8 +78,9 @@ internal sealed class AppConfig
         ["originalMetadata"] = JsonText.From(false),
         ["font"] = JsonText.From("nunito"),
         ["starRating"] = JsonText.From(false),
-        // osu-web's tier colour on the global rank (issue #30).
+        // osu-web's tier colour on the global rank (issue #30), and where the B, C and D counts show (issue #31).
         ["rankTiers"] = JsonText.From(true),
+        ["lowerGrades"] = JsonText.From("hover"),
         ["country"] = JsonText.From(""),
         ["tagline"] = JsonText.From(""),
         ["checkForUpdates"] = JsonText.From(true),
@@ -195,6 +196,7 @@ internal sealed class AppConfig
         ["starRating"] = this["starRating"] is { ValueKind: JsonValueKind.True },
         // On unless turned off; a hand-edited value that is not a switch is the default.
         ["rankTiers"] = this["rankTiers"] is not { ValueKind: JsonValueKind.False },
+        ["lowerGrades"] = Js.IsString(this["lowerGrades"], out var lower) && lower is "off" or "always" ? lower : "hover",
         ["autoUpdate"] = this["autoUpdate"] is { ValueKind: JsonValueKind.True },
     };
 
