@@ -308,9 +308,14 @@ public static class Program
             bpm = 60000 / playable.GetMostCommonBeatLength() * rate,
             circles = types.Count(t => t.HasFlag(LegacyHitObjectType.Circle)),
             sliders = types.Count(t => (t & (LegacyHitObjectType.Slider | LegacyHitObjectType.Hold)) != 0),
+#if !OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES
             settings = ruleset.GetBeatmapAttributesForDisplay(info, mods)
                 .Select(a => new { acronym = a.Acronym, original = a.OriginalValue, adjusted = a.AdjustedValue, max = a.MaxValue })
                 .ToList(),
+#else
+            // A build from osu! source older than this (SourceHelper.SourceFeatures) shows no settings.
+            settings = Array.Empty<object>(),
+#endif
             version = OsuVersion,
         };
     }

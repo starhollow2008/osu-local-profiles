@@ -140,6 +140,17 @@ Other settings says so and Rebuild builds it again, though the source's version 
 (`SourceHelper.IsCurrent`). The running helper can't be replaced in place, so the rebuild keeps its
 staging folder's name. Until then it still prices every score; only what it can't answer is missing.
 
+**`Program.cs` is written for current osu!; older source gets exceptions, not a different base.**
+Something it uses that older osu! lacks goes in `SourceHelper.SourceFeatures`: a constant, and the
+file and text that show a source has it. A source without it is built with that constant defined,
+and `Program.cs` leaves the use out under `#if !<constant>`, answering without it (the `difficulty`
+request's `settings` is empty before osu! 2025.804.0). The release never defines one, so its build
+is unchanged. Not reflection: a call by name isn't checked by the compiler and a trimmed build can
+lose it. A clone from before osu! moved to .NET 10 pins SDK 8 in its global.json, which can't build
+the helper, so that one is built from the project's folder instead (`SourceHelper.BuildDirectory`).
+Checked by hand against ppy/osu `bea61d2` (December 2024): `scripts/pp-parity.mjs` against the
+release, where every request is answered, with the same fields.
+
 **A new calculator reprices what the old one priced, once, on its first launch.**
 `Tracker.recalculateAfterUpdate` runs after the index and catch-up (an unindexed beatmap prices as
 missing). It picks `outdatedPpSql` across every profile, hidden scores included, and runs once per

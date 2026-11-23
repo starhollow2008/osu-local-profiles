@@ -148,6 +148,58 @@ public class PpSourceTests
         Assert.Contains("<TargetFramework>net10.0</TargetFramework>", xml);
         Assert.DoesNotContain("\r", xml);
         Assert.EndsWith("</Project>\n", xml);
+        // A source that can't be read is built as current osu! is.
+        Assert.DoesNotContain("DefineConstants", xml);
+    }
+
+    /// <summary>The helper code, tools/PpCalculator/Program.cs.</summary>
+    private static string HelperProgram([System.Runtime.CompilerServices.CallerFilePath] string here = "") =>
+        File.ReadAllText(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "tools", "PpCalculator", "Program.cs"));
+
+    [Fact]
+    public void Older_osu_source_leaves_out_only_what_it_lacks()
+    {
+        var source = FakeSource();
+        try
+        {
+            var ruleset = NodePath.Join(source, "osu.Game/Rulesets/Ruleset.cs");
+            Directory.CreateDirectory(Path.GetDirectoryName(ruleset)!);
+
+            File.WriteAllText(ruleset, "public virtual IEnumerable<RulesetBeatmapAttribute> GetBeatmapAttributesForDisplay(");
+            Assert.Empty(SourceHelper.MissingFeatures(source));
+            Assert.DoesNotContain("DefineConstants", SourceHelper.ProjectXml(source));
+
+            File.WriteAllText(ruleset, "public abstract class Ruleset { }");
+            Assert.Equal(["OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES"], SourceHelper.MissingFeatures(source));
+            Assert.Contains("<DefineConstants>$(DefineConstants);OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES</DefineConstants>", SourceHelper.ProjectXml(source));
+
+            // Every constant is one the helper's code leaves something out for.
+            var program = HelperProgram();
+            foreach (var feature in SourceHelper.SourceFeatures) Assert.Contains($"#if !{feature.Constant}", program);
+        }
+        finally
+        {
+            Directory.Delete(source, true);
+        }
+    }
+
+    [Fact]
+    public void A_source_pinned_to_an_sdk_before_net_10_is_built_by_the_newest_one()
+    {
+        var source = FakeSource();
+        const string project = "/data/pp-source/project";
+        try
+        {
+            Assert.Equal(source, SourceHelper.BuildDirectory(source, project));
+            File.WriteAllText(NodePath.Join(source, "global.json"), """{ "sdk": { "version": "10.0.100", "rollForward": "latestFeature" } }""");
+            Assert.Equal(source, SourceHelper.BuildDirectory(source, project));
+            File.WriteAllText(NodePath.Join(source, "global.json"), """{ "sdk": { "version": "8.0.100", "rollForward": "latestFeature" } }""");
+            Assert.Equal(project, SourceHelper.BuildDirectory(source, project));
+        }
+        finally
+        {
+            Directory.Delete(source, true);
+        }
     }
 
     [Fact]
