@@ -631,25 +631,31 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
             async Task<RecomputeResult> Run()
             {
                 await Task.Yield();
-                var sum = RecomputeResult.None;
-                var done = 0;
-                Recalculating?.Invoke(done, total);
-                foreach (var batch in batches)
+                try
                 {
-                    var step = await Enqueue(() => Recompute.Scores(db, resolver, batch.ProfileId, current, ids: batch.Ids));
-                    sum += step;
-                    done += batch.Ids.Count;
+                    var sum = RecomputeResult.None;
+                    var done = 0;
                     Recalculating?.Invoke(done, total);
+                    foreach (var batch in batches)
+                    {
+                        var step = await Enqueue(() => Recompute.Scores(db, resolver, batch.ProfileId, current, ids: batch.Ids));
+                        sum += step;
+                        done += batch.Ids.Count;
+                        Recalculating?.Invoke(done, total);
+                    }
+                    Recalculated?.Invoke(sum);
+                    return sum;
                 }
-                Recalculated?.Invoke(sum);
-                return sum;
+                finally
+                {
+                    // Over before the task is, so whoever awaited it can start the next one: a
+                    // continuation clearing it later refused a switch made straight after another.
+                    // The gate is held until this task is recorded below, so it is never cleared first.
+                    lock (gate) recalculation = null;
+                }
             }
             var task = Run();
             recalculation = task;
-            task.ContinueWith(_ =>
-            {
-                lock (gate) recalculation = null;
-            }, TaskScheduler.Default);
             return task;
         }
     }
