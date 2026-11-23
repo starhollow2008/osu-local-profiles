@@ -749,6 +749,8 @@
   "score.playedOn": "플레이 환경",
   "score.pp": "pp",
   "score.ppBreakdown": "pp 구성",
+  "score.starsWithMods": "{mods} 적용 스타 레이팅",
+  "score.starsWithoutMods": "모드 없는 스타 레이팅",
   "score.submittedOn": "전송 시각",
   "score.tracking": "기록 중",
   "scoreCard.loading": "불러오는 중…",

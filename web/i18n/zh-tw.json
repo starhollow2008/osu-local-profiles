@@ -749,6 +749,8 @@
   "score.playedOn": "遊玩平台",
   "score.pp": "pp",
   "score.ppBreakdown": "pp 明細",
+  "score.starsWithMods": "使用 {mods} 時的星數",
+  "score.starsWithoutMods": "無模組時的星數",
   "score.submittedOn": "提交於",
   "score.tracking": "記錄中",
   "scoreCard.loading": "載入中……",

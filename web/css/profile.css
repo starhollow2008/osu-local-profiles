@@ -5236,6 +5236,36 @@ a.beatmapset-badge--spotlight:hover {
   min-width: calc(0.67em * 3 + 0.25em);
 }
 
+/*
+ * A score card's star ratings when its mods changed the difficulty's (issue #32): without mods,
+ * an arrow, then the score's own with the mods that changed it named beside it.
+ */
+.score-beatmap__stars,
+.score-beatmap__stars-modded {
+  display: inline-flex;
+  align-items: center;
+}
+
+.score-beatmap__stars {
+  gap: 6px;
+}
+
+.score-beatmap__stars-modded {
+  gap: 5px;
+}
+
+.score-beatmap__stars-arrow {
+  flex: none;
+  color: hsl(var(--hsl-c2));
+}
+
+.score-beatmap__stars-mods {
+  font-size: var(--fs-small);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: hsl(var(--hsl-h1));
+}
+
 /* ======================================================================== */
 /* View Details: osu!'s score page, as a card over the profile               */
 /* ======================================================================== */

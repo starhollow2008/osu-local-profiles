@@ -761,6 +761,8 @@
   "score.playedOn": "Zagrane na",
   "score.pp": "pp",
   "score.ppBreakdown": "rozbicie pp",
+  "score.starsWithMods": "Ocena gwiazdek z {mods}",
+  "score.starsWithoutMods": "Ocena gwiazdek bez modów",
   "score.submittedOn": "Wysłano",
   "score.tracking": "Śledzi",
   "scoreCard.loading": "Wczytywanie…",

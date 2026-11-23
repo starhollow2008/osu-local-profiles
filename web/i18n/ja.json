@@ -749,6 +749,8 @@
   "score.playedOn": "プレイ環境",
   "score.pp": "pp",
   "score.ppBreakdown": "pp の内訳",
+  "score.starsWithMods": "{mods} ありのスターレーティング",
+  "score.starsWithoutMods": "MODなしのスターレーティング",
   "score.submittedOn": "送信日時",
   "score.tracking": "記録中",
   "scoreCard.loading": "読み込み中…",

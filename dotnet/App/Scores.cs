@@ -51,7 +51,13 @@ internal sealed class ScoreDetail(Play play)
     /// <summary>Empty for a stable score: its replay records what was hit, not what could have been.</summary>
     public Dictionary<string, object?> MaximumStatistics { get; init; } = [];
     public bool? PerfectCombo { get; init; }
-    public object? DifficultyStars { get; init; }
+    /// <summary>
+    /// The difficulty's star rating without mods, beside <see cref="Stars"/>, the score's own (issue
+    /// #32). Set by the score route when no score of this profile's has it (<see cref="Scores.DifficultyStars"/>).
+    /// </summary>
+    public object? DifficultyStars { get; set; }
+    /// <summary>The score's mods that change a star rating, which the card names beside the score's own.</summary>
+    public List<string> RatingMods { get; init; } = [];
     public object? CreatorId { get; init; }
     /// <summary>Whether the replay file is on disk right now, not just whether one was recorded.</summary>
     public bool ReplayAvailable { get; init; }
@@ -136,10 +142,24 @@ internal static partial class Scores
     private static readonly string[] Rulesets = ["osu", "taiko", "fruits", "mania"];
 
     /// <summary>
-    /// The difficulty's own star rating: osu!'s from the set's cached page, or any score on it
-    /// whose mods leave the rating alone. Never a score's rating its mods changed.
+    /// The difficulty's own star rating, from a score on it whose mods leave the rating alone: the
+    /// calculator that priced the score beside it worked it out. Never a score's rating its mods
+    /// changed. Null when there is none: the score route then asks the calculator, and then osu!'s
+    /// cached set page (<see cref="SetPageStars"/>), which before issue #32 were never asked and left
+    /// the card without one for a beatmap only played with DT, HR and the like.
     /// </summary>
-    private static object? DifficultyStars(Database db, long profileId, object? md5, object? mode, object? beatmapId, object? beatmapsetId)
+    public static object? DifficultyStars(Database db, long profileId, object? md5, object? mode)
+    {
+        var scores = db.Rows($"""
+            SELECT s.stars, s.mods_json FROM scores s
+             WHERE s.profile_id = ? AND s.beatmap_md5 = ? AND s.mode = ? AND s.stars IS NOT NULL
+               AND {Eligibility.VisibleSql()}
+            """, profileId, md5, mode);
+        return scores.FirstOrDefault(s => Favorites.RatingNeutral(s.Str("mods_json")))?["stars"];
+    }
+
+    /// <summary>osu!'s star rating for the difficulty, from its set's cached page: the last resort, since it may be another osu! version's.</summary>
+    public static object? SetPageStars(Database db, object? mode, object? beatmapId, object? beatmapsetId)
     {
         if (beatmapsetId is not null && beatmapId is long or double && Favorites.DetailsFor(db, beatmapsetId) is { } details
             && Js.Get(details, "difficulties") is { ValueKind: JsonValueKind.Array } difficulties)
@@ -156,13 +176,7 @@ internal static partial class Scores
                 return Js.Get(known, "stars");
             }
         }
-
-        var scores = db.Rows($"""
-            SELECT s.stars, s.mods_json FROM scores s
-             WHERE s.profile_id = ? AND s.beatmap_md5 = ? AND s.mode = ? AND s.stars IS NOT NULL
-               AND {Eligibility.VisibleSql()}
-            """, profileId, md5, mode);
-        return scores.FirstOrDefault(s => Favorites.RatingNeutral(s.Str("mods_json")))?["stars"];
+        return null;
     }
 
     public static ScoreDetail? Detail(Database db, long profileId, long id, Eligibility e)
@@ -191,7 +205,11 @@ internal static partial class Scores
             MaximumStatistics = ParseStatistics(row.Str("max_statistics_json")) ?? [],
             // The medals' definition of a full combo, so the card and the FC medals never disagree.
             PerfectCombo = mapMax is null or <= 0 ? null : maxCombo >= mapMax,
-            DifficultyStars = DifficultyStars(db, profileId, play.BeatmapMd5, row["mode"], play.BeatmapId, play.BeatmapsetId),
+            DifficultyStars = DifficultyStars(db, profileId, play.BeatmapMd5, row["mode"]),
+            // A rating priced without Relax or Autopilot (Stats.PpBasis) names neither.
+            RatingMods = Favorites.RatingMods(play.PpBasis == "without-unranked-mods"
+                ? play.Mods.Where(m => Mods.Strippable([m]).Length == 0)
+                : play.Mods),
             CreatorId = creatorId is { ValueKind: not JsonValueKind.Null } ? creatorId : null,
             // A built replay (McOsu, a link, typed in) has no cursor data: `HasReplay` says so.
             ReplayAvailable = play.HasReplay && replayPath is not null && File.Exists(replayPath),

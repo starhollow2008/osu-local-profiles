@@ -123,6 +123,36 @@ test('the card escapes what came from files, and offers a download only when the
   assert.ok(scoreCard({ ...detail, client: 'stable', grade: 'F' }, owner).includes('score-dial'));
 });
 
+test("a modded score's card shows the difficulty's star rating and its own, naming the mods (issue #32)", () => {
+  /** The ratings the card's header shows, in order, and the mods named beside them. */
+  const ratings = (score: Record<string, unknown>) => {
+    const card = scoreCard({ ...detail, ...score }, owner);
+    const header = card.slice(card.indexOf('score-beatmap__detail'), card.indexOf('beatmap-list-item__col--main'));
+    return {
+      shown: [...header.matchAll(/difficulty-badge__rating">([^<]*)</g)].map((m) => m[1]),
+      mods: header.match(/score-beatmap__stars-mods">([^<]*)</)?.[1] ?? null,
+      arrow: header.includes('score-beatmap__stars-arrow'),
+    };
+  };
+
+  // No mods, or only mods that leave the rating alone: one rating.
+  assert.deepEqual(ratings({ stars: 3.1, difficultyStars: 3.1 }), { shown: ['3.10'], mods: null, arrow: false });
+  assert.deepEqual(ratings({ mods: [{ acronym: 'HD' }], ratingMods: [], stars: 3.1, difficultyStars: 3.1 }), { shown: ['3.10'], mods: null, arrow: false });
+  // Neither known: none, rather than a guess.
+  assert.deepEqual(ratings({ stars: null, difficultyStars: null }), { shown: [], mods: null, arrow: false });
+
+  // DT, HR: without mods, an arrow, then the score's own with the mods that changed it.
+  assert.deepEqual(ratings({ mods: [{ acronym: 'HD' }, { acronym: 'DT' }], ratingMods: ['DT'], stars: 4.52, difficultyStars: 3.1 }),
+    { shown: ['3.10', '4.52'], mods: '+DT', arrow: true });
+  assert.deepEqual(ratings({ ratingMods: ['HR', 'DT'], stars: 4.9, difficultyStars: 3.1 }), { shown: ['3.10', '4.90'], mods: '+HRDT', arrow: true });
+  // The difficulty's not known: the score's own, still marked as modded.
+  assert.deepEqual(ratings({ ratingMods: ['DT'], stars: 4.52, difficultyStars: null }), { shown: ['4.52'], mods: '+DT', arrow: false });
+  // A mod that changed nothing a reader could see: one rating.
+  assert.deepEqual(ratings({ ratingMods: ['DA'], stars: 3.1, difficultyStars: 3.1 }), { shown: ['3.10'], mods: null, arrow: false });
+  // With no mods at all, the score's own rating is the difficulty's.
+  assert.deepEqual(ratings({ ratingMods: [], stars: 3.1, difficultyStars: null }), { shown: ['3.10'], mods: null, arrow: false });
+});
+
 test('a score row shows its star rating only when asked', () => {
   const play = { id: 1, title: 'Heart no Shuchou', artist: 'CHiCO', version: "Kowari's Confession", stars: 6.18, mods: [] };
   const plain = playRow(play);

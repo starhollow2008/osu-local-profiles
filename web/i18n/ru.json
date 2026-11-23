@@ -749,6 +749,8 @@
   "score.playedOn": "Сыграно на",
   "score.pp": "pp",
   "score.ppBreakdown": "разбор pp",
+  "score.starsWithMods": "Звёздный рейтинг с {mods}",
+  "score.starsWithoutMods": "Звёздный рейтинг без модов",
   "score.submittedOn": "Отправлено",
   "score.tracking": "Отслеживает",
   "scoreCard.loading": "Загрузка…",

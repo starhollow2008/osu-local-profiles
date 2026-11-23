@@ -763,6 +763,8 @@
   "score.playedOn": "Played on",
   "score.pp": "pp",
   "score.ppBreakdown": "pp breakdown",
+  "score.starsWithMods": "Star rating with {mods}",
+  "score.starsWithoutMods": "Star rating without mods",
   "score.submittedOn": "Submitted on",
   "score.tracking": "Tracking",
   "scoreCard.loading": "Loading…",

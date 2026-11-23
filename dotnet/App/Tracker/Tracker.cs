@@ -504,8 +504,9 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
         Enqueue(async () => calculator is null ? null : await calculator.Difficulty(osuPath, mode, mods));
 
     /// <summary>
-    /// A beatmap's star rating without mods, in its own ruleset, for a list of beatmaps to pick from.
-    /// Kept for as long as the same calculator is in use, since a list asks for the same ones again.
+    /// A beatmap's star rating without mods in a ruleset: its own for a list of beatmaps to pick
+    /// from, the score's for a converted play's card. Kept for as long as the same calculator is in
+    /// use, since a list asks for the same ones again.
     /// </summary>
     public Task<double?> BeatmapStars(string osuPath, string md5, int mode) => Enqueue(async () =>
     {
@@ -515,9 +516,10 @@ internal sealed class PlayTracker(Database db, BeatmapResolver resolver, IReadOn
             starsCache.Clear();
             starsFrom = calculator;
         }
-        if (starsCache.TryGetValue(md5, out var known)) return known;
+        var key = $"{md5}:{mode}";
+        if (starsCache.TryGetValue(key, out var known)) return known;
         var stars = (await calculator.Difficulty(osuPath, mode, []))?.Stars;
-        starsCache[md5] = stars;
+        starsCache[key] = stars;
         return stars;
     });
 

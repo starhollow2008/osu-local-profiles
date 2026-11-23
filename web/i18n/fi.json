@@ -749,6 +749,8 @@
   "score.playedOn": "Pelattu alustalla",
   "score.pp": "pp",
   "score.ppBreakdown": "pp:n erittely",
+  "score.starsWithMods": "Tähtiluokitus modeilla {mods}",
+  "score.starsWithoutMods": "Tähtiluokitus ilman modeja",
   "score.submittedOn": "Lähetetty",
   "score.tracking": "Seuraa",
   "scoreCard.loading": "Ladataan…",

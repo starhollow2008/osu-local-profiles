@@ -749,6 +749,8 @@
   "score.playedOn": "Gespeeld op",
   "score.pp": "pp",
   "score.ppBreakdown": "pp-uitsplitsing",
+  "score.starsWithMods": "Sterrenwaardering met {mods}",
+  "score.starsWithoutMods": "Sterrenwaardering zonder mods",
   "score.submittedOn": "Verstuurd op",
   "score.tracking": "Houdt bij",
   "scoreCard.loading": "Laden…",

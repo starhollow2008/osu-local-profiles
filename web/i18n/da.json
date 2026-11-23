@@ -749,6 +749,8 @@
   "score.playedOn": "Spillet på",
   "score.pp": "pp",
   "score.ppBreakdown": "pp-fordeling",
+  "score.starsWithMods": "Stjernebedømmelse med {mods}",
+  "score.starsWithoutMods": "Stjernebedømmelse uden mods",
   "score.submittedOn": "Sendt den",
   "score.tracking": "Følger",
   "scoreCard.loading": "Indlæser…",

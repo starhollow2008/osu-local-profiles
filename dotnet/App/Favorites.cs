@@ -142,6 +142,10 @@ internal static class Favorites
     public static bool RatingNeutral(string? modsJson) =>
         Mods.Parse(modsJson) is { } mods && mods.All(m => Mods.Acronym(m) is { } a && RatingNeutralMods.Contains(a));
 
+    /// <summary>The mods that change a star rating, each once, in the order played: what a score card names beside its own rating.</summary>
+    public static List<string> RatingMods(IEnumerable<JsonElement> mods) =>
+        [.. mods.Select(Mods.Acronym).Where(a => a is not null && !RatingNeutralMods.Contains(a)).Select(a => a!).Distinct()];
+
     /// <summary>
     /// A card from local knowledge alone, for a set osu.ppy.sh could not be asked about: every
     /// difficulty the cache holds, star ratings only from this profile's rating-neutral scores,

@@ -749,6 +749,8 @@
   "score.playedOn": "Gespielt auf",
   "score.pp": "pp",
   "score.ppBreakdown": "pp-Aufschlüsselung",
+  "score.starsWithMods": "Sternebewertung mit {mods}",
+  "score.starsWithoutMods": "Sternebewertung ohne Mods",
   "score.submittedOn": "Übermittelt am",
   "score.tracking": "Verfolgt",
   "scoreCard.loading": "Wird geladen …",

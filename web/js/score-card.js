@@ -254,6 +254,32 @@ function tower(grade) {
     .join('')}</div>`;
 }
 
+const ARROW = `<svg class="score-beatmap__stars-arrow" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M2.5 8h10m-4-4 4 4-4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+/**
+ * The difficulty's star rating, and the score's own beside it when its mods changed it (issue #32):
+ * without mods first, then an arrow to the rating with them, naming the mods that changed it.
+ */
+function starRatings(score) {
+  const base = score.difficultyStars;
+  const own = score.stars;
+  const mods = score.ratingMods ?? [];
+  const col = (inner) => `<div class="beatmap-list-item__col">${inner}</div>`;
+  const changed = own != null && mods.length > 0 && (base == null || Math.round(own * 100) !== Math.round(base * 100));
+  if (!changed) {
+    // No mod changed it, so the score's own is the difficulty's when nothing else says it.
+    const rating = base ?? (mods.length === 0 ? own : null);
+    return rating == null ? '' : col(difficultyBadge(rating));
+  }
+  const names = `+${mods.join('')}`;
+  const without = base == null
+    ? ''
+    : `<span class="score-beatmap__stars-base" title="${escapeHtml(t('score.starsWithoutMods'))}">${difficultyBadge(base)}</span>${ARROW}`;
+  return col(`<span class="score-beatmap__stars">${without}<span class="score-beatmap__stars-modded" title="${escapeHtml(
+    t('score.starsWithMods', { mods: mods.join(', ') }),
+  )}">${difficultyBadge(own)}<span class="score-beatmap__stars-mods">${escapeHtml(names)}</span></span></span>`);
+}
+
 function beatmapInfo(score) {
   const ruleset = RULESET[score.mode] ?? 'osu';
   const href = score.beatmapId ? `https://osu.ppy.sh/beatmaps/${score.beatmapId}?mode=${ruleset}` : null;
@@ -275,7 +301,7 @@ function beatmapInfo(score) {
   <div class="score-beatmap__detail">
     <div class="beatmap-list-item beatmap-list-item--inline">
       <div class="beatmap-list-item__col beatmap-list-item__col--icon" title="${escapeHtml(MODE_NAME[ruleset])}">${MODE_ICON[ruleset]}</div>
-      ${score.difficultyStars == null ? '' : `<div class="beatmap-list-item__col">${difficultyBadge(score.difficultyStars)}</div>`}
+      ${starRatings(score)}
       <div class="beatmap-list-item__col beatmap-list-item__col--main">
         <div class="beatmap-list-item__version u-ellipsis">${link(escapeHtml(score.version ?? ''), 'beatmap-list-item__version-link')}${
           mapper ? ` <span class="beatmap-list-item__mapper">mapped by ${mapper}</span>` : ''

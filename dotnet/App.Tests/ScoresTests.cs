@@ -92,16 +92,25 @@ public class ScoresTests
     public void The_difficulty_badge_is_the_maps_rating_never_a_modded_scores()
     {
         using var h = new Harness();
-        var dt = h.Add(mods: """[{"acronym":"DT"}]""", stars: 4.6);
+        var dt = h.Add(mods: """[{"acronym":"HD"},{"acronym":"DT"}]""", stars: 4.6);
+        // Left for the score route, which asks the calculator and then osu!'s set page (issue #32).
         Assert.Null(h.Detail(dt)!.DifficultyStars);
-        h.Add(mods: """[{"acronym":"HD"}]""", stars: 3.42);
-        Assert.Equal(3.42, h.Detail(dt)!.DifficultyStars);
+        Assert.Equal(["DT"], h.Detail(dt)!.RatingMods);
+        Assert.Equal(4.6, h.Detail(dt)!.Stars);
 
         h.H.Db.Run("INSERT INTO beatmapset_details (beatmapset_id, data, fetched_at) VALUES (1830679, ?, 0)",
             """{"id":1830679,"userId":99,"difficulties":[{"id":3770193,"mode":"osu","stars":3.5,"version":"Seolv's Hard"}]}""");
+        Assert.Equal("3.5", Json(Scores.SetPageStars(h.H.Db, 0L, 3770193L, 1830679L)));
+        // A converted play is rated in its own ruleset, which the set's page does not list.
+        Assert.Null(Scores.SetPageStars(h.H.Db, 1L, 3770193L, 1830679L));
+
+        // A score whose mods leave the rating alone was priced by the same calculator as the score
+        // beside it, so it comes before osu!'s page, which may be another osu! version's.
+        var hd = h.Add(mods: """[{"acronym":"HD"}]""", stars: 3.42);
         var d = h.Detail(dt)!;
-        Assert.Equal("3.5", Json(d.DifficultyStars));
+        Assert.Equal(3.42, d.DifficultyStars);
         Assert.Equal("99", Json(d.CreatorId));
+        Assert.Empty(h.Detail(hd)!.RatingMods);
     }
 
     [Fact]

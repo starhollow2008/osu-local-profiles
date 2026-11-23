@@ -749,6 +749,8 @@
   "score.playedOn": "Jogada no",
   "score.pp": "pp",
   "score.ppBreakdown": "detalhamento do pp",
+  "score.starsWithMods": "Dificuldade em estrelas com {mods}",
+  "score.starsWithoutMods": "Dificuldade em estrelas sem mods",
   "score.submittedOn": "Enviada em",
   "score.tracking": "Acompanhando",
   "scoreCard.loading": "Carregando…",

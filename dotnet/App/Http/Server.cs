@@ -377,6 +377,13 @@ internal static partial class Server
                     await Json(context, new { error = $"there is no score {Js.NumberToString(number)}" }, 404);
                     return;
                 }
+                // No score of the owner's rates the difficulty without mods: the calculator does, from
+                // the beatmap, in the score's ruleset, and osu!'s set page only when it can't (issue #32).
+                if (detail.DifficultyStars is null)
+                {
+                    detail.DifficultyStars = await NoModStars(detail)
+                        ?? Scores.SetPageStars(db, detail.Mode, detail.BeatmapId, detail.BeatmapsetId);
+                }
                 await Json(context, new
                 {
                     score = detail,
@@ -498,6 +505,17 @@ internal static partial class Server
             if (opts.Tracker is { } t) return t;
             await Json(context, new { error = "this copy tracks nothing" }, 503);
             return null;
+        }
+
+        // A score's difficulty without mods, from the calculator in use: null with no calculator,
+        // no tracker (a read-only copy) or no beatmap file.
+        async Task<double?> NoModStars(ScoreDetail detail)
+        {
+            if (opts.Tracker is not { } tracker || detail.BeatmapMd5 is not string md5) return null;
+            var ruleset = detail.Mode is long or double ? Convert.ToDouble(detail.Mode) : -1;
+            if (ruleset is not (0 or 1 or 2 or 3)) return null;
+            var path = tracker.Beatmaps.Resolve(md5).OsuPath;
+            return path is not null && File.Exists(path) ? await tracker.BeatmapStars(path, md5, (int)ruleset) : null;
         }
 
         if (pathname == "/api/recompute" && method == "POST")
