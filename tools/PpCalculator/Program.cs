@@ -275,7 +275,7 @@ public static class Program
 
     /// <summary>
     /// A beatmap as osu!'s song select describes it for the ruleset and mods: its star rating, length,
-    /// BPM, and the ruleset's own difficulty settings (<c>GetBeatmapAttributesForDisplay</c>: mania's
+    /// BPM, circles and sliders, and the ruleset's own difficulty settings (<c>GetBeatmapAttributesForDisplay</c>: mania's
     /// key count, and AR and OD as a rate mod makes them feel), each before and after the mods.
     /// </summary>
     private static object Difficulty(Request request)
@@ -294,6 +294,10 @@ public static class Program
         info.TotalObjectCount = source.HitObjects.Count;
         info.EndTimeObjectCount = source.HitObjects.Count(h => h is osu.Game.Rulesets.Objects.Types.IHasDuration);
 
+        // Circles and sliders as the .osu file has them, which is what osu-web counts: mania's hold
+        // notes with the sliders, and the beatmap's own whatever ruleset it is played in.
+        var types = source.HitObjects.OfType<osu.Game.Rulesets.Objects.Legacy.IHasLegacyHitObjectType>().Select(h => h.LegacyType).ToList();
+
         return new
         {
             ok = true,
@@ -302,6 +306,8 @@ public static class Program
             // As osu-web's beatmapset page has it: from the start of the song to the end of its last object.
             lengthMs = BeatmapExtensions.CalculatePlayableBounds(playable.HitObjects).end / rate,
             bpm = 60000 / playable.GetMostCommonBeatLength() * rate,
+            circles = types.Count(t => t.HasFlag(LegacyHitObjectType.Circle)),
+            sliders = types.Count(t => (t & (LegacyHitObjectType.Slider | LegacyHitObjectType.Hold)) != 0),
             settings = ruleset.GetBeatmapAttributesForDisplay(info, mods)
                 .Select(a => new { acronym = a.Acronym, original = a.OriginalValue, adjusted = a.AdjustedValue, max = a.MaxValue })
                 .ToList(),

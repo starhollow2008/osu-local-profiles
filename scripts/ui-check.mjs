@@ -2029,7 +2029,7 @@ const ppCalc = JSON.parse(
     const fcCells = () => [...$('ppCalcFc').querySelectorAll('tbody td:not(:first-child)')];
     await until(() => !$('ppCalcStats').hidden && !$('ppCalcFc').hidden && fcCells().every((c) => !c.classList.contains('pp-calc__fc-waiting')));
     out.stats = !$('ppCalcStats').hidden && $('ppCalcStats').querySelectorAll('.beatmap-stats-table tr').length >= 3
-      && $('ppCalcStats').querySelectorAll('.beatmap-basic-stats__entry').length === 2
+      && $('ppCalcStats').querySelectorAll('.beatmap-basic-stats__entry').length === 4
       && Boolean($('ppCalcStats').querySelector('.bar--beatmap-stats-stars'));
     const fc = fcCells().map((c) => Number(c.textContent.replace(/[^0-9.]/g, '')));
     out.fc = fc.length === 4 && fc.every((n, i) => n > 0 && (i === 0 || n <= fc[i - 1])) && Math.abs(fc[0] - pp()) <= 1;
@@ -2111,7 +2111,8 @@ const ppCalc = JSON.parse(
         out.seedHolds = Boolean(seed) && /^[0-9]+$/.test(seed.value) && pp() === first;
         seed.value = String((Number(seed.value) + 1) % 2147483647);
         seed.dispatchEvent(new Event('input', { bubbles: true }));
-        await until(() => pp() !== first);
+        // Longer than until gives: on a long beatmap, one of the FC table prices may be ahead of it in the queue.
+        for (let i = 0; i < 200 && pp() === first; i++) await wait(100);
         out.seedChanges = pp() !== first;
         random.click();
         await wait(1000);
@@ -2175,7 +2176,7 @@ check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defau
 check('Escape closes it', ppCalc.escape ?? SKIP, true);
 check('selecting text and letting go outside it leaves it open', ppCalc.dragStaysOpen, true);
 check('each beatmap found shows its star rating', ppCalc.none ? SKIP : Boolean(ppCalc.rowStars), true);
-check("the beatmap's length, BPM and settings are shown as osu-web shows them", ppCalc.none ? SKIP : ppCalc.stats, true);
+check("the beatmap's length, BPM, circles, sliders and settings are shown as osu-web shows them", ppCalc.none ? SKIP : ppCalc.stats, true);
 check('a full combo is priced at 100, 99, 98 and 95%', ppCalc.none ? SKIP : ppCalc.fc, true);
 check('opened again, the beatmap chosen last is still there', ppCalc.none ? SKIP : ppCalc.keepsBeatmap, true);
 check('a click on the backdrop closes it', ppCalc.none ? SKIP : ppCalc.backdropCloses, true);

@@ -794,7 +794,7 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   only some): filled in after the rows are drawn, a few at a time, and kept by the tracker for as long
   as the same calculator is in use (`Tracker.BeatmapStars`).
 - **The beatmap, and a full combo.** Beside the result, the beatmap as osu-web's beatmapset page shows
-  one (length, BPM, a bar for each setting and the star rating), with these mods: the helper's
+  one (length, BPM, circles, sliders, a bar for each setting and the star rating), with these mods: the helper's
   `difficulty` request, which is osu!'s song select (`GetBeatmapAttributesForDisplay`: AR and OD as a
   rate mod makes them feel, mania's key count), with the length and BPM at the mods' rate
   (`/api/pp-calculator/describe`). Over it, as the osu! pp extension has it, a full combo priced at 100,

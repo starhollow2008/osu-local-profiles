@@ -225,15 +225,17 @@ internal sealed class OfficialCalculator : IDisposable
                 .ToList()
             : [];
         return new DifficultyInfo(stars, NumberOrNull(response, "maxCombo") ?? 0, NumberOrNull(response, "lengthMs") ?? 0,
-            NumberOrNull(response, "bpm") ?? 0, settings);
+            NumberOrNull(response, "bpm") ?? 0, settings, NumberOrNull(response, "circles") ?? 0, NumberOrNull(response, "sliders") ?? 0);
     }
 }
 
 /// <summary>
 /// A beatmap as osu!'s song select describes it for a ruleset and mods: its star rating, maximum
-/// combo, length and BPM (both at the mods' rate), and the ruleset's own settings.
+/// combo, length and BPM (both at the mods' rate), its circles and sliders as the .osu file has them,
+/// and the ruleset's own settings.
 /// </summary>
-internal sealed record DifficultyInfo(double Stars, double MaxCombo, double LengthMs, double Bpm, List<DisplaySetting> Settings);
+internal sealed record DifficultyInfo(double Stars, double MaxCombo, double LengthMs, double Bpm, List<DisplaySetting> Settings,
+    double Circles, double Sliders);
 
 /// <summary>One of a ruleset's settings as song select shows it (<c>CS</c>, <c>AR</c>, <c>OD</c>, <c>HP</c>, mania's <c>KC</c>...).</summary>
 internal sealed record DisplaySetting(string Acronym, double Original, double Adjusted, double Max);

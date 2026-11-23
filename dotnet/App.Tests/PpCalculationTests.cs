@@ -95,6 +95,8 @@ public sealed class PpCalculationTests : IDisposable
         // The test beatmap: a beat every 250ms, CS 4, AR 9, OD 8, HP 5.
         Assert.Equal(240, nomod.Bpm, 6);
         Assert.True(nomod.LengthMs > 0);
+        // Its circles and sliders as the .osu file has them: 20 circles, then a slider.
+        Assert.Equal((20d, 1d), (nomod.Circles, nomod.Sliders));
         Assert.Equal(["CS", "AR", "OD", "HP"], nomod.Settings.Select(s => s.Acronym));
         Assert.Equal((4d, 4d), (Setting(nomod, "CS").Original, Setting(nomod, "CS").Adjusted));
         Assert.Equal((9d, 9d), (Setting(nomod, "AR").Original, Setting(nomod, "AR").Adjusted));
@@ -112,6 +114,8 @@ public sealed class PpCalculationTests : IDisposable
         // Mania counts keys, which song select shows in place of circle size.
         var mania = (await PpCalculation.Describe(deps, JsonText.From(new { md5, mode = 3 })))!;
         Assert.Contains(mania.Settings, s => s.Acronym == "KC");
+        // The beatmap's own, whatever ruleset it is played in, as osu-web counts them.
+        Assert.Equal((20d, 1d), (mania.Circles, mania.Sliders));
         Assert.DoesNotContain(mania.Settings, s => s.Acronym == "CS");
 
         Assert.Equal("choose a ruleset",

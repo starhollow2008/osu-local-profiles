@@ -123,8 +123,8 @@ const GRADES = {
  */
 const LEGACY = ['XH', 'X', 'SH', 'S', 'A', 'B', 'C', 'D'];
 
-/* The beatmapset page's basic stats the pp calculator shows: not its circle and slider counts. */
-const BASIC_STATS = ['total_length', 'bpm'];
+/* The beatmapset page's basic stats, all four of which the pp calculator shows. */
+const BASIC_STATS = ['total_length', 'bpm', 'count_circles', 'count_sliders'];
 
 /* ------------------------------------------------------------------ writing */
 
@@ -138,7 +138,7 @@ for (const rank of LEGACY) {
   files.push([`resources/images/scores/legacy-ranking-${rank}@2x.png`, `scores/legacy-ranking-${rank}@2x.png`]);
 }
 files.push(['public/images/layout/avatar-guest@2x.png', 'layout/avatar-guest@2x.png']);
-// The beatmapset page's length and BPM icons (`beatmap-basic-stats.tsx`), for the pp calculator.
+// The beatmapset page's basic stats icons (`beatmap-basic-stats.tsx`), for the pp calculator.
 for (const stat of BASIC_STATS) {
   files.push([`public/images/layout/beatmapset-page/${stat}.svg`, `layout/beatmapset-page/${stat}.svg`]);
 }
@@ -223,7 +223,7 @@ by ppy.
 | \`mods/\` | \`${MODS}/\` | the glyph in each mod badge, and the badge blanks |
 | \`grades/\` | \`public/images/badges/score-ranks-v2019/\` | the small grade badges |
 | \`scores/\` | \`resources/images/scores/\` | a stable score's big grade letter |
-| \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture, and the pp calculator's length and BPM icons |
+| \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture, and the pp calculator's beatmap stats icons |
 | \`covers/\` | \`${DEFAULT_COVER}\` at commit \`${COVERS_COMMIT}\` | the banner of a profile with none of its own |
 | \`modes/\` | \`${EXTRA_FONT}\`, glyphs ${Object.values(MODE_GLYPHS).join(', ')} | the mode switcher's ruleset icons |
 

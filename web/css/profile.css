@@ -3989,7 +3989,7 @@
 /* The inputs on the left and what they come to on the right; one above the other when narrow. */
 .pp-calc__body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 230px;
+  grid-template-columns: minmax(0, 1fr) 270px;
   gap: 20px;
   align-items: start;
 }

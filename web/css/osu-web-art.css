@@ -107,6 +107,8 @@
 /* osu-web's beatmap-basic-stats icons, as its beatmap-basic-stats.tsx sets them. */
 .beatmap-basic-stats__entry-icon--total_length { background-image: url("../osu-web/layout/beatmapset-page/total_length.svg"); }
 .beatmap-basic-stats__entry-icon--bpm { background-image: url("../osu-web/layout/beatmapset-page/bpm.svg"); }
+.beatmap-basic-stats__entry-icon--count_circles { background-image: url("../osu-web/layout/beatmapset-page/count_circles.svg"); }
+.beatmap-basic-stats__entry-icon--count_sliders { background-image: url("../osu-web/layout/beatmapset-page/count_sliders.svg"); }
 
 /* osu-web's default profile banner, for a profile with none of its own. */
 .cover-default { background-image: url("../osu-web/covers/c3.jpg"); }

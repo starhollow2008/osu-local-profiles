@@ -891,7 +891,7 @@ function statRow(label, value, original, stars = false) {
   </tr>`;
 }
 
-/** The beatmap with these mods, as osu-web's beatmapset page shows one: length and BPM, then each setting. */
+/** The beatmap with these mods, as osu-web's beatmapset page shows one: its basic stats, then each setting. */
 function renderStats(info) {
   const box = $('ppCalcStats');
   if (!info) {
@@ -902,18 +902,20 @@ function renderStats(info) {
   const rows = STATS.filter(([acronym]) => byAcronym.has(acronym))
     .map(([acronym, label]) => statRow(label(), byAcronym.get(acronym).adjusted, byAcronym.get(acronym).original))
     .join('');
-  const bpm = info.bpm > 1000 ? '∞' : statValue(info.bpm);
+  // osu-web's beatmap-basic-stats.tsx, in its order: length, BPM, circles and sliders.
+  const basic = [
+    ['total_length', t('ppCalc.statLength'), duration(info.lengthMs)],
+    ['bpm', 'BPM', info.bpm > 1000 ? '∞' : statValue(info.bpm)],
+    ['count_circles', t('ppCalc.statCircles'), fmt(info.circles)],
+    ['count_sliders', t('ppCalc.statSliders'), fmt(info.sliders)],
+  ]
+    .map(([key, title, value]) => `<div class="beatmap-basic-stats__entry" title="${escapeHtml(title)}">
+          <div class="beatmap-basic-stats__entry-icon beatmap-basic-stats__entry-icon--${key}"></div>
+          <span>${escapeHtml(value)}</span>
+        </div>`)
+    .join('');
   box.innerHTML = `<div class="pp-calc__stats-row">
-      <div class="beatmap-basic-stats">
-        <div class="beatmap-basic-stats__entry" title="${escapeHtml(t('ppCalc.statLength'))}">
-          <div class="beatmap-basic-stats__entry-icon beatmap-basic-stats__entry-icon--total_length"></div>
-          <span>${escapeHtml(duration(info.lengthMs))}</span>
-        </div>
-        <div class="beatmap-basic-stats__entry" title="BPM">
-          <div class="beatmap-basic-stats__entry-icon beatmap-basic-stats__entry-icon--bpm"></div>
-          <span>${escapeHtml(bpm)}</span>
-        </div>
-      </div>
+      <div class="beatmap-basic-stats">${basic}</div>
     </div>
     <div class="pp-calc__stats-row">
       <table class="beatmap-stats-table">

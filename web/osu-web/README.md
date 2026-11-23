@@ -15,7 +15,7 @@ by ppy.
 | `mods/` | `public/images/badges/mods/` | the glyph in each mod badge, and the badge blanks |
 | `grades/` | `public/images/badges/score-ranks-v2019/` | the small grade badges |
 | `scores/` | `resources/images/scores/` | a stable score's big grade letter |
-| `layout/` | `public/images/layout/` | the avatar of a profile with no picture, and the pp calculator's length and BPM icons |
+| `layout/` | `public/images/layout/` | the avatar of a profile with no picture, and the pp calculator's beatmap stats icons |
 | `covers/` | `public/images/headers/profile-covers/c3.jpg` at commit `770e5d41a20f6b3fd62be5b599a2f1c8cce6c87c` | the banner of a profile with none of its own |
 | `modes/` | `resources/fonts/extra/extra.svg`, glyphs mode-osu, mode-taiko, mode-ctb, mode-mania | the mode switcher's ruleset icons |
 
