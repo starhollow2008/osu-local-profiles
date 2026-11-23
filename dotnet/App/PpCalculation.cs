@@ -162,9 +162,11 @@ internal static partial class PpCalculation
         Dictionary<string, double>? ends = null;
         if (!classic && mode == 0)
         {
+            // The release always counts them: only a helper built from source by an earlier version of
+            // this app can't (SourceHelper.ProgramStamp), and a rebuild in Other settings is what fixes it.
             ends = perfectPlay?.Lazer is { } lazer && lazer.ContainsKey(SliderTails) && lazer.ContainsKey(SliderTicks)
                 ? lazer
-                : throw new InvalidOperationException("this calculator can only price osu! with Classic");
+                : throw new InvalidOperationException(NeedsRebuild);
         }
 
         var counts = new Dictionary<string, double>(StringComparer.Ordinal) { ["c300"] = 0, ["c100"] = 0, ["c50"] = 0, ["geki"] = 0, ["katu"] = 0, ["miss"] = 0 };
@@ -259,6 +261,10 @@ internal static partial class PpCalculation
             result.Breakdown, result.Version, await deps.ModsRanked(mode, JsonText.From(mods)), priced, perfect, classic,
             ends?[SliderTails], ends?[SliderTicks], stableScore is > 0 ? stableTotal is not null : null);
     }
+
+    /// <summary>Why osu! without Classic can't be priced: a calculator that can't count a beatmap's slider ends and ticks.</summary>
+    public const string NeedsRebuild =
+        "your osu! source calculator was built by an earlier version of this app; rebuild it in Other settings to price osu! without Classic";
 
     private const string SliderTails = "slider_tail_hit";
     private const string SliderTicks = "large_tick_hit";

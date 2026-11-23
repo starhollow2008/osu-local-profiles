@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
@@ -11,7 +12,11 @@ namespace OsuLocalProfiles.Calc;
 /// <param name="Version">What its pp is labelled: see <see cref="SourceHelper.SourceVersion"/>.</param>
 /// <param name="Source">The osu! source folder it was built from.</param>
 /// <param name="Dir">Where it was published to.</param>
-internal sealed record BuiltHelper(string Version, string Source, string Dir, double BuiltAt);
+/// <param name="Program">
+/// The <see cref="SourceHelper.ProgramStamp"/> of this app's helper code it was built from; null for a
+/// build by an app from before it was recorded.
+/// </param>
+internal sealed record BuiltHelper(string Version, string Source, string Dir, double BuiltAt, string? Program = null);
 
 /// <summary>
 /// The pp helper, built against the player's own osu! source rather than osu!'s released packages
@@ -187,13 +192,46 @@ internal static partial class SourceHelper
             // A folder that is not text names no folder at all.
             if (!Js.IsString(Js.Get(helper, "source"), out var source)) return null;
             var builtAt = Js.Get(helper, "builtAt") is { ValueKind: JsonValueKind.Number } n ? n.GetDouble() : 0;
-            return File.Exists(NodePath.Join(dir, "osu-pp.dll")) ? new BuiltHelper(version, source, dir, builtAt) : null;
+            var program = Js.IsString(Js.Get(helper, "program"), out var stamp) ? stamp : null;
+            return File.Exists(NodePath.Join(dir, "osu-pp.dll")) ? new BuiltHelper(version, source, dir, builtAt, program) : null;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             return null;
         }
     }
+
+    /// <summary>
+    /// This app's helper code (<c>tools/PpCalculator/Program.cs</c>) as a short hash, line endings
+    /// aside. A build records it, because the helper answers what the app asks of it only as that code
+    /// did: an update that adds a request leaves a helper built before it unable to answer, and an
+    /// update never touches <c>data/pp-source/</c>. Null when the file can't be read.
+    /// </summary>
+    public static string? ProgramStamp(string program)
+    {
+        try
+        {
+            var text = File.ReadAllText(program).Replace("\r\n", "\n");
+            return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)))[..12];
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Built from other helper code than this app's (<paramref name="stamp"/>), or by an app from before
+    /// that was recorded. Not when this app's can't be read, since then nothing can be told.
+    /// </summary>
+    public static bool Outdated(BuiltHelper helper, string? stamp) => stamp is not null && helper.Program != stamp;
+
+    /// <summary>
+    /// <paramref name="helper"/> is the build of <paramref name="source"/> as it is now
+    /// (<paramref name="version"/>), from this app's helper code as it is now: nothing to build.
+    /// </summary>
+    public static bool IsCurrent([NotNullWhen(true)] BuiltHelper? helper, string source, string version, string? stamp) =>
+        helper is not null && SameFolder(helper.Source, source) && helper.Version == version && !Outdated(helper, stamp);
 
     /// <summary>How to start it. Framework-dependent: whoever builds osu! from source has .NET installed.</summary>
     public static HelperCandidate Candidate(BuiltHelper helper) => new("dotnet", [NodePath.Join(helper.Dir, "osu-pp.dll")]);
@@ -209,6 +247,7 @@ internal static partial class SourceHelper
     {
         if (CheckOsuSource(source) is { } problem) throw new InvalidOperationException(problem);
         var version = SourceVersion(source);
+        var stamp = ProgramStamp(program);
 
         var root = RootOf(dataDir);
         var project = NodePath.Join(root, "project");
@@ -305,9 +344,9 @@ internal static partial class SourceHelper
 
         Prune(staging);
 
-        // Named by version. A helper of the same name is only rebuilt when it is not the one running
-        // (PpSource.Use), so it can be replaced; one that cannot be is left, and this is kept under its
-        // staging name instead.
+        // Named by version. A helper of the same name is usually not the one running, so it can be
+        // replaced; one that cannot be (the running one, rebuilt because this app's helper code has
+        // changed since: PpSource.Use) is left, and this is kept under its staging name instead.
         var dir = NodePath.Join(root, name);
         try
         {
@@ -318,13 +357,14 @@ internal static partial class SourceHelper
         {
             dir = staging;
         }
-        var helper = new BuiltHelper(version, NodePath.Resolve(source), dir, Js.Now());
+        var helper = new BuiltHelper(version, NodePath.Resolve(source), dir, Js.Now(), stamp);
         File.WriteAllText(NodePath.Join(root, "helper.json"), JsonSerializer.Serialize(new
         {
             version = helper.Version,
             source = helper.Source,
             dir = helper.Dir,
             builtAt = helper.BuiltAt,
+            program = helper.Program,
         }, new JsonSerializerOptions(JsonText.Options) { WriteIndented = true, IndentSize = 2, NewLine = "\n" }) + "\n");
         Sweep(root, [dir]);
         return helper;

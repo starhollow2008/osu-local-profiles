@@ -238,6 +238,28 @@ public sealed class PpCalculationTests : IDisposable
     }
 
     [Fact]
+    public async Task A_source_build_from_an_earlier_app_prices_typed_judgements_and_says_to_rebuild_for_the_rest()
+    {
+        var deps = Deps();
+        var md5 = PpCalculation.Upload(deps, Encoding.UTF8.GetBytes(Beatmap())).Md5;
+
+        // Before the judgements request: no perfect play, so the judgements are typed, and Classic only.
+        var old = deps with { PerfectJudgements = (_, _, _) => Task.FromResult<PerfectPlay?>(null) };
+        var typed = await Calculate(old, new { md5, mode = 0, counts = new { c300 = 20, c100 = 1 } });
+        Assert.Null(typed.Perfect);
+        Assert.True(typed.Pp > 0);
+        Assert.Equal(PpCalculation.NeedsRebuild,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => Calculate(old, new { md5, mode = 0, classic = false, counts = new { c300 = 21 } }))).Message);
+
+        // Before its slider ends and ticks: a perfect play with Classic, and still not without it.
+        var real = await deps.PerfectJudgements(deps.Resolver.Resolve(md5).OsuPath!, 0, []);
+        var noEnds = deps with { PerfectJudgements = (_, _, _) => Task.FromResult<PerfectPlay?>(real! with { Lazer = null }) };
+        Assert.Equal(21, (await Calculate(noEnds, new { md5, mode = 0 })).Perfect!["c300"]);
+        Assert.Equal(PpCalculation.NeedsRebuild,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => Calculate(noEnds, new { md5, mode = 0, classic = false }))).Message);
+    }
+
+    [Fact]
     public async Task Without_Classic_a_taiko_play_has_Hiddens_lazer_bonus()
     {
         var deps = Deps();

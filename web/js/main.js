@@ -3778,9 +3778,11 @@ function renderPpCalculator() {
  * The player's own osu! source, in place of the release (roadmap 5.70). `ppCalculator.source`
  * says what is in use and under way; `ppSourceNow` is what the folder would be labelled if it
  * were built now, asked for when Settings opens (it costs a call to git), so the page can offer
- * a rebuild once the source has changed.
+ * a rebuild once the source has changed. `ppSourceOutdated`, asked for with it: built by an earlier
+ * version of the app, whose helper code can't answer all the pp calculator asks, so a rebuild too.
  */
 let ppSourceNow = null;
+let ppSourceOutdated = false;
 
 async function loadPpSource() {
   if (!ppCalculator.source) return;
@@ -3790,6 +3792,7 @@ async function loadPpSource() {
     const d = await r.json();
     ppCalculator = { ...ppCalculator, source: d };
     ppSourceNow = d.now ?? null;
+    ppSourceOutdated = d.outdated === true;
     renderPpSource();
   } catch {
     /* the panel shows what it already had */
@@ -3815,6 +3818,8 @@ function renderPpSource() {
   } else if (inUse && ppSourceNow && s.version && ppSourceNow !== s.version) {
     // What is in use is said above, by the calculator's own line; this is only what is new.
     text = t('ppSource.changed');
+  } else if (inUse && ppSourceOutdated) {
+    text = t('ppSource.outdated');
   }
   status.hidden = text === '';
   status.textContent = text;
@@ -3832,7 +3837,8 @@ function renderPpSource() {
     button.textContent = same ? t('ppSource.rebuild') : t('ppSourceUse');
   }
   // In use and unchanged: there is nothing to build.
-  button.disabled = busy || path.value.trim() === '' || (same && (!ppSourceNow || ppSourceNow === s.version) && !s.error);
+  button.disabled = busy || path.value.trim() === ''
+    || (same && (!ppSourceNow || ppSourceNow === s.version) && !ppSourceOutdated && !s.error);
   $('ppSourceRelease').hidden = !inUse;
   $('ppSourceRelease').disabled = busy;
 }

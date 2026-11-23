@@ -131,6 +131,15 @@ a replay (not only `outdatedPpSql`'s: a custom-mod play the release couldn't pri
 to reprice). A build or start that fails changes nothing, and at launch a configured source with
 no working helper means no calculator (`startupCalculator`), never the release.
 
+**A source helper is rebuilt when this app's `Program.cs` changes.** It answers only what the
+`Program.cs` it was built from knew, and an update never touches `data/pp-source/`, so a helper
+built before a request was added (the pp calculator's `judgements`, and its slider ends and ticks)
+quietly can't answer it. `helper.json` records `program`, a hash of that file
+(`SourceHelper.ProgramStamp`, line endings aside). One without it, or with another, is outdated:
+Other settings says so and Rebuild builds it again, though the source's version is unchanged
+(`SourceHelper.IsCurrent`). The running helper can't be replaced in place, so the rebuild keeps its
+staging folder's name. Until then it still prices every score; only what it can't answer is missing.
+
 **A new calculator reprices what the old one priced, once, on its first launch.**
 `Tracker.recalculateAfterUpdate` runs after the index and catch-up (an unindexed beatmap prices as
 missing). It picks `outdatedPpSql` across every profile, hidden scores included, and runs once per
@@ -765,7 +774,8 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   converted beatmap for the ruleset and mods, in stable's counters: osu! and mania by object (a hold
   is one), taiko and catch by osu!'s own judgements (notes; fruits, drops and droplets). The page
   keeps the best judgement as whatever the others leave, so the total always matches. A source build
-  older than the request can't answer it, and then every judgement is typed.
+  older than the request can't answer it, and then every judgement is typed: accuracy is disabled,
+  with a hint to rebuild, and osu! without Classic says to rebuild (`PpCalculation.NeedsRebuild`).
 - **Beatmaps**: searched across every client's index (artist, title, mapper, difficulty), a link
   downloaded as for a score link, or a `.osu` file, which is kept in `data/beatmaps/` and indexed.
 

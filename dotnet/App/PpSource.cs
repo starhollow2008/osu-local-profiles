@@ -15,9 +15,10 @@ internal sealed record PpSourceState(string Source, string? Version, PpSourceBui
 /// <summary>
 /// <see cref="PpSourceState"/>, and <c>now</c>: what the source folder would be labelled if it were
 /// built now. It differs from <c>version</c> once the player has changed their source since it was
-/// built, and the page offers a rebuild then.
+/// built, and the page offers a rebuild then. It does too when <c>outdated</c>: the helper was built
+/// by an earlier version of this app, whose helper code can't answer everything this one asks.
 /// </summary>
-internal sealed record PpSourceView(string Source, string? Version, PpSourceBuilding? Building, string? Error, string? Now);
+internal sealed record PpSourceView(string Source, string? Version, PpSourceBuilding? Building, string? Error, string? Now, bool Outdated);
 
 /// <summary>What the switch needs from the tracker, so the tests can stand in for it.</summary>
 internal sealed record PpSourceTracker(
@@ -101,13 +102,19 @@ internal sealed class PpSource
         lock (gate) return new PpSourceState(source, source.Length == 0 ? null : tracker.CalculatorVersion(), building, error);
     }
 
-    /// <summary><see cref="State"/>, and what the source folder would be labelled now, which asks git.</summary>
+    /// <summary>
+    /// <see cref="State"/>, what the source folder would be labelled now, which asks git, and whether
+    /// its helper was built from older helper code than this app's.
+    /// </summary>
     public PpSourceView View()
     {
         var now = State();
         string? current = null;
+        var outdated = false;
         if (now.Source.Length > 0)
         {
+            outdated = SourceHelper.Read(dataDir) is { } helper && SourceHelper.SameFolder(helper.Source, now.Source)
+                && SourceHelper.Outdated(helper, SourceHelper.ProgramStamp(program));
             try
             {
                 current = SourceHelper.SourceVersion(now.Source);
@@ -117,7 +124,7 @@ internal sealed class PpSource
                 current = null;
             }
         }
-        return new PpSourceView(now.Source, now.Version, now.Building, now.Error, current);
+        return new PpSourceView(now.Source, now.Version, now.Building, now.Error, current, outdated);
     }
 
     private void OnChanged() => Changed?.Invoke(State());
@@ -210,18 +217,22 @@ internal sealed class PpSource
             return Fail(e.Message);
         }
 
-        // In use already, exactly as the source is now: nothing to do.
+        // Built from exactly this source as it is now, by this app's helper code as it is now. One built
+        // by an earlier version of the app is built again, or it can't answer what this one asks.
+        var built = SourceHelper.Read(dataDir);
+        var helper = SourceHelper.IsCurrent(built, source, version, SourceHelper.ProgramStamp(program)) ? built : null;
+
+        // In use already, and current: nothing to do.
         var inUse = getSource();
-        if (inUse.Length > 0 && SourceHelper.SameFolder(inUse, source) && tracker.CalculatorVersion() == version)
+        if (helper is not null && inUse.Length > 0 && SourceHelper.SameFolder(inUse, source) && tracker.CalculatorVersion() == version)
         {
             lock (gate) error = null;
             OnChanged();
             return State();
         }
 
-        // Built from exactly this source as it is now: start that rather than build it again.
-        var helper = SourceHelper.Read(dataDir);
-        if (helper is null || !SourceHelper.SameFolder(helper.Source, source) || helper.Version != version)
+        // Current but not in use: start that rather than build it again.
+        if (helper is null)
         {
             lock (gate)
             {

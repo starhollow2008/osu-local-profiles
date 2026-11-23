@@ -282,6 +282,79 @@ public class PpSourceTests
     }
 
     [Fact]
+    public void A_build_from_older_helper_code_than_this_apps_is_built_again()
+    {
+        var dir = Tmp("olp-pp-program-");
+        try
+        {
+            var program = NodePath.Join(dir, "Program.cs");
+            File.WriteAllText(program, "class A {}\r\n// one\r\n");
+            var stamp = SourceHelper.ProgramStamp(program);
+            Assert.Matches("^[0-9a-f]{12}$", stamp);
+            // Line endings aside, since a checkout may have either.
+            File.WriteAllText(program, "class A {}\n// one\n");
+            Assert.Equal(stamp, SourceHelper.ProgramStamp(program));
+            Assert.Null(SourceHelper.ProgramStamp(NodePath.Join(dir, "missing.cs")));
+
+            var built = new BuiltHelper("source abc1234", "C:/osu", "C:/data/pp-source/abc1234", 1, stamp);
+            Assert.True(SourceHelper.IsCurrent(built, "C:/osu/", "source abc1234", stamp));
+            Assert.False(SourceHelper.IsCurrent(null, "C:/osu", "source abc1234", stamp));
+            Assert.False(SourceHelper.IsCurrent(built, "C:/other", "source abc1234", stamp));
+            Assert.False(SourceHelper.IsCurrent(built, "C:/osu", "source def5678", stamp));
+
+            // A request added to the helper since: built again, as is one built before stamps were recorded.
+            File.WriteAllText(program, "class A {}\n// two\n");
+            var now = SourceHelper.ProgramStamp(program);
+            Assert.True(SourceHelper.Outdated(built, now));
+            Assert.False(SourceHelper.IsCurrent(built, "C:/osu", "source abc1234", now));
+            Assert.True(SourceHelper.Outdated(built with { Program = null }, now));
+            // This app's helper code unreadable: nothing can be told, so nothing is built for it.
+            Assert.False(SourceHelper.Outdated(built with { Program = null }, null));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public void Settings_is_told_when_the_helper_in_use_was_built_by_an_earlier_version_of_the_app()
+    {
+        var data = Tmp("olp-pp-data-");
+        var source = FakeSource();
+        try
+        {
+            var program = NodePath.Join(data, "Program.cs");
+            File.WriteAllText(program, "class A {}\n");
+            var dir = NodePath.Join(data, "pp-source", "abc1234");
+            Directory.CreateDirectory(dir);
+            File.WriteAllText(NodePath.Join(dir, "osu-pp.dll"), "");
+            void Record(string? stamp) => File.WriteAllText(NodePath.Join(data, "pp-source", "helper.json"),
+                JsonText.Stringify(new { version = "source abc1234", source, dir, builtAt = 1, program = stamp }));
+
+            PpSource Service(string inUse) => new(
+                new PpSourceTracker((_, _) => Task.FromResult(RecomputeResult.None), () => "source abc1234", () => false),
+                data, program, () => inUse, _ => { });
+
+            // Recorded before stamps were.
+            Record(null);
+            Assert.Null(SourceHelper.Read(data)!.Program);
+            Assert.True(Service(source).View().Outdated);
+            // Nothing to say while the release is in use.
+            Assert.False(Service("").View().Outdated);
+
+            Record(SourceHelper.ProgramStamp(program));
+            Assert.Equal(SourceHelper.ProgramStamp(program), SourceHelper.Read(data)!.Program);
+            Assert.False(Service(source).View().Outdated);
+        }
+        finally
+        {
+            Directory.Delete(data, true);
+            Directory.Delete(source, true);
+        }
+    }
+
+    [Fact]
     public async Task Nothing_switches_while_scores_are_being_recalculated()
     {
         var data = Tmp("olp-pp-data-");

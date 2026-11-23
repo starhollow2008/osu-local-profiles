@@ -760,6 +760,11 @@ async function calculate(fresh) {
     }, t('ppCalc.failed'));
     if (mine !== asked) return;
     perfect = d.perfect ?? null;
+    // An accuracy becomes judgements only from a perfect play's. A calculator that can't count one is
+    // a build from source by an earlier version of the app (SourceHelper.ProgramStamp), and a rebuild fixes it.
+    const counting = perfect !== null;
+    $('ppCalcAccuracy').disabled = $('ppCalcAccuracySlider').disabled = !counting;
+    $('ppCalcAccuracyRebuild').hidden = counting || !d.version?.startsWith('source ');
     ends = d.sliderEnds == null ? null : { sliders: d.sliderEnds, ticks: d.sliderTicks ?? 0 };
     if (fresh) renderCounts(d.counts);
     $('ppCalcCombo').placeholder = fmt(d.maxCombo);
