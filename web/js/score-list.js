@@ -10,7 +10,7 @@
  */
 import { escapeHtml, fmt, fullDate, pct, timeAgo } from './format.js';
 import { gradeBadge, modList, modPill } from './badges.js';
-import { plural, t, tOwn } from './i18n.js';
+import { t } from './i18n.js';
 import { beatmapArtist, beatmapName, beatmapTitle } from './metadata.js';
 import { playMenuButton, playRow } from './sections.js';
 import { closeOnBackdrop, postJson } from './ui.js';
@@ -195,17 +195,6 @@ function clientName(client) {
   return CLIENT_NAMES[client] ?? client;
 }
 
-/** "4 plays", by the language's own plural rules. */
-export function playsText(n) {
-  const count = { n: fmt(n) };
-  return plural(
-    n,
-    () => t('scoreList.playsOne', count),
-    () => tOwn('scoreList.playsFew', count),
-    () => t('scoreList.playsMany', count),
-  );
-}
-
 /** The table's columns: the sort each one is, where it is one. */
 const COLUMNS = [
   { key: 'place', label: '', className: 'score-table__place' },
@@ -264,9 +253,9 @@ function tableRow(play, place) {
 </tr>`;
 }
 
-/** osu!'s rows, each with its beatmap's playcount beside the date. */
+/** osu!'s rows, as Best Performance draws them. How often each beatmap was played is the table's. */
 export function rowsHtml(plays, { starRating = false } = {}) {
-  return plays.map((p) => playRow(p, { actions: true, starRating, playcount: playsText(Number(p.playcount ?? 1)) })).join('');
+  return plays.map((p) => playRow(p, { actions: true, starRating })).join('');
 }
 
 /* ------------------------------------------------------------------ the page */

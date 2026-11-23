@@ -8051,13 +8051,6 @@ s.bbcode-editor__glyph {
   background-color: hsla(var(--hsl-b6), 0.5);
 }
 
-/* osu!'s rows, as Best Performance draws them, with each beatmap's playcount beside the date. */
-.play-detail__playcount {
-  flex: none;
-  margin-left: 10px;
-  color: hsl(var(--hsl-f1));
-}
-
 /* Under the list: show more and show all in the middle, how many at a time at the right. */
 .score-list__paging {
   display: grid;

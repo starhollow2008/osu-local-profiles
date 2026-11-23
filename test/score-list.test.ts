@@ -7,7 +7,6 @@ import {
   activeFilters,
   addSortLevel,
   normaliseView,
-  playsText,
   resetView,
   rowsHtml,
   scoreListUrl,
@@ -138,9 +137,8 @@ test('the table numbers its rows, sorts from its heads, and escapes what came fr
   assert.match(html, />4<\/td>/);
 });
 
-test('the rows are osu!s, with the playcount beside the date', () => {
+test('the rows are osu!s, and how often a beatmap was played is left to the table', () => {
   const html = rowsHtml([play]);
   assert.match(html, /class="play-detail"/);
-  assert.match(html, /play-detail__playcount">4 plays</);
-  assert.equal(playsText(1), '1 play');
+  assert.doesNotMatch(html, /play-detail__playcount|4 plays/);
 });

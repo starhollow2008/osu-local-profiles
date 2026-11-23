@@ -216,7 +216,7 @@ export function playMenuButton(play) {
  * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
  * accuracy, mods and pp stepping right.
  */
-export function playRow(play, { showWeight = false, actions = false, reorderable = false, starRating = false, playcount = null } = {}) {
+export function playRow(play, { showWeight = false, actions = false, reorderable = false, starRating = false } = {}) {
   const artist = playArtist(play);
   const title = maybeLink(
     beatmapHref(play),
@@ -261,7 +261,6 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
       <div class="play-detail__beatmap-and-time">
         <span class="play-detail__beatmap u-ellipsis">${escapeHtml(play.version ?? '')}${stars}</span>
         <span class="play-detail__time" title="${escapeHtml(fullDate(play.playedAt))}">${escapeHtml(timeAgo(play.playedAt))}</span>
-        ${playcount === null ? '' : `<span class="play-detail__playcount">${escapeHtml(playcount)}</span>`}
         ${sourceTag(play)}
       </div>
     </div>
