@@ -1422,7 +1422,8 @@
             <input type="range" class="pp-calc__slider" id="ppCalcAccuracySlider" min="0" max="100" step="0.01" value="100"
                    data-i18n-attr="aria-label:ppCalc.accuracy" aria-label="Accuracy">
           </div>
-          <div class="field">
+          <!-- osu! and catch only: taiko's and mania's pp never read the combo. -->
+          <div class="field" id="ppCalcComboField">
             <label for="ppCalcCombo" data-i18n="ppCalc.combo">Max combo</label>
             <span class="pp-calc__combo"><input type="number" id="ppCalcCombo" min="0" step="1"><span id="ppCalcMaxCombo"></span></span>
             <input type="range" class="pp-calc__slider" id="ppCalcComboSlider" min="0" max="1" step="1" value="1"

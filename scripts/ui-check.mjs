@@ -2064,6 +2064,16 @@ const ppCalc = JSON.parse(
       out.defaultSaved = stored === !original && clOn() === !original;
       box.click();
       for (let i = 0; i < 40 && (await saved()) !== original; i++) await wait(100);
+
+      // Combo only where the ruleset's pp reads it: osu! and catch, not taiko or mania.
+      if (offered === '0,1,2,3') {
+        const shown = [];
+        for (const m of ['1', '2', '3', '0']) {
+          $('ppCalcModes').querySelector('[data-mode="' + m + '"]').click();
+          if (!$('ppCalcComboField').hidden) shown.push(m);
+        }
+        out.comboRulesets = shown.sort().join(',');
+      }
     }
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     out.escape = $('ppCalcModal').hidden;
@@ -2088,6 +2098,7 @@ check('osu! without Classic has slider ends to miss', ppCalc.none || ppCalc.laze
 check("osu!stable's score is asked for only with Classic", ppCalc.none || ppCalc.stableScore === undefined ? SKIP : ppCalc.stableScore, true);
 check('the accuracy slider prices the play as it moves', ppCalc.none || ppCalc.accuracySlider === undefined ? SKIP : ppCalc.accuracySlider, true);
 check('so does the combo slider', ppCalc.none || ppCalc.comboSlider === undefined ? SKIP : ppCalc.comboSlider, true);
+check('combo is asked for in osu! and catch only', ppCalc.none || ppCalc.comboRulesets === undefined ? SKIP : ppCalc.comboRulesets, '0,2');
 check('Classic by default is saved for the profile', ppCalc.none || ppCalc.defaultSaved === undefined ? SKIP : ppCalc.defaultSaved, true);
 check('Escape closes it', ppCalc.escape ?? SKIP, true);
 

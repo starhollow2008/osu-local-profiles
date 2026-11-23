@@ -7,7 +7,8 @@
  * It starts at a perfect play: osu! counts the beatmap's judgements for the ruleset and mods, and
  * the 300s (MAX in mania) are whatever the other judgements leave, so the total always matches the
  * beatmap. A blank combo is a full one. An accuracy typed in becomes judgements (pp-accuracy.js).
- * Accuracy and combo have sliders too, which price the play again as they move.
+ * Accuracy and combo have sliders too, which price the play again as they move. Combo is asked
+ * for only in osu! and catch, since taiko's and mania's pp never read it.
  *
  * Every number comes from dotnet/App/PpCalculation.cs, which prices the play with the calculator
  * the app prices scores with: osu!'s release, or the player's own source (roadmap 5.70). With
@@ -137,6 +138,8 @@ let again = false;
 
 const say = (message, isError) => hint('ppCalcHint', message, isError);
 const mode = () => ruleset;
+/** osu! and catch: taiko's and mania's pp never read the combo, so it is not asked for there. */
+const comboCounts = (m) => m === 0 || m === 2;
 const withoutClassic = () => !classic && mode() <= 1;
 
 export const ppCalculatorOpen = () => !$('ppCalcModal').hidden;
@@ -215,8 +218,8 @@ export function scorePlay(score) {
   if (score.passed !== false && score.statistics) {
     play.counts = countsFromStatistics(ruleset, score.statistics);
     if (ruleset === 0 && !withClassic) Object.assign(play.counts, sliderMisses(score.statistics, score.maximumStatistics));
-    // A mania combo can run past the maximum osu!'s calculator counts, and mania's pp has no use for it.
-    play.combo = ruleset === 3 ? null : (score.maxCombo ?? null);
+    // Taiko's and mania's pp have no use for it, and a mania combo can run past the maximum osu! counts.
+    play.combo = comboCounts(ruleset) ? (score.maxCombo ?? null) : null;
     play.score = score.stableScore ?? null;
   }
   return play;
@@ -507,6 +510,7 @@ function renderModState() {
   }
   // osu!stable's score says where an osu! play broke its combo, and only with Classic.
   $('ppCalcScoreField').hidden = !(mode() === 0 && classic);
+  $('ppCalcComboField').hidden = !comboCounts(mode());
   renderModSettings();
 }
 
@@ -751,7 +755,7 @@ async function calculate(fresh) {
       mods: requestMods(),
       classic,
       counts: fresh ? null : typedCounts(),
-      combo: $('ppCalcCombo').value,
+      combo: comboCounts(mode()) ? $('ppCalcCombo').value : '',
       score: mode() === 0 && classic ? $('ppCalcScore').value : '',
     }, t('ppCalc.failed'));
     if (mine !== asked) return;
@@ -802,7 +806,7 @@ function renderResult(d) {
       ${gradeBadge(d.rank)}
       <span>${fmt(d.stars, 2)}★</span>
       <span>${pct(d.accuracy)}</span>
-      <span>${fmt(d.combo)}/${fmt(d.maxCombo)}x</span>
+      ${comboCounts(mode()) ? `<span>${fmt(d.combo)}/${fmt(d.maxCombo)}x</span>` : ''}
     </div>
     ${parts ? `<dl class="pp-calc__parts">${parts}</dl>` : ''}
     ${d.ranked === false ? `<p class="pp-calc__note">${escapeHtml(t('ppCalc.unranked'))}</p>` : ''}

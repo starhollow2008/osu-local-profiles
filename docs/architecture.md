@@ -757,6 +757,8 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   replay's total, and `ignoreLegacyTotalScore` is dropped, so osu! works out the slider breaks from it
   (`OsuLegacyScoreMissCalculator`) as it does for a stable score. Without it, osu! guesses them from
   the combo. A stable score's detail carries it (`stableScore`), so opening one prices it as stored.
+- **Combo is asked for in osu! and catch only.** Taiko's and mania's calculators never read it, so
+  their combo field and slider are hidden and no combo is sent (`comboCounts`).
 - **Mods that change no pp** (`PpCalculation.NoPp`, measured and re-checked by a test) are shown
   dimmed and can't be chosen.
 - **It starts at a perfect play.** The helper's `judgements` request counts a perfect play on osu!'s
