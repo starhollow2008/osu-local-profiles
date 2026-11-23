@@ -77,15 +77,43 @@ internal static class Profiles
         return trimmed;
     }
 
-    /// <summary>A new profile starts empty and tracks from now, never from earlier plays.</summary>
+    /// <summary>The highest profile id ever given out, deleted ones included.</summary>
+    private const string LastIdKey = "lastProfileId";
+
+    /// <summary>The highest id any profile has had: a live one, or one remembered when it was deleted.</summary>
+    private static long LastGiven(Database db)
+    {
+        var highest = Convert.ToInt64(db.Scalar("SELECT COALESCE(MAX(id), 0) AS id FROM profiles"));
+        var stored = db.Get("SELECT value FROM kv WHERE key = ?", r => r.GetString(0), LastIdKey);
+        return long.TryParse(stored, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var last)
+            ? Math.Max(highest, last)
+            : highest;
+    }
+
+    private static void RememberGiven(Database db, long id)
+    {
+        var value = Js.NumberToString(id);
+        db.Run("INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = ?", LastIdKey, value, value);
+    }
+
+    /// <summary>
+    /// A new profile starts empty and tracks from now, never from earlier plays. Its id is one no
+    /// profile has had: SQLite would give a deleted profile's id out again, and the page tells
+    /// profiles apart by id (issue #34).
+    /// </summary>
     public static Profile Create(Database db, string? name)
     {
         var clean = CleanName(name);
         if (db.Exists("SELECT 1 AS hit FROM profiles WHERE name = ?", clean)) throw new UserError($"a profile called \"{clean}\" already exists");
 
         var now = Js.Now();
-        db.Run("INSERT INTO profiles (name, created_at, tracking_since, default_mode) VALUES (?, ?, ?, 0)", clean, now, now);
-        var id = Convert.ToInt64(db.Scalar("SELECT last_insert_rowid() AS id"));
+        long id = 0;
+        db.Transaction(() =>
+        {
+            id = LastGiven(db) + 1;
+            db.Run("INSERT INTO profiles (id, name, created_at, tracking_since, default_mode) VALUES (?, ?, ?, ?, 0)", id, clean, now, now);
+            RememberGiven(db, id);
+        });
         return Get(db, id)!;
     }
 
@@ -118,6 +146,8 @@ internal static class Profiles
 
         db.Transaction(() =>
         {
+            // Remembered before it goes, so Create never gives this id out again.
+            RememberGiven(db, LastGiven(db));
             if (db.Run("DELETE FROM profiles WHERE id = ?", id) == 0) throw new UserError($"no profile with id {Js.NumberToString(id)}");
         });
 

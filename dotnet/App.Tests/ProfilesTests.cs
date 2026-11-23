@@ -96,6 +96,79 @@ public class ProfilesTests
     }
 
     [Fact]
+    public void A_deleted_profiles_id_is_never_given_to_a_new_one()
+    {
+        using var h = new TempDb();
+        var second = Profiles.Create(h.Db, "Second");
+        Profiles.Delete(h.Db, second.Id);
+        var third = Profiles.Create(h.Db, "Third");
+        Assert.True(third.Id > second.Id, $"{third.Id} reused {second.Id}");
+
+        // An install from before the last id was kept: the delete itself remembers it.
+        var fourth = Profiles.Create(h.Db, "Fourth");
+        h.Db.Run("DELETE FROM kv WHERE key = ?", "lastProfileId");
+        Profiles.Delete(h.Db, fourth.Id);
+        Assert.True(Profiles.Create(h.Db, "Fifth").Id > fourth.Id);
+    }
+
+    [Fact]
+    public void A_profiles_pictures_and_me_images_go_with_it_and_a_new_profile_starts_with_none()
+    {
+        var data = Directory.CreateTempSubdirectory("olp-cs-files-").FullName;
+        try
+        {
+            byte[] png = [0x89, (byte)'P', (byte)'N', (byte)'G', 13, 10, 26, 10, 0, 0, 0, 0];
+            Identity.SaveImage(data, 2, "avatar", png, ".png");
+            Identity.SaveImage(data, 2, "cover", png, ".png");
+            Identity.SaveImage(data, 3, "cover", png, ".png");
+            Assert.NotNull(Identity.SaveAboutImage(data, 2, png));
+
+            Identity.DeleteFiles(data, 2);
+            Assert.Equal((false, false), Identity.ImageState(data, 2));
+            Assert.False(Directory.Exists(Path.Combine(data, "about-images", "2")));
+            // Another profile's are its own.
+            Assert.Equal((false, true), Identity.ImageState(data, 3));
+
+            // The pictures from before there was a second profile are the first profile's alone.
+            File.WriteAllBytes(Path.Combine(data, "avatar.png"), png);
+            Assert.NotNull(Identity.FindImage(data, 1, "avatar"));
+            Assert.Null(Identity.FindImage(data, 4, "avatar"));
+            Identity.DeleteFiles(data, 1);
+            Assert.True(File.Exists(Path.Combine(data, "avatar.png")));
+        }
+        finally
+        {
+            Directory.Delete(data, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void A_pictures_address_names_its_profile_and_changes_when_it_is_replaced()
+    {
+        var data = Directory.CreateTempSubdirectory("olp-cs-url-").FullName;
+        try
+        {
+            byte[] png = [0x89, (byte)'P', (byte)'N', (byte)'G', 13, 10, 26, 10, 0, 0, 0, 0];
+            Assert.Null(Identity.ImageUrl(data, 2, "cover"));
+            var file = Identity.SaveImage(data, 2, "cover", png, ".png");
+            File.SetLastWriteTimeUtc(file, new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            var first = Identity.ImageUrl(data, 2, "cover");
+            Assert.StartsWith("/api/image/cover?profile=2&v=", first);
+
+            Identity.SaveImage(data, 3, "cover", png, ".png");
+            Assert.StartsWith("/api/image/cover?profile=3&", Identity.ImageUrl(data, 3, "cover"));
+
+            file = Identity.SaveImage(data, 2, "cover", png, ".png");
+            File.SetLastWriteTimeUtc(file, new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc));
+            Assert.NotEqual(first, Identity.ImageUrl(data, 2, "cover"));
+        }
+        finally
+        {
+            Directory.Delete(data, recursive: true);
+        }
+    }
+
+    [Fact]
     public void The_last_profile_cannot_be_deleted()
     {
         using var h = new TempDb();

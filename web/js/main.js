@@ -65,6 +65,7 @@ import {
   refreshScoreList,
   scoreListOpen,
   scoreListPopoverOpen,
+  scoreListProfileChanged,
 } from './score-list.js';
 import { setPopupCards } from './beatmaps-popup.js';
 import {
@@ -281,8 +282,10 @@ function renderIdentity() {
   // As osu!'s "<name> · player info | osu!".
   document.title = t('tabTitle', { name: profile.name });
 
-  $('avatar').innerHTML = profile.hasAvatar
-    ? `<img src="${assetUrl('/api/image/avatar')}" alt="${escapeHtml(profile.name)}">`
+  // The address names the profile and the picture's version, so a switch or an upload never shows
+  // the picture the browser already had (issue #34).
+  $('avatar').innerHTML = profile.avatarUrl
+    ? `<img src="${escapeHtml(assetUrl(profile.avatarUrl))}" alt="${escapeHtml(profile.name)}">`
     : guestAvatar(profile.name);
   // The Scores view says whose scores they are, as the profile's header does.
   $('scoreListAvatar').innerHTML = $('avatar').innerHTML;
@@ -311,8 +314,8 @@ function renderIdentity() {
  */
 function renderCover() {
   const el = $('cover');
-  el.classList.toggle('cover-default', !profile?.hasCover);
-  if (profile?.hasCover) el.style.setProperty('--cover', `url('${assetUrl('/api/image/cover')}')`);
+  el.classList.toggle('cover-default', !profile?.coverUrl);
+  if (profile?.coverUrl) el.style.setProperty('--cover', `url('${assetUrl(profile.coverUrl)}')`);
   else el.style.removeProperty('--cover');
 }
 
@@ -849,10 +852,16 @@ document.addEventListener('click', async (e) => {
 
 /* ------------------------------------------------------------------ data */
 
+/** Which loadProfile is the latest: an older one's answer must not be drawn over a newer one's. */
+let profileLoads = 0;
+
 async function loadProfile() {
+  const mine = ++profileLoads;
   const query = new URLSearchParams({ mode: String(mode) });
   for (const section of PAGED) query.set(section, String(shown[section]));
   const data = await (await fetch(`/api/profile?${query}`)).json();
+  // A switch of profile or mode since this was asked: the later answer is the one to show.
+  if (mine !== profileLoads) return;
 
   // A profile that has never been paged has no totals; fall back to what arrived, so the
   // page still renders against an older server.
@@ -860,7 +869,8 @@ async function loadProfile() {
   const totalFor = (section, list) => totals[section] ?? list.length;
 
   renderStats(data.stats, data.medalTotal, data.imported);
-  renderCover();
+  // The banner is drawn by loadState, with the profile it belongs to: drawn here, it could be the
+  // previous profile's, since the two load side by side (issue #34).
   renderCoverToggle();
 
   renderRank(data);
@@ -957,11 +967,28 @@ async function loadProfile() {
   bindCharts(document);
 }
 
+/**
+ * Another profile is now the one shown, by a switch here, in another tab, or a delete: the page is
+ * left as a reload would leave it, with nothing kept from the one before (issue #34). Ids are never
+ * reused, so a different id is a different profile.
+ */
+function profileChanged(s) {
+  // Its own ruleset and first pages, as a reload opens it.
+  mode = s.defaultMode ?? 0;
+  for (const section of PAGED) shown[section] = firstPage(section);
+  // A me! draft was the previous profile's: saved now, it would land in this one.
+  if (editingAbout) closeAboutEditor();
+  scoreListProfileChanged();
+  void loadProfile();
+}
+
 async function loadState() {
   const s = await (await fetch('/api/state')).json();
+  const previousId = profile?.id ?? null;
   profile = s.profile;
   profiles = s.profiles ?? [];
   settings = s.settings ?? {};
+  if (previousId !== null && previousId !== profile?.id) profileChanged(s);
   renderProfileHue();
   staleScores = s.staleScores ?? 0;
   ppCalculator = s.ppCalculator ?? ppCalculator;
@@ -1035,6 +1062,7 @@ async function loadState() {
   renderImporting(s.importing);
   renderOsuImport(s.osuImport);
   renderIdentity();
+  renderCover();
   // Never clobber what is being typed: a 15-second poll must not swallow a draft.
   if (!editingAbout) renderAbout();
   applySectionOrder();
@@ -2327,16 +2355,13 @@ let editing = { id: null, name: null };
 const identityHint = (message, isError) => hint('identityHint', message, isError);
 const identityAction = (payload) => postJson('/api/identity', payload);
 
-/** Cache-busted, because the file behind these URLs is replaced in place. */
+/** At the header's addresses, which change with the profile and the picture (issue #34). */
 function renderIdentityPreviews() {
-  const stamp = Date.now();
-  $('identityAvatar').innerHTML = profile?.hasAvatar
-    ? `<img src="/api/image/avatar?v=${stamp}" alt="">`
+  $('identityAvatar').innerHTML = profile?.avatarUrl
+    ? `<img src="${escapeHtml(profile.avatarUrl)}" alt="">`
     : guestAvatar(profile?.name ?? '');
-  $('identityCover').style.backgroundImage = profile?.hasCover
-    ? `url('/api/image/cover?v=${stamp}')`
-    : 'none';
-  $('identityCover').classList.toggle('identity-image__preview--empty', !profile?.hasCover);
+  $('identityCover').style.backgroundImage = profile?.coverUrl ? `url('${profile.coverUrl}')` : 'none';
+  $('identityCover').classList.toggle('identity-image__preview--empty', !profile?.coverUrl);
 
   for (const kind of ['avatar', 'cover']) {
     const has = kind === 'avatar' ? profile?.hasAvatar : profile?.hasCover;

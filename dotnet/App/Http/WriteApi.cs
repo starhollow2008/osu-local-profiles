@@ -781,6 +781,8 @@ internal static partial class Server
                 case "create":
                 {
                     var profile = Profiles.Create(db, NameOf(body));
+                    // Anything left under this id by a profile deleted before ids were kept apart.
+                    Identity.DeleteFiles(opts.Paths.DataDir, profile.Id);
                     Profiles.SetActive(db, profile.Id);
                     await tracker.SwitchProfile(profile.Id, profile.TrackingSince);
                     opts.Events.Broadcast("profiles", new { active = profile.Id });
@@ -816,6 +818,7 @@ internal static partial class Server
                     var id = Num(body, "id");
                     var name = IsInteger(id) && Profiles.Get(db, RowId(id)) is { } doomed ? doomed.Name : Js.NumberToString(id);
                     var (deletedScores, nextActive) = Profiles.Delete(db, id);
+                    Identity.DeleteFiles(opts.Paths.DataDir, RowId(id));
                     var next = Profiles.Get(db, nextActive)!;
                     await tracker.SwitchProfile(next.Id, next.TrackingSince);
                     opts.Events.Broadcast("profiles", new { active = next.Id });

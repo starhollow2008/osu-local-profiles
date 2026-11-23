@@ -142,6 +142,8 @@ internal static class StateApi
                 trackingSince = profile.TrackingSince,
                 hasAvatar,
                 hasCover,
+                avatarUrl = Identity.ImageUrl(opts.Paths.DataDir, profileId, "avatar"),
+                coverUrl = Identity.ImageUrl(opts.Paths.DataDir, profileId, "cover"),
             },
             profiles = Profiles.List(db),
             // A read-only copy tracks nothing: the tracker's fields as they are before anything is tracked.

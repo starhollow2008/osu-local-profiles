@@ -304,7 +304,11 @@ internal static partial class Identity
         ["cover"] = ["cover.jpg", "cover.png", "cover.jpeg", "cover.webp"],
     };
 
-    /// <summary>The image this profile shows, or null to fall back to what the page draws.</summary>
+    /// <summary>
+    /// The image this profile shows, or null to fall back to what the page draws. The legacy names
+    /// are from before there was a second profile, so they are the first one's, never every
+    /// profile's: a new profile starts with none (issue #34).
+    /// </summary>
     public static string? FindImage(string dataDir, long profileId, string kind)
     {
         foreach (var extension in Extensions)
@@ -312,6 +316,7 @@ internal static partial class Identity
             var file = Path.Combine(dataDir, $"profile-{profileId}-{kind}{extension}");
             if (File.Exists(file)) return file;
         }
+        if (profileId != 1) return null;
         foreach (var name in LegacyNames[kind])
         {
             var file = Path.Combine(dataDir, name);
@@ -322,4 +327,24 @@ internal static partial class Identity
 
     public static (bool HasAvatar, bool HasCover) ImageState(string dataDir, long profileId) =>
         (FindImage(dataDir, profileId, "avatar") is not null, FindImage(dataDir, profileId, "cover") is not null);
+
+    /// <summary>
+    /// Where the page shows this profile's picture, or null when it has none. The address names the
+    /// profile and the file's version, so a browser never shows another profile's picture, or this
+    /// one's from before an upload, from its cache (issue #34).
+    /// </summary>
+    public static string? ImageUrl(string dataDir, long profileId, string kind)
+    {
+        if (FindImage(dataDir, profileId, kind) is not { } file) return null;
+        long version;
+        try
+        {
+            version = new DateTimeOffset(File.GetLastWriteTimeUtc(file)).ToUnixTimeMilliseconds();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            version = 0;
+        }
+        return $"/api/image/{kind}?profile={profileId}&v={version}";
+    }
 }

@@ -377,7 +377,6 @@ internal static partial class Server
                     await Json(context, new { error = $"there is no score {Js.NumberToString(number)}" }, 404);
                     return;
                 }
-                var (hasAvatar, hasCover) = Identity.ImageState(opts.Paths.DataDir, owner.Id);
                 await Json(context, new
                 {
                     score = detail,
@@ -388,9 +387,9 @@ internal static partial class Server
                         id = owner.Id,
                         name = owner.Name,
                         country = ownerSettings.Country,
-                        avatar = hasAvatar ? $"/api/image/avatar?profile={owner.Id}" : null,
+                        avatar = Identity.ImageUrl(opts.Paths.DataDir, owner.Id, "avatar"),
                         // None of its own: the card shows osu-web's default banner.
-                        cover = hasCover ? $"/api/image/cover?profile={owner.Id}" : null,
+                        cover = Identity.ImageUrl(opts.Paths.DataDir, owner.Id, "cover"),
                         active = owner.Id == Current(),
                         tracking = owner.Id == Current() && (opts.Tracker?.IsTracking ?? false),
                     },

@@ -44,6 +44,35 @@ internal static partial class Identity
         }
     }
 
+    /// <summary>
+    /// Every file a profile has in <c>data/</c>: its avatar, banner and me! images. Deleting a profile
+    /// takes them with it, and a new profile clears any under its id, so it never starts with another's
+    /// (issue #34). The legacy <c>avatar.png</c> and the rest are left alone.
+    /// </summary>
+    public static void DeleteFiles(string dataDir, long profileId)
+    {
+        foreach (var kind in new[] { "avatar", "cover" })
+        {
+            try
+            {
+                ClearImage(dataDir, profileId, kind);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                /* in use or read-only: it stays, and is still this id's */
+            }
+        }
+        var folder = NodePath.Join(dataDir, "about-images", profileId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        try
+        {
+            if (Directory.Exists(folder)) Directory.Delete(folder, true);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            /* as above */
+        }
+    }
+
     /// <summary>An image for a profile's me!, named by its content's hash: its address, or null when it is no image.</summary>
     public static string? SaveAboutImage(string dataDir, long profileId, byte[] bytes)
     {

@@ -523,6 +523,16 @@ Plain HTML, CSS and ES modules, with no framework and no build step. The page is
 an SSE event triggers a refetch and a re-render of the affected block, which is plenty for a page
 that changes when a play lands, and editing `web/` is just a reload.
 
+**Another profile leaves the page as a reload would** (issue #34). `loadState` sees the id change
+and `profileChanged` resets what a reload would: the ruleset, the pages shown, an open me! draft
+and the Scores view, whose unsaved change is dropped rather than saved into the new profile.
+Profile ids are never given out twice (`Profiles.Create`, `kv` `lastProfileId`), so a different id
+is a different profile, and a profile's pictures and me! images are deleted with it. A picture's
+address names its profile and the file's version (`Identity.ImageUrl`): one address for every
+profile let the browser show the previous profile's from its cache. `loadProfile` drops an
+answer a newer call has overtaken, and the banner is drawn by `loadState`, with the profile it
+belongs to.
+
 **Keep `[hidden] { display: none !important; }` in `web/css/base.css`.** A `display: grid` backdrop
 once outranked the browser's low-specificity `[hidden]`, so the reset dialog was open on load with
 Cancel, Escape and the backdrop all apparently dead. The destructive button was the only one that

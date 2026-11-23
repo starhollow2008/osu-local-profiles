@@ -550,6 +550,20 @@ export function refreshScoreList() {
 }
 
 /**
+ * Another profile is shown (issue #34). A change not yet saved was the previous profile's, and
+ * would be saved to this one, so it is dropped; an open view starts again with this profile's setup.
+ */
+export function scoreListProfileChanged() {
+  clearTimeout(saveTimer);
+  if (!scoreListOpen()) return;
+  view = normaliseView(ctx.getSettings().scoreList);
+  rows = [];
+  loaded = false;
+  render();
+  void load();
+}
+
+/**
  * Wire the view up once. `context` lends what lives in main.js: `getMode`, `getSettings`,
  * `setSettings`, `getConfig` and `openScore`.
  */

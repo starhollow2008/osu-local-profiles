@@ -125,8 +125,9 @@ export async function buildInteractiveHtml(progress = () => {}) {
   };
   const flag = (code) => (code ? carry(`/flags/${code.toLowerCase()}.svg`) : null);
 
-  if (state.profile.hasAvatar) await carry('/api/image/avatar');
-  if (state.profile.hasCover) await carry('/api/image/cover');
+  // Their addresses name the profile and the picture's version (issue #34).
+  if (state.profile.avatarUrl) await carry(state.profile.avatarUrl);
+  if (state.profile.coverUrl) await carry(state.profile.coverUrl);
   await flag(state.profile.country);
   // The level-up and new-best icons in the Recent feed.
   await carry('/feed-icons/level-up.png');
@@ -134,11 +135,14 @@ export async function buildInteractiveHtml(progress = () => {}) {
   // Every score's owner is this profile, whose pictures are carried once, under the header's
   // own addresses; each score card looks them up there (assetUrl) rather than every score
   // carrying a copy of its own -- which made a profile of forty scores sixteen megabytes.
-  const own = (url) => (typeof url === 'string' ? url.replace(`?profile=${state.profile.id}`, '') : url);
+  const own = (url, kind) =>
+    typeof url === 'string' && url.startsWith(`/api/image/${kind}?profile=${state.profile.id}&`)
+      ? (state.profile[`${kind}Url`] ?? url)
+      : url;
   for (const detail of Object.values(scores)) {
     if (!detail.owner) continue;
-    detail.owner.avatar = own(detail.owner.avatar);
-    detail.owner.cover = own(detail.owner.cover);
+    detail.owner.avatar = own(detail.owner.avatar, 'avatar');
+    detail.owner.cover = own(detail.owner.cover, 'cover');
     await carry(detail.owner.avatar);
     await carry(detail.owner.cover);
     await flag(detail.owner.country);
