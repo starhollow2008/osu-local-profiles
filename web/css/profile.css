@@ -787,6 +787,8 @@
 
 .profile-detail-stats {
   display: grid;
+  /* On a phone, one column no wider than the screen, whatever is in it. */
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   gap: 15px;
 }
@@ -987,9 +989,16 @@
   display: grid;
 }
 
-/* Always: all eight in the row, the numbers beside them drawn closer together to make room. */
+/*
+ * Always: all eight in the row, the numbers beside them drawn closer together to make room. At
+ * full size they need 380px, more than a phone has, so there the badges shrink with the screen.
+ */
 .profile-rank-count--all {
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.profile-rank-count--all .profile-rank-count__rank .score-rank {
+  font-size: clamp(14px, 5.2vw, 22px);
 }
 
 .profile-detail-stats__chart-numbers--all-grades .profile-detail-stats__values--grid {
