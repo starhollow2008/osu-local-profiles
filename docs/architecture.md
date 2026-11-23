@@ -778,8 +778,9 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   converted beatmap for the ruleset and mods, in stable's counters: osu! and mania by object (a hold
   is one), taiko and catch by osu!'s own judgements (notes; fruits, drops and droplets). The page
   keeps the best judgement as whatever the others leave, so the total always matches. A source build
-  older than the request can't answer it, and then every judgement is typed: accuracy is disabled,
-  with a hint to rebuild, and osu! without Classic says to rebuild (`PpCalculation.NeedsRebuild`).
+  older than the request can't answer it, and then every judgement is typed: a beatmap chosen says to
+  rebuild (`PpCalculation.CountsNeedRebuild`), accuracy is disabled with a hint under the judgements
+  to rebuild, and osu! without Classic says to rebuild (`PpCalculation.NeedsRebuild`).
 - **Beatmaps**: searched across every client's index (artist, title, mapper, difficulty), a link
   downloaded as for a score link, or a `.osu` file, which is kept in `data/beatmaps/` and indexed.
 

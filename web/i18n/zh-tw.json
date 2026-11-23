@@ -596,7 +596,7 @@
   "ppCalc.speed": "{mod} 速度",
   "ppCalc.stableScore": "osu!stable 分數",
   "ppCalc.stableScoreUnused": "只在使用 osu!stable 本身的 Mod 時使用。",
-  "ppCalc.rebuildSource": "請在「其他設定」中重新建置你的 osu! 原始碼才能使用。",
+  "ppCalc.rebuildSource": "請在「其他設定」中重新建置你的 osu! 原始碼，以自動填入判定數量並使用準確率。",
   "ppCalc.tooMany": "判定總數超過此圖譜的 {total}。",
   "ppCalc.unranked": "不計排名的模組",
   "ppCalcClose": "關閉",

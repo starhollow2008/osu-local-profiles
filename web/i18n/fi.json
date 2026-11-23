@@ -596,7 +596,7 @@
   "ppCalc.speed": "{mod}-nopeus",
   "ppCalc.stableScore": "osu!stable-pisteet",
   "ppCalc.stableScoreUnused": "Käytetään vain osu!stablen omien modien kanssa.",
-  "ppCalc.rebuildSource": "Käännä osu!-lähdekoodisi uudelleen kohdassa Muut asetukset käyttääksesi tätä.",
+  "ppCalc.rebuildSource": "Käännä osu!-lähdekoodisi uudelleen kohdassa Muut asetukset, jotta osumat täytetään ja tarkkuutta voi käyttää.",
   "ppCalc.tooMany": "Arvioinnit ovat yhteensä enemmän kuin tämän beatmapin {total}.",
   "ppCalc.unranked": "Rankkaamattomat modit",
   "ppCalcClose": "Sulje",

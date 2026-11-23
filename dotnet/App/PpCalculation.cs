@@ -179,7 +179,8 @@ internal static partial class PpCalculation
         var given = Js.Get(input, "counts");
         if (given is null or { ValueKind: JsonValueKind.Null })
         {
-            if (perfect is null) throw new InvalidOperationException("enter the play’s judgements");
+            // As for osu! without Classic, only a source build by an earlier version of the app can't count them.
+            if (perfect is null) throw new InvalidOperationException(CountsNeedRebuild);
             foreach (var (key, n) in perfect) counts[key] = n;
         }
         else
@@ -271,6 +272,10 @@ internal static partial class PpCalculation
     /// <summary>Why osu! without Classic can't be priced: a calculator that can't count a beatmap's slider ends and ticks.</summary>
     public const string NeedsRebuild =
         "your osu! source calculator was built by an earlier version of this app; rebuild it in Other settings to price osu! without Classic";
+
+    /// <summary>Why a beatmap's judgements aren't filled in: a calculator that can't count a perfect play.</summary>
+    public const string CountsNeedRebuild =
+        "your osu! source calculator was built by an earlier version of this app; rebuild it in Other settings to fill in the judgements, or enter them";
 
     private const string SliderTails = "slider_tail_hit";
     private const string SliderTicks = "large_tick_hit";

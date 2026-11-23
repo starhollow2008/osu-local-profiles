@@ -596,7 +596,7 @@
   "ppCalc.speed": "{mod} の速度",
   "ppCalc.stableScore": "osu!stable のスコア",
   "ppCalc.stableScoreUnused": "osu!stable 自体の Mod でのみ使われます。",
-  "ppCalc.rebuildSource": "使うには、その他の設定で osu! のソースを再ビルドしてください。",
+  "ppCalc.rebuildSource": "判定数を自動で入力して精度を使うには、その他の設定で osu! のソースを再ビルドしてください。",
   "ppCalc.tooMany": "判定の合計がこのビートマップの {total} を超えています。",
   "ppCalc.unranked": "ランク外の Mod",
   "ppCalcClose": "閉じる",

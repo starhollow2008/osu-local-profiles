@@ -596,7 +596,7 @@
   "ppCalc.speed": "Vitesse de {mod}",
   "ppCalc.stableScore": "Score osu!stable",
   "ppCalc.stableScoreUnused": "Utilisé seulement avec les mods d'osu!stable.",
-  "ppCalc.rebuildSource": "Recompilez votre source d'osu! dans Autres réglages pour utiliser ceci.",
+  "ppCalc.rebuildSource": "Recompilez votre source d'osu! dans Autres réglages pour que les jugements soient remplis et que la précision soit utilisable.",
   "ppCalc.tooMany": "Les jugements dépassent les {total} de cette beatmap.",
   "ppCalc.unranked": "Mods non classés",
   "ppCalcClose": "Fermer",

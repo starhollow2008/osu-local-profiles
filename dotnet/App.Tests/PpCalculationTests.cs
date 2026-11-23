@@ -265,6 +265,8 @@ public sealed class PpCalculationTests : IDisposable
         var typed = await Calculate(old, new { md5, mode = 0, counts = new { c300 = 20, c100 = 1 } });
         Assert.Null(typed.Perfect);
         Assert.True(typed.Pp > 0);
+        Assert.Equal(PpCalculation.CountsNeedRebuild,
+            (await Assert.ThrowsAsync<InvalidOperationException>(() => Calculate(old, new { md5, mode = 0 }))).Message);
         Assert.Equal(PpCalculation.NeedsRebuild,
             (await Assert.ThrowsAsync<InvalidOperationException>(() => Calculate(old, new { md5, mode = 0, classic = false, counts = new { c300 = 21 } }))).Message);
 

@@ -603,7 +603,7 @@
   "ppCalc.speed": "Prędkość {mod}",
   "ppCalc.stableScore": "Wynik z osu!stable",
   "ppCalc.stableScoreUnused": "Używany tylko z modami osu!stable.",
-  "ppCalc.rebuildSource": "Zbuduj ponownie swoje źródło osu! w Pozostałych ustawieniach, aby tego użyć.",
+  "ppCalc.rebuildSource": "Zbuduj ponownie swoje źródło osu! w Pozostałych ustawieniach, aby wypełnić oceny trafień i używać celności.",
   "ppCalc.tooMany": "Oceny sumują się do więcej niż {total} tej beatmapy.",
   "ppCalc.unranked": "Nierankingowe mody",
   "ppCalcClose": "Zamknij",

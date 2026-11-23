@@ -1414,6 +1414,8 @@
         </div>
         <div class="manual-grid" id="ppCalcModSettings"></div>
         <div class="manual-counts" id="ppCalcCounts"></div>
+        <!-- A calculator that can't count a perfect play: a source build by an earlier version of the app. -->
+        <p class="setting__hint" id="ppCalcRebuild" data-i18n="ppCalc.rebuildSource" hidden>Rebuild your osu! source in Other settings to fill in the judgements and use accuracy.</p>
         <!-- Typed, or dragged: a slider prices the play again as it moves. -->
         <div class="pp-calc__totals">
           <div class="field">
@@ -1421,8 +1423,6 @@
             <span class="pp-calc__combo"><input type="number" id="ppCalcAccuracy" min="0" max="100" step="0.01"><span>%</span></span>
             <input type="range" class="pp-calc__slider" id="ppCalcAccuracySlider" min="0" max="100" step="0.01" value="100"
                    data-i18n-attr="aria-label:ppCalc.accuracy" aria-label="Accuracy">
-            <!-- A calculator that can't count a perfect play: a source build by an earlier version of the app. -->
-            <span class="setting__hint" id="ppCalcAccuracyRebuild" data-i18n="ppCalc.rebuildSource" hidden>Rebuild your osu! source in Other settings to use this.</span>
           </div>
           <!-- osu! and catch only: taiko's and mania's pp never read the combo. -->
           <div class="field" id="ppCalcComboField">

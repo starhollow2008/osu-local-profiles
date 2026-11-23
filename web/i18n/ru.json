@@ -596,7 +596,7 @@
   "ppCalc.speed": "Скорость {mod}",
   "ppCalc.stableScore": "Очки osu!stable",
   "ppCalc.stableScoreUnused": "Используется только с модами самого osu!stable.",
-  "ppCalc.rebuildSource": "Чтобы использовать это, пересоберите свой исходный код osu! в разделе «Прочие настройки».",
+  "ppCalc.rebuildSource": "Пересоберите свой исходный код osu! в разделе «Прочие настройки», чтобы попадания заполнялись сами и работала точность.",
   "ppCalc.tooMany": "Сумма оценок больше, чем {total} у этой карты.",
   "ppCalc.unranked": "Нерейтинговые моды",
   "ppCalcClose": "Закрыть",
