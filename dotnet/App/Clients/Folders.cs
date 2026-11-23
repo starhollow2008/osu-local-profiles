@@ -7,9 +7,11 @@ namespace OsuLocalProfiles.Clients;
 /// folder", with three verbs that are deliberately not symmetrical.
 /// </summary>
 /// <remarks>
-/// <b>Add</b> writes to <c>installRoots</c>, the user speaking, never overruled. <b>Remove</b> takes
-/// a root out of <c>installRoots</c> and can do nothing else: a folder the app found by itself can
-/// only be outranked. <b>Rescan</b> forgets what was remembered and searches from scratch. Nothing
+/// <b>Add</b> writes to <c>installRoots</c>, the user speaking, never overruled. Every folder there is
+/// tracked, and one the app found is tracked only for a client none was added for (issue #35).
+/// <b>Track</b> adds a folder the app found, keeping the one it was tracking for that client.
+/// <b>Remove</b> takes a root out of <c>installRoots</c> and can do nothing else: a folder the app
+/// found by itself can only be outranked. <b>Rescan</b> forgets what was remembered and searches from scratch. Nothing
 /// restarts: the watchers and the resolver are built once at startup, so a change takes effect on
 /// the next start, and <c>needsRestart</c> says so.
 /// </remarks>
@@ -39,6 +41,8 @@ internal sealed partial class OsuFolders(AppConfig config, Action<AppConfig> sav
                 development = c.Development,
                 configured = configured.Any(r => SameRoot(r, c.Root)),
                 active = tracking.Any(i => SameRoot(i.Root, c.Root)),
+                // Tracked from the next start: what Track offers for the rest.
+                tracked = discovery.Installs.Any(i => SameRoot(i.Root, c.Root)),
             }).ToList();
             var wouldTrack = discovery.Installs.Select(i => i.Root).ToList();
             var needsRestart = wouldTrack.Count != tracking.Count || !wouldTrack.All(root => tracking.Any(i => SameRoot(i.Root, root)));
@@ -112,6 +116,24 @@ internal sealed partial class OsuFolders(AppConfig config, Action<AppConfig> sav
             var roots = config.Strings("installRoots");
             // Newest first: a folder added now outranks one added last month for the same client.
             if (!roots.Any(r => SameRoot(r, root))) config["installRoots"] = JsonText.From(new List<string> { root }.Concat(roots).ToList());
+        }
+        return Refresh(false);
+    }
+
+    /// <summary>
+    /// Track a folder the app found, beside what it tracks. The folder it found for that client is
+    /// added too, since a folder added by hand would otherwise outrank it.
+    /// </summary>
+    public Task<object> Track(string root)
+    {
+        lock (gate)
+        {
+            var candidate = discovery.Candidates.FirstOrDefault(c => SameRoot(c.Root, root))
+                ?? throw new UserError($"{root} is not one of the folders found.");
+            var kept = discovery.Installs.Where(i => i.Kind == candidate.Kind && i.Development == candidate.Development).Select(i => i.Root);
+            var roots = config.Strings("installRoots");
+            var added = new[] { candidate.Root }.Concat(kept).Where(r => !roots.Any(x => SameRoot(x, r))).ToList();
+            config["installRoots"] = JsonText.From(roots.Concat(added).ToList());
         }
         return Refresh(false);
     }

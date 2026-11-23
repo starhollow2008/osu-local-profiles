@@ -997,10 +997,16 @@ async function loadState() {
   renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
   renderStableNote();
-  // osu!'s development client is a lazer of its own, and says which (roadmap 5.68).
+  // osu!'s development client is a lazer of its own, and says which (roadmap 5.68). Several folders
+  // of one client are counted rather than repeated (issue #35).
+  const names = s.installs.map((i) => (i.development ? `${i.kind} (${t('folders.development')})` : i.kind));
   const kinds =
-    s.installs.map((i) => (i.development ? `${i.kind} (${t('folders.development')})` : i.kind)).join(' + ') ||
-    t('menu.noClientFound');
+    [...new Set(names)]
+      .map((name) => {
+        const count = names.filter((n) => n === name).length;
+        return count > 1 ? `${name} ×${count}` : name;
+      })
+      .join(' + ') || t('menu.noClientFound');
   const session = { name: s.profile.name, kinds, n: s.scoresThisSession };
   filterNarrowing = Boolean(s.filterNarrowing);
   playsFiltered = s.playsFiltered ?? 0;

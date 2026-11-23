@@ -7375,6 +7375,23 @@ s.bbcode-editor__glyph {
   color: var(--rank-d);
 }
 
+/* Another folder of a client already tracked (issue #35), styled as the dialog's other buttons. */
+.folder__track {
+  flex: none;
+  background-color: hsl(var(--hsl-b3));
+  border-radius: var(--radius-base);
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+.folder__track:hover {
+  background-color: hsl(var(--hsl-b2));
+}
+
+.folder__track:disabled {
+  opacity: 0.6;
+}
+
 .folder-add {
   display: flex;
   align-items: flex-end;

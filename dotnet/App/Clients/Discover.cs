@@ -404,12 +404,18 @@ internal static partial class Discover
         var bySource = new Dictionary<string, int> { ["configured"] = 0, ["remembered"] = 1, ["detected"] = 2, ["searched"] = 2 };
         var sorted = candidates.OrderBy(c => bySource[c.Source]).ThenByDescending(c => c.Score).ToList();
 
-        // One of each, and the development client in a slot of its own beside release lazer.
+        // Every folder the user chose (issue #35: two osu!stable folders, say), and the best one found
+        // for each client they chose none for. The development client has a slot of its own beside
+        // release lazer.
         var installs = new List<OsuInstall>();
         foreach (var (kind, development) in new[] { ("lazer", false), ("lazer", true), ("stable", false), ("mcosu", false), ("neki", false), ("neomod", false) })
         {
-            var best = sorted.FirstOrDefault(c => c.Kind == kind && c.Development == development);
-            if (best is not null && Classify(best.Root, builtReplays) is { } install) installs.Add(install);
+            var slot = sorted.Where(c => c.Kind == kind && c.Development == development).ToList();
+            var chosen = slot.Where(c => c.Source == "configured").ToList();
+            foreach (var candidate in chosen.Count > 0 ? chosen : slot.Take(1))
+            {
+                if (Classify(candidate.Root, builtReplays) is { } install) installs.Add(install);
+            }
         }
         return new DiscoveryResult(installs, sorted, searched);
     }

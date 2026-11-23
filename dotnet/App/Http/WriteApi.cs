@@ -308,12 +308,27 @@ internal static partial class Server
                 await Json(context, answer);
                 return;
             }
+            if (Js.IsString(Js.Get(body, "track"), out var track))
+            {
+                object tracked;
+                try
+                {
+                    tracked = await folders.Track(track);
+                }
+                catch (Exception e) when (e is not OutOfMemoryException)
+                {
+                    await Json(context, new { error = e.Message }, 400);
+                    return;
+                }
+                await Json(context, tracked);
+                return;
+            }
             if (Js.IsString(Js.Get(body, "remove"), out var remove))
             {
                 await Json(context, folders.Remove(remove));
                 return;
             }
-            await Json(context, new { error = "expected add, remove or rescan" }, 400);
+            await Json(context, new { error = "expected add, track, remove or rescan" }, 400);
         });
     }
 

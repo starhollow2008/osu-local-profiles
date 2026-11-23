@@ -980,6 +980,15 @@ attribute. Updates never carry quarantine, since the app downloads them itself. 
 `config.installRoots` is the escape hatch for layouts nobody anticipated (stable under unusual Wine
 wrappers, say).
 
+**Every folder added is tracked; a found one only for a client none was added for** (issue #35,
+`Discover.Run`). With nothing added, that is one of each client, as before. Adding a folder still
+stops the one found for that client, since the usual reason to add one is that the wrong one was
+found. Options -> osu! folders' **Track** (`OsuFolders.Track`) adds a found folder and keeps the one
+being tracked for that client, so two osu!stable folders are two clicks. The tracker already ran
+over every install, a replay in two folders is one score (`dedupe_key`), and lazer's realm is only
+detected, never read, so nothing past discovery is per client. One calculator still prices every
+score, whichever folder it came from.
+
 ## Updater: rewrites the app's own folder
 
 `dotnet/App/Update/`, and the swap in `tools/launcher/swap.go`.

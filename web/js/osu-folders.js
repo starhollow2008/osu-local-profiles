@@ -66,7 +66,9 @@ function render() {
               c.configured
                 ? `<button type="button" class="folder__remove" data-remove="${escapeHtml(c.root)}"
                      title="${escapeHtml(t('folders.forget'))}">&times;</button>`
-                : ''
+                : c.tracked
+                  ? ''
+                  : `<button type="button" class="folder__track" data-track="${escapeHtml(c.root)}">${escapeHtml(t('folders.track'))}</button>`
             }
           </div>`;
       })
@@ -116,12 +118,18 @@ export function bindOsuFolders() {
   $('foldersClose').onclick = closeOsuFolders;
 
   $('folderList').onclick = async (e) => {
-    const button = e.target.closest('[data-remove]');
+    const button = e.target.closest('[data-remove], [data-track]');
     if (!button) return;
     button.disabled = true;
     try {
-      await send({ remove: button.dataset.remove }, t('folders.removeFailed'));
-      toast(t('folders.removed'));
+      if (button.dataset.track) {
+        // Beside the folders already tracked, as another osu!stable or lazer (issue #35).
+        await send({ track: button.dataset.track }, t('folders.trackFailed'));
+        toast(t('folders.tracked'));
+      } else {
+        await send({ remove: button.dataset.remove }, t('folders.removeFailed'));
+        toast(t('folders.removed'));
+      }
     } catch (err) {
       setHint(err.message, true);
       button.disabled = false;

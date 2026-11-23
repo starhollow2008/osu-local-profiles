@@ -480,7 +480,7 @@ public sealed class WriteApiTests : IAsyncLifetime
     {
         var folder = Directory.CreateDirectory(Path.Combine(install, "games")).FullName;
         Assert.Equal("give a folder to add", Error((await Post("/api/installs", new { add = "  " })).Body));
-        Assert.Equal("expected add, remove or rescan", Error((await Post("/api/installs", new { })).Body));
+        Assert.Equal("expected add, track, remove or rescan", Error((await Post("/api/installs", new { })).Body));
         Assert.Equal($"There is no folder at {Path.Combine(folder, "missing")}.", Error((await Post("/api/installs", new { add = Path.Combine(folder, "missing") })).Body));
         Assert.Contains("does not look like an osu! install", Error((await Post("/api/installs", new { add = $"\"{folder}\"" })).Body));
 

@@ -231,4 +231,41 @@ public sealed class DetectTests : IDisposable
         // A configured root that holds nothing is ignored, not fatal.
         Assert.Empty((await Discover.Run([Path.Combine(tmp, "nothing")], [], "", noSearch: true, env: e)).Installs);
     }
+
+    [Fact]
+    public async Task Every_folder_added_by_hand_is_tracked_and_one_found_only_for_a_client_none_was_added_for()
+    {
+        var e = Env("linux", Path.Combine(tmp, "emptyhome"));
+        var mine = StableAt(Path.Combine(tmp, "mine", "osu!"));
+        var server = StableAt(Path.Combine(tmp, "server", "osu!"));
+        var found = StableAt(Path.Combine(tmp, "found", "osu!"));
+        var other = StableAt(Path.Combine(tmp, "other", "osu!"));
+
+        // Nothing added: the one found, as ever.
+        var quiet = await Discover.Run([], [found, other], "", noSearch: true, env: e);
+        Assert.Single(quiet.Installs, i => i.Kind == "stable");
+
+        // Two added: both, and the found ones stay listed but untracked.
+        var both = await Discover.Run([mine, server], [found, other], "", noSearch: true, env: e);
+        Assert.Equal([mine, server], both.Installs.Where(i => i.Kind == "stable").Select(i => i.Root));
+        Assert.Equal(4, both.Candidates.Count(c => c.Kind == "stable"));
+    }
+
+    [Fact]
+    public async Task Tracking_a_found_folder_keeps_the_one_already_tracked()
+    {
+        var a = StableAt(Path.Combine(tmp, "a", "osu!"));
+        var b = StableAt(Path.Combine(tmp, "b", "osu!"));
+        var config = AppConfig.Load(Folder("data"));
+        config["searchedForInstalls"] = JsonText.From(true);
+        var initial = await Discover.Run([], [a, b], "", noSearch: true, env: Env("linux", Path.Combine(tmp, "emptyhome")));
+        var folders = new OsuFolders(config, _ => { }, initial.Installs, initial, "");
+        string[] stables = [a, b];
+        var tracked = Assert.Single(initial.Installs, i => stables.Contains(i.Root)).Root;
+        var untracked = tracked == a ? b : a;
+
+        await folders.Track(untracked);
+        Assert.Equal([untracked, tracked], config.Strings("installRoots"));
+        await Assert.ThrowsAsync<UserError>(() => folders.Track(Path.Combine(tmp, "nowhere")));
+    }
 }
