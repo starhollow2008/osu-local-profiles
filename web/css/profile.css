@@ -1039,6 +1039,7 @@
   font-weight: var(--font-weight);
 }
 
+.rank-value--base,
 .rank-value--iron {
   --font-weight: 400;
 }
@@ -1075,6 +1076,612 @@
   .profile-stats {
     grid-template-columns: auto auto;
   }
+}
+
+/* ======================================================================== */
+/* Show more details: Ranked Play, Daily Challenge and the three cards      */
+/* ======================================================================== */
+
+/*
+ * osu-web's `profile-detail.less`: the button that switches the stats between osu!'s two views,
+ * over the top right of the band on a phone, and centred in the right gutter beside it on a
+ * desktop, under the cover's chevron.
+ */
+.profile-detail {
+  position: relative;
+}
+
+.profile-detail__type-toggle {
+  position: absolute;
+  top: 5px;
+  right: 20px;
+  z-index: 2;
+}
+
+@media (min-width: 900px) {
+  .profile-detail__type-toggle {
+    display: flex;
+    justify-content: center;
+    width: var(--gutter);
+    top: 10px;
+    right: 0;
+  }
+}
+
+/* osu-web's `btn-circle--activated`, as `--page-toggle` colours it. */
+.btn-circle--page-toggle.btn-circle--activated {
+  background: hsl(var(--hsl-h2));
+  color: hsl(var(--hsl-c1));
+}
+
+.btn-circle--page-toggle.btn-circle--activated:hover {
+  background: hsl(var(--hsl-l3));
+  color: hsl(var(--hsl-b5));
+}
+
+/* osu-web's utilities.less `u-fancy-text`, and `u-relative`. */
+.u-fancy-text {
+  background-image: linear-gradient(var(--colour));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.u-relative {
+  position: relative;
+}
+
+/* osu-web's svg-icon.less: a picture in the text's colour. Which picture is osu-web-art.css. */
+.svg-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  background-color: currentColor;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* --- beside the ranks: daily-challenge.less ------------------------------ */
+
+.daily-challenge {
+  background: hsl(var(--hsl-b4));
+  border-radius: var(--radius-base);
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 1px;
+  border: 2px solid transparent;
+}
+
+.daily-challenge__name {
+  font-size: var(--fs-normal);
+  padding: 0 5px;
+}
+
+.daily-challenge__value-box {
+  border-radius: var(--radius-base);
+  background: hsl(var(--hsl-b6));
+  padding: 5px 10px;
+}
+
+.daily-challenge__value {
+  --colour: hsl(var(--hsl-c2)), hsl(var(--hsl-c2));
+  background-image: linear-gradient(var(--colour));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.daily-challenge__value--plain {
+  background: none;
+  color: hsl(var(--hsl-c2));
+}
+
+/*
+ * Took part today: osu-web's lime border, and a tick in a circle on the corner (`fa-check`,
+ * Font Awesome Free 5.15.4, CC BY 4.0, drawn here as a mask in the circle's dark colour).
+ */
+.daily-challenge--played-today,
+.profile-detail-stats-big__badge--daily-challenge-played {
+  border: 2px solid hsl(var(--hsl-lime-1));
+}
+
+.daily-challenge--played-today::before,
+.daily-challenge--played-today::after,
+.profile-detail-stats-big__badge--daily-challenge-played::before,
+.profile-detail-stats-big__badge--daily-challenge-played::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 16px;
+  height: 16px;
+  transform: translate(50%, -50%);
+}
+
+.daily-challenge--played-today::before,
+.profile-detail-stats-big__badge--daily-challenge-played::before {
+  border-radius: 50%;
+  background-color: hsl(var(--hsl-lime-1));
+}
+
+.daily-challenge--played-today::after,
+.profile-detail-stats-big__badge--daily-challenge-played::after {
+  background-color: hsl(var(--hsl-b6));
+  --check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cpath d='M173.898 439.404l-166.4-166.4c-9.997-9.997-9.997-26.206 0-36.204l36.203-36.204c9.997-9.998 26.207-9.998 36.204 0L192 312.69 432.095 72.596c9.997-9.997 26.207-9.997 36.204 0l36.203 36.204c9.997 9.997 9.997 26.206 0 36.204l-294.4 294.401c-9.998 9.997-26.207 9.997-36.204-.001z'/%3E%3C/svg%3E");
+  -webkit-mask: var(--check) center / 8px no-repeat;
+  mask: var(--check) center / 8px no-repeat;
+}
+
+/*
+ * The popups osu-web opens over these on hover (a qtip, `qtip--daily-challenge`): above the box,
+ * from its left edge. Opened by the pointer, the keyboard, or a tap, which focuses the box.
+ */
+.detail-popup-owner {
+  cursor: default;
+}
+
+.detail-popup-owner:focus-visible {
+  outline: 2px solid hsl(var(--hsl-c1));
+  outline-offset: 2px;
+}
+
+.detail-popup {
+  display: none;
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 8px);
+  z-index: 5;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 20px));
+  box-shadow: 0 2px 10px hsla(0, 0%, 0%, 0.5);
+  cursor: auto;
+}
+
+/* The gap between the box and its popup, so the pointer can cross it. */
+.detail-popup::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
+}
+
+.detail-popup-owner:hover > .detail-popup,
+.detail-popup-owner:focus-within > .detail-popup {
+  display: grid;
+}
+
+/* No room above on the screen: below the box instead. */
+.detail-popup-owner--below > .detail-popup {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.detail-popup-owner--below > .detail-popup::after {
+  top: auto;
+  bottom: 100%;
+}
+
+/* daily-challenge-popup.less */
+.daily-challenge-popup {
+  background: hsl(var(--hsl-b4));
+  border-radius: 20px;
+  font-size: var(--fs-normal);
+}
+
+.daily-challenge-popup__content {
+  padding: 15px;
+  gap: 10px;
+  display: grid;
+}
+
+.daily-challenge-popup__content--main {
+  grid-template-columns: 1fr auto;
+}
+
+.daily-challenge-popup__content--top {
+  background: hsl(var(--hsl-b5));
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.daily-challenge-popup__row {
+  display: contents;
+}
+
+.daily-challenge-popup__value {
+  color: hsl(var(--hsl-c2));
+}
+
+.daily-challenge-popup__value--fancy {
+  background-image: linear-gradient(var(--colour));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.daily-challenge-popup__value--top {
+  font-size: 40px;
+  font-weight: 300;
+}
+
+/* matchmaking-popup.less */
+.matchmaking-popup {
+  background: hsl(var(--hsl-b4));
+  border-radius: 20px;
+  font-size: var(--fs-normal);
+  padding: 15px;
+  gap: 10px;
+  grid-template-columns: 1fr auto auto auto auto;
+}
+
+.matchmaking-popup__row {
+  display: contents;
+}
+
+.matchmaking-popup__value {
+  color: hsl(var(--hsl-c2));
+}
+
+/* --- more details: profile-detail-stats-v2.less, -card.less, -big.less ----- */
+
+.profile-detail-stats-v2 {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  .profile-detail-stats-v2 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.profile-detail-stats-card {
+  --bg-hsl: var(--hsl-b3);
+  --padding: 10px;
+  border-radius: var(--radius-large);
+  background: hsl(var(--bg-hsl));
+  display: grid;
+  position: relative;
+  grid-template-rows: auto auto 1fr;
+  min-width: 0;
+}
+
+.profile-detail-stats-card--extra {
+  background: transparent;
+  gap: 5px;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-detail-stats-card__top {
+  padding: var(--padding);
+  gap: 10px;
+  display: grid;
+  align-items: center;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 70%, rgba(0, 0, 0, 0.1));
+  border-radius: var(--radius-large) var(--radius-large) 0 0;
+}
+
+.profile-detail-stats-card__title {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 5px;
+  font-size: var(--fs-title-small-3);
+  font-weight: 700;
+  align-items: center;
+  justify-content: start;
+}
+
+.profile-detail-stats-card__title-icon {
+  font-size: 24px;
+  display: contents;
+}
+
+.profile-detail-stats-card__values {
+  display: grid;
+  gap: 5px;
+}
+
+.profile-detail-stats-card__values--matchmaking-matches {
+  grid-template-columns: 2fr 1fr 1fr;
+}
+
+.profile-detail-stats-card__values--matchmaking-rating {
+  grid-template-columns: 1fr 1fr;
+}
+
+.profile-detail-stats-card__values--row {
+  display: flex;
+}
+
+.profile-detail-stats-card__middle {
+  --bg-1-a: 0.2;
+  --bg-1-hsl: 0, 0%, 0%;
+  --bg-2-hsl: var(--bg-hsl);
+  background: linear-gradient(hsla(var(--bg-1-hsl), var(--bg-1-a)), hsla(var(--bg-1-hsl), var(--bg-1-a))), hsl(var(--bg-2-hsl));
+  padding: var(--padding);
+  height: 60px;
+  display: grid;
+}
+
+.profile-detail-stats-card__bottom {
+  display: grid;
+  padding: var(--padding) 0;
+  position: relative;
+  min-height: 80px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.4)), rgba(0, 0, 0, 0.2);
+  border-radius: 0 0 var(--radius-large) var(--radius-large);
+}
+
+.profile-detail-stats-card__chart {
+  position: absolute;
+  display: grid;
+  inset: 0 15px 0 0;
+  font-size: var(--fs-normal);
+}
+
+/* osu-web's card charts carry no dates under them: the line has the card's bottom to itself. */
+.profile-detail-stats-card__chart .chart__caption {
+  display: none;
+}
+
+.profile-detail-stats-card__empty-chart {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: var(--fs-normal);
+}
+
+.profile-detail-stats-card__matchmaking-tier-badge {
+  position: absolute;
+  top: var(--padding);
+  right: var(--padding);
+}
+
+.profile-detail-stats-card__variants {
+  display: inline-flex;
+  gap: 5px;
+  position: absolute;
+  top: 100%;
+  right: 0;
+}
+
+.profile-detail-stats-card__variant {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+  color: hsl(var(--hsl-l2));
+  font-weight: 400;
+}
+
+.profile-detail-stats-card__variant:hover {
+  color: hsl(var(--hsl-l1));
+}
+
+.profile-detail-stats-card__variant--active,
+.profile-detail-stats-card__variant--active:hover {
+  color: hsl(var(--hsl-c1));
+}
+
+/* value-display.less: the smaller rank, and a provisional rating, dimmed. */
+.value-display--rank-small {
+  --value-font-size: var(--fs-title-small-3);
+}
+
+@media (min-width: 900px) {
+  .value-display--rank-small {
+    --value-font-size: var(--fs-large);
+  }
+}
+
+.value-display--provisional .value-display__value {
+  opacity: 0.6;
+}
+
+/* profile-rank-count.less `--v2`: smaller badges in the Solo Play card's middle row. */
+.profile-rank-count--v2 {
+  gap: 8px;
+}
+
+.profile-rank-count--v2 .profile-rank-count__rank .score-rank {
+  font-size: 16px;
+}
+
+/* All eight in the card's row: closer, so they fit its width. */
+.profile-rank-count--v2.profile-rank-count--all {
+  gap: 2px;
+}
+
+.profile-rank-count--v2.profile-rank-count--all .profile-rank-count__rank .score-rank {
+  font-size: 15px;
+}
+
+/* matchmaking-tier-badge.less: the picture is osu-web-art.css. */
+.matchmaking-tier-badge {
+  font-size: 8px;
+  width: 10em;
+  height: 10.1875em;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center top;
+  position: relative;
+}
+
+.matchmaking-tier-badge__lustrous-rank-container {
+  text-align: center;
+  position: absolute;
+  top: 8.7em;
+  left: 0;
+  right: 0;
+}
+
+.matchmaking-tier-badge__lustrous-rank {
+  font-size: 1.25em;
+  font-weight: 800;
+  color: rgba(0, 0, 0, 0.8);
+  line-height: 1;
+}
+
+/* matchmaking-result.less, matchmaking-result-icon.less */
+.matchmaking-result {
+  display: grid;
+  gap: 5px;
+}
+
+.matchmaking-result--provisional {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 0 5px;
+  color: hsl(var(--hsl-c2));
+  font-size: var(--fs-normal);
+}
+
+.matchmaking-result__provisional-icon {
+  flex: none;
+  font-size: 14px;
+}
+
+.matchmaking-result__provisional-icon svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+}
+
+.matchmaking-result__title {
+  font-size: var(--fs-normal);
+  font-weight: 700;
+}
+
+.matchmaking-result__icons {
+  display: flex;
+  gap: 5px;
+  overflow: hidden;
+  position: relative;
+}
+
+.matchmaking-result__icons::after {
+  position: absolute;
+  pointer-events: none;
+  inset: 0;
+  left: auto;
+  max-width: 40%;
+  width: 120px;
+  content: "";
+  background:
+    linear-gradient(to right, hsla(var(--bg-1-hsl), 0), hsla(var(--bg-1-hsl), var(--bg-1-a))),
+    linear-gradient(to right, hsla(var(--bg-2-hsl), 0), hsl(var(--bg-2-hsl)));
+}
+
+/* osu-web's basic colours: green 125, red 360, orange 45, at its four steps. */
+.matchmaking-result-icon {
+  --colour: hsl(var(--hue), 40%, 30%);
+  border-radius: 10000px;
+  display: flex;
+  width: 24px;
+  height: 16px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-small);
+  font-weight: 900;
+  background-image: linear-gradient(to bottom, hsl(var(--hue), 100%, 70%), hsl(var(--hue), 60%, 50%));
+  color: var(--colour);
+  text-decoration: none;
+}
+
+.matchmaking-result-icon:hover {
+  color: var(--colour);
+}
+
+.matchmaking-result-icon::before {
+  content: var(--label);
+}
+
+.matchmaking-result-icon--result-draw {
+  --hue: 45;
+  --label: "D";
+}
+
+.matchmaking-result-icon--result-loss {
+  --hue: 360;
+  --label: "L";
+}
+
+.matchmaking-result-icon--result-win {
+  --hue: 125;
+  --label: "W";
+}
+
+/* profile-detail-stats-big.less: Daily Challenge over the stats. */
+.profile-detail-stats-big {
+  box-shadow: var(--box-shadow);
+  background-color: hsl(var(--hsl-b3));
+  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.4));
+  border-radius: var(--radius-large);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  padding: 10px 8px;
+  gap: 4px;
+  align-items: center;
+  position: relative;
+}
+
+.profile-detail-stats-big__icon {
+  display: contents;
+  font-size: 24px;
+}
+
+.profile-detail-stats-big__title-container {
+  display: grid;
+  font-size: var(--fs-normal);
+  line-height: normal;
+  color: hsl(var(--hsl-c2));
+}
+
+.profile-detail-stats-big__label {
+  font-weight: 700;
+  color: hsl(var(--hsl-c1));
+}
+
+.profile-detail-stats-big__badge {
+  border-radius: var(--radius-base);
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  height: 40px;
+  width: 86px;
+  background-color: rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+
+.profile-detail-stats-big__fancy-text {
+  background-image: linear-gradient(var(--colour));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.profile-detail-stats-big__plain-text {
+  color: hsl(var(--hsl-c2));
+}
+
+/* The stats box under it takes the column's height that is left, as osu-web's does. */
+.profile-detail-stats-card--extra .profile-stats {
+  flex: 1;
+  align-content: start;
 }
 
 /* ======================================================================== */

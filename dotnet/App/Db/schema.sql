@@ -375,4 +375,17 @@ CREATE TABLE IF NOT EXISTS first_place_counts (
   PRIMARY KEY (profile_id, mode)
 );
 
+-- osu!'s Daily Challenge and Ranked Play for the profile's linked account, as its public profile
+-- page for a ruleset shows them (Show more details): read with the rank events, kept as JSON, and
+-- shown as osu! gave them. A row per ruleset, since Ranked Play is per ruleset; Daily Challenge is
+-- the account's, the same in each. Cleared by a reset.
+CREATE TABLE IF NOT EXISTS online_stats (
+  profile_id       INTEGER NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  mode             INTEGER NOT NULL,
+  daily_challenge  TEXT,
+  ranked_play      TEXT,
+  read_at          INTEGER NOT NULL,
+  PRIMARY KEY (profile_id, mode)
+);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);

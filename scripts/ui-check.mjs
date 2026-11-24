@@ -3729,13 +3729,33 @@ check(
 );
 check(
   'five grade counts',
-  await evaluate("document.querySelectorAll('.profile-rank-count__item').length"),
+  await evaluate("document.querySelectorAll('#gradeCounts > .profile-rank-count__item').length"),
   5,
 );
 check(
   'stats box filled in',
   await evaluate("document.querySelectorAll('#profileStats .profile-stats__entry').length"),
   8,
+);
+// osu-web's Show more details: three cards, the stats box gaining Total Play Time, and back.
+check(
+  'Show more details switches to the three cards and back',
+  await evaluate(`(() => {
+    const button = document.getElementById('detailToggle');
+    const before = localStorage.getItem('profileDetailV2');
+    localStorage.setItem('profileDetailV2', '0');
+    button.click();
+    const more = !document.getElementById('detailV2').hidden && document.getElementById('detailV1').hidden
+      && document.querySelectorAll('#detailV2 > .profile-detail-stats-card').length === 3
+      && document.querySelectorAll('#v2Stats .profile-stats__entry').length === 9
+      && button.getAttribute('aria-pressed') === 'true';
+    button.click();
+    const less = document.getElementById('detailV2').hidden && !document.getElementById('detailV1').hidden
+      && document.querySelectorAll('#detailBoxes > .daily-challenge').length === 2;
+    if (before === null) localStorage.removeItem('profileDetailV2'); else localStorage.setItem('profileDetailV2', before);
+    return more && less;
+  })()`),
+  true,
 );
 /*
  * Named rather than counted, so adding a section is a deliberate edit here -- but compared

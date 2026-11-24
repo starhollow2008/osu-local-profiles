@@ -135,6 +135,40 @@ export function rankChart(input) {
 }
 
 /**
+ * A Ranked Play rating over time, as osu-web's `detail-stats-v2/matchmaking-chart.tsx` draws it:
+ * the last rating of each day, oldest first, on a log scale with the higher rating at the top. One
+ * day alone gets the day before it at the same rating, so it still draws a line. `input` is the
+ * pool's `ratingHistory`, newest first, as osu-web hands it over.
+ */
+export function ratingChart(input) {
+  if (!input || input.length === 0) return EMPTY(t('rankedPlay.noRecentPlays'));
+
+  const byDay = new Map();
+  for (const entry of input) {
+    const day = Math.floor(entry.at / 86_400_000) * 86_400_000;
+    if (!byDay.has(day)) byDay.set(day, entry.rating);
+  }
+  const points = [...byDay].map(([at, rating]) => ({ at, rating })).reverse();
+  if (points.length === 1) points.unshift({ at: points[0].at - 86_400_000, rating: points[0].rating });
+
+  const [minX, maxX] = extent(points.map((p) => p.at));
+  const [low, high] = extent(points.map((p) => Math.max(p.rating, 1)));
+  const spanX = maxX - minX || 1;
+  const lo = Math.log(low);
+  const spanY = Math.log(high) - lo;
+  const label = escapeHtml(t('rankedPlay.rating'));
+
+  const plotted = points.map((p) => ({
+    x: ((p.at - minX) / spanX) * 100,
+    y: spanY > 0 ? 94 - ((Math.log(Math.max(p.rating, 1)) - lo) / spanY) * 88 : 50,
+    title: `<strong>${label}</strong> ${fmt(p.rating)}`,
+    sub: daysAgoLabel(p.at),
+  }));
+
+  return render(plotted, { caption: dateCaption(minX, maxX) });
+}
+
+/**
  * pp over time, shown in the same slot when no rank curve exists for the mode.
  *
  * The baseline is anchored at zero rather than at the lowest value: a new profile starts

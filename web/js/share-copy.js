@@ -15,6 +15,7 @@
 import { escapeHtml } from './format.js';
 import { bundleModules } from './bundle.js';
 import { currentLocale, DEFAULT_LOCALE, t } from './i18n.js';
+import { tierBadges } from './ranked-play.js';
 
 /** How much of each list the copy carries: every row the page could ask for, within reason. */
 const LENGTHS = { events: 500, top: 100, recent: 500, mostPlayed: 500, favorites: 500 };
@@ -53,12 +54,17 @@ async function fetchDataUri(url) {
  * avatar through `url()`s relative to the stylesheet, which mean nothing once the sheet is
  * inlined into a file. Each one the app serves becomes a data: URI; anything else (another
  * host, an existing data: URI) is left as it was, and so is a picture that cannot be read.
+ *
+ * Of the Ranked Play tier badges, a picture per tier and ruleset, only the ones named in
+ * `badges` are carried: all of them would add two megabytes to every copy.
  */
-async function inlineCssUrls(css, href) {
+async function inlineCssUrls(css, href, badges = new Set()) {
   const base = new URL(href, location.href);
   const uris = new Map();
   for (const [, , ref] of css.matchAll(/url\(\s*(['"]?)([^'")]+)\1\s*\)/g)) {
     if (uris.has(ref) || ref.startsWith('data:')) continue;
+    const badge = /matchmaking-tiers\/(.+)@2x\.png$/.exec(ref);
+    if (badge && !badges.has(badge[1])) continue;
     const target = new URL(ref, base);
     if (target.origin !== location.origin) continue;
     uris.set(ref, await fetchDataUri(target.pathname).catch(() => null));
@@ -203,8 +209,10 @@ export async function buildInteractiveHtml(progress = () => {}) {
 
   // Every replacement is a function: the text going in is CSS and JavaScript, full of `$`,
   // which a replacement *string* would read as patterns.
+  // The tier badges the copy's Ranked Play can show, in any mode.
+  const badges = new Set(Object.values(profiles).flatMap((profile) => [...tierBadges(profile.online?.rankedPlay)]));
   for (const [tag, href] of [...html.matchAll(/<link rel="stylesheet" href="([^"]+)">/g)]) {
-    const css = await inlineCssUrls(await fetchText(href), href);
+    const css = await inlineCssUrls(await fetchText(href), href, badges);
     html = html.replace(tag, () => `<style>\n${css}\n</style>`);
   }
   const icon = /<link rel="icon"[^>]*href="([^"]+)"[^>]*>/.exec(html);

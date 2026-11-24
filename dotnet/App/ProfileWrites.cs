@@ -308,7 +308,8 @@ internal static class ProfileData
 
     /// <summary>
     /// Every play erased and tracking restarted from now: scores, unfinished plays, deletions, the
-    /// declined list, the standing and medals borrowed from osu!, and rank events.
+    /// declined list, the standing and medals borrowed from osu!, rank events, and the Daily
+    /// Challenge and Ranked Play read from osu!.
     /// </summary>
     public static (double Deleted, double TrackingSince) Reset(Database db, long profileId) => db.Serialized(() =>
     {
@@ -328,6 +329,7 @@ internal static class ProfileData
             db.Run("DELETE FROM rank_events WHERE profile_id = ?", profileId);
             db.Run("DELETE FROM first_places WHERE profile_id = ?", profileId);
             db.Run("DELETE FROM first_place_counts WHERE profile_id = ?", profileId);
+            db.Run("DELETE FROM online_stats WHERE profile_id = ?", profileId);
             db.Run("UPDATE profiles SET tracking_since = ? WHERE id = ?", now, profileId);
         });
         return (before, now);

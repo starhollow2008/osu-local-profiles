@@ -58,6 +58,7 @@ import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { forgetAnnouncedMedals, renderMedals } from './medals.js';
 import { rankTier } from './rank-tier.js';
+import { dailyChallengeBig, dailyChallengeBox, rankedPlayBox, rankedPlayCard } from './detail-stats.js';
 import {
   bindScoreList,
   closeScoreList,
@@ -136,19 +137,21 @@ function renderGradeCounts() {
   const more = where === 'hover'
     ? `<div class="profile-rank-count__more" role="tooltip">${LOWER_GRADES.map(item).join('')}</div>`
     : '';
-  const box = $('gradeCounts');
-  box.innerHTML = row + more;
-  box.classList.toggle('profile-rank-count--all', where === 'always');
-  box.classList.toggle('profile-rank-count--more', where === 'hover');
-  // Reachable by keyboard and by a tap, which focuses it, when the box opens on hover.
-  if (where === 'hover') {
-    box.tabIndex = 0;
-    box.setAttribute('aria-label', LOWER_GRADES.map((g) => `${g} ${fmt(stats.grades?.[g] ?? 0)}`).join(', '));
-  } else {
-    box.removeAttribute('tabindex');
-    box.removeAttribute('aria-label');
+  // Under the chart, and in Show more details' Solo Play card.
+  for (const box of [$('gradeCounts'), $('v2GradeCounts')]) {
+    box.innerHTML = row + more;
+    box.classList.toggle('profile-rank-count--all', where === 'always');
+    box.classList.toggle('profile-rank-count--more', where === 'hover');
+    // Reachable by keyboard and by a tap, which focuses it, when the box opens on hover.
+    if (where === 'hover') {
+      box.tabIndex = 0;
+      box.setAttribute('aria-label', LOWER_GRADES.map((g) => `${g} ${fmt(stats.grades?.[g] ?? 0)}`).join(', '));
+    } else {
+      box.removeAttribute('tabindex');
+      box.removeAttribute('aria-label');
+    }
   }
-  box.closest('.profile-detail-stats__chart-numbers')?.classList.toggle('profile-detail-stats__chart-numbers--all-grades', where === 'always');
+  $('gradeCounts').closest('.profile-detail-stats__chart-numbers')?.classList.toggle('profile-detail-stats__chart-numbers--all-grades', where === 'always');
 }
 
 /**
@@ -628,6 +631,10 @@ function renderStats(next, medalTotal, imported) {
   // The Scores view's own copy, beside the profile's name.
   $('scoreListPp').textContent = `${fmt(stats.totalPp, 0)} pp`;
   $('scoreListPp').title = $('totalPp').title;
+  // Show more details' Solo Play card: pp and Medals beside each other.
+  $('v2Pp').textContent = $('totalPp').textContent;
+  $('v2Pp').title = $('totalPp').title;
+  $('v2Medals').textContent = $('medalTotal').textContent;
 
   const playTime = playTimeStrings(stats.playTime);
   $('playTime').textContent = playTime.value;
@@ -635,19 +642,24 @@ function renderStats(next, medalTotal, imported) {
 
   renderGradeCounts();
 
-  // osu-web's v1 stats box, minus play time (which it also omits). Replays watched is a dash
-  // for now, there to give the box osu!'s width.
-  const entries = [
+  /*
+   * osu-web's stats box (stats.tsx), minus play time, which it also leaves out: Total Play Time
+   * is under the chart. Show more details has no row under its chart, so its box has play time
+   * as a row of its own, after the play count. Replays watched is a dash for now, there to give
+   * the box osu!'s width.
+   */
+  const entries = (withPlayTime) => [
     [t('stats.rankedScore'), fmt(stats.rankedScore)],
     [t('stats.hitAccuracy'), pct(stats.accuracy)],
     [t('stats.playCount'), fmt(stats.playcount)],
+    ...(withPlayTime ? [[t('page.totalPlayTime'), `<span title="${escapeHtml(playTime.title)}">${escapeHtml(playTime.value)}</span>`]] : []),
     [t('stats.totalScore'), fmt(stats.totalScore)],
     [t('stats.totalHits'), fmt(stats.totalHits)],
     [t('stats.hitsPerPlay'), fmt(stats.hitsPerPlay)],
     [t('stats.maximumCombo'), `${fmt(stats.maxCombo)}x`],
     [t('stats.replaysWatched'), '-'],
   ];
-  $('profileStats').innerHTML = entries
+  const statsBox = (rows) => rows
     .map(
       ([k, v]) => `<div class="profile-stats__entry">
         <dt class="profile-stats__key">${escapeHtml(k)}</dt>
@@ -655,6 +667,8 @@ function renderStats(next, medalTotal, imported) {
       </div>`,
     )
     .join('');
+  $('profileStats').innerHTML = statsBox(entries(false));
+  $('v2Stats').innerHTML = statsBox(entries(true));
 
   const progress = Math.round((stats.level.progress ?? 0) * 100);
   $('levelFill').style.width = `${progress}%`;
@@ -669,36 +683,100 @@ function renderStats(next, medalTotal, imported) {
  * number would be worse than an honest dash.
  */
 function renderRank(data) {
-  const el = $('globalRank');
   // osu-web's tier colour (issue #30), unless Other settings turned it off.
   const tier = data.rank && app.config?.rankTiers !== false ? rankTier(data.rank.rank, data.rankSource?.players) : null;
-  el.classList.toggle('rank-value', tier !== null);
-  for (const name of [...el.classList]) if (name.startsWith('rank-value--')) el.classList.remove(name);
-  if (tier) el.classList.add(`rank-value--${tier}`);
-  if (tier) el.style.setProperty('--colour', `var(--level-tier-${tier})`);
-  else el.style.removeProperty('--colour');
-  if (data.rank) {
-    el.textContent = `#${fmt(data.rank.rank)}`;
-    el.title =
-      t('rank.estimatedFrom', { dump: data.rankSource?.dump ?? data.rank.dump }) +
+  const title = data.rank
+    ? t('rank.estimatedFrom', { dump: data.rankSource?.dump ?? data.rank.dump }) +
       (data.rankSource
         ? t('rank.sampleSize', { n: fmt(data.rankSource.sampled) })
         : '') +
       '. ' +
       t('rank.approximate') +
       // The ladder is release pp; pp from the player's own source is measured against it anyway.
-      (data.counting?.ppSource ? ` ${t('rank.fromSource')}` : '');
-  } else {
-    el.textContent = '-';
-    el.title = stats?.totalPp > 0
+      (data.counting?.ppSource ? ` ${t('rank.fromSource')}` : '')
+    : stats?.totalPp > 0
       ? t('rank.noCurve')
       : t('rank.noPp');
+  // Beside the chart, and in Show more details' Solo Play card.
+  for (const el of [$('globalRank'), $('v2GlobalRank')]) {
+    el.classList.toggle('rank-value', tier !== null);
+    for (const name of [...el.classList]) if (name.startsWith('rank-value--')) el.classList.remove(name);
+    if (tier) el.classList.add(`rank-value--${tier}`);
+    if (tier) el.style.setProperty('--colour', `var(--level-tier-${tier})`);
+    else el.style.removeProperty('--colour');
+    el.textContent = data.rank ? `#${fmt(data.rank.rank)}` : '-';
+    el.title = title;
   }
   // The Scores view's copy, left out when there is no rank to give.
   $('scoreListRank').hidden = !data.rank;
   $('scoreListRank').textContent = data.rank ? t('scoreList.rankGlobal', { rank: fmt(data.rank.rank) }) : '';
-  $('scoreListRank').title = data.rank ? el.title : '';
+  $('scoreListRank').title = data.rank ? title : '';
 }
+
+/* ------------------------------------------------------ more details */
+
+/*
+ * osu-web's Show more details (`detail.tsx`): which of the two views the stats are drawn in, kept
+ * per browser like the cover's, as osu-web keeps it per account (`profile_detail_v2`).
+ */
+const DETAIL_KEY = 'profileDetailV2';
+/** The linked account's Ranked Play and Daily Challenge, as /api/profile last gave them. */
+let online = null;
+/** The Ranked Play pool picked from mania's key counts, or null for the one osu-web shows first. */
+let rankedPool = null;
+
+function renderDetailToggle() {
+  const more = localStorage.getItem(DETAIL_KEY) === '1';
+  $('detailV1').hidden = more;
+  $('detailV2').hidden = !more;
+  // Two literal calls, not one chosen by a condition: the i18n check can only see a literal.
+  const showLess = t('detail.showLess');
+  const showMore = t('detail.showMore');
+  const button = $('detailToggle');
+  button.classList.toggle('btn-circle--activated', more);
+  button.setAttribute('aria-pressed', String(more));
+  button.title = more ? showLess : showMore;
+  button.setAttribute('aria-label', button.title);
+}
+
+$('detailToggle').onclick = () => {
+  localStorage.setItem(DETAIL_KEY, localStorage.getItem(DETAIL_KEY) === '1' ? '0' : '1');
+  renderDetailToggle();
+};
+
+/** Ranked Play and Daily Challenge, in both views. */
+function renderOnline(next) {
+  online = next ?? null;
+  $('detailBoxes').innerHTML = rankedPlayBox(online) + dailyChallengeBox(online);
+  $('v2RankedPlay').innerHTML = rankedPlayCard(online, rankedPool);
+  $('v2DailyChallenge').innerHTML = dailyChallengeBig(online);
+}
+
+/*
+ * The Ranked Play and Daily Challenge popups open above their box, as osu-web's do, and below it
+ * when the screen has no room above.
+ */
+function placeDetailPopup(event) {
+  const owner = event.target instanceof Element ? event.target.closest('.detail-popup-owner') : null;
+  const popup = owner?.querySelector(':scope > .detail-popup');
+  if (!popup || owner.contains(event.relatedTarget)) return;
+  popup.style.visibility = 'hidden';
+  popup.style.display = 'grid';
+  const height = popup.offsetHeight;
+  popup.style.removeProperty('display');
+  popup.style.removeProperty('visibility');
+  owner.classList.toggle('detail-popup-owner--below', owner.getBoundingClientRect().top < height + 8);
+}
+for (const type of ['mouseover', 'focusin']) document.addEventListener(type, placeDetailPopup);
+
+// Mania's key counts: each is a pool of its own, as on osu-web.
+$('v2RankedPlay').addEventListener('click', (event) => {
+  const button = event.target instanceof Element ? event.target.closest('[data-ranked-pool]') : null;
+  if (!button) return;
+  rankedPool = Number(button.getAttribute('data-ranked-pool'));
+  renderOnline(online);
+  bindCharts($('v2RankedPlay'));
+});
 
 /**
  * Says, once, that this profile is not being scored the way osu! would.
@@ -907,17 +985,21 @@ async function loadProfile() {
   // The banner is drawn by loadState, with the profile it belongs to: drawn here, it could be the
   // previous profile's, since the two load side by side (issue #34).
   renderCoverToggle();
+  renderDetailToggle();
 
   renderRank(data);
+  renderOnline(data.online);
 
   // osu-web charts global rank; fall back to pp when no rank curve exists for this mode.
   const rankPoints = (data.rankHistory ?? []).filter((p) => p.rank != null);
-  $('ppChart').innerHTML = rankPoints.length
+  const detailChart = rankPoints.length
     ? rankChart(rankPoints)
     : ppChart(
         data.ppHistory,
         data.stats.playcount > 0 ? t('chart.noRankedPlays') : t('chart.unranked'),
       );
+  $('ppChart').innerHTML = detailChart;
+  $('v2Chart').innerHTML = detailChart;
 
   $('recentActivity').innerHTML =
     activityList(data.events) +

@@ -61,7 +61,9 @@ internal static class RankEvents
 
 /// <summary>
 /// When to ask osu!: once at start, and <see cref="RankEvents.AskAfterPlayMs"/> after the last of a
-/// run of plays. A failure (offline, osu! down) is quiet: the next play or launch asks again.
+/// run of plays. A failure (offline, osu! down) is quiet: the next play or launch asks again. Each
+/// time, the account's Daily Challenge and Ranked Play are read too (<see cref="OnlineStats"/>): for
+/// every ruleset the profile plays at start, and after plays, the rulesets they were in.
 /// </summary>
 internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<PlayerIdentity> identity, OsuWeb osu, Action<int>? onNew = null,
     BeatmapResolver? beatmaps = null)
@@ -71,31 +73,44 @@ internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<P
     private int asking;
     /// <summary>Whether this launch has compared osu!'s first-place counts yet: once a launch, not once a play.</summary>
     private bool countsCompared;
+    /// <summary>The rulesets played since the last ask, whose Daily Challenge and Ranked Play to read.</summary>
+    private readonly HashSet<int> playedModes = [];
 
     /// <summary>A play was just tracked. Only one osu! could rank is worth asking about.</summary>
-    public void Played(string client, string grade)
+    public void Played(string client, string grade, double mode)
     {
         if (client is "mcosu" or "neki" or "neomod" || grade == "F") return;
         if (Account() is null) return;
         lock (gate)
         {
+            if (mode is 0 or 1 or 2 or 3) playedModes.Add((int)mode);
             timer?.Dispose();
             timer = new Timer(_ =>
             {
                 lock (gate) timer = null;
-                _ = CatchUp();
+                _ = CatchUp(afterPlay: true);
             }, null, TimeSpan.FromMilliseconds(RankEvents.AskAfterPlayMs), Timeout.InfiniteTimeSpan);
         }
     }
 
-    /// <summary>Ask now. How many new events were kept; 0 when there was nobody to ask about.</summary>
-    public async Task<int> CatchUp()
+    /// <summary>
+    /// Ask now. How many new events were kept; 0 when there was nobody to ask about. After plays,
+    /// Daily Challenge and Ranked Play are read for the rulesets played; otherwise for every one
+    /// the profile plays.
+    /// </summary>
+    public async Task<int> CatchUp(bool afterPlay = false)
     {
         if (Interlocked.Exchange(ref asking, 1) == 1) return 0;
         try
         {
             if (Account() is not { } account) return 0;
             var profile = profileId();
+            List<int> modes;
+            lock (gate)
+            {
+                modes = afterPlay ? [.. playedModes.Order()] : OnlineStats.Modes(db, profile);
+                playedModes.Clear();
+            }
             var activity = await osu.FetchRecentActivity(account);
             var added = RankEvents.Save(db, profile, activity.Ranks);
             var changed = added + FirstPlaces.Lost(db, profile, activity.Lost);
@@ -104,6 +119,7 @@ internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<P
                 countsCompared = true;
                 changed += await CompareFirstPlaceCounts(account, profile, beatmaps);
             }
+            changed += await ReadOnlineStats(account, profile, modes);
             if (changed > 0) onNew?.Invoke(changed);
             return added;
         }
@@ -118,6 +134,37 @@ internal sealed class RankEventWatcher(Database db, Func<long> profileId, Func<P
     }
 
     private double? Account() => RankEvents.Account(db, profileId(), identity());
+
+    /// <summary>
+    /// Each ruleset's profile page, and for each Ranked Play pool with a settled rating, its chart:
+    /// how many rulesets changed. One that fails keeps its last read, for the next ask.
+    /// </summary>
+    private async Task<int> ReadOnlineStats(double account, long profile, List<int> modes)
+    {
+        var changed = 0;
+        foreach (var mode in modes)
+        {
+            try
+            {
+                var page = await osu.FetchOnlineStats(account, mode);
+                if (page.RankedPlay is { } pools)
+                {
+                    for (var i = 0; i < pools.Count; i++)
+                    {
+                        // osu-web draws no chart for a provisional rating, or for a pool never played.
+                        if (pools[i].Provisional || pools[i].RecentHistory.Count == 0) continue;
+                        pools[i] = pools[i] with { RatingHistory = await osu.FetchRatingHistory(pools[i].PoolId, account) };
+                    }
+                }
+                if (OnlineStats.Save(db, profile, mode, page, Js.Now())) changed++;
+            }
+            catch (Exception e) when (e is not OutOfMemoryException)
+            {
+                /* osu! out of reach: the last read stays */
+            }
+        }
+        return changed;
+    }
 
     /// <summary>
     /// For each ruleset first places were imported for, osu!'s count now against the count at the

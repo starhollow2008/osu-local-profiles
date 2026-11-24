@@ -1111,6 +1111,17 @@ at start, once after linking, and `ASK_AFTER_PLAY_MS` after the last of a run of
 (`rankAccount`), and an event is kept only against a play of this profile: same beatmap and mode,
 within `MATCH_WINDOW_MS`, joined by `dedupe_key` so a reingest keeps it.
 
+**Daily Challenge and Ranked Play** (`dotnet/App/OnlineStats.cs`), which Show more details shows
+as osu-web does (`detail-stats-v2`), are read at the same moments, for the same account, and only
+then: the profile page of each ruleset the profile plays (`/users/<id>/<ruleset>`, its
+`daily_challenge_user_stats` and `matchmaking_stats`) at start, after linking and on a profile
+switch, and after plays only for the rulesets played. A pool whose rating has settled also reads
+osu-web's chart for it (`/matchmaking-pools/<pool>/user-chart/<id>`). Kept per profile and ruleset in
+`online_stats`, so the page shows the last read offline, and shown as osu! gave it: no figure of the
+app's own reads it. A profile with no linked account of the player's own draws the same boxes with
+dashes. The page's half is `web/js/detail-stats.js`, and Share carries only the tier badges its copy
+shows (`tierBadges`), not all 77.
+
 ## Launcher: a tray icon
 
 `tools/launcher/` (Go, `fyne.io/systray`) is what a package opens: `osu! local profiles.exe`,

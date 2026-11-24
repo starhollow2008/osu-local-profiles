@@ -5,7 +5,7 @@
  * mod.less, score-rank.less, legacy-rank.less and avatar.less do. Shapes, sizes and colours are
  * in profile.css; this file is only which picture goes where.
  *
- * Artwork (c) ppy Pty Ltd, AGPL-3.0-or-later, from ppy/osu-web@705b1d829879.
+ * Artwork (c) ppy Pty Ltd, AGPL-3.0-or-later, from ppy/osu-web@7076b37b3d94.
  * Share inlines every url() here into a saved copy (web/js/share-copy.js).
  */
 
@@ -123,3 +123,85 @@
 .mode-icon--taiko::before { content: "\e803"; }
 .mode-icon--fruits::before { content: "\e801"; }
 .mode-icon--mania::before { content: "\e802"; }
+
+/* Show more details: osu-web's svg-icon.less, and the badges of matchmaking-tier-badge.less. */
+.svg-icon--solo { -webkit-mask-image: url("../osu-web/icons/solo.svg"); mask-image: url("../osu-web/icons/solo.svg"); }
+.svg-icon--multi { -webkit-mask-image: url("../osu-web/icons/multi.svg"); mask-image: url("../osu-web/icons/multi.svg"); }
+.svg-icon--daily-challenge { -webkit-mask-image: url("../osu-web/icons/daily-challenge.svg"); mask-image: url("../osu-web/icons/daily-challenge.svg"); }
+.matchmaking-tier-badge--Bronze-I-0 { background-image: url("../osu-web/matchmaking-tiers/Bronze-I-0@2x.png"); }
+.matchmaking-tier-badge--Bronze-I-1 { background-image: url("../osu-web/matchmaking-tiers/Bronze-I-1@2x.png"); }
+.matchmaking-tier-badge--Bronze-I-2 { background-image: url("../osu-web/matchmaking-tiers/Bronze-I-2@2x.png"); }
+.matchmaking-tier-badge--Bronze-I-3 { background-image: url("../osu-web/matchmaking-tiers/Bronze-I-3@2x.png"); }
+.matchmaking-tier-badge--Bronze-II-0 { background-image: url("../osu-web/matchmaking-tiers/Bronze-II-0@2x.png"); }
+.matchmaking-tier-badge--Bronze-II-1 { background-image: url("../osu-web/matchmaking-tiers/Bronze-II-1@2x.png"); }
+.matchmaking-tier-badge--Bronze-II-2 { background-image: url("../osu-web/matchmaking-tiers/Bronze-II-2@2x.png"); }
+.matchmaking-tier-badge--Bronze-II-3 { background-image: url("../osu-web/matchmaking-tiers/Bronze-II-3@2x.png"); }
+.matchmaking-tier-badge--Bronze-III-0 { background-image: url("../osu-web/matchmaking-tiers/Bronze-III-0@2x.png"); }
+.matchmaking-tier-badge--Bronze-III-1 { background-image: url("../osu-web/matchmaking-tiers/Bronze-III-1@2x.png"); }
+.matchmaking-tier-badge--Bronze-III-2 { background-image: url("../osu-web/matchmaking-tiers/Bronze-III-2@2x.png"); }
+.matchmaking-tier-badge--Bronze-III-3 { background-image: url("../osu-web/matchmaking-tiers/Bronze-III-3@2x.png"); }
+.matchmaking-tier-badge--Silver-I-0 { background-image: url("../osu-web/matchmaking-tiers/Silver-I-0@2x.png"); }
+.matchmaking-tier-badge--Silver-I-1 { background-image: url("../osu-web/matchmaking-tiers/Silver-I-1@2x.png"); }
+.matchmaking-tier-badge--Silver-I-2 { background-image: url("../osu-web/matchmaking-tiers/Silver-I-2@2x.png"); }
+.matchmaking-tier-badge--Silver-I-3 { background-image: url("../osu-web/matchmaking-tiers/Silver-I-3@2x.png"); }
+.matchmaking-tier-badge--Silver-II-0 { background-image: url("../osu-web/matchmaking-tiers/Silver-II-0@2x.png"); }
+.matchmaking-tier-badge--Silver-II-1 { background-image: url("../osu-web/matchmaking-tiers/Silver-II-1@2x.png"); }
+.matchmaking-tier-badge--Silver-II-2 { background-image: url("../osu-web/matchmaking-tiers/Silver-II-2@2x.png"); }
+.matchmaking-tier-badge--Silver-II-3 { background-image: url("../osu-web/matchmaking-tiers/Silver-II-3@2x.png"); }
+.matchmaking-tier-badge--Silver-III-0 { background-image: url("../osu-web/matchmaking-tiers/Silver-III-0@2x.png"); }
+.matchmaking-tier-badge--Silver-III-1 { background-image: url("../osu-web/matchmaking-tiers/Silver-III-1@2x.png"); }
+.matchmaking-tier-badge--Silver-III-2 { background-image: url("../osu-web/matchmaking-tiers/Silver-III-2@2x.png"); }
+.matchmaking-tier-badge--Silver-III-3 { background-image: url("../osu-web/matchmaking-tiers/Silver-III-3@2x.png"); }
+.matchmaking-tier-badge--Gold-I-0 { background-image: url("../osu-web/matchmaking-tiers/Gold-I-0@2x.png"); }
+.matchmaking-tier-badge--Gold-I-1 { background-image: url("../osu-web/matchmaking-tiers/Gold-I-1@2x.png"); }
+.matchmaking-tier-badge--Gold-I-2 { background-image: url("../osu-web/matchmaking-tiers/Gold-I-2@2x.png"); }
+.matchmaking-tier-badge--Gold-I-3 { background-image: url("../osu-web/matchmaking-tiers/Gold-I-3@2x.png"); }
+.matchmaking-tier-badge--Gold-II-0 { background-image: url("../osu-web/matchmaking-tiers/Gold-II-0@2x.png"); }
+.matchmaking-tier-badge--Gold-II-1 { background-image: url("../osu-web/matchmaking-tiers/Gold-II-1@2x.png"); }
+.matchmaking-tier-badge--Gold-II-2 { background-image: url("../osu-web/matchmaking-tiers/Gold-II-2@2x.png"); }
+.matchmaking-tier-badge--Gold-II-3 { background-image: url("../osu-web/matchmaking-tiers/Gold-II-3@2x.png"); }
+.matchmaking-tier-badge--Gold-III-0 { background-image: url("../osu-web/matchmaking-tiers/Gold-III-0@2x.png"); }
+.matchmaking-tier-badge--Gold-III-1 { background-image: url("../osu-web/matchmaking-tiers/Gold-III-1@2x.png"); }
+.matchmaking-tier-badge--Gold-III-2 { background-image: url("../osu-web/matchmaking-tiers/Gold-III-2@2x.png"); }
+.matchmaking-tier-badge--Gold-III-3 { background-image: url("../osu-web/matchmaking-tiers/Gold-III-3@2x.png"); }
+.matchmaking-tier-badge--Platinum-I-0 { background-image: url("../osu-web/matchmaking-tiers/Platinum-I-0@2x.png"); }
+.matchmaking-tier-badge--Platinum-I-1 { background-image: url("../osu-web/matchmaking-tiers/Platinum-I-1@2x.png"); }
+.matchmaking-tier-badge--Platinum-I-2 { background-image: url("../osu-web/matchmaking-tiers/Platinum-I-2@2x.png"); }
+.matchmaking-tier-badge--Platinum-I-3 { background-image: url("../osu-web/matchmaking-tiers/Platinum-I-3@2x.png"); }
+.matchmaking-tier-badge--Platinum-II-0 { background-image: url("../osu-web/matchmaking-tiers/Platinum-II-0@2x.png"); }
+.matchmaking-tier-badge--Platinum-II-1 { background-image: url("../osu-web/matchmaking-tiers/Platinum-II-1@2x.png"); }
+.matchmaking-tier-badge--Platinum-II-2 { background-image: url("../osu-web/matchmaking-tiers/Platinum-II-2@2x.png"); }
+.matchmaking-tier-badge--Platinum-II-3 { background-image: url("../osu-web/matchmaking-tiers/Platinum-II-3@2x.png"); }
+.matchmaking-tier-badge--Platinum-III-0 { background-image: url("../osu-web/matchmaking-tiers/Platinum-III-0@2x.png"); }
+.matchmaking-tier-badge--Platinum-III-1 { background-image: url("../osu-web/matchmaking-tiers/Platinum-III-1@2x.png"); }
+.matchmaking-tier-badge--Platinum-III-2 { background-image: url("../osu-web/matchmaking-tiers/Platinum-III-2@2x.png"); }
+.matchmaking-tier-badge--Platinum-III-3 { background-image: url("../osu-web/matchmaking-tiers/Platinum-III-3@2x.png"); }
+.matchmaking-tier-badge--Rhodium-I-0 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-I-0@2x.png"); }
+.matchmaking-tier-badge--Rhodium-I-1 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-I-1@2x.png"); }
+.matchmaking-tier-badge--Rhodium-I-2 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-I-2@2x.png"); }
+.matchmaking-tier-badge--Rhodium-I-3 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-I-3@2x.png"); }
+.matchmaking-tier-badge--Rhodium-II-0 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-II-0@2x.png"); }
+.matchmaking-tier-badge--Rhodium-II-1 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-II-1@2x.png"); }
+.matchmaking-tier-badge--Rhodium-II-2 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-II-2@2x.png"); }
+.matchmaking-tier-badge--Rhodium-II-3 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-II-3@2x.png"); }
+.matchmaking-tier-badge--Rhodium-III-0 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-III-0@2x.png"); }
+.matchmaking-tier-badge--Rhodium-III-1 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-III-1@2x.png"); }
+.matchmaking-tier-badge--Rhodium-III-2 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-III-2@2x.png"); }
+.matchmaking-tier-badge--Rhodium-III-3 { background-image: url("../osu-web/matchmaking-tiers/Rhodium-III-3@2x.png"); }
+.matchmaking-tier-badge--Radiant-I-0 { background-image: url("../osu-web/matchmaking-tiers/Radiant-I-0@2x.png"); }
+.matchmaking-tier-badge--Radiant-I-1 { background-image: url("../osu-web/matchmaking-tiers/Radiant-I-1@2x.png"); }
+.matchmaking-tier-badge--Radiant-I-2 { background-image: url("../osu-web/matchmaking-tiers/Radiant-I-2@2x.png"); }
+.matchmaking-tier-badge--Radiant-I-3 { background-image: url("../osu-web/matchmaking-tiers/Radiant-I-3@2x.png"); }
+.matchmaking-tier-badge--Radiant-II-0 { background-image: url("../osu-web/matchmaking-tiers/Radiant-II-0@2x.png"); }
+.matchmaking-tier-badge--Radiant-II-1 { background-image: url("../osu-web/matchmaking-tiers/Radiant-II-1@2x.png"); }
+.matchmaking-tier-badge--Radiant-II-2 { background-image: url("../osu-web/matchmaking-tiers/Radiant-II-2@2x.png"); }
+.matchmaking-tier-badge--Radiant-II-3 { background-image: url("../osu-web/matchmaking-tiers/Radiant-II-3@2x.png"); }
+.matchmaking-tier-badge--Radiant-III-0 { background-image: url("../osu-web/matchmaking-tiers/Radiant-III-0@2x.png"); }
+.matchmaking-tier-badge--Radiant-III-1 { background-image: url("../osu-web/matchmaking-tiers/Radiant-III-1@2x.png"); }
+.matchmaking-tier-badge--Radiant-III-2 { background-image: url("../osu-web/matchmaking-tiers/Radiant-III-2@2x.png"); }
+.matchmaking-tier-badge--Radiant-III-3 { background-image: url("../osu-web/matchmaking-tiers/Radiant-III-3@2x.png"); }
+.matchmaking-tier-badge--Lustrous-0 { background-image: url("../osu-web/matchmaking-tiers/Lustrous-0@2x.png"); }
+.matchmaking-tier-badge--Lustrous-1 { background-image: url("../osu-web/matchmaking-tiers/Lustrous-1@2x.png"); }
+.matchmaking-tier-badge--Lustrous-2 { background-image: url("../osu-web/matchmaking-tiers/Lustrous-2@2x.png"); }
+.matchmaking-tier-badge--Lustrous-3 { background-image: url("../osu-web/matchmaking-tiers/Lustrous-3@2x.png"); }
+.matchmaking-tier-badge--Placeholder { background-image: url("../osu-web/matchmaking-tiers/Placeholder@2x.png"); }

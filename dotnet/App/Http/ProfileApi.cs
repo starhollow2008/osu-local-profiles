@@ -110,6 +110,8 @@ internal static class ProfileApi
             // Players: what the page divides the rank by for its tier, as osu-web does (issue #30).
             rankSource = table is null ? null : new { table.Dump, table.Sampled, table.Players },
             imported = stats.BonusPpBorrowed ? Standing.Imported(db, profileId, mode) : null,
+            // osu!'s Daily Challenge and Ranked Play for the linked account, as last read; null for none.
+            online = OnlineStats.View(db, profileId, mode),
             medals = medalSummary,
             medalTotal,
             pinned = cache.Remember($"pinned:{rulesKey}", () => Stats.PinnedPlays(db, profileId, mode, e)),

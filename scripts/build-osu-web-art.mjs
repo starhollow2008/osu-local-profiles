@@ -4,8 +4,8 @@
  *
  * This project is AGPL-3.0-or-later, the licence osu-web is under, so osu!'s own files are
  * used rather than redrawn: the 70-odd mod glyphs and the badge blanks they sit in, the small
- * grade badges, stable's big grade letters, the guest avatar, the default profile banner and the
- * four ruleset icons. They are copied byte for byte and never edited, from one osu-web commit,
+ * grade badges, stable's big grade letters, the guest avatar, the default profile banner, the
+ * four ruleset icons, and the icons and Ranked Play tier badges of Show more details. They are copied byte for byte and never edited, from one osu-web commit,
  * which `web/osu-web/README.md` records -- all but the ruleset icons, which osu-web keeps only as
  * glyphs of an icon font, and are written into a font of their own (see `MODE_GLYPHS`), and the
  * banner, which osu-web no longer has (see `COVERS_COMMIT`).
@@ -126,6 +126,19 @@ const LEGACY = ['XH', 'X', 'SH', 'S', 'A', 'B', 'C', 'D'];
 /* The beatmapset page's basic stats, all four of which the pp calculator shows. */
 const BASIC_STATS = ['total_length', 'bpm', 'count_circles', 'count_sliders'];
 
+/*
+ * Show more details (`detail-stats-v2`): the icons beside its cards' titles, osu-web's
+ * `svg-icon` primitives, and the Ranked Play card's tier badge (`matchmaking-tier-badge.less`),
+ * a picture per tier and ruleset, and the placeholder for a rating not yet settled. Only the @2x
+ * badges, as with stable's letters: a 1x screen scales them down cleanly.
+ */
+const ICONS = ['solo', 'multi', 'daily-challenge'];
+const TIERS = [
+  ...['Bronze', 'Silver', 'Gold', 'Platinum', 'Rhodium', 'Radiant'].flatMap((tier) => ['I', 'II', 'III'].map((level) => `${tier}-${level}`)),
+  'Lustrous',
+];
+const TIER_FILES = [...TIERS.flatMap((tier) => [0, 1, 2, 3].map((ruleset) => `${tier}-${ruleset}`)), 'Placeholder'];
+
 /* ------------------------------------------------------------------ writing */
 
 const files = [];
@@ -141,6 +154,10 @@ files.push(['public/images/layout/avatar-guest@2x.png', 'layout/avatar-guest@2x.
 // The beatmapset page's basic stats icons (`beatmap-basic-stats.tsx`), for the pp calculator.
 for (const stat of BASIC_STATS) {
   files.push([`public/images/layout/beatmapset-page/${stat}.svg`, `layout/beatmapset-page/${stat}.svg`]);
+}
+for (const icon of ICONS) files.push([`resources/images/icons/primitives/${icon}.svg`, `icons/${icon}.svg`]);
+for (const tier of TIER_FILES) {
+  files.push([`resources/images/icons/matchmaking-tiers/${tier}@2x.png`, `matchmaking-tiers/${tier}@2x.png`]);
 }
 
 // Read everything before touching the folder, so a failed download leaves the old set whole.
@@ -226,6 +243,8 @@ by ppy.
 | \`layout/\` | \`public/images/layout/\` | the avatar of a profile with no picture, and the pp calculator's beatmap stats icons |
 | \`covers/\` | \`${DEFAULT_COVER}\` at commit \`${COVERS_COMMIT}\` | the banner of a profile with none of its own |
 | \`modes/\` | \`${EXTRA_FONT}\`, glyphs ${Object.values(MODE_GLYPHS).join(', ')} | the mode switcher's ruleset icons |
+| \`icons/\` | \`resources/images/icons/primitives/\` | the icons beside the titles of Show more details' cards |
+| \`matchmaking-tiers/\` | \`resources/images/icons/matchmaking-tiers/\`, the @2x files | the Ranked Play card's tier badge |
 
 \`modes/\` is the one folder that is not a copied file: osu-web keeps the ruleset icons only as
 glyphs of its icon font, so those four outlines are written, unchanged and at the same code
@@ -278,12 +297,16 @@ ${BASIC_STATS.map((stat) => `.beatmap-basic-stats__entry-icon--${stat} { backgro
   font-display: block;
 }
 ${modeGlyphs.map(({ ruleset, codePoint }) => `.mode-icon--${ruleset}::before { content: "\\${codePoint.toString(16)}"; }`).join('\n')}
+
+/* Show more details: osu-web's svg-icon.less, and the badges of matchmaking-tier-badge.less. */
+${ICONS.map((icon) => `.svg-icon--${icon} { ${mask(`icons/${icon}.svg`)} }`).join('\n')}
+${TIER_FILES.map((tier) => `.matchmaking-tier-badge--${tier} { background-image: ${url(`matchmaking-tiers/${tier}@2x.png`)}; }`).join('\n')}
 `;
 
 fs.writeFileSync(cssFile, css);
 
 console.log(
   `${glyphs.length} mod glyphs, ${Object.keys(GRADES).length} grades, ${LEGACY.length} stable letters, a banner, ` +
-    `${Object.keys(MODE_GLYPHS).length} ruleset icons ` +
+    `${Object.keys(MODE_GLYPHS).length} ruleset icons, ${ICONS.length} icons, ${TIER_FILES.length} tier badges ` +
     `-> web/osu-web/ (${(bytes / 1024).toFixed(0)} KB) from ${REPO}@${commit.slice(0, 12)}`,
 );

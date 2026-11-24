@@ -806,6 +806,8 @@ internal static partial class Server
                     var profile = Profiles.Get(db, RowId(id))!;
                     await tracker.SwitchProfile(profile.Id, profile.TrackingSince);
                     opts.Events.Broadcast("profiles", new { active = profile.Id });
+                    // The profile switched to: where its plays placed, and its Daily Challenge and Ranked Play.
+                    if (opts.RankEvents is { } rank) _ = rank.CatchUp();
                     Console.WriteLine($"\n  now tracking \"{profile.Name}\"\n");
                     await Json(context, new { ok = true, profile, profiles = Profiles.List(db) });
                     return;

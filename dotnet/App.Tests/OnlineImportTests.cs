@@ -203,15 +203,58 @@ public sealed class OnlineImportTests : IDisposable
         var told = 0;
         var watcher = new RankEventWatcher(h.Db, () => h.ProfileId, () => PlayerIdentity.Unknown, osu.Client(), n => told += n);
         Assert.Equal(0, await watcher.CatchUp());
-        watcher.Played("lazer", "A");
+        watcher.Played("lazer", "A", 0);
         Assert.Empty(osu.Asked);
 
         Settings.SettingsStore.Update(h.Db, h.ProfileId, JsonText.From(new { linkedUserId = 3119700, linkedUsername = "Tangy" }));
-        watcher.Played("mcosu", "A");
-        watcher.Played("lazer", "F");
+        watcher.Played("mcosu", "A", 0);
+        watcher.Played("lazer", "F", 0);
         Assert.Equal(1, await watcher.CatchUp());
-        Assert.Equal(["https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0"], osu.Asked);
+        // And the account's Daily Challenge and Ranked Play, for the one ruleset the profile plays.
+        Assert.Equal(["https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0", "https://osu.ppy.sh/users/3119700/osu"], osu.Asked);
         Assert.Equal(1, told);
+    }
+
+    [Fact]
+    public async Task After_plays_Daily_Challenge_and_Ranked_Play_are_read_for_the_rulesets_played()
+    {
+        Play();
+        const string Profile = """
+            {"user":{"daily_challenge_user_stats":{"playcount":3},
+              "matchmaking_stats":[{"pool_id":40,"rank":7,"rating":1800,"plays":30,"first_placements":12,"is_rating_provisional":false,
+                "pool":{"active":true,"name":"RP: Season 1","ruleset_id":3,"variant_id":4},
+                "recent_history":[{"created_at":"2026-11-20T10:00:00Z","id":9,"result":"loss","room_id":1}]}]}}
+            """;
+        var osu = new FakeOsu(url => FakeOsu.Answer(
+            url.Contains("recent_activity") ? "[]"
+            : url.Contains("user-chart") ? """{"user_elo_history":[{"created_at":"2026-11-20T10:00:00Z","elo_after":1800}]}"""
+            : $"<div data-initial-data=\"{Profile.Replace("\"", "&quot;")}\"></div>"));
+        var told = 0;
+        var watcher = new RankEventWatcher(h.Db, () => h.ProfileId, () => PlayerIdentity.Unknown, osu.Client(), n => told += n);
+        Settings.SettingsStore.Update(h.Db, h.ProfileId, JsonText.From(new { linkedUserId = 3119700, linkedUsername = "Tangy" }));
+
+        // A mania play and a taiko one: those two rulesets, and the settled pool's rating chart.
+        watcher.Played("lazer", "A", 3);
+        watcher.Played("lazer", "S", 1);
+        await watcher.CatchUp(afterPlay: true);
+        Assert.Equal([
+            "https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0",
+            "https://osu.ppy.sh/users/3119700/taiko",
+            "https://osu.ppy.sh/matchmaking-pools/40/user-chart/3119700",
+            "https://osu.ppy.sh/users/3119700/mania",
+            "https://osu.ppy.sh/matchmaking-pools/40/user-chart/3119700",
+        ], osu.Asked);
+        Assert.Equal(2, told);
+        var mania = JsonText.From(OnlineStats.View(h.Db, h.ProfileId, 3));
+        Assert.Equal(1800, mania.GetProperty("rankedPlay")[0].GetProperty("ratingHistory")[0].GetProperty("rating").GetDouble());
+
+        // Asked again with nothing played since: every ruleset the profile plays or was read for.
+        osu.Asked.Clear();
+        await watcher.CatchUp(afterPlay: true);
+        Assert.Equal(["https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0"], osu.Asked);
+        osu.Asked.Clear();
+        await watcher.CatchUp();
+        Assert.Equal(["/osu", "/taiko", "/mania"], osu.Asked.Where(u => u.Contains("/users/") && !u.Contains("recent")).Select(u => u[u.LastIndexOf('/')..]));
     }
 
     /* ------------------------------------------------- First Place Ranks (roadmap 5.87) */
@@ -297,7 +340,7 @@ public sealed class OnlineImportTests : IDisposable
 
         // Once a launch: a play later asks about its events, not the count.
         var asked = osu.Asked.Count;
-        await watcher.CatchUp();
+        await watcher.CatchUp(afterPlay: true);
         Assert.Equal(["https://osu.ppy.sh/users/3119700/recent_activity?limit=100&offset=0"], osu.Asked.Skip(asked));
     }
 }
