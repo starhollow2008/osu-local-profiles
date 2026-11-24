@@ -287,6 +287,8 @@ let modesWithPlays = [];
 /** What this build is, from /api/state. `version` is null if package.json was unreadable. */
 let app = { version: null };
 let profile = null;
+/** How many favourites the profile shows: what Remove all in Options -> Profiles would remove. */
+let favoriteCount = 0;
 let stats = null;
 let settings = {};
 let counting = null;
@@ -1069,6 +1071,8 @@ async function loadProfile() {
   favoriteSetIds = new Set(data.favoriteIds ?? []);
   const favoritesTotal = totalFor('favorites', data.favorites ?? []);
   $('favoriteCount').textContent = fmt(favoritesTotal);
+  favoriteCount = favoritesTotal;
+  renderFavoritesClear();
   setPopupCards(data.favorites ?? []);
   $('favoriteBeatmaps').innerHTML =
     favoriteList(data.favorites) +
@@ -2949,6 +2953,7 @@ $('sharedFavorites').onchange = async () => {
     const c = await postJson('/api/app-config', { sharedFavorites: shareFavorites }, 'saving that failed');
     app = { ...app, config: c.config };
     renderImportNote();
+    renderFavoritesClear();
     await loadProfile();
     toast(
       shareFavorites
@@ -2958,6 +2963,34 @@ $('sharedFavorites').onchange = async () => {
   } catch (err) {
     $('sharedFavorites').checked = !shareFavorites;
     toast(err.message);
+  }
+};
+
+/** Remove all favorite beatmaps: every profile's while they are shared, this profile's otherwise. */
+function renderFavoritesClear() {
+  const shared = app.config?.sharedFavorites !== false;
+  // Two literal calls, not one chosen by a condition: the i18n check can only see a literal.
+  const everyProfile = t('favorites.clearEveryProfile');
+  const thisProfile = t('favorites.clearThisProfile');
+  $('favoritesClearHint').textContent = shared ? everyProfile : thisProfile;
+  $('favoritesClear').disabled = favoriteCount === 0;
+}
+
+$('favoritesClear').onclick = async () => {
+  const shared = app.config?.sharedFavorites !== false;
+  const ask = shared
+    ? t('favorites.clearAskShared')
+    : t('favorites.clearAskProfile', { name: profile?.name ?? '' });
+  if (!confirm(`${ask}\n\n${t('favorites.clearWarning')}`)) return;
+  $('favoritesClear').disabled = true;
+  try {
+    await postJson('/api/favorites', { action: 'clear', confirm: true }, 'removing them failed');
+    toast(t('favorites.cleared'));
+    await loadProfile();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    renderFavoritesClear();
   }
 };
 
@@ -4135,6 +4168,7 @@ function openProfiles({ section = null, favoritesOnly = false } = {}) {
   // An import from osu! that is running is left as it is, with its bar showing.
   if (!osuImportRunning()) resetImport({ favoritesOnly });
   $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
+  renderFavoritesClear();
   $('profilesModal').hidden = false;
   renderOsuImport(osuImportState);
   $('profilesModal').querySelector('.modal').scrollTop = 0;

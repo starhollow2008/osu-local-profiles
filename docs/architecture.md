@@ -496,6 +496,11 @@ Shared by default (`config.sharedFavorites`). `FavoriteScope` picks the table, a
 `syncFavoriteSharing` merges per-profile lists with the shared one once per switch (recorded in
 `kv`), so nothing is lost. Removing a shared favourite removes it from every profile's own list.
 
+Remove all favorite beatmaps (Options → Profiles, under the sharing switch) is `Favorites.Clear`,
+`POST /api/favorites {"action":"clear","confirm":true}`: while shared, the shared list and every
+profile's own, so switching sharing off cannot bring them back; otherwise the current profile's
+alone. `beatmapset_details` is kept, so a set favourited again draws at once.
+
 ## osu! account link: no API, no credentials
 
 `osu.ppy.sh/users/<name>` redirects to the numeric id and embeds the public user object as

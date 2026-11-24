@@ -357,7 +357,7 @@ public sealed class WriteApiTests : IAsyncLifetime
     public async Task A_favourite_is_saved_first_and_described_by_osu_when_it_answers()
     {
         Assert.Equal("a beatmapset id is needed", Error((await Post("/api/favorites", new { action = "add", beatmapsetId = 1.5 })).Body));
-        Assert.Equal("action must be add or remove", Error((await Post("/api/favorites", new { action = "toggle", beatmapsetId = 1 })).Body));
+        Assert.Equal("action must be add, remove or clear", Error((await Post("/api/favorites", new { action = "toggle", beatmapsetId = 1 })).Body));
 
         // Offline: kept regardless, with why osu! could not describe it.
         var (_, offline) = await Post("/api/favorites", new { action = "add", beatmapsetId = 8495 });
@@ -375,6 +375,12 @@ public sealed class WriteApiTests : IAsyncLifetime
 
         var (_, removed) = await Post("/api/favorites", new { action = "remove", beatmapsetId = 100 });
         Assert.Equal("[8495]", removed.GetProperty("favorites").GetRawText());
+
+        // Every favourite at once, only when confirmed.
+        Assert.Equal("clearing every favorite needs confirm: true", Error((await Post("/api/favorites", new { action = "clear" })).Body));
+        var (_, cleared) = await Post("/api/favorites", new { action = "clear", confirm = true });
+        Assert.Equal(1, cleared.GetProperty("removed").GetInt32());
+        Assert.Equal("[]", cleared.GetProperty("favorites").GetRawText());
     }
 
     [Fact]

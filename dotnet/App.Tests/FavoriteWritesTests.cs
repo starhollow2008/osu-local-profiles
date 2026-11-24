@@ -55,6 +55,37 @@ public sealed class FavoriteWritesTests : IDisposable
     }
 
     [Fact]
+    public void Clearing_a_profiles_own_favourites_leaves_every_other_profiles()
+    {
+        var other = Profiles.Create(h.Db, "Second").Id;
+        Favorites.Add(h.Db, Own(h.ProfileId), 100);
+        Favorites.Add(h.Db, Own(h.ProfileId), 101);
+        Favorites.Add(h.Db, Own(other), 200);
+        Favorites.SaveDetails(h.Db, Details(100));
+        Assert.Equal(2, Favorites.Clear(h.Db, Own(h.ProfileId)));
+        Assert.Empty(Ids(Own(h.ProfileId)));
+        Assert.Equal([200], Ids(Own(other)));
+        // What osu! said about the set stays, for the next time it is favourited.
+        Assert.NotNull(Favorites.DetailsFor(h.Db, 100.0));
+        Assert.Equal(0, Favorites.Clear(h.Db, Own(h.ProfileId)));
+    }
+
+    [Fact]
+    public void Clearing_while_shared_empties_every_profile_for_good()
+    {
+        var other = Profiles.Create(h.Db, "Second").Id;
+        Favorites.Add(h.Db, Own(other), 100);
+        Favorites.SyncSharing(h.Db, true);
+        Favorites.Add(h.Db, new FavoriteScope(h.ProfileId, true), 101);
+        Assert.Equal(2, Favorites.Clear(h.Db, new FavoriteScope(h.ProfileId, true)));
+        Assert.Empty(Ids(new FavoriteScope(other, true)));
+        // Switching sharing off afterwards brings none of them back.
+        Favorites.SyncSharing(h.Db, false);
+        Assert.Empty(Ids(Own(other)));
+        Assert.Empty(Ids(Own(h.ProfileId)));
+    }
+
+    [Fact]
     public void An_import_keeps_osus_order_caches_every_card_and_counts_only_what_is_new()
     {
         Favorites.Add(h.Db, Own(h.ProfileId), 2, 1);

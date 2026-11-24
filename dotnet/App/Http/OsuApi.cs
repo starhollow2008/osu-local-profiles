@@ -25,6 +25,20 @@ internal static partial class Server
     {
         var db = opts.Db;
         var action = Str(body, "action");
+        // Every favourite at once, from Options -> Profiles: confirmed, as a profile's deletion is.
+        if (action == "clear")
+        {
+            if (!IsTrue(body, "confirm"))
+            {
+                await Json(context, new { error = "clearing every favorite needs confirm: true" }, 400);
+                return;
+            }
+            var cleared = FavoritesOf(opts, profileId);
+            var removed = Favorites.Clear(db, cleared);
+            opts.Events.Broadcast("favorites", new { action });
+            await Json(context, new { ok = true, removed, favorites = Favorites.Ids(db, cleared) });
+            return;
+        }
         var id = Num(body, "beatmapsetId");
         if (!IsInteger(id) || id <= 0)
         {
@@ -33,7 +47,7 @@ internal static partial class Server
         }
         if (action is not ("add" or "remove"))
         {
-            await Json(context, new { error = "action must be add or remove" }, 400);
+            await Json(context, new { error = "action must be add, remove or clear" }, 400);
             return;
         }
 

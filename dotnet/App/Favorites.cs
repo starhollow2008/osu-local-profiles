@@ -255,6 +255,23 @@ internal static class Favorites
     });
 
     /// <summary>
+    /// Every favourite removed: while they are shared, the shared list and every profile's own, so
+    /// switching sharing off later cannot bring them back; otherwise this profile's alone. How many
+    /// the list held. What osu! said about each set is kept, so one favourited again draws at once.
+    /// </summary>
+    public static int Clear(Database db, FavoriteScope scope) => db.Serialized(() =>
+    {
+        if (!scope.Shared) return db.Run("DELETE FROM favorite_beatmapsets WHERE profile_id = ?", scope.ProfileId);
+        var removed = 0;
+        db.Transaction(() =>
+        {
+            removed = db.Run("DELETE FROM shared_favorite_beatmapsets");
+            db.Run("DELETE FROM favorite_beatmapsets");
+        });
+        return removed;
+    });
+
+    /// <summary>
     /// An account's favourites, copied in with their details; how many were new. A millisecond apart,
     /// so the first in osu!'s list stays the newest here too.
     /// </summary>

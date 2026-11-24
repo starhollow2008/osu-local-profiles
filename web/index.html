@@ -1261,6 +1261,14 @@
           <input type="checkbox" id="sharedFavorites">
         </label>
       </div>
+      <!-- Every favourite at once: every profile's while they are shared, this profile's otherwise. -->
+      <div class="share-option profile-danger">
+        <div class="share-option__detail">
+          <b data-i18n="favorites.clearTitle">Remove all favorite beatmaps</b>
+          <div class="setting__hint" id="favoritesClearHint">From every profile.</div>
+        </div>
+        <button type="button" class="danger-button" id="favoritesClear" data-i18n="favorites.clear">Remove all</button>
+      </div>
     </section>
 
     <div class="actions">
