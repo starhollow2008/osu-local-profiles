@@ -10,4 +10,7 @@
          are osu!'s to update, and its packages are pinned to the release that prices pp. -->
     <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
   </PropertyGroup>
+  <!-- The advisories on osu!'s dependencies judged unreachable, with why: the pp helper's own list,
+       for every project here that its packages reach (the app and its tests). -->
+  <Import Project="$(MSBuildThisFileDirectory)..\tools\PpCalculator\NuGetAudit.props" />
 </Project>

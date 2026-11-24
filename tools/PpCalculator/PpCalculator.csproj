@@ -22,12 +22,17 @@
     <PackageReference Include="ppy.osu.Game.Rulesets.Mania" Version="2026.916.0" />
   </ItemGroup>
   <!--
-    AutoMapper 13.0.1 comes from ppy.osu.Game, which uses it only to detach Realm objects. The
-    helper opens no Realm, so AutoMapper never runs here, and the advisory needs an attacker's
-    object graph mapped through it. Its fix (15.1.1) is not a drop-in: 15 changed licence and
-    API, and osu.Game is built against 13. Drop this when osu.Game moves past it.
+    Patched versions of what ppy.osu.Game brings in, where the fix is a drop-in: osu!'s online
+    multiplayer client, which the helper never connects. Checked with scripts/pp-parity.mjs, every
+    answer identical. Once osu.Game asks for a newer one, restore fails with NU1605 (a downgrade):
+    then delete that line, as osu.Game has the fix itself.
   -->
   <ItemGroup>
-    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+    <PackageReference Include="MessagePack" Version="3.1.12" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.MessagePack" Version="10.0.15" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Protocols.NewtonsoftJson" Version="10.0.15" />
   </ItemGroup>
+  <!-- The advisories left, which have no drop-in fix, and why each is suppressed. -->
+  <Import Project="NuGetAudit.props" />
 </Project>

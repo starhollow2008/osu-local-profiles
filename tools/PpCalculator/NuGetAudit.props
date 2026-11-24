@@ -1,0 +1,32 @@
+<Project>
+  <!--
+    Advisories on packages that osu!'s own ppy.osu.Game brings in, judged unreachable here and
+    with no drop-in fix. Imported by PpCalculator.csproj and by dotnet/Directory.Build.props (the
+    app and its tests), since a suppression doesn't carry over to a project that references this
+    one. Each is per advisory, so a new one still warns. Drop an entry once osu.Game moves past
+    the version it names.
+  -->
+  <ItemGroup>
+    <!--
+      AutoMapper 13.0.1: ppy.osu.Game uses it only to detach Realm objects. The helper opens no
+      Realm, so AutoMapper never runs here, and each advisory needs an attacker's object graph
+      mapped through it. Its fixes (15.1.4) are not a drop-in: 15 changed licence and API, and
+      osu.Game is built against 13.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-rvv3-g6hj-g44x" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-6vhm-j9h7-f9gh" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gpwp-5797-mjff" />
+    <!--
+      SixLabors.ImageSharp 3.1.11: osu! decodes game textures with it; pp calculation decodes no
+      image, and the app's own pictures never pass through it. Every advisory is in TIFF, ICC
+      profile or histogram equalisation code. The fix (3.2.0) refuses to build without a Six Labors
+      licence key when referenced directly, so it can't simply be pinned.
+    -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gwg2-r3hj-4w44" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-v76p-62qx-wwq2" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-wmxv-xphr-5c9g" />
+  </ItemGroup>
+</Project>

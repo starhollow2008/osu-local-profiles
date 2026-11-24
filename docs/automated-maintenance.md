@@ -131,7 +131,10 @@ Runs never overlap, so the two helpers go in fixed folders beside the clone:
 2. Set all five `PackageReference` versions in `tools/PpCalculator/PpCalculator.csproj` to
    `pp.latest`. If the build reports `NU1202 ... supports: net<N>`, osu! moved to a newer .NET:
    install it with `~/dotnet-install.sh --channel <N>.0 --install-dir ~/.dotnet` and make every
-   change step 1 of *Keeping pp current* in `docs/maintaining.md` lists.
+   change step 1 of *Keeping pp current* in `docs/maintaining.md` lists. If it reports `NU1605`
+   (a downgrade) for one of the patched packages pinned below the osu! ones, osu! now asks for a
+   newer one itself: delete that pin, keep the deletion with the version bump, and build again.
+   An entry in `tools/PpCalculator/NuGetAudit.props` whose package osu! has moved past goes too.
 3. `node scripts/build-pp-helper.mjs ~/osu-maintenance/work/pp-new` builds the new one.
 4. `node scripts/pp-parity.mjs ~/osu-maintenance/work/pp-old ~/osu-maintenance/work/pp-new`.
    It prints that the two versions differ and leaves out the `version` field every answer
