@@ -197,6 +197,9 @@ internal static class StateApi
                 root = i.Root,
                 hasOnlineDb = i.OnlineDb is not null,
             }),
+            // Where mods are picked, the mods of these clients are offered without asking.
+            clientsWithOwnMods = Clients.Torii.ClientsWithOwnMods(
+                opts.Installs.Select(i => (i.Kind, i.Root)).Concat(opts.Folders?.Found() ?? []), opts.Machine),
         };
     }
 }

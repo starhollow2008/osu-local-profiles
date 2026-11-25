@@ -27,6 +27,9 @@ internal sealed class ServerOptions
     /// <summary>Whether anything on this machine can say if a beatmap is ranked: lazer's online.db.</summary>
     public bool StatusKnown { get; init; } = true;
 
+    /// <summary>Where to look for the folders of clients with mods of their own; null in tests, which look nowhere.</summary>
+    public Clients.DetectEnvironment? Machine { get; init; }
+
     /// <summary>The osu! installs found at the start.</summary>
     public IReadOnlyList<Clients.OsuInstall> Installs { get; init; } = [];
 

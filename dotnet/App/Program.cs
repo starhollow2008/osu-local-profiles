@@ -234,6 +234,7 @@ var app = Server.Build(new ServerOptions
     PpSource = ppSources,
     StatusKnown = resolver.KnowsStatus,
     Installs = installs,
+    Machine = OsuLocalProfiles.Clients.DetectEnvironment.Current(),
     Tracker = tracker,
     Updater = updater,
     OnUpdateExit = code =>

@@ -82,6 +82,9 @@ internal sealed class AppConfig
         ["starRatingBadge"] = JsonText.From(false),
         ["judgements"] = JsonText.From(false),
         ["scoreBackgrounds"] = JsonText.From(false),
+        // Mods only other clients have, shown where mods are picked even with none of them found, and the note saying so.
+        ["otherClientMods"] = JsonText.From(false),
+        ["otherClientModsNote"] = JsonText.From(true),
         // osu-web's tier colour on the global rank (issue #30), and where the B, C and D counts show (issue #31).
         ["rankTiers"] = JsonText.From(true),
         ["lowerGrades"] = JsonText.From("hover"),
@@ -201,6 +204,8 @@ internal sealed class AppConfig
         ["starRatingBadge"] = this["starRatingBadge"] is { ValueKind: JsonValueKind.True },
         ["judgements"] = this["judgements"] is { ValueKind: JsonValueKind.True },
         ["scoreBackgrounds"] = this["scoreBackgrounds"] is { ValueKind: JsonValueKind.True },
+        ["otherClientMods"] = this["otherClientMods"] is { ValueKind: JsonValueKind.True },
+        ["otherClientModsNote"] = this["otherClientModsNote"] is not { ValueKind: JsonValueKind.False },
         // On unless turned off; a hand-edited value that is not a switch is the default.
         ["rankTiers"] = this["rankTiers"] is not { ValueKind: JsonValueKind.False },
         ["lowerGrades"] = Js.IsString(this["lowerGrades"], out var lower) && lower is "off" or "always" ? lower : "hover",

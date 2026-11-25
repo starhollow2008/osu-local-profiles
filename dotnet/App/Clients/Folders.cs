@@ -57,6 +57,12 @@ internal sealed partial class OsuFolders(AppConfig config, Action<AppConfig> sav
         }
     }
 
+    /// <summary>Every folder found or added, tracked or not.</summary>
+    public List<(string Kind, string Root)> Found()
+    {
+        lock (gate) return [.. discovery.Candidates.Select(c => (c.Kind, c.Root))];
+    }
+
     /// <summary>Discovery again over the current config, without searching unless asked.</summary>
     private async Task<object> Refresh(bool force)
     {

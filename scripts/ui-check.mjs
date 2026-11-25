@@ -605,20 +605,39 @@ check(
   await evaluate("document.querySelectorAll('#filterBody .tfilter-section').length"),
   9,
 );
-// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod,
-// McOsu's MC, neomod's NEO, and Torii's and Ritsu's 16 (their Miss Challenge shares MC's chip).
+// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod: 67.
+// Then other clients' mods (McOsu's MC, neomod's NEO, Torii's and Ritsu's, whose Miss Challenge
+// shares MC's chip) only for a client found here or with Other settings' switch on, and any the
+// saved filter names (web/js/client-mods.js).
+const clientMods = await evaluate(`(async () => {
+  const s = await (await fetch('/api/state')).json();
+  const { shownClientMods } = await import('/js/client-mods.js');
+  const clients = s.clientsWithOwnMods ?? [];
+  const named = Object.entries(s.settings.trackingFilter.mods ?? {}).filter(([, v]) => v !== 'allowed').map(([a]) => a);
+  const shown = shownClientMods({ clients, all: s.app.config.otherClientMods === true, named });
+  return {
+    shown: shown.size,
+    mc: shown.has('MC') ? (clients.includes('ritsu') && !clients.includes('mcosu') ? 'Difficulty increase' : 'Fun') : null,
+    note: shown.size < 18 && s.app.config.otherClientModsNote !== false,
+  };
+})()`);
 check(
-  'every mod in the game has a chip',
+  "every mod in the game has a chip, and other clients' only where they are wanted",
   await evaluate("document.querySelectorAll('#tf-mods .mod-chip').length"),
-  85,
+  67 + clientMods.shown,
 );
 check(
-  "McOsu's own mods are one chip, among the Fun mods",
+  'a note says where the hidden ones are, until it is dismissed',
+  await evaluate("Boolean(document.getElementById('tf-client-mods-note'))"),
+  clientMods.note,
+);
+check(
+  "McOsu's own mods are one chip, among the Fun mods, when they are shown",
   await evaluate(`(() => {
     const chip = document.querySelector('#tf-mods .mod-chip[data-mod=MC]');
     return chip ? chip.closest('.mod-grid__group').querySelector('.mod-grid__label').textContent.trim() : null;
   })()`),
-  'Fun',
+  clientMods.mc,
 );
 check(
   'the readout starts by saying nothing is excluded',

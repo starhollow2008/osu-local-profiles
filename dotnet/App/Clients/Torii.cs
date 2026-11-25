@@ -23,6 +23,31 @@ internal static class Torii
     public static readonly HashSet<string> Unpriced =
         ["CG", "DCY", "DFK", "ECH", "HFR", "HST", "NL", "PMR", "RDV2", "RSL", "SA", "SOT", "SWG"];
 
+    /// <summary>The folder each keeps its own data in, beside lazer's <c>osu</c>: <c>%APPDATA%</c> on Windows.</summary>
+    public static readonly (string Client, string Folder)[] DataFolders = [("torii", "osu-torii"), ("ritsu", "Ritsu")];
+
+    /// <summary>
+    /// The clients with mods of their own on this machine, which the page offers those mods for:
+    /// McOsu and neomod by a folder of theirs tracked or found, Torii and Ritsu by their own data
+    /// folder, or a lazer folder that is one of those. <paramref name="machine"/> null looks at no folders.
+    /// </summary>
+    public static List<string> ClientsWithOwnMods(IEnumerable<(string Kind, string Root)> folders, DetectEnvironment? machine)
+    {
+        var found = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (var (kind, root) in folders)
+        {
+            if (kind is "mcosu" or "neomod") found.Add(kind);
+            var name = NodePath.Basename(NodePath.Resolve(root));
+            foreach (var (client, folder) in DataFolders)
+                if (string.Equals(name, folder, StringComparison.OrdinalIgnoreCase)) found.Add(client);
+        }
+        if (machine is not null)
+            foreach (var home in Detect.LazerDataHomes(machine))
+                foreach (var (client, folder) in DataFolders)
+                    if (Directory.Exists(NodePath.Join(home, folder))) found.Add(client);
+        return [.. found];
+    }
+
     /// <summary>Whether a lazer play carries a mod osu!'s calculator cannot price.</summary>
     public static bool ChangesBeatmap(IEnumerable<JsonElement>? mods) =>
         mods is not null && mods.Any(m => Calc.Mods.Acronym(m) is { } a && Unpriced.Contains(a));

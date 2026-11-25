@@ -158,7 +158,7 @@ internal static partial class Server
         });
     }
 
-    private static readonly string[] AppConfigSwitches = ["openBrowser", "sharedFavorites", "originalMetadata", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "rankTiers", "autoUpdate"];
+    private static readonly string[] AppConfigSwitches = ["openBrowser", "sharedFavorites", "originalMetadata", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "autoUpdate"];
 
     /// <summary>
     /// The install's own options. Only these keys, each only to a value of the right type: this
@@ -251,7 +251,7 @@ internal static partial class Server
             current[key] = value;
             opts.Config[key] = value;
         }
-        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "rankTiers", "lowerGrades" })
+        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "lowerGrades" })
         {
             if (patch.TryGetValue(key, out var value)) Set(key, value);
         }

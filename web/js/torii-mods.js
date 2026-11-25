@@ -88,6 +88,9 @@ export const TORII_DEFINITIONS = {
   SWG: { name: 'Swing', type: 'System', modes: [0], playable: true, settings: {} },
 };
 
+/** The two Torii has. Ritsu has every one here. */
+export const TORII_OWN = ['HS', 'PA'];
+
 /** Ritsu's Miss Challenge, which is MC on a play osu! does not score as stable. */
 export const MISS_CHALLENGE = {
   name: 'Miss Challenge', type: 'DifficultyIncrease', modes: [0], playable: true,

@@ -22,6 +22,7 @@ import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS } from './mcosu-mods.js';
 import { NEOMOD_DEFINITIONS } from './neomod-mods.js';
 import { TORII_DEFINITIONS } from './torii-mods.js';
+import { OTHER_CLIENT_MODS, shownClientMods } from './client-mods.js';
 import { hint, postJson, toast } from './ui.js';
 import { plural, t, tOwn } from './i18n.js';
 
@@ -130,7 +131,11 @@ const MOD_STATE_WORDS = {
 
 /* The filter being edited, and the machine facts that decide what the dialog can offer. */
 let draft = null;
-let context = { statusKnown: true, hasLazer: true, onSaved: null, found: null };
+let context = {
+  statusKnown: true, hasLazer: true, onSaved: null, found: null,
+  // Other clients' mods: the clients found, Other settings' switch, and whether the note saying so is still wanted.
+  clientsWithOwnMods: [], otherClientMods: false, otherClientModsNote: true, onDismissClientModsNote: null,
+};
 
 /**
  * The names the player added (`Settings.ownNames`), edited here beside the filter's ticks
@@ -607,17 +612,35 @@ function datesSection(key, title, help, { unknown } = {}) {
 function modsSection() {
   // McOsu's MC and neomod's NEO among the Fun mods: every mod only one of them has, as one chip each.
   // Torii's and Ritsu's beside osu!'s, in their own types; Ritsu's Miss Challenge shares MC's chip.
+  // Only for the clients found here, unless Other settings shows them all (client-mods.js).
+  const shown = shownClientMods({
+    clients: context.clientsWithOwnMods,
+    all: context.otherClientMods,
+    named: Object.keys(draft.mods).filter((a) => draft.mods[a] !== 'allowed'),
+  });
   const acronyms = [
     ...Object.keys(MOD_DEFINITIONS),
     ...Object.keys(MCOSU_DEFINITIONS),
     ...Object.keys(NEOMOD_DEFINITIONS),
     ...Object.keys(TORII_DEFINITIONS),
   ].filter(
-    (a) => !HIDDEN_MODS.has(a),
+    (a) => !HIDDEN_MODS.has(a) && (!OTHER_CLIENT_MODS.has(a) || shown.has(a)),
   );
+  const someHidden = [...OTHER_CLIENT_MODS].some((a) => !shown.has(a));
+  const note =
+    someHidden && context.otherClientModsNote
+      ? `<div class="counting-note" id="tf-client-mods-note">
+           <div class="counting-note__text">${escapeHtml(t('filter.otherClientModsNote'))}</div>
+           <div class="counting-note__actions">
+             <button type="button" class="counting-note__dismiss" data-dismiss-client-mods>${escapeHtml(t('common.dontShowAgain'))}</button>
+             <button type="button" class="counting-note__close" data-dismiss-client-mods
+                     aria-label="${escapeHtml(t('common.dontShowThisAgain'))}">&times;</button>
+           </div>
+         </div>`
+      : '';
   const groups = MOD_GROUPS.map(([type, label]) => {
     const heading = label();
-    const inGroup = acronyms.filter((a) => modDefinition(a).type === type).sort();
+    const inGroup = acronyms.filter((a) => modDefinition(a, chipClient(a)).type === type).sort();
     if (inGroup.length === 0) return '';
     return `<div class="mod-grid__group">
       <div class="mod-grid__label">${escapeHtml(heading)}</div>
@@ -627,7 +650,7 @@ function modsSection() {
 
   return section(
     t('filter.mods'),
-    `<div class="mod-grid__legend">
+    `${note}<div class="mod-grid__legend">
        <span class="mod-grid__key mod-grid__key--allowed">${escapeHtml(t('filter.mayBeUsed'))}</span>
        <span class="mod-grid__key mod-grid__key--required">${escapeHtml(t('filter.mustBeUsed'))}</span>
        <span class="mod-grid__key mod-grid__key--excluded">${escapeHtml(t('filter.mustNotBeUsed'))}</span>
@@ -649,9 +672,15 @@ function modsSection() {
   );
 }
 
+/** MC's chip is Ritsu's Miss Challenge where Ritsu was found and McOsu was not, and McOsu's otherwise. */
+const chipClient = (acronym) =>
+  acronym === 'MC' && context.clientsWithOwnMods.includes('ritsu') && !context.clientsWithOwnMods.includes('mcosu')
+    ? 'lazer'
+    : undefined;
+
 /** One chip. `NM` is this app's own, not a mod: it stands for a play with no mods at all. */
 function modChip(acronym) {
-  const definition = modDefinition(acronym);
+  const definition = modDefinition(acronym, chipClient(acronym));
   const modes =
     definition && definition.modes.length < 4
       ? ` ${t('filter.modesOnly', {
@@ -664,7 +693,7 @@ function modChip(acronym) {
       : `${definition?.name ?? acronym}${modes}`;
   return `<button type="button" class="mod-chip" data-mod="${escapeHtml(acronym)}"
     data-name="${escapeHtml(name)}" aria-pressed="false">${
-      acronym === 'NM' ? noModIcon() : modPill(acronym)
+      acronym === 'NM' ? noModIcon() : modPill(acronym, { client: chipClient(acronym) })
     }</button>`;
 }
 
@@ -1047,6 +1076,12 @@ function bindBody() {
       draft.names = null;
       paintNames();
       renderReadouts();
+      return;
+    }
+    if (e.target.closest('[data-dismiss-client-mods]')) {
+      $('tf-client-mods-note')?.remove();
+      context.otherClientModsNote = false;
+      context.onDismissClientModsNote?.();
       return;
     }
     if (e.target.closest('#tf-mods-all')) {

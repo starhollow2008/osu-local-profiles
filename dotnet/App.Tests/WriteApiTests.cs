@@ -248,6 +248,22 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Other_clients_mods_start_hidden_with_a_note_that_can_be_dismissed()
+    {
+        var config = (await client.GetFromJson("/api/app-config")).GetProperty("config");
+        Assert.False(config.GetProperty("otherClientMods").GetBoolean());
+        Assert.True(config.GetProperty("otherClientModsNote").GetBoolean());
+
+        var changed = (await Post("/api/app-config", new { otherClientMods = true, otherClientModsNote = false })).Body.GetProperty("config");
+        Assert.True(changed.GetProperty("otherClientMods").GetBoolean());
+        Assert.False(changed.GetProperty("otherClientModsNote").GetBoolean());
+        Assert.Equal("otherClientMods must be true or false", Error((await Post("/api/app-config", new { otherClientMods = "yes" })).Body));
+
+        // Which clients were found, for the page: none in a test, which looks at no folders.
+        Assert.Equal(0, (await client.GetFromJson("/api/state")).GetProperty("clientsWithOwnMods").GetArrayLength());
+    }
+
+    [Fact]
     public void A_rank_curve_counts_its_players_by_its_last_place()
     {
         var osu = Calc.Ranks.Table(0)!;

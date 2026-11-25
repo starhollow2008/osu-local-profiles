@@ -65,7 +65,7 @@ internal static partial class Detect
         e["XDG_DATA_HOME"] is { Length: > 0 } configured && NodePath.IsAbsolute(configured) ? configured : NodePath.Join(e.Home, ".local", "share");
 
     /// <summary>The folders each platform keeps application data in. All three on every platform: they cannot collide.</summary>
-    private static List<string> LazerDataHomes(DetectEnvironment e)
+    public static List<string> LazerDataHomes(DetectEnvironment e)
     {
         var output = new List<string>();
         if (e["APPDATA"] is { Length: > 0 } appData) output.Add(appData);

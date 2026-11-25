@@ -310,6 +310,8 @@ let playsRefused = 0;
 let unsubmittedAttempts = 0;
 /** Which clients were found, so the page can say how the one being watched behaves. */
 let installKinds = [];
+/** The clients found with mods of their own, which the tracking filter offers those mods for. */
+let clientsWithOwnMods = [];
 let sharing = { canScreenshot: false };
 
 /* ---------------------------------------------------------------- header */
@@ -1145,6 +1147,7 @@ async function loadState() {
 
   renderLazerScoring();
   installKinds = s.installs.map((i) => i.kind);
+  clientsWithOwnMods = s.clientsWithOwnMods ?? [];
   renderStableNote();
   // osu!'s development client is a lazer of its own, and says which (roadmap 5.68). Several folders
   // of one client are counted rather than repeated (issue #35).
@@ -3442,6 +3445,7 @@ function openSettings() {
   $('starRatingSetting').value = app.config?.starRating !== true ? 'off' : app.config?.starRatingBadge === true ? 'badge' : 'text';
   $('judgementsSetting').checked = app.config?.judgements === true;
   $('scoreBackgroundsSetting').checked = app.config?.scoreBackgrounds === true;
+  $('otherClientModsSetting').checked = app.config?.otherClientMods === true;
   $('rankTiersSetting').checked = app.config?.rankTiers !== false;
   $('lowerGradesSetting').value = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
   $('fontSetting').value = pageFont();
@@ -3525,10 +3529,11 @@ $('settingsSave').onclick = async () => {
 
     // The rest of how score rows look (issues #37 and #38): the star rating as osu!'s badge, the
     // judgements and the beatmap's background. A hidden star rating keeps how it would be shown.
+    // Other clients' mods where mods are picked go with them.
     const rows = {};
     const starRatingBadge = starRating ? starChoice === 'badge' : app.config?.starRatingBadge === true;
     if (starRatingBadge !== (app.config?.starRatingBadge === true)) rows.starRatingBadge = starRatingBadge;
-    for (const key of ['judgements', 'scoreBackgrounds']) {
+    for (const key of ['judgements', 'scoreBackgrounds', 'otherClientMods']) {
       const on = $(`${key}Setting`).checked;
       if (on !== (app.config?.[key] === true)) rows[key] = on;
     }
@@ -5038,6 +5043,17 @@ $('optFilter').onclick = async () => {
     ownNames: settings.ownNames,
     found,
     hasLazer: installKinds.includes('lazer'),
+    clientsWithOwnMods,
+    otherClientMods: app.config?.otherClientMods === true,
+    otherClientModsNote: app.config?.otherClientModsNote !== false,
+    onDismissClientModsNote: async () => {
+      try {
+        const c = await postJson('/api/app-config', { otherClientModsNote: false }, 'saving that failed');
+        app = { ...app, config: c.config };
+      } catch (err) {
+        toast(err.message);
+      }
+    },
     playsFiltered,
     onSaved: async (saved) => {
       settings = saved;

@@ -48,4 +48,26 @@ public sealed class ToriiTests
         Assert.Equal("excluded", filter.Mods["RDV2"]);
         Assert.False(filter.Mods.ContainsKey("ABCDE"));
     }
+
+    [Fact]
+    public void A_client_with_mods_of_its_own_is_found_by_its_folder()
+    {
+        // McOsu and neomod by a folder of theirs, tracked or only found; stable, lazer and neki have none.
+        Assert.Equal(["mcosu", "neomod"], Torii.ClientsWithOwnMods(
+            [("stable", "/games/osu!"), ("lazer", "/home/p/.local/share/osu"), ("neki", "/games/neki"), ("neomod", "/games/neomod"), ("mcosu", "/games/McOsu")], null));
+        Assert.Empty(Torii.ClientsWithOwnMods([], null));
+
+        // Torii and Ritsu write lazer folders: a lazer folder that is theirs, by its name.
+        Assert.Equal(["ritsu", "torii"], Torii.ClientsWithOwnMods([("lazer", "/home/p/.local/share/osu-torii"), ("lazer", "/home/p/.local/share/ritsu/")], null));
+        // Not a folder somewhere below one of that name.
+        Assert.Empty(Torii.ClientsWithOwnMods([("lazer", "/home/Ritsu/.local/share/osu")], null));
+
+        // Or their own folder beside lazer's, wherever their files went.
+        using var temp = new TempDb();
+        Directory.CreateDirectory(Path.Combine(temp.Folder, "osu-torii"));
+        var machine = new DetectEnvironment("win32", Path.Combine(temp.Folder, "home"), new Dictionary<string, string?> { ["APPDATA"] = temp.Folder });
+        Assert.Equal(["torii"], Torii.ClientsWithOwnMods([], machine));
+        Directory.CreateDirectory(Path.Combine(temp.Folder, "Ritsu"));
+        Assert.Equal(["ritsu", "torii"], Torii.ClientsWithOwnMods([], machine));
+    }
 }
