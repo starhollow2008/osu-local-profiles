@@ -2127,11 +2127,15 @@
   font-weight: 400;
 }
 
-/* A background colour paints under its own image, so the dimming is a layer over the cover. */
+/*
+ * A background colour paints under its own image, so the dimming is a layer over the cover. It
+ * is the page's darkest colour rather than the row's own grey, which laid over the art at 80%
+ * washed its colours out: dark keeps them, and the row's text stays readable on bright art.
+ */
 .play-detail--cover {
-  --bg: hsla(var(--hsl-b3), 0.7);
-  --bg-main: hsla(var(--hsl-b2), 0.8);
-  background-image: linear-gradient(hsla(var(--hsl-b2), 0.8), hsla(var(--hsl-b2), 0.8)), var(--cover);
+  --bg: hsla(var(--hsl-b6), 0.55);
+  --bg-main: hsla(var(--hsl-b6), 0.62);
+  background-image: linear-gradient(hsla(var(--hsl-b6), 0.62), hsla(var(--hsl-b6), 0.62)), var(--cover);
   background-size: cover;
   background-position: center;
 }
@@ -2238,9 +2242,10 @@
     background-color: var(--bg-main);
   }
 
+  /* Hovered, a little more of the art shows, in the same dark. */
   .play-detail--cover:hover {
-    --bg: hsla(var(--hsl-b2), 0.6);
-    --bg-main: hsla(var(--hsl-b1), 0.7);
+    --bg: hsla(var(--hsl-b6), 0.45);
+    --bg-main: hsla(var(--hsl-b6), 0.5);
   }
 
   /*
