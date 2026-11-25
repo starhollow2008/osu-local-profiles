@@ -313,12 +313,53 @@ public static class Program
                 .Select(a => new { acronym = a.Acronym, original = a.OriginalValue, adjusted = a.AdjustedValue, max = a.MaxValue })
                 .ToList(),
 #else
-            // A build from osu! source older than this (SourceHelper.SourceFeatures) shows no settings.
-            settings = Array.Empty<object>(),
+            // A build from osu! source older than this (SourceHelper.SourceFeatures): as its song select had them.
+            settings = SongSelectSettings(request.Ruleset, ruleset, info, mods, playable, rate),
 #endif
             version = OsuVersion,
         };
     }
+
+#if OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES
+    /// <summary>
+    /// The settings song select showed before <c>GetBeatmapAttributesForDisplay</c> (osu! 2025.804.0),
+    /// worked out as it did from osu! 2023.1218.0: the mods applied to the beatmap's own, then adjusted
+    /// for the rate by the ruleset (<c>GetRateAdjustedDisplayDifficulty</c>), in the rows the ruleset
+    /// shows now. Older source, and the few weeks of 2025 between the two methods, show none.
+    /// </summary>
+    private static List<object> SongSelectSettings(int legacyId, Ruleset ruleset, BeatmapInfo info, Mod[] mods, IBeatmap playable, double rate)
+    {
+#if !OSU_SOURCE_LACKS_RATE_ADJUSTED_DIFFICULTY
+        var original = info.Difficulty;
+        var withMods = new BeatmapDifficulty(original);
+        foreach (var mod in mods.OfType<IApplicableToDifficulty>()) mod.ApplyToDifficulty(withMods);
+        var shown = ruleset.GetRateAdjustedDisplayDifficulty(withMods, rate);
+
+        object Row(string acronym, double before, double after, double max = 10) =>
+            new { acronym, original = before, adjusted = after, max };
+        var cs = Row("CS", original.CircleSize, shown.CircleSize);
+        var ar = Row("AR", original.ApproachRate, shown.ApproachRate);
+        var od = Row("OD", original.OverallDifficulty, shown.OverallDifficulty);
+        var hp = Row("HP", original.DrainRate, shown.DrainRate);
+        switch (legacyId)
+        {
+            case 1:
+                return [od, hp];
+            case 2:
+                return [cs, ar, hp];
+            case 3:
+                // The key count without mods, and the columns the beatmap has with them.
+                int keys = ((ILegacyRuleset)ruleset).GetKeyCount(info);
+                int columns = playable is osu.Game.Rulesets.Mania.Beatmaps.ManiaBeatmap mania ? mania.TotalColumns : keys;
+                return [Row("KC", keys, columns, 18), od, hp];
+            default:
+                return [cs, ar, od, hp];
+        }
+#else
+        return [];
+#endif
+    }
+#endif
 
     /// <summary>
     /// The judgements of a perfect play, counted as osu!stable's results screen counts them, on the

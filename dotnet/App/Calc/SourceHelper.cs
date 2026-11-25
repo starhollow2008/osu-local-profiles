@@ -153,13 +153,17 @@ internal static partial class SourceHelper
 
     /// <summary>
     /// What the helper uses of osu! that older osu! source lacks: the constant that leaves it out of
-    /// <c>tools/PpCalculator/Program.cs</c>, and the file and text that show a source has it. The
-    /// release never defines one, so the helper is written for current osu! and these are the exceptions.
+    /// <c>tools/PpCalculator/Program.cs</c>, and the file and the texts, any one of which shows a source
+    /// has it or needs no stand-in for it. The release never defines one, so the helper is written for
+    /// current osu! and these are the exceptions.
     /// </summary>
-    public static readonly (string Constant, string File, string Text)[] SourceFeatures =
+    public static readonly (string Constant, string File, string[] Texts)[] SourceFeatures =
     [
         // osu! 2025.804.0 (ppy/osu e2a454ae00): AR, OD and the rest as song select shows them.
-        ("OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES", "osu.Game/Rulesets/Ruleset.cs", "GetBeatmapAttributesForDisplay"),
+        ("OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES", "osu.Game/Rulesets/Ruleset.cs", ["GetBeatmapAttributesForDisplay"]),
+        // osu! 2023.1218.0 to mid-2025: how song select worked them out before that (issue #36).
+        ("OSU_SOURCE_LACKS_RATE_ADJUSTED_DIFFICULTY", "osu.Game/Rulesets/Ruleset.cs",
+            ["GetRateAdjustedDisplayDifficulty", "GetBeatmapAttributesForDisplay"]),
     ];
 
     /// <summary>
@@ -171,7 +175,8 @@ internal static partial class SourceHelper
         {
             try
             {
-                return !File.ReadAllText(NodePath.Join(source, f.File)).Contains(f.Text, StringComparison.Ordinal);
+                var text = File.ReadAllText(NodePath.Join(source, f.File));
+                return !f.Texts.Any(t => text.Contains(t, StringComparison.Ordinal));
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {

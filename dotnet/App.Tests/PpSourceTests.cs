@@ -169,13 +169,23 @@ public class PpSourceTests
             Assert.Empty(SourceHelper.MissingFeatures(source));
             Assert.DoesNotContain("DefineConstants", SourceHelper.ProjectXml(source));
 
-            File.WriteAllText(ruleset, "public abstract class Ruleset { }");
+            // osu! from 2023.1218.0 until the display attributes (ppy/osu bea61d2, December 2024, among them):
+            // the settings as its song select worked them out (issue #36).
+            File.WriteAllText(ruleset, "public virtual BeatmapDifficulty GetRateAdjustedDisplayDifficulty(IBeatmapDifficultyInfo difficulty, double rate)");
             Assert.Equal(["OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES"], SourceHelper.MissingFeatures(source));
             Assert.Contains("<DefineConstants>$(DefineConstants);OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES</DefineConstants>", SourceHelper.ProjectXml(source));
+
+            // Older still: neither, and no settings.
+            File.WriteAllText(ruleset, "public abstract class Ruleset { }");
+            Assert.Equal(["OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES", "OSU_SOURCE_LACKS_RATE_ADJUSTED_DIFFICULTY"], SourceHelper.MissingFeatures(source));
+            Assert.Contains("<DefineConstants>$(DefineConstants);OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES;OSU_SOURCE_LACKS_RATE_ADJUSTED_DIFFICULTY</DefineConstants>", SourceHelper.ProjectXml(source));
 
             // Every constant is one the helper's code leaves something out for.
             var program = HelperProgram();
             foreach (var feature in SourceHelper.SourceFeatures) Assert.Contains($"#if !{feature.Constant}", program);
+            // Without osu!'s display attributes, the settings are worked out as that osu!'s song select did (issue #36).
+            Assert.Contains("#if OSU_SOURCE_LACKS_DISPLAY_ATTRIBUTES", program);
+            Assert.Contains("settings = SongSelectSettings(", program);
         }
         finally
         {

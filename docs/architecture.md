@@ -142,9 +142,11 @@ staging folder's name. Until then it still prices every score; only what it can'
 
 **`Program.cs` is written for current osu!; older source gets exceptions, not a different base.**
 Something it uses that older osu! lacks goes in `SourceHelper.SourceFeatures`: a constant, and the
-file and text that show a source has it. A source without it is built with that constant defined,
-and `Program.cs` leaves the use out under `#if !<constant>`, answering without it (the `difficulty`
-request's `settings` is empty before osu! 2025.804.0). The release never defines one, so its build
+file and the texts, any one of which shows a source has it or needs no stand-in. A source without
+it is built with that constant defined, and `Program.cs` leaves the use out under `#if !<constant>`,
+answering without it or as that osu! did: before osu! 2025.804.0 the `difficulty` request's
+`settings` are worked out as song select did from 2023.1218.0 (`SongSelectSettings`, issue #36),
+and are empty before that. The release never defines one, so its build
 is unchanged. Not reflection: a call by name isn't checked by the compiler and a trimmed build can
 lose it. A clone from before osu! moved to .NET 10 pins SDK 8 in its global.json, which can't build
 the helper, so that one is built from the project's folder instead (`SourceHelper.BuildDirectory`).
