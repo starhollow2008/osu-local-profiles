@@ -1731,7 +1731,8 @@ function showWhatsNew() {
   $('whatsNewNotes').innerHTML = w.notes?.length ? notesHtml(w.notes) : `<p>${escapeHtml(t('whatsNew.noNotes'))}</p>`;
   $('whatsNewLinks').innerHTML = updateLinks(null, app.update?.changelogUrl, w.to);
   $('whatsNewModal').hidden = false;
-  $('whatsNewClose').focus();
+  $('whatsNewModal').querySelector('.modal').scrollTop = 0;
+  $('whatsNewClose').focus({ preventScroll: true });
 }
 
 function closeWhatsNew() {
@@ -1835,7 +1836,9 @@ function openUpdate() {
   $('updateHint').innerHTML = '&nbsp;';
   renderUpdateProgress();
   $('updateModal').hidden = false;
-  $('updateCancel').focus();
+  // From the top, with the notes, rather than scrolled down to Cancel by focusing it.
+  $('updateModal').querySelector('.modal').scrollTop = 0;
+  $('updateCancel').focus({ preventScroll: true });
 }
 
 /*
@@ -4565,7 +4568,7 @@ function openBackfill() {
     $('backfillModal').hidden = false;
     renderImporting(importState);
     $('backfillConfirm').scrollIntoView({ block: 'nearest' });
-    $('backfillCancel').focus();
+    $('backfillCancel').focus({ preventScroll: true });
     return;
   }
   applyPreset(3);
@@ -4576,7 +4579,9 @@ function openBackfill() {
   renderBackfillFilterHint();
   resetBackfillPreview(t('backfill.pickATime'));
   $('backfillModal').hidden = false;
-  $('backfillCancel').focus();
+  // From the top: Cancel is at the bottom, and focusing it would scroll the dialog there.
+  $('backfillModal').querySelector('.modal').scrollTop = 0;
+  $('backfillCancel').focus({ preventScroll: true });
 }
 
 /** Closing only hides it. An import that is running carries on, shown in the cover's corner. */

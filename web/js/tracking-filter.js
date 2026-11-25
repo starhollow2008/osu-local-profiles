@@ -1285,7 +1285,9 @@ export function openTrackingFilter(options) {
   };
 
   $('filterModal').hidden = false;
-  $('filterCancel').focus();
+  // From the top: Cancel is at the bottom, and focusing it would scroll the whole dialog there.
+  $('filterModal').querySelector('.modal').scrollTop = 0;
+  $('filterCancel').focus({ preventScroll: true });
 }
 
 export function closeTrackingFilter() {
