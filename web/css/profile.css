@@ -3366,14 +3366,11 @@
 /* ======================================================================== */
 
 /*
- * Plain text, rendered with line breaks and autolinked URLs and nothing else. osu! accepts
- * BBCode here; a local profile gains nothing from an HTML sanitiser it would have to get
- * exactly right, and everything to lose by getting it wrong.
+ * me!, as BBCode (web/js/bbcode.js). In the section's own 14px and `.bbcode`'s 1.5 line height,
+ * as osu-web's `.bbcode--profile-page` inherits them from `.page-extra` (issue #41): it was 13px.
  */
 .about {
   color: hsl(var(--hsl-c1));
-  font-size: var(--fs-normal-2);
-  line-height: 1.55;
   cursor: text;
   border-radius: var(--radius-base);
   padding: 4px 6px;
