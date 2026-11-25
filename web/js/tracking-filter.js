@@ -21,6 +21,7 @@ import { modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS } from './mcosu-mods.js';
 import { NEOMOD_DEFINITIONS } from './neomod-mods.js';
+import { TORII_DEFINITIONS } from './torii-mods.js';
 import { hint, postJson, toast } from './ui.js';
 import { plural, t, tOwn } from './i18n.js';
 
@@ -605,10 +606,12 @@ function datesSection(key, title, help, { unknown } = {}) {
  */
 function modsSection() {
   // McOsu's MC and neomod's NEO among the Fun mods: every mod only one of them has, as one chip each.
+  // Torii's and Ritsu's beside osu!'s, in their own types; Ritsu's Miss Challenge shares MC's chip.
   const acronyms = [
     ...Object.keys(MOD_DEFINITIONS),
     ...Object.keys(MCOSU_DEFINITIONS),
     ...Object.keys(NEOMOD_DEFINITIONS),
+    ...Object.keys(TORII_DEFINITIONS),
   ].filter(
     (a) => !HIDDEN_MODS.has(a),
   );

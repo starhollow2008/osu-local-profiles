@@ -158,7 +158,8 @@ internal static class Mods
             var neomod = Clients.Neomod.Mods(score.Neomod);
             return neomod.Priced is null ? new PriceOptions(Unpriceable: true) : new PriceOptions(neomod.Priced, neomod.IgnoreLegacyTotalScore, AsStable: true);
         }
-        if (score.Mcosu is null) return new PriceOptions();
+        // Torii's and Ritsu's mods that change the beatmap would be priced as if they were not there.
+        if (score.Mcosu is null) return Clients.Torii.ChangesBeatmap(ReplayMods(score)) ? new PriceOptions(Unpriceable: true) : new PriceOptions();
         var derived = McosuModsFor(score, osuPath);
         if (derived.Priced is null) return new PriceOptions(Unpriceable: true);
         return new PriceOptions(derived.Priced, derived.IgnoreLegacyTotalScore);

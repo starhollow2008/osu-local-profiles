@@ -275,7 +275,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
       </div>
     </div>
     <div class="play-detail__mods-pp">
-      <div class="play-detail__mods">${modList(play.mods)}</div>
+      <div class="play-detail__mods">${modList(play.mods, play.client)}</div>
       ${pp}
     </div>
     ${menu}

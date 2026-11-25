@@ -321,7 +321,7 @@ function player(score, who) {
   const source = sourceTag(score);
   return `<div class="score-player">
   <div class="score-player__row score-player__row--score">
-    <div class="score-player__mods">${modList(score.mods)}</div>
+    <div class="score-player__mods">${modList(score.mods, score.client)}</div>
     <div class="score-player__score">${fmt(score.totalScore)}</div>
   </div>
   <div class="score-player__row score-player__row--player">

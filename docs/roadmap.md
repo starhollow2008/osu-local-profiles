@@ -99,6 +99,7 @@ does not have to make it again.
 | 5.85 | neomod                                                    | done   |
 | 5.86 | Scores: every score, sorted, filtered and exported        | done   |
 | 5.87 | First Place Ranks                                         | done   |
+| 5.88 | Torii's and Ritsu's mods                                  | done   |
 
 ## Constraints on every item
 
@@ -1878,3 +1879,36 @@ already reads (5.79), has `rank` events (#1 among them) and `rankLost` ("lost fi
 (`dotnet/App/RankEvents.cs`), `FetchFirstPlaces`, `FetchFirstPlaceCount` and
 `FirstPlacesLostFromJson` in `dotnet/App/Clients/OsuWeb.cs`; tests in `OnlineImportTests` and
 `OsuWebTests`.
+
+## 5.88 - Torii's and Ritsu's mods
+
+**Status:** done. Asked for in [#40](https://github.com/jonathant09/osu-local-profiles/issues/40).
+
+[Torii](https://github.com/ShikkesoraSIM/torii-osu) is an osu!lazer fork, and
+[Ritsu](https://github.com/Azuuryy/ritsu) an offline client built on it, with Modosu's training
+mods. Read from their source (Torii `a2628b3`, Ritsu `7e28ddd`, both 2026-11). Both write lazer's
+replays with their own acronyms in them, so their plays are lazer plays, and their data folders
+(`osu-torii`, `Ritsu`, beside lazer's `osu`) are found by adding them under Installation
+locations. Torii and Ritsu can also use lazer's own folder in place.
+
+### Decisions
+
+- **Their mods are shown by their own names and types**, from `web/js/torii-mods.js`, and placed
+  after osu!'s in each type for the filter and the mods sort. osu-web has no glyph for them, so
+  they show their acronym, as osu! does.
+- **Torii adds Hit Sounder (HS) and Pitch Adjust (PA); Ritsu adds the rest.** Pitch Adjust is in
+  every ruleset, the others in osu! only.
+- **A mod that leaves the beatmap alone is priced as osu! prices the play without it.** osu!'s
+  calculator reads an acronym it lacks as an UnknownMod, which does nothing. These are Hit Sounder,
+  Pitch Adjust (pitch only, the speed is unchanged), Metronome and Miss Challenge.
+- **A mod that changes the beatmap means no pp** (`Torii.Unpriced`): Circle Generation, Decoy
+  Circles, Directional Flicks, Echo, One Eye, Streamline, No Sliding, Phrase Mirror, RandomV2,
+  Reversed Sliders, Spacing Adjust, Spacing Overtime and Swing. Each moves, adds, removes or retimes
+  objects, or changes the difficulty, which osu!'s calculator would never see.
+- **Ritsu's Miss Challenge is MC, which is also McOsu's own mod here.** On a play osu! scores as
+  stable it is McOsu's, and on any other it is Miss Challenge, so every play carries its client to
+  the page. The filter's MC chip and the Scores view's MC filter cover both.
+- **The tracking filter keeps four-letter acronyms**, for RandomV2's RDV2.
+
+`dotnet/App/Clients/Torii.cs`, `web/js/torii-mods.js`; tests in `ToriiTests` and
+`test/badges.test.ts`.

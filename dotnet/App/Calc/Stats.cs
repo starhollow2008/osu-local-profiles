@@ -184,6 +184,8 @@ internal static partial class Stats
             Creator = r["creator"],
             // As osu! lists a stable play: with Classic, which osu! itself scored it with.
             Mods = Mods.WithClassicMod(RowMods(r), client),
+            // Which mods an acronym stands for can depend on it: MC is McOsu's or Ritsu's.
+            Client = client,
             Accuracy = r["accuracy"],
             MaxCombo = r["max_combo"],
             TotalScore = r["total_score"],

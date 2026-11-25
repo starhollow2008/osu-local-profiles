@@ -12,10 +12,22 @@ import { t } from './i18n.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS, mcosuModNames } from './mcosu-mods.js';
 import { NEOMOD_DEFINITIONS, neomodModNames } from './neomod-mods.js';
+import { MISS_CHALLENGE, TORII_DEFINITIONS } from './torii-mods.js';
 
-/** A mod's name, type and settings: osu-web's, or McOsu's MC and neomod's NEO beside them. */
-export function modDefinition(acronym) {
-  return MOD_DEFINITIONS[acronym] ?? MCOSU_DEFINITIONS[acronym] ?? NEOMOD_DEFINITIONS[acronym] ?? null;
+/** The clients whose plays osu! scores as osu!stable plays, McOsu's among them. */
+const STABLE_SCORED = new Set(['stable', 'mcosu', 'neki', 'neomod']);
+
+/** Whether an MC is Ritsu's Miss Challenge: on a play osu! scores as lazer's, it is never McOsu's. */
+const isMissChallenge = (acronym, client) => acronym === 'MC' && client != null && !STABLE_SCORED.has(client);
+
+/**
+ * A mod's name, type and settings: osu-web's, or McOsu's MC, neomod's NEO, and Torii's and
+ * Ritsu's beside them. `client` is the play's, which tells McOsu's MC from Ritsu's.
+ */
+export function modDefinition(acronym, client) {
+  if (isMissChallenge(acronym, client)) return MISS_CHALLENGE;
+  return MOD_DEFINITIONS[acronym] ?? MCOSU_DEFINITIONS[acronym] ?? NEOMOD_DEFINITIONS[acronym] ??
+    TORII_DEFINITIONS[acronym] ?? null;
 }
 
 /* Unique ids per generated SVG, since several appear on the page at once. */
@@ -121,9 +133,9 @@ function settingValue(value) {
  * how osu! writes it. A setting osu! gives no label to is left out of the tooltip rather
  * than shown under its raw key.
  */
-function modTitle(mod, definition) {
+function modTitle(mod, definition, client) {
   // MC stands for McOsu's own mods, and its settings are which of them were on.
-  if (mod.acronym === 'MC') {
+  if (mod.acronym === 'MC' && !isMissChallenge(mod.acronym, client)) {
     const names = mcosuModNames(mod.settings);
     return names.length === 0 ? 'McOsu' : `McOsu (${names.join(', ')})`;
   }
@@ -156,16 +168,17 @@ function modTitle(mod, definition) {
  * for shows its acronym instead (`data-acronym`), which is what osu! itself does.
  *
  * `title` replaces the tooltip, for a badge that stands for something other than a mod:
- * the play tracking filter's "no mods at all".
+ * the play tracking filter's "no mods at all". `client` is the play's, as for `modDefinition`.
  */
-export function modPill(mod, { title: named } = {}) {
+export function modPill(mod, { title: named, client } = {}) {
   const m = typeof mod === 'string' ? { acronym: mod } : mod;
-  const definition = modDefinition(m.acronym);
+  const definition = modDefinition(m.acronym, client);
   const type = MOD_TYPES.has(definition?.type) ? ` mod--type-${definition.type}` : '';
   const extended = extendedContent(m);
-  // MC's and NEO's settings say which mods they stand for, not that anything was customised.
-  const customised = m.acronym !== 'MC' && m.acronym !== 'NEO' && Object.keys(m.settings ?? {}).length > 0;
-  const title = escapeHtml(named ?? modTitle(m, definition));
+  // McOsu's MC and neomod's NEO have settings that say which mods they stand for, not that anything was customised.
+  const ownMod = (m.acronym === 'MC' && !isMissChallenge(m.acronym, client)) || m.acronym === 'NEO';
+  const customised = !ownMod && Object.keys(m.settings ?? {}).length > 0;
+  const title = escapeHtml(named ?? modTitle(m, definition, client));
   const acronym = escapeHtml(m.acronym);
 
   return `<div class="mod${type}" role="img" aria-label="${title}" title="${title}">` +
@@ -175,9 +188,10 @@ export function modPill(mod, { title: named } = {}) {
     '</div>';
 }
 
-export function modList(mods) {
+/** A play's mods. `client` is the play's, as for `modDefinition`. */
+export function modList(mods, client) {
   if (!mods || mods.length === 0) return '';
-  return mods.map((mod) => modPill(mod)).join('');
+  return mods.map((mod) => modPill(mod, { client })).join('');
 }
 
 /* ------------------------------------------------------------------------ */

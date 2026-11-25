@@ -19,19 +19,20 @@ internal static partial class Stats
 {
     /// <summary>
     /// The mods in the order osu!lazer's mod select lists them (difficulty reduction, difficulty
-    /// increase, conversion, automation, fun, system), every ruleset's together, then McOsu's and
-    /// neomod's own; anything else after, alphabetically. The filter's order, and the mods sort's.
+    /// increase, conversion, automation, fun, system), every ruleset's together, with Torii's and
+    /// Ritsu's after osu!'s in each, then McOsu's and neomod's own; anything else after,
+    /// alphabetically. The filter's order, and the mods sort's.
     /// </summary>
     private static readonly string[] ModOrder =
     [
-        "EZ", "NF", "HT", "DC", "NR",
-        "HR", "SD", "PF", "DT", "NC", "HD", "FI", "CO", "FL", "BL", "ST", "AC",
+        "EZ", "NF", "HT", "DC", "NR", "HST",
+        "HR", "SD", "PF", "DT", "NC", "HD", "FI", "CO", "FL", "BL", "ST", "AC", "NL", "HFR", "DFK", "DCY", "RSL",
         "TP", "DA", "CL", "RD", "MR", "AL", "SG", "SW", "SR", "CS", "HO", "IN", "DS",
-        "1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K",
+        "1K", "2K", "3K", "4K", "5K", "6K", "7K", "8K", "9K", "10K", "CG", "RDV2", "SA", "SOT",
         "AT", "CN", "RX", "AP", "SO",
         "TR", "WG", "SI", "GR", "DF", "WU", "WD", "TC", "BR", "AD", "MU", "NS", "MG", "RP", "AS", "FR", "BU", "SY",
-        "DP", "BM", "FF", "MF",
-        "TD", "SV2",
+        "DP", "BM", "FF", "MF", "ME", "HS", "PA",
+        "TD", "SV2", "PMR", "ECH", "SWG",
         "MC", "NEO",
     ];
 
@@ -193,7 +194,6 @@ internal static partial class Stats
         var play = ToPlay(r, e);
         play.Playcount = r["playcount"];
         play.Misses = r["count_miss"];
-        play.Client = r.Text("client");
         return play;
     };
 

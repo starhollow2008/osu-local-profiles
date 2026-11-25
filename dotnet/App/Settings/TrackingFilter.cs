@@ -239,7 +239,7 @@ internal sealed partial class TrackingFilter
         return rules;
     }
 
-    [GeneratedRegex(@"^[0-9A-Z]{2,3}\z")]
+    [GeneratedRegex(@"^[0-9A-Z]{2,4}\z")]
     private static partial Regex Acronym();
 
     /// <summary>
@@ -314,7 +314,7 @@ internal sealed partial class TrackingFilter
             foreach (var property in mods!.Value.EnumerateObject()) entries[property.Name] = property.Value;
             foreach (var (acronym, state) in entries)
             {
-                // osu!'s acronyms are two or three characters; mania's key counts start with a digit.
+                // osu!'s acronyms are two or three characters, Ritsu's RDV2 four; mania's key counts start with a digit.
                 if (!Acronym().IsMatch(acronym)) continue;
                 var coerced = CoerceModState(state);
                 if (coerced != "allowed") output.Mods[acronym] = coerced;

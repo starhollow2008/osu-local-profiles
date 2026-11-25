@@ -242,7 +242,7 @@ function tableRow(play, place) {
     <span class="score-table__title">${escapeHtml(title)}</span>${artist ? ` <small>by ${escapeHtml(artist)}</small>` : ''}
     <span class="score-table__version">[${escapeHtml(play.version ?? '')}]</span>${play.creator ? ` <small>${escapeHtml(play.creator)}</small>` : ''}
   </td>
-  <td><div class="score-table__mods">${modList(play.mods)}</div></td>
+  <td><div class="score-table__mods">${modList(play.mods, play.client)}</div></td>
   <td class="num">${pct(play.accuracy)}</td>
   <td class="num">${fmt(play.maxCombo ?? 0)}x</td>
   <td class="num">${play.stars == null ? '' : `${fmt(play.stars, 2)}&#9733;`}</td>
