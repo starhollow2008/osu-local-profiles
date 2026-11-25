@@ -1909,9 +1909,9 @@ locations. Torii and Ritsu can also use lazer's own folder in place.
   stable it is McOsu's, and on any other it is Miss Challenge, so every play carries its client to
   the page. The filter's MC chip and the Scores view's MC filter cover both.
 - **The tracking filter keeps four-letter acronyms**, for RandomV2's RDV2.
-- **Other clients' mods are offered only for a client found on this computer** (McOsu's, neomod's,
+- **Custom clients' mods are offered only for a client found on this computer** (McOsu's, neomod's,
   Torii's and Ritsu's): McOsu and neomod by a folder of theirs, tracked or only found, and Torii and
-  Ritsu by their own data folder (`Torii.ClientsWithOwnMods`). Other settings' "Show mods from other
+  Ritsu by their own data folder (`Torii.ClientsWithOwnMods`). Other settings' "Show mods from custom
   clients" (off by default) offers all of them, and a mod the saved filter names is shown either way.
   While some are hidden, the filter says so in a note that can be dismissed for good. Only the
   tracking filter offers them: the calculator and Manually enter a score offer osu!'s own mods only.
