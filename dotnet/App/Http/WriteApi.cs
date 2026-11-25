@@ -238,6 +238,15 @@ internal static partial class Server
             }
             patch["lowerGrades"] = lowerGrades;
         }
+        if (Js.Get(body, "ppDecimals") is { } ppDecimals)
+        {
+            if (AppConfig.PpDecimals(ppDecimals) is null)
+            {
+                await Json(context, new { error = $"ppDecimals must be a whole number from 0 to {AppConfig.MaxPpDecimals}" }, 400);
+                return;
+            }
+            patch["ppDecimals"] = ppDecimals;
+        }
         if (patch.Count == 0)
         {
             await Json(context, new { error = "openBrowser must be true or false" }, 400);
@@ -251,7 +260,7 @@ internal static partial class Server
             current[key] = value;
             opts.Config[key] = value;
         }
-        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "lowerGrades" })
+        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "lowerGrades", "ppDecimals" })
         {
             if (patch.TryGetValue(key, out var value)) Set(key, value);
         }

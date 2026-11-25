@@ -7,7 +7,7 @@
  * the markup and every drawing are made here. Global Rank and the replay watch count are
  * left out: both are facts about osu!'s leaderboards, which a local profile does not have.
  */
-import { escapeHtml, fmt } from './format.js';
+import { escapeHtml, fmt, fmtPp } from './format.js';
 import { coverUrl, gradeBadge, modList } from './badges.js';
 import { MODE_ICON, MODE_NAME, difficultyBadge } from './beatmapsets.js';
 import { ppNotes, sourceTag } from './sections.js';
@@ -314,7 +314,7 @@ function ppValue(score) {
   const cls = ['score-stats__pp'];
   if (why.uncounted) cls.push('score-stats__pp--uncounted');
   if (why.unofficial) cls.push('score-stats__pp--unofficial');
-  return `<span class="${cls.join(' ')}" title="${escapeHtml(title)}">${fmt(Math.round(score.pp))}${
+  return `<span class="${cls.join(' ')}" title="${escapeHtml(title)}">${fmtPp(score.pp)}${
     why.unofficial ? '<span class="score-stats__pp-mark" aria-hidden="true">*</span>' : ''
   }</span>`;
 }

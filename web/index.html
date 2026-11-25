@@ -1019,6 +1019,14 @@
               <input type="checkbox" id="originalMetadataSetting">
             </label>
           </div>
+          <!-- Issue #42: in config.json, 0 to 3 (MaxPpDecimals in dotnet/App/AppConfig.cs). -->
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.ppDecimals">Decimal places on pp</span>
+              <input type="number" id="ppDecimalsSetting" min="0" max="3" step="1" required inputmode="numeric">
+            </label>
+            <div class="setting__hint" data-i18n="installSettings.ppDecimalsHint">0 to 3. 0 by default, as on osu!.</div>
+          </div>
 
           <h5 class="settings-group" data-i18n="settingsGroup.profilePage">Profile page</h5>
           <div class="setting">

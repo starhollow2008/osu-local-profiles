@@ -25,6 +25,23 @@ export function fmt(n, digits = 0) {
   });
 }
 
+/**
+ * How many decimals pp is shown with: Settings -> Appearance (issue #42). Whole numbers by
+ * default, as osu! shows it, and at most three, as many as osu!'s own API gives.
+ */
+export const MAX_PP_DECIMALS = 3;
+let ppDecimals = 0;
+
+/** From config.json's `ppDecimals`. Anything but a whole number from 0 to 3 is the default. */
+export function setPpDecimals(n) {
+  ppDecimals = Number.isInteger(n) && n >= 0 && n <= MAX_PP_DECIMALS ? n : 0;
+}
+
+/** A pp value, to as many decimals as Settings says. */
+export function fmtPp(n) {
+  return fmt(n, ppDecimals);
+}
+
 /** osu! shows accuracy to two decimals, from a 0..1 fraction. */
 export function pct(fraction, digits = 2) {
   return `${fmt((fraction ?? 0) * 100, digits)}%`;

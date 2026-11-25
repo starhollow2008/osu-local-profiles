@@ -88,6 +88,8 @@ internal sealed class AppConfig
         // osu-web's tier colour on the global rank (issue #30), and where the B, C and D counts show (issue #31).
         ["rankTiers"] = JsonText.From(true),
         ["lowerGrades"] = JsonText.From("hover"),
+        // How many decimals pp is shown with (issue #42): whole numbers, as osu! shows it, up to MaxPpDecimals.
+        ["ppDecimals"] = JsonText.From(0),
         ["country"] = JsonText.From(""),
         ["tagline"] = JsonText.From(""),
         ["checkForUpdates"] = JsonText.From(true),
@@ -191,6 +193,13 @@ internal sealed class AppConfig
         }
     }
 
+    /// <summary>The most decimals pp can be shown with: as many as osu!'s own API gives.</summary>
+    public const int MaxPpDecimals = 3;
+
+    /// <summary>A number of pp decimals, or null when <paramref name="value"/> is not a whole number from 0 to <see cref="MaxPpDecimals"/>.</summary>
+    public static int? PpDecimals(JsonElement? value) =>
+        value is { ValueKind: JsonValueKind.Number } number && number.TryGetInt32(out var n) && n is >= 0 and <= MaxPpDecimals ? n : null;
+
     /// <summary>What the page may read and change of the install: <c>appConfig.get()</c> in src/main.ts.</summary>
     public Dictionary<string, object?> PageView() => new()
     {
@@ -209,6 +218,8 @@ internal sealed class AppConfig
         // On unless turned off; a hand-edited value that is not a switch is the default.
         ["rankTiers"] = this["rankTiers"] is not { ValueKind: JsonValueKind.False },
         ["lowerGrades"] = Js.IsString(this["lowerGrades"], out var lower) && lower is "off" or "always" ? lower : "hover",
+        // A hand-edited value that is not a whole number from 0 to MaxPpDecimals is the default.
+        ["ppDecimals"] = PpDecimals(this["ppDecimals"]) ?? 0,
         ["autoUpdate"] = this["autoUpdate"] is { ValueKind: JsonValueKind.True },
     };
 

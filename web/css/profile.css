@@ -4239,6 +4239,12 @@
   width: 90px;
 }
 
+/* Decimal places on pp: one digit, with the browser's arrows beside it (issue #42). */
+#ppDecimalsSetting {
+  flex: none;
+  width: 64px;
+}
+
 .rows-setting input[type="number"]:disabled {
   opacity: 0.45;
 }

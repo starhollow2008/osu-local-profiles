@@ -8,7 +8,7 @@
  * rather than what it lists. The server decides what is listed (dotnet/App/Calc/ScoreList.cs);
  * this only asks and draws.
  */
-import { escapeHtml, fmt, fullDate, pct, timeAgo } from './format.js';
+import { escapeHtml, fmt, fmtPp, fullDate, pct, timeAgo } from './format.js';
 import { gradeBadge, modList, modPill } from './badges.js';
 import { t } from './i18n.js';
 import { beatmapArtist, beatmapName, beatmapTitle } from './metadata.js';
@@ -234,7 +234,7 @@ function tableRow(play, place) {
   const full = `${artist ? `${artist} - ` : ''}${title} [${play.version ?? ''}]`;
   const pp = play.pp == null
     ? '<span class="score-table__muted">-</span>'
-    : `${fmt(play.pp)}<small>pp</small>`;
+    : `${fmtPp(play.pp)}<small>pp</small>`;
   return `<tr class="score-table__row${play.counted ? '' : ' score-table__row--uncounted'}" data-score-id="${play.id}">
   <td class="score-table__place">${place}</td>
   <td class="score-table__grade">${gradeBadge(play.grade)}</td>

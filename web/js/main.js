@@ -11,8 +11,11 @@ import {
   countryName,
   escapeHtml,
   fmt,
+  fmtPp,
+  MAX_PP_DECIMALS,
   pct,
   playTimeStrings,
+  setPpDecimals,
   shortDate,
   timeAgo,
 } from './format.js';
@@ -600,7 +603,7 @@ for (const id of ['modes', 'modesMobile']) {
 function renderStats(next, medalTotal, imported) {
   stats = next;
   $('medalTotal').textContent = fmt(medalTotal ?? 0);
-  $('totalPp').textContent = fmt(stats.totalPp, 0);
+  $('totalPp').textContent = fmtPp(stats.totalPp);
   /*
    * The bonus half of the tooltip says where the number came from, because it may not have
    * been earned here. Bonus pp is awarded for how many distinct ranked beatmaps an account
@@ -611,28 +614,28 @@ function renderStats(next, medalTotal, imported) {
   const maps = { n: fmt(stats.distinctRankedBeatmaps) };
   const bonus = stats.bonusPpBorrowed
     ? t('stats.bonusBorrowed', {
-        pp: fmt(stats.bonusPp, 0),
+        pp: fmtPp(stats.bonusPp),
       }) +
       (imported?.osuTotalPp
         ? t('stats.bonusBorrowedThere', {
-            pp: fmt(imported.osuTotalPp, 0),
+            pp: fmtPp(imported.osuTotalPp),
           })
         : '')
     : stats.distinctRankedBeatmaps === 1
       ? t('stats.bonusOneMap', {
-          pp: fmt(stats.bonusPp, 0),
+          pp: fmtPp(stats.bonusPp),
           ...maps,
         })
       : t('stats.bonusMaps', {
-          pp: fmt(stats.bonusPp, 0),
+          pp: fmtPp(stats.bonusPp),
           ...maps,
         });
   $('totalPp').title = t('stats.ppTitle', {
-    pp: fmt(stats.weightedPp, 0),
+    pp: fmtPp(stats.weightedPp),
     bonus,
   });
   // The Scores view's own copy, beside the profile's name.
-  $('scoreListPp').textContent = `${fmt(stats.totalPp, 0)} pp`;
+  $('scoreListPp').textContent = `${fmtPp(stats.totalPp)} pp`;
   $('scoreListPp').title = $('totalPp').title;
   // Show more details' Solo Play card: pp and Medals beside each other.
   $('v2Pp').textContent = $('totalPp').textContent;
@@ -1129,6 +1132,7 @@ async function loadState() {
   refreshOpenProfiles();
 
   app = s.app ?? app;
+  setPpDecimals(app.config?.ppDecimals);
   // The app's own answer, which outranks what this browser remembered. Not awaited: the
   // rest of this render is in the language already on screen, and a change re-runs it.
   void applyConfigLanguage();
@@ -3151,7 +3155,7 @@ async function renderRemovedScores() {
                 : ''
             }`
           : `${escapeHtml(h.grade)} &middot; ${pct(h.accuracy)} &middot;
-              ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmt(h.pp, 0)}pp` : ''}`;
+              ${escapeHtml(h.modsLabel)}${h.pp != null ? ` &middot; ${fmtPp(h.pp)}pp` : ''}`;
         return `<div class="removed-row">
           <div class="removed-row__detail">
             <div class="u-ellipsis">${escapeHtml(original(h.title, h.titleOriginal))}${
@@ -3451,6 +3455,7 @@ function fillInstallSettings() {
   $('rankTiersSetting').checked = app.config?.rankTiers !== false;
   $('lowerGradesSetting').value = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
   $('fontSetting').value = pageFont();
+  $('ppDecimalsSetting').value = String(app.config?.ppDecimals ?? 0);
   $('autoUpdateSetting').checked = app.config?.autoUpdate === true;
 }
 
@@ -3612,6 +3617,18 @@ for (const key of ['judgements', 'scoreBackgrounds', 'otherClientMods', 'rankTie
   $(`${key}Setting`).onchange = () => void saveInstallSetting({ [key]: $(`${key}Setting`).checked });
 }
 $('lowerGradesSetting').onchange = () => void saveInstallSetting({ lowerGrades: $('lowerGradesSetting').value });
+
+// How many decimals pp is shown with (issue #42), from its arrows or typed. Applied before the
+// redraw, so the page is drawn with it rather than with what it was.
+$('ppDecimalsSetting').onchange = () => {
+  const box = $('ppDecimalsSetting');
+  if (!box.checkValidity()) {
+    settingsHint(t('installSettings.ppDecimalsInvalid', { max: fmt(MAX_PP_DECIMALS) }), true);
+    return;
+  }
+  setPpDecimals(box.valueAsNumber);
+  void saveInstallSetting({ ppDecimals: box.valueAsNumber });
+};
 
 // The typeface. Switching it restyles the page at once.
 $('fontSetting').onchange = () => {
@@ -4138,7 +4155,7 @@ function recomputeDone(d) {
       () => t('recompute.doneMany', updated),
     ) +
     (d.gainedPp > 0
-      ? t('recompute.gained', { n: fmt(d.gainedPp) })
+      ? t('recompute.gained', { n: fmtPp(d.gainedPp) })
       : '') +
     (d.skipped > 0
       ? t('recompute.skipped', { n: fmt(d.skipped) })
@@ -4976,7 +4993,7 @@ $('scoreLinkCheck').onclick = async () => {
       pct(d.accuracy),
       `${fmt(d.maxCombo)}x`,
       d.mods,
-      d.osuPp != null ? t('scoreLink.osuPp', { pp: fmt(d.osuPp, 0) }) : null,
+      d.osuPp != null ? t('scoreLink.osuPp', { pp: fmtPp(d.osuPp) }) : null,
       new Date(d.playedAt).toLocaleString(currentLocale()),
     ].filter(Boolean);
     const notes = [];
@@ -5013,7 +5030,7 @@ $('scoreLinkImport').onclick = async () => {
       // for the one built from the link.
       const imported = {
         title: original(d.score.title, d.score.titleOriginal),
-        pp: d.score.pp != null ? fmt(d.score.pp, 0) : '-',
+        pp: d.score.pp != null ? fmtPp(d.score.pp) : '-',
       };
       resetBackfillPreview(
         escapeHtml(d.replay ? t('scoreLink.importedWithReplay', imported) : t('scoreLink.imported', imported)),
@@ -5039,7 +5056,7 @@ $('backfillManual').onclick = () =>
     resetBackfillPreview(
       escapeHtml(t('manual.added', {
         title: original(d.score.title, d.score.titleOriginal),
-        pp: d.score.pp != null ? fmt(d.score.pp, 0) : '-',
+        pp: d.score.pp != null ? fmtPp(d.score.pp) : '-',
       })),
     );
     await Promise.all([loadProfile(), loadState()]);
@@ -5261,7 +5278,7 @@ on('score', (e) => {
   const pp =
     shownPp == null
       ? ''
-      : `${fmt(shownPp, 0)}pp${counted ? '' : ` ${t('live.notCounted')}`}`;
+      : `${fmtPp(shownPp)}pp${counted ? '' : ` ${t('live.notCounted')}`}`;
   toast(
     `${s.grade} ${pct(s.accuracy)} ${pp} - ${original(s.title, s.titleOriginal)}`.replace(/\s+/g, ' '),
   );

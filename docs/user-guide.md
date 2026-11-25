@@ -706,6 +706,7 @@ needs git and the .NET 10 SDK.
 | `language` | `""` | the page's language, as one of osu!'s own codes (`de`, `pt-br`, `zh-tw`). Empty means never chosen, which is what lets the first launch ask |
 | `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Settings** |
 | `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Settings -> Appearance -> Font** |
+| `ppDecimals` | `0` | decimal places on every pp shown, from `0` (whole numbers, as on osu!) to `3` -- also **Options -> Settings -> Appearance -> Decimal places on pp** |
 | `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Settings -> System -> Auto-update** |
 | `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
 

@@ -18,7 +18,7 @@
  * line, and a tooltip pinned to a top corner that flips away from the cursor rather than
  * following it.
  */
-import { daysAgoLabel, escapeHtml, fmt, monthLabel, monthTitle } from './format.js';
+import { daysAgoLabel, escapeHtml, fmt, fmtPp, monthLabel, monthTitle } from './format.js';
 import { t } from './i18n.js';
 
 const EMPTY = (message) => `<div class="profile-detail-stats__empty-chart">${escapeHtml(message)}</div>`;
@@ -186,7 +186,7 @@ export function ppChart(input, emptyMessage = t('chart.noRankedPlays')) {
   const plotted = points.map((p) => ({
     x: ((p.at - minX) / spanX) * 100,
     y: 96 - (p.pp / spanY) * 92,
-    title: `<strong>Performance</strong> ${fmt(p.pp, 0)}pp`,
+    title: `<strong>Performance</strong> ${fmtPp(p.pp)}pp`,
     sub: daysAgoLabel(p.at),
   }));
 

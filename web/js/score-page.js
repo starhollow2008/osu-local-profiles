@@ -16,6 +16,7 @@ import {
 } from './score-share.js';
 import { postJson, toast } from './ui.js';
 import { applyConfigFont } from './font.js';
+import { setPpDecimals } from './format.js';
 import { knownLocale, storedLocale, useLocale } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -42,6 +43,8 @@ async function load() {
     const r = await fetch(`/api/scores/${id}`);
     const d = await r.json();
     await languageChosen;
+    // pp to as many decimals as the app shows it (issue #42).
+    setPpDecimals((await appConfig).ppDecimals);
     if (!r.ok) throw new Error(d.error ?? 'that score could not be loaded');
     score = d.score;
     owner = d.owner;

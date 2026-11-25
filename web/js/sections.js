@@ -1,5 +1,5 @@
 /** Markup builders for the repeated rows on the profile page. */
-import { escapeHtml, fmt, pct, timeAgo, fullDate, MODE_NAMES } from './format.js';
+import { escapeHtml, fmt, fmtPp, pct, timeAgo, fullDate, MODE_NAMES } from './format.js';
 import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './badges.js';
 import { t } from './i18n.js';
 import { assetUrl } from './static-mode.js';
@@ -184,7 +184,7 @@ function ppCell(play) {
   }
 
   const title = notes.length ? ` title="${escapeHtml(notes.join(' '))}"` : '';
-  return `<div class="${classes.join(' ')}"${title}>${fmt(play.pp, 0)}${marker}<span class="play-detail__pp-unit">pp</span></div>`;
+  return `<div class="${classes.join(' ')}"${title}>${fmtPp(play.pp)}${marker}<span class="play-detail__pp-unit">pp</span></div>`;
 }
 
 /**
@@ -254,7 +254,7 @@ export function playRow(play, {
 
   const weighted =
     showWeight && play.pp != null
-      ? `<span class="play-detail__weighted-pp">${fmt(play.weightedPp, 0)}pp</span>`
+      ? `<span class="play-detail__weighted-pp">${fmtPp(play.weightedPp)}pp</span>`
       : '';
   const weightNote =
     showWeight && play.weight != null
@@ -520,7 +520,7 @@ export function activityRow(event) {
     case 'best':
       icon = feedIcon('new-best.png');
       text = t('activity.best', {
-        pp: fmt(event.pp, 0),
+        pp: fmtPp(event.pp),
         map:
           escapeHtml(original(event.title, event.titleOriginal)) +
           (event.version ? ` [${escapeHtml(event.version)}]` : ''),

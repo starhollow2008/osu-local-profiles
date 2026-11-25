@@ -226,6 +226,26 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Pp_decimals_start_at_whole_numbers_and_take_only_0_to_3()
+    {
+        // Issue #42: as osu! shows pp, until asked for more.
+        Assert.Equal(0, (await client.GetFromJson("/api/app-config")).GetProperty("config").GetProperty("ppDecimals").GetInt32());
+
+        Assert.Equal(2, (await Post("/api/app-config", new { ppDecimals = 2 })).Body.GetProperty("config").GetProperty("ppDecimals").GetInt32());
+        Assert.Equal(3, (await Post("/api/app-config", new { ppDecimals = 3 })).Body.GetProperty("config").GetProperty("ppDecimals").GetInt32());
+
+        const string refused = "ppDecimals must be a whole number from 0 to 3";
+        Assert.Equal(refused, Error((await Post("/api/app-config", new { ppDecimals = 4 })).Body));
+        Assert.Equal(refused, Error((await Post("/api/app-config", new { ppDecimals = -1 })).Body));
+        Assert.Equal(refused, Error((await Post("/api/app-config", new { ppDecimals = 1.5 })).Body));
+        Assert.Equal(refused, Error((await Post("/api/app-config", new { ppDecimals = "2" })).Body));
+
+        // A hand edit that is not one reads as the default.
+        File.WriteAllText(Path.Combine(DataDir, "config.json"), """{"port": 7272, "ppDecimals": 7}""");
+        Assert.Equal(0, AppConfig.Load(DataDir).PageView()["ppDecimals"]);
+    }
+
+    [Fact]
     public async Task How_score_rows_look_starts_off_and_takes_only_a_switch()
     {
         // Issues #37 and #38: the judgements, the background and the star badge, off by default.
