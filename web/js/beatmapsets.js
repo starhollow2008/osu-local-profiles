@@ -38,19 +38,33 @@ function mixGamma(a, b, t) {
   });
 }
 
+/** d3's clamped `scaleLinear` over these stops, with the gamma interpolation above. */
+function sample(domain, range, rating) {
+  let i = 0;
+  while (i < domain.length - 2 && rating > domain[i + 1]) i++;
+  const t = (rating - domain[i]) / (domain[i + 1] - domain[i]);
+  return toHex(mixGamma(channels(range[i]), channels(range[i + 1]), Math.min(1, Math.max(0, t))));
+}
+
 export function getDiffColour(rating) {
   if (rating == null) return null;
   if (rating < 0.1) return '#AAAAAA';
   if (rating >= 9) return '#000000';
-  let i = 0;
-  while (i < DIFF_DOMAIN.length - 2 && rating > DIFF_DOMAIN[i + 1]) i++;
-  const t = (rating - DIFF_DOMAIN[i]) / (DIFF_DOMAIN[i + 1] - DIFF_DOMAIN[i]);
-  return toHex(mixGamma(channels(DIFF_RANGE[i]), channels(DIFF_RANGE[i + 1]), Math.min(1, Math.max(0, t))));
+  return sample(DIFF_DOMAIN, DIFF_RANGE, rating);
 }
 
-/** osu-web's `getDiffTextColour`, for the range this page can reach: black, then yellow. */
+/*
+ * osu-web's `difficultyTextColourSpectrum`, which lazer shares: on the black badge from 9
+ * stars up, the number runs from yellow through red and purple to blue, which it stays at past 12.4.
+ */
+const TEXT_DOMAIN = [9, 9.9, 10.6, 11.5, 12.4];
+const TEXT_RANGE = ['#F6F05C', '#FF8068', '#FF4E6F', '#C645B8', '#6563DE'];
+
+/** osu-web's `getDiffTextColour`: black, then yellow from 6.5 stars, then the spectrum from 9. */
 export function getDiffTextColour(rating) {
-  return rating == null || rating < 6.5 ? '#000000' : '#F6F05C';
+  if (rating == null || rating < 6.5) return '#000000';
+  if (rating < 9) return '#F6F05C';
+  return sample(TEXT_DOMAIN, TEXT_RANGE, rating);
 }
 
 /* ------------------------------------------------------------------------ */

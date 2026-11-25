@@ -29,6 +29,16 @@ test("difficulty colours follow osu-web's ramp", () => {
   assert.equal(getDiffTextColour(7), '#F6F05C');
 });
 
+test('from 9 stars the number runs through its own spectrum, and stays blue past 12.4', () => {
+  assert.equal(getDiffTextColour(9), '#f6f05c');
+  assert.equal(getDiffTextColour(9.9), '#ff8068');
+  assert.equal(getDiffTextColour(12.4), '#6563de');
+  assert.equal(getDiffTextColour(14.8), '#6563de');
+  const between = getDiffTextColour(10.29);
+  assert.notEqual(between, getDiffTextColour(9.9));
+  assert.notEqual(between, getDiffTextColour(10.6));
+});
+
 test('difficulties group by ruleset, easiest first', () => {
   const groups = groupDifficulties([
     { id: 1, mode: 'taiko', stars: 3, version: 'b' },
