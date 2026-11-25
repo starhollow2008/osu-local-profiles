@@ -2110,6 +2110,37 @@
 }
 
 /*
+ * Other settings: a score's judgements between its mods and its accuracy (issue #37), each in
+ * osu!'s colour for it, and its beatmap's cover behind the row (issue #38), under the row's own
+ * colours made see-through.
+ */
+.play-detail__judgements {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.play-detail__judgement-slash {
+  color: hsl(var(--hsl-f1));
+  font-weight: 400;
+}
+
+/* A background colour paints under its own image, so the dimming is a layer over the cover. */
+.play-detail--cover {
+  --bg: hsla(var(--hsl-b3), 0.7);
+  --bg-main: hsla(var(--hsl-b2), 0.8);
+  background-image: linear-gradient(hsla(var(--hsl-b2), 0.8), hsla(var(--hsl-b2), 0.8)), var(--cover);
+  background-size: cover;
+  background-position: center;
+}
+
+.play-detail--cover .play-detail__group--top {
+  background-color: transparent;
+}
+
+/*
  * A play that was started and never finished -- a quit, a retry, an HP fail.
  *
  * osu! counts these toward a play count and this profile does too, but there is no score
@@ -2189,6 +2220,27 @@
 
   .play-detail__mods-pp {
     display: contents;
+  }
+
+  /* After the mods, which come first on a wide page, and before the accuracy. */
+  .play-detail__judgements {
+    order: -1;
+    padding: 5px 10px;
+    background-color: var(--bg-main);
+  }
+
+  /* On a wide page each part of the row dims the cover under it itself. */
+  .play-detail--cover {
+    background-image: var(--cover);
+  }
+
+  .play-detail--cover .play-detail__group--top {
+    background-color: var(--bg-main);
+  }
+
+  .play-detail--cover:hover {
+    --bg: hsla(var(--hsl-b2), 0.6);
+    --bg-main: hsla(var(--hsl-b1), 0.7);
   }
 
   /*
@@ -6468,13 +6520,19 @@ a.beatmapset-badge--spotlight:hover {
 }
 
 /* osu-web's `hit-stat-colours`, which are ppy/osu's own judgement colours. */
+.play-detail__judgement--great,
 .score-stats__stat-row--hit-great,
 .score-stats__stat-row--hit-large_tick_hit,
 .score-stats__stat-row--hit-small_tick_hit { color: hsl(var(--hsl-blue-2)); }
+.play-detail__judgement--perfect,
 .score-stats__stat-row--hit-perfect { color: hsl(var(--hsl-blue-1)); }
+.play-detail__judgement--good,
 .score-stats__stat-row--hit-good { color: hsl(var(--hsl-green-1)); }
+.play-detail__judgement--ok,
 .score-stats__stat-row--hit-ok { color: hsl(var(--hsl-lime-2)); }
+.play-detail__judgement--meh,
 .score-stats__stat-row--hit-meh { color: hsl(var(--hsl-orange-1)); }
+.play-detail__judgement--miss,
 .score-stats__stat-row--hit-miss { color: hsl(var(--hsl-red-1)); }
 .score-stats__stat-row--hit-small_tick_miss { color: hsl(var(--hsl-f1)); }
 

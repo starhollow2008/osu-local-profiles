@@ -4,6 +4,8 @@ import { coverUrl, gradeBadge, incompleteBadge, medalBadge, modList } from './ba
 import { t } from './i18n.js';
 import { assetUrl } from './static-mode.js';
 import { beatmapArtist, beatmapName, beatmapTitle, original } from './metadata.js';
+import { difficultyBadge } from './beatmapsets.js';
+import { statisticsFor } from './statistics.js';
 
 function titleOf(item) {
   return beatmapName(item) || t('beatmap.unknown', {
@@ -213,10 +215,36 @@ export function playMenuButton(play) {
 }
 
 /**
- * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
- * accuracy, mods and pp stepping right.
+ * How Other settings asks score rows to look, as `playRow` options: the star rating as text or
+ * as osu!'s badge, the judgements, and the beatmap's background. All off unless asked for.
  */
-export function playRow(play, { showWeight = false, actions = false, reorderable = false, starRating = false } = {}) {
+export function rowLooks(config) {
+  return {
+    starRating: config?.starRating === true,
+    starBadge: config?.starRatingBadge === true,
+    judgements: config?.judgements === true,
+    background: config?.scoreBackgrounds === true,
+  };
+}
+
+/** A score's judgements as osu! counts them for its ruleset, each in osu!'s colour for it. */
+function judgementsCell(play) {
+  const { basic } = statisticsFor({ mode: play.mode ?? 0, statistics: play.statistics ?? {} });
+  const title = basic.map((s) => `${s.label}: ${fmt(s.value)}`).join(', ');
+  const counts = basic
+    .map((s) => `<span class="play-detail__judgement play-detail__judgement--${s.attribute}">${fmt(s.value)}</span>`)
+    .join('<span class="play-detail__judgement-slash">/</span>');
+  return `<div class="play-detail__judgements" title="${escapeHtml(title)}">${counts}</div>`;
+}
+
+/**
+ * One score, laid out as osu-web's `.play-detail`: grade and title on the left, then
+ * accuracy, mods and pp stepping right. The `rowLooks` options add to it.
+ */
+export function playRow(play, {
+  showWeight = false, actions = false, reorderable = false,
+  starRating = false, starBadge = false, judgements = false, background = false,
+} = {}) {
   const artist = playArtist(play);
   const title = maybeLink(
     beatmapHref(play),
@@ -235,8 +263,14 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
 
   const pp = ppCell(play);
 
-  // Other settings -> Show star rating on scores. osu! shows none here, so off by default.
-  const stars = starRating && play.stars != null ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
+  // Other settings -> Star rating on scores. osu! shows none here, so off by default; as text
+  // after the difficulty's name, or as osu!'s badge before it.
+  const shown = starRating && play.stars != null;
+  const stars = shown && !starBadge ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
+  const badge = shown && starBadge ? difficultyBadge(play.stars) : '';
+
+  // Other settings -> Show beatmap backgrounds on scores: the set's cover behind the row.
+  const cover = background && onlineId(play.beatmapsetId) ? coverUrl(play.beatmapsetId, 'cover') : null;
 
   /*
    * One shared popover does the menu (see #playMenu), so a row only carries the button and
@@ -251,15 +285,15 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
     ? '<div class="play-detail__grip" aria-hidden="true" title="Drag to reorder">&#8942;&#8942;</div>'
     : '';
 
-  return `<div class="play-detail${reorderable ? ' play-detail--reorderable' : ''}"
-    data-score-id="${play.id}"${reorderable ? ' draggable="true"' : ''}>
+  return `<div class="play-detail${reorderable ? ' play-detail--reorderable' : ''}${cover ? ' play-detail--cover' : ''}"
+    data-score-id="${play.id}"${reorderable ? ' draggable="true"' : ''}${cover ? ` style="--cover: url('${cover}')"` : ''}>
   ${grip}
   <div class="play-detail__group play-detail__group--top">
     <div class="play-detail__icon">${gradeBadge(play.grade)}</div>
     <div class="play-detail__detail">
       ${title}
       <div class="play-detail__beatmap-and-time">
-        <span class="play-detail__beatmap u-ellipsis">${escapeHtml(play.version ?? '')}${stars}</span>
+        ${badge}<span class="play-detail__beatmap u-ellipsis">${escapeHtml(play.version ?? '')}${stars}</span>
         <span class="play-detail__time" title="${escapeHtml(fullDate(play.playedAt))}">${escapeHtml(timeAgo(play.playedAt))}</span>
         ${sourceTag(play)}
       </div>
@@ -276,6 +310,7 @@ export function playRow(play, { showWeight = false, actions = false, reorderable
     </div>
     <div class="play-detail__mods-pp">
       <div class="play-detail__mods">${modList(play.mods, play.client)}</div>
+      ${judgements ? judgementsCell(play) : ''}
       ${pp}
     </div>
     ${menu}

@@ -12,7 +12,7 @@ import { escapeHtml, fmt, fullDate, pct, timeAgo } from './format.js';
 import { gradeBadge, modList, modPill } from './badges.js';
 import { t } from './i18n.js';
 import { beatmapArtist, beatmapName, beatmapTitle } from './metadata.js';
-import { playMenuButton, playRow } from './sections.js';
+import { playMenuButton, playRow, rowLooks } from './sections.js';
 import { closeOnBackdrop, postJson } from './ui.js';
 
 const $ = (id) => document.getElementById(id);
@@ -254,8 +254,8 @@ function tableRow(play, place) {
 }
 
 /** osu!'s rows, as Best Performance draws them. How often each beatmap was played is the table's. */
-export function rowsHtml(plays, { starRating = false } = {}) {
-  return plays.map((p) => playRow(p, { actions: true, starRating })).join('');
+export function rowsHtml(plays, looks = {}) {
+  return plays.map((p) => playRow(p, { ...looks, actions: true })).join('');
 }
 
 /* ------------------------------------------------------------------ the page */
@@ -333,7 +333,7 @@ function render() {
     body.innerHTML = `<div class="u-empty">${escapeHtml(viewChanged(view) ? t('scoreList.noMatch') : t('scoreList.empty'))}</div>`;
   } else {
     body.innerHTML = view.layout === 'rows'
-      ? `<div class="score-list__rows">${rowsHtml(rows, { starRating: ctx.getConfig()?.starRating === true })}</div>`
+      ? `<div class="score-list__rows">${rowsHtml(rows, rowLooks(ctx.getConfig()))}</div>`
       : tableHtml(rows, view);
   }
   const more = rows.length < total;

@@ -304,4 +304,22 @@ public sealed class ScoreListTests : IDisposable
         // Without a list, every score, and no playcount column.
         Assert.DoesNotContain(Tables.Scores(h.Db, h.ProfileId, e, 0, t).Columns, c => c.Header == "scoreList.playcount");
     }
+
+    [Fact]
+    public void Each_row_carries_its_mode_client_and_judgements_for_the_rows_that_show_them()
+    {
+        // Issue #37: a stable score's counters as lazer names them, a lazer score's own statistics.
+        var stable = Score("aaa", 300, client: "stable", misses: 2);
+        var lazer = Score("bbb", 200);
+        h.Db.Run("UPDATE scores SET statistics_json = ? WHERE id = ?", """{"great":475,"ok":3,"meh":1,"miss":16}""", lazer);
+        var rows = List(View(new { })).ToDictionary(p => p.Id!);
+
+        var old = rows[stable];
+        Assert.Equal(("stable", 0L), (old.Client, Convert.ToInt64(old.Mode)));
+        Assert.Equal([("great", 100L), ("ok", 0L), ("meh", 0L), ("miss", 2L)],
+            old.Statistics.Select(kv => (kv.Key, Convert.ToInt64(kv.Value))));
+        Assert.Equal("""{"great":475,"ok":3,"meh":1,"miss":16}""", JsonText.Stringify(rows[lazer].Statistics));
+        // The misses the Scores view sorts by are still the row's own.
+        Assert.Equal(2L, Convert.ToInt64(old.Misses));
+    }
 }

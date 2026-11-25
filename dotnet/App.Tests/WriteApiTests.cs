@@ -226,6 +226,28 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task How_score_rows_look_starts_off_and_takes_only_a_switch()
+    {
+        // Issues #37 and #38: the judgements, the background and the star badge, off by default.
+        var config = (await client.GetFromJson("/api/app-config")).GetProperty("config");
+        Assert.False(config.GetProperty("judgements").GetBoolean());
+        Assert.False(config.GetProperty("scoreBackgrounds").GetBoolean());
+        Assert.False(config.GetProperty("starRatingBadge").GetBoolean());
+
+        var changed = (await Post("/api/app-config", new { judgements = true, scoreBackgrounds = true, starRatingBadge = true })).Body.GetProperty("config");
+        Assert.True(changed.GetProperty("starRatingBadge").GetBoolean());
+        Assert.True(changed.GetProperty("judgements").GetBoolean());
+        Assert.True(changed.GetProperty("scoreBackgrounds").GetBoolean());
+        Assert.Equal("judgements must be true or false", Error((await Post("/api/app-config", new { judgements = "yes" })).Body));
+
+        // A hand edit that is not a switch reads as off.
+        File.WriteAllText(Path.Combine(DataDir, "config.json"), """{"port": 7272, "judgements": 1, "scoreBackgrounds": "on"}""");
+        var edited = AppConfig.Load(DataDir).PageView();
+        Assert.Equal(false, edited["judgements"]);
+        Assert.Equal(false, edited["scoreBackgrounds"]);
+    }
+
+    [Fact]
     public void A_rank_curve_counts_its_players_by_its_last_place()
     {
         var osu = Calc.Ranks.Table(0)!;

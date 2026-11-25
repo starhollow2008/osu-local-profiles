@@ -139,7 +139,7 @@ internal static partial class Stats
                  WHERE s.profile_id = ? AND s.mode = ? AND {Eligibility.IncompleteSql(e)} AND s.beatmap_md5 IS NOT NULL) p
                GROUP BY p.beatmap_md5),
             listed AS (
-              SELECT {PlayColumns(e)}, {pp} AS pp, s.count_miss, COALESCE(pc.n, 1) AS playcount,
+              SELECT {PlayColumns(e)}, {pp} AS pp, COALESCE(pc.n, 1) AS playcount,
                      ROW_NUMBER() OVER (PARTITION BY s.beatmap_md5
                                         ORDER BY {pp} IS NULL, {pp} DESC, {Eligibility.ScoreColumn(e)} DESC, s.played_at DESC) AS place_on_map
                 FROM scores s

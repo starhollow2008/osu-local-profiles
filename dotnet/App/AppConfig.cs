@@ -78,6 +78,10 @@ internal sealed class AppConfig
         ["originalMetadata"] = JsonText.From(false),
         ["font"] = JsonText.From("nunito"),
         ["starRating"] = JsonText.From(false),
+        // A score row's star rating as osu!'s badge and its beatmap's background (issue #38), and its judgements (issue #37).
+        ["starRatingBadge"] = JsonText.From(false),
+        ["judgements"] = JsonText.From(false),
+        ["scoreBackgrounds"] = JsonText.From(false),
         // osu-web's tier colour on the global rank (issue #30), and where the B, C and D counts show (issue #31).
         ["rankTiers"] = JsonText.From(true),
         ["lowerGrades"] = JsonText.From("hover"),
@@ -194,6 +198,9 @@ internal sealed class AppConfig
         // A hand-edited value that is neither is Nunito, the default.
         ["font"] = Js.IsString(this["font"], out var font) && font == "system" ? "system" : "nunito",
         ["starRating"] = this["starRating"] is { ValueKind: JsonValueKind.True },
+        ["starRatingBadge"] = this["starRatingBadge"] is { ValueKind: JsonValueKind.True },
+        ["judgements"] = this["judgements"] is { ValueKind: JsonValueKind.True },
+        ["scoreBackgrounds"] = this["scoreBackgrounds"] is { ValueKind: JsonValueKind.True },
         // On unless turned off; a hand-edited value that is not a switch is the default.
         ["rankTiers"] = this["rankTiers"] is not { ValueKind: JsonValueKind.False },
         ["lowerGrades"] = Js.IsString(this["lowerGrades"], out var lower) && lower is "off" or "always" ? lower : "hover",

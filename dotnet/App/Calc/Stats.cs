@@ -23,6 +23,9 @@ internal sealed class Play
     public object? Creator { get; init; }
     /// <summary>Full mod objects: lazer carries settings such as DT at 1.3x.</summary>
     public List<JsonElement> Mods { get; init; } = [];
+    public object? Mode { get; init; }
+    /// <summary>Its judgements, named as lazer names them, a stable score's too.</summary>
+    public Dictionary<string, object?> Statistics { get; init; } = [];
     public object? Accuracy { get; init; }
     public object? MaxCombo { get; init; }
     public object? TotalScore { get; init; }
@@ -155,6 +158,7 @@ internal static partial class Stats
                 -- Nor is one built for a score from its link or entered by hand.
                 (s.replay_path IS NOT NULL AND s.client <> 'mcosu' AND s.origin IS NULL) AS has_replay,
                 s.mode, s.origin, s.imported_at IS NOT NULL AS imported, s.online_score_id, s.legacy_score_id,
+                s.statistics_json, s.count300, s.count100, s.count50, s.count_geki, s.count_katu, s.count_miss,
                 b.beatmapset_id, {Metadata.NameColumns}, b.version, b.creator
         """;
 
@@ -186,6 +190,9 @@ internal static partial class Stats
             Mods = Mods.WithClassicMod(RowMods(r), client),
             // Which mods an acronym stands for can depend on it: MC is McOsu's or Ritsu's.
             Client = client,
+            Mode = r["mode"],
+            // A row shows its judgements when the profile asks (Other settings).
+            Statistics = Scores.ParseStatistics(r.Str("statistics_json")) ?? Scores.LegacyStatistics(r["mode"], r),
             Accuracy = r["accuracy"],
             MaxCombo = r["max_combo"],
             TotalScore = r["total_score"],

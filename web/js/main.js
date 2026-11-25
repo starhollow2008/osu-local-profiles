@@ -94,6 +94,7 @@ import {
   countingNoteText,
   playList,
   reconcileSectionOrder,
+  rowLooks,
   showMore,
 } from './sections.js';
 
@@ -1017,13 +1018,13 @@ async function loadProfile() {
   // terms of positions in this list.
   pinnedIds = (data.pinned ?? []).map((p) => p.id);
   $('pinnedCount').textContent = fmt(pinnedIds.length);
-  // Other settings -> Show star rating on scores, off unless the app says otherwise.
-  const starRating = app.config?.starRating === true;
+  // Other settings -> how score rows look: star rating, judgements and backgrounds, all off by default.
+  const looks = rowLooks(app.config);
   // Nothing pinned leaves the space empty, as osu! does, rather than explaining itself.
   $('pinnedPlays').innerHTML = playList(data.pinned, {
     actions: true,
     reorderable: true,
-    starRating,
+    ...looks,
     empty: '',
   });
 
@@ -1033,7 +1034,7 @@ async function loadProfile() {
     playList(data.top, {
       showWeight: true,
       actions: true,
-      starRating,
+      ...looks,
       empty:
         settings.includeUnrankedMods || settings.includeUnrankedMaps?.length
           ? t('empty.noPpPlays')
@@ -1045,7 +1046,7 @@ async function loadProfile() {
   $('firstsCount').textContent = fmt(firstsTotal);
   $('firstPlaces').innerHTML =
     // None leaves the space empty, as Pinned Scores does.
-    playList(data.firsts ?? [], { actions: true, starRating, empty: '' }) +
+    playList(data.firsts ?? [], { actions: true, ...looks, empty: '' }) +
     showMore('firsts', (data.firsts ?? []).length, shown.firsts, firstsTotal, settings.showMoreAll);
 
   const chart = playHistoryChart(data.monthlyPlaycounts);
@@ -1063,7 +1064,7 @@ async function loadProfile() {
   $('recentPlays').innerHTML =
     playList(data.recent, {
       actions: true,
-      starRating,
+      ...looks,
       empty: t('empty.goSetAPlay'),
     }) + showMore('recent', data.recent.length, shown.recent, recentTotal, settings.showMoreAll);
 
@@ -3438,7 +3439,9 @@ function openSettings() {
   void loadPpSource();
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   $('originalMetadataSetting').checked = preferOriginalMetadata();
-  $('starRatingSetting').checked = app.config?.starRating === true;
+  $('starRatingSetting').value = app.config?.starRating !== true ? 'off' : app.config?.starRatingBadge === true ? 'badge' : 'text';
+  $('judgementsSetting').checked = app.config?.judgements === true;
+  $('scoreBackgroundsSetting').checked = app.config?.scoreBackgrounds === true;
   $('rankTiersSetting').checked = app.config?.rankTiers !== false;
   $('lowerGradesSetting').value = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
   $('fontSetting').value = pageFont();
@@ -3511,12 +3514,27 @@ $('settingsSave').onclick = async () => {
     }
 
     // Star ratings on score rows, install-level too. The reload below redraws the rows.
-    const starRating = $('starRatingSetting').checked;
+    const starChoice = $('starRatingSetting').value;
+    const starRating = starChoice !== 'off';
     if (starRating !== (app.config?.starRating === true)) {
       const c = await postJson('/api/app-config', { starRating }, 'saving that failed');
       app = { ...app, config: c.config };
       // The note said where this is; changing it is as good as closing the note.
       dismissStarRatingNotice();
+    }
+
+    // The rest of how score rows look (issues #37 and #38): the star rating as osu!'s badge, the
+    // judgements and the beatmap's background. A hidden star rating keeps how it would be shown.
+    const rows = {};
+    const starRatingBadge = starRating ? starChoice === 'badge' : app.config?.starRatingBadge === true;
+    if (starRatingBadge !== (app.config?.starRatingBadge === true)) rows.starRatingBadge = starRatingBadge;
+    for (const key of ['judgements', 'scoreBackgrounds']) {
+      const on = $(`${key}Setting`).checked;
+      if (on !== (app.config?.[key] === true)) rows[key] = on;
+    }
+    if (Object.keys(rows).length) {
+      const c = await postJson('/api/app-config', rows, 'saving that failed');
+      app = { ...app, config: c.config };
     }
 
     // The global rank's tier colour (issue #30) and the B, C and D counts (issue #31), install-level
@@ -5309,7 +5327,7 @@ on('app-config', (e) => {
   applyConfigFont(app.config);
   renderUpdate();
   // Changed in another tab: redraw the score rows, the rank's colour and the grade counts.
-  const redraw = ['starRating', 'rankTiers', 'lowerGrades'].some((key) => before[key] !== app.config?.[key]);
+  const redraw = ['starRating', 'starRatingBadge', 'judgements', 'scoreBackgrounds', 'rankTiers', 'lowerGrades'].some((key) => before[key] !== app.config?.[key]);
   if (redraw) void loadProfile();
 });
 // Pin, unpin and remove all change what the page should be showing.

@@ -17,8 +17,17 @@ export function countingNoteText(counting: {
   extraMapStatuses?: readonly number[];
 } | null | undefined): string;
 
+/** How Other settings asks score rows to look, as `playRow` options. */
+export interface RowLooks {
+  starRating: boolean;
+  starBadge: boolean;
+  judgements: boolean;
+  background: boolean;
+}
+export function rowLooks(config: Record<string, unknown> | null | undefined): RowLooks;
+
 /** One score row, as osu-web's `.play-detail`. */
 export function playRow(
   play: Record<string, unknown>,
-  options?: { showWeight?: boolean; actions?: boolean; reorderable?: boolean; starRating?: boolean; playcount?: string | null },
+  options?: { showWeight?: boolean; actions?: boolean; reorderable?: boolean; playcount?: string | null } & Partial<RowLooks>,
 ): string;

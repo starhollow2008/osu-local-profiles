@@ -6,9 +6,9 @@ import {
   flooredAccuracy,
   rankCutoffs,
   scoreCard,
-  statisticsFor,
 } from '../web/js/score-card.js';
-import { playRow } from '../web/js/sections.js';
+import { playRow, rowLooks } from '../web/js/sections.js';
+import { statisticsFor } from '../web/js/statistics.js';
 
 /*
  * View Details (roadmap 5.21): osu!'s score page as a card, drawn from what `/api/scores/:id`
@@ -159,4 +159,42 @@ test('a score row shows its star rating only when asked', () => {
   assert.match(plain, /Kowari&#39;s Confession<\/span>|Kowari's Confession<\/span>/);
   assert.doesNotMatch(plain, /6\.18|&#9733;/);
   assert.match(playRow(play, { starRating: true }), /Kowari(&#39;|')s Confession &middot; 6\.18&#9733;<\/span>/);
+});
+
+test("a score row can show the star rating as osu!'s badge, its judgements and its beatmap's background", () => {
+  const play = {
+    id: 1, title: 'Heart no Shuchou', artist: 'CHiCO', version: "Kowari's Confession", stars: 6.18, mods: [{ acronym: 'HD' }],
+    mode: 0, beatmapsetId: 1830679, statistics: { great: 1045, ok: 21, meh: 0, miss: 2, large_tick_hit: 40 },
+  };
+  const plain = playRow(play);
+  assert.doesNotMatch(plain, /difficulty-badge|play-detail__judgements|play-detail--cover|--cover/);
+
+  // The badge before the difficulty's name, and no text star rating after it.
+  const badged = playRow(play, { starRating: true, starBadge: true });
+  assert.match(badged, /class="difficulty-badge"[\s\S]*6\.18[\s\S]*Kowari(&#39;|')s Confession<\/span>/);
+  assert.doesNotMatch(badged, /&#9733;/);
+  // A badge with the star rating hidden is no star rating at all.
+  assert.doesNotMatch(playRow(play, { starBadge: true }), /difficulty-badge/);
+
+  // osu!'s four judgements for the ruleset, in its order, after the mods and before the pp.
+  const judged = playRow(play, { judgements: true });
+  const counts = [...judged.matchAll(/play-detail__judgement--(\w+)">([^<]+)</g)].map((m) => [m[1], m[2]]);
+  assert.deepEqual(counts, [['great', '1,045'], ['ok', '21'], ['meh', '0'], ['miss', '2']]);
+  assert.ok(judged.indexOf('play-detail__mods') < judged.indexOf('play-detail__judgements'));
+  assert.ok(judged.indexOf('play-detail__judgements') < judged.indexOf('play-detail__pp'));
+  // A taiko score has three.
+  assert.equal(playRow({ ...play, mode: 1 }, { judgements: true }).match(/play-detail__judgement--/g)?.length, 3);
+
+  const covered = playRow(play, { background: true });
+  assert.match(covered, /class="play-detail play-detail--cover"/);
+  assert.match(covered, /--cover: url\('https:\/\/assets\.ppy\.sh\/beatmaps\/1830679\/covers\/cover\.jpg'\)/);
+  // A beatmap osu! has no set for has no cover to show.
+  assert.doesNotMatch(playRow({ ...play, beatmapsetId: null }, { background: true }), /play-detail--cover/);
+
+  // Each from its own setting, and all off until asked for.
+  assert.deepEqual(rowLooks(undefined), { starRating: false, starBadge: false, judgements: false, background: false });
+  assert.deepEqual(
+    rowLooks({ starRating: true, starRatingBadge: true, judgements: true, scoreBackgrounds: true }),
+    { starRating: true, starBadge: true, judgements: true, background: true },
+  );
 });

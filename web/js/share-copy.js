@@ -191,11 +191,16 @@ export async function buildInteractiveHtml(progress = () => {}) {
       importing: { ...(state.importing ?? {}), active: false },
       sharing: { canScreenshot: false },
       starRatingNotice: false,
-      // Star ratings as the sharer sees them; nothing else of the install's options.
+      // Score rows as the sharer sees them; nothing else of the install's options.
       app: {
         version: state.app?.version ?? null,
         update: null,
-        config: { starRating: state.app?.config?.starRating === true },
+        config: {
+          starRating: state.app?.config?.starRating === true,
+          starRatingBadge: state.app?.config?.starRatingBadge === true,
+          judgements: state.app?.config?.judgements === true,
+          scoreBackgrounds: state.app?.config?.scoreBackgrounds === true,
+        },
       },
     },
     profiles,

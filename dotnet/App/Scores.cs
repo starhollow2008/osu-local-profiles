@@ -112,7 +112,7 @@ internal static partial class Scores
     }
 
     /// <summary>Judgement counts as stored, keeping only finite numbers; null when unreadable.</summary>
-    private static Dictionary<string, object?>? ParseStatistics(string? json)
+    public static Dictionary<string, object?>? ParseStatistics(string? json)
     {
         if (string.IsNullOrEmpty(json) || !JsonText.TryParse(json, out var parsed)) return null;
         // Object.entries(null) throws in JavaScript, and the caller falls back to the counters.

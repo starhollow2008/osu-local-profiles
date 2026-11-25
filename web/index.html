@@ -1026,8 +1026,24 @@
       </div>
       <div class="setting">
         <label class="field">
-          <span data-i18n="installSettings.starRating">Show star rating on scores</span>
-          <input type="checkbox" id="starRatingSetting">
+          <span data-i18n="installSettings.starRating">Star rating on scores</span>
+          <select id="starRatingSetting">
+            <option value="off" data-i18n="installSettings.starRatingOff">Hidden</option>
+            <option value="text" data-i18n="installSettings.starRatingText">As text</option>
+            <option value="badge" data-i18n="installSettings.starRatingBadge">As a badge</option>
+          </select>
+        </label>
+      </div>
+      <div class="setting">
+        <label class="field">
+          <span data-i18n="installSettings.judgements">Show judgements on scores</span>
+          <input type="checkbox" id="judgementsSetting">
+        </label>
+      </div>
+      <div class="setting">
+        <label class="field">
+          <span data-i18n="installSettings.scoreBackgrounds">Show beatmap backgrounds on scores</span>
+          <input type="checkbox" id="scoreBackgroundsSetting">
         </label>
       </div>
       <div class="setting">
