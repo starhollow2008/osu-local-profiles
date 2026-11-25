@@ -618,7 +618,7 @@ internal sealed partial class Updater
         _ = PrepareUpdate("auto").ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
     }
 
-    /// <summary>Options -> Auto-update changed. Turned off, a build it downloaded is not installed.</summary>
+    /// <summary>Options -> Settings -> System -> Auto-update changed. Turned off, a build it downloaded is not installed.</summary>
     public void AutoUpdateChanged()
     {
         if (!autoUpdate() && ReadReady()?.Requested == "auto") DropReady();

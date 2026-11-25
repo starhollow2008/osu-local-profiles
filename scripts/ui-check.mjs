@@ -160,6 +160,15 @@ if (languageBefore && languageBefore !== 'en') {
 const shown = (id) =>
   evaluate(`getComputedStyle(document.getElementById('${id}')).display`);
 
+/** Options -> Settings, at one of its pages, the way a person gets there. */
+const openSettingsAt = (page) =>
+  evaluate(`(() => {
+    document.getElementById('optionsBtn').click();
+    document.getElementById('optSettings').click();
+    document.querySelector('#settingsNav [data-settings-page="${page}"]').click();
+  })()`);
+const closeSettingsDialog = () => evaluate("document.getElementById('settingsClose').click()");
+
 const checks = [];
 
 /*
@@ -203,12 +212,11 @@ await evaluate("document.body.click()");
 check('options menu closes', await shown('optionsMenu'), 'none');
 
 console.log('\nafter choosing Reset profile');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optProfiles').click()");
+await openSettingsAt('profile');
 await evaluate("document.getElementById('profileReset').click()");
 check('reset dialog opens', await shown('resetModal'), 'grid');
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
-check('and Profiles closed behind it', await shown('profilesModal'), 'none');
+check('and Settings closed behind it', await shown('settingsModal'), 'none');
 console.log(`  summary text: "${await evaluate("document.getElementById('resetSummary').textContent")}"`);
 
 console.log('\nafter clicking Cancel');
@@ -216,8 +224,7 @@ await evaluate("document.getElementById('resetCancel').click()");
 check('reset dialog closes', await shown('resetModal'), 'none');
 
 console.log('\nafter reopening and clicking the backdrop');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optProfiles').click()");
+await openSettingsAt('profile');
 await evaluate("document.getElementById('profileReset').click()");
 await evaluate(`(() => {
   const el = document.getElementById('resetModal');
@@ -227,8 +234,7 @@ await evaluate(`(() => {
 check('backdrop click closes it', await shown('resetModal'), 'none');
 
 console.log('\nafter reopening and pressing Escape');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optProfiles').click()");
+await openSettingsAt('profile');
 await evaluate("document.getElementById('profileReset').click()");
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
@@ -578,8 +584,8 @@ const filterInUse = await evaluate(
 const unlessSet = (value) => (filterInUse ? SKIP : value);
 
 check('the filter dialog is hidden on load', await shown('filterModal'), 'none');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optFilter').click()");
+await openSettingsAt('tracking');
+await evaluate("document.getElementById('settingsFilterOpen').click()");
 // It opens once the names its Player names lists have been asked for, so give that a moment.
 await evaluate(`(async () => {
   for (let i = 0; i < 50 && document.getElementById('filterModal').hidden; i++) await new Promise((r) => setTimeout(r, 100));
@@ -607,7 +613,7 @@ check(
 );
 // Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod: 67.
 // Then other clients' mods (McOsu's MC, neomod's NEO, Torii's and Ritsu's, whose Miss Challenge
-// shares MC's chip) only for a client found here or with Other settings' switch on, and any the
+// shares MC's chip) only for a client found here or with Settings' switch on, and any the
 // saved filter names (web/js/client-mods.js).
 const clientMods = await evaluate(`(async () => {
   const s = await (await fetch('/api/state')).json();
@@ -771,12 +777,28 @@ check(
   ),
   false,
 );
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optFilter').click()");
+await openSettingsAt('tracking');
+await evaluate("document.getElementById('settingsFilterOpen').click()");
+// Pressed before it has opened, Escape would close Settings and leave the filter to open alone.
+await evaluate(`(async () => {
+  for (let i = 0; i < 50 && document.getElementById('filterModal').hidden; i++) await new Promise((r) => setTimeout(r, 100));
+})()`);
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
 check('Escape closes it', await shown('filterModal'), 'none');
+check('and leaves Settings open beneath it', await shown('settingsModal'), 'grid');
+await closeSettingsDialog();
+
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optFilter').click()");
+await evaluate(`(async () => {
+  for (let i = 0; i < 50 && document.getElementById('filterModal').hidden; i++) await new Promise((r) => setTimeout(r, 100));
+})()`);
+check('Options -> Play tracking filter opens it too', await shown('filterModal'), 'grid');
+check('on its own, with no Settings beneath it', await shown('settingsModal'), 'none');
+await evaluate("document.getElementById('filterCancel').click()");
+check('and Cancel closes it', await shown('filterModal'), 'none');
 
 console.log('\nfavorite beatmaps');
 check(
@@ -1002,9 +1024,9 @@ check('the not-running notice is hidden while the app runs', await shown('stoppe
 
 console.log('\nopen in browser on start');
 /*
- * In Other settings, under This install. Read, flip and save, read back from the server, then
- * flip back and save again: the check must leave config.json as it found it, since it runs
- * against a real install.
+ * In Settings -> System. Read, flip, read back from the server, then flip back: a change applies
+ * with no Save, and the check must leave config.json as it found it, since it runs against a
+ * real install.
  */
 const toggle = await evaluate(`(async () => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -1012,72 +1034,52 @@ const toggle = await evaluate(`(async () => {
   const open = () => {
     document.getElementById('optionsBtn').click();
     document.getElementById('optSettings').click();
+    document.querySelector('#settingsNav [data-settings-page="system"]').click();
   };
   const box = () => document.getElementById('openBrowserSetting');
-  // Save can offer a recompute with a native confirm(), which would hold this check until
-  // someone answered it. Declined here, and put back below.
-  const realConfirm = window.confirm;
-  window.confirm = () => false;
+  const flip = (to) => {
+    box().checked = to;
+    box().dispatchEvent(new Event('change', { bubbles: true }));
+  };
   const before = await state();
   open();
-  const inSettings = document.getElementById('settingsModal').contains(box());
+  const inSystem = !!box().closest('.settings-page[data-page="system"]') && box().offsetParent !== null;
   const shownBefore = box().checked === before;
-  box().checked = !before;
-  document.getElementById('settingsSave').click();
+  flip(!before);
   await wait(1500);
   const after = await state();
+  document.getElementById('settingsClose').click();
   open();
   const shownAfter = box().checked === after;
-  box().checked = before;
-  document.getElementById('settingsSave').click();
+  flip(before);
   await wait(1500);
   const restored = (await state()) === before;
-  window.confirm = realConfirm;
-  return { inSettings, shownBefore, flipped: after === !before, shownAfter, restored };
+  document.getElementById('settingsClose').click();
+  return { inSystem, shownBefore, flipped: after === !before, shownAfter, restored };
 })()`);
-check('it is in Other settings', toggle.inSettings, true);
+check('it is on Settings -> System', toggle.inSystem, true);
 check('the box shows the saved setting', toggle.shownBefore, true);
-check('saving it flipped saves the opposite', toggle.flipped, true);
+check('changing it saves the opposite, with no Save', toggle.flipped, true);
 check('and the box follows when the dialog is opened again', toggle.shownAfter, true);
-check('saving it back puts it back', toggle.restored, true);
+check('changing it back puts it back', toggle.restored, true);
 
-console.log('\nshare dialog');
-check('the share dialog is hidden on load', await shown('shareModal'), 'none');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optShare').click()");
-check('it opens', await shown('shareModal'), 'grid');
-check('it is called Share & back up', await evaluate("document.getElementById('shareTitle').textContent"), 'Share & back up');
+console.log('\nshare & export, in Settings');
+await openSettingsAt('share');
+const sharePage = "document.querySelector('#settingsModal [data-page=\"share\"]')";
+check('it is a page of Settings', await evaluate(`!${sharePage}.hidden`), true);
+check('it is called Share & export', await evaluate(`${sharePage}.querySelector('.settings-page__title').textContent`), 'Share & export');
 check(
-  'exporting and backing up are offered in it',
-  await evaluate("!!document.getElementById('shareExport') && !!document.getElementById('shareBackup')"),
+  'exporting is offered on it, and backing up is not',
+  await evaluate(`${sharePage}.contains(document.getElementById('shareExport')) && !${sharePage}.contains(document.getElementById('shareBackup'))`),
   true,
 );
 check(
-  'restoring takes the backup zip, or a .db from an older version',
-  await evaluate("!!document.getElementById('shareRestore') && document.getElementById('restoreFile').accept"),
-  '.zip,.db',
-);
-/*
- * The path arrives from its own endpoint after the dialog opens, never from /api/state,
- * which the saved web page is built from.
- */
-check(
-  'the data folder is named in full, with a way to open it',
-  await evaluate(`new Promise((resolve) => setTimeout(() => {
-    const path = document.getElementById('dataFolderPath');
-    resolve(/data$/.test(path.textContent) && getComputedStyle(path).display === 'block' &&
-      !!document.getElementById('openDataFolder'));
-  }, 500))`),
-  true,
-);
-check(
-  'the JSON export is under Export, not Back up, so it is not taken for a backup',
+  'the JSON export is under Export',
   await evaluate(`(() => {
-    const headings = [...document.querySelectorAll('#shareModal h4')];
+    const headings = [...document.querySelectorAll('#settingsModal [data-page="share"] .settings-group')];
     const exportHeading = headings.find((h) => h.textContent === 'Export');
     return !!exportHeading &&
-      !!(exportHeading.compareDocumentPosition(document.getElementById('shareExport')) & Node.DOCUMENT_POSITION_FOLLOWING) &&
-      !!(document.getElementById('shareBackup').compareDocumentPosition(exportHeading) & Node.DOCUMENT_POSITION_FOLLOWING);
+      !!(exportHeading.compareDocumentPosition(document.getElementById('shareExport')) & Node.DOCUMENT_POSITION_FOLLOWING);
   })()`),
   true,
 );
@@ -1111,9 +1113,9 @@ check(
 );
 // The live page is never offered to the network any more: the option was removed outright.
 check(
-  'the dialog offers no network sharing',
+  'the page offers no network sharing',
   await evaluate(`(() => {
-    const text = document.getElementById('shareModal').textContent;
+    const text = document.querySelector('#settingsModal [data-page="share"]').textContent;
     return !document.getElementById('shareNetwork') && !/network|shareOnNetwork/i.test(text);
   })()`),
   true,
@@ -1121,7 +1123,38 @@ check(
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
-check('Escape closes the share dialog', await shown('shareModal'), 'none');
+check('Escape closes Settings from it', await shown('settingsModal'), 'none');
+
+console.log('\nbacking up, in Settings -> System');
+await openSettingsAt('system');
+check(
+  'backing up and restoring are on the System page',
+  await evaluate(`(() => {
+    const page = document.querySelector('#settingsModal [data-page="system"]');
+    return !page.hidden && page.contains(document.getElementById('shareBackup')) &&
+      page.contains(document.getElementById('shareRestore'));
+  })()`),
+  true,
+);
+check(
+  'restoring takes the backup zip, or a .db from an older version',
+  await evaluate("document.getElementById('restoreFile').accept"),
+  '.zip,.db',
+);
+/*
+ * The path arrives from its own endpoint when the page is shown, never from /api/state,
+ * which the saved web page is built from.
+ */
+check(
+  'the data folder is named in full, with a way to open it',
+  await evaluate(`new Promise((resolve) => setTimeout(() => {
+    const path = document.getElementById('dataFolderPath');
+    resolve(/data$/.test(path.textContent) && getComputedStyle(path).display === 'block' &&
+      !!document.getElementById('openDataFolder'));
+  }, 500))`),
+  true,
+);
+await closeSettingsDialog();
 
 /*
  * `?export=1` hides everything that only makes sense while using the page. The screenshot
@@ -2220,8 +2253,8 @@ check('opened again, the beatmap chosen last is still there', ppCalc.none ? SKIP
 check('a click on the backdrop closes it', ppCalc.none ? SKIP : ppCalc.backdropCloses, true);
 
 /*
- * The options menu, as the user asked for it: no trailing ellipses, Settings called Other
- * settings, and Edit profile and Import from osu! folded into Profiles.
+ * The options menu, as the user asked for it: actions, Lazer scoring, and Settings for the rest.
+ * No trailing ellipses.
  */
 console.log('\noptions menu');
 const menuLabels = JSON.parse(
@@ -2232,28 +2265,13 @@ check(
   JSON.stringify(menuLabels.filter((l) => l.endsWith('…') || l.endsWith('...'))),
   '[]',
 );
-check('Settings is called Other settings', menuLabels.includes('Other settings') && !menuLabels.includes('Settings'), true);
 check(
-  'Edit profile and Import from osu! are part of Profiles, not the menu',
-  menuLabels.includes('Edit profile') || menuLabels.includes('Import from osu!'),
-  false,
+  'it is Profiles, pp calculator, Import scores, Play tracking filter, Lazer scoring, Launch on startup and Settings',
+  JSON.stringify(menuLabels),
+  JSON.stringify(['Profiles', 'pp calculator', 'Import scores', 'Play tracking filter', 'Lazer scoring', 'Launch on startup', 'Settings']),
 );
-
-// Seven, Auto-update and Launch on startup on rows of their own at the user's request (roadmap
-// 5.66, 5.77), and the pp calculator.
-check('the menu is ten entries', menuLabels.length, 10);
-check('Auto-update is one of them', menuLabels.includes('Auto-update'), true);
-// The way out when auto-detection missed an install. It has to be reachable from the menu,
-// because the person who needs it is the one the app has already failed.
-check('osu! folders is one of them', menuLabels.includes('osu! folders'), true);
 check(
-  'Open in browser, Export, Back up and Reset have left it',
-  await evaluate("['optOpenBrowser', 'optExport', 'optBackup', 'optReset'].filter((id) => document.getElementById(id)).length"),
-  0,
-);
-check('sharing and backing up are one entry', menuLabels.includes('Share & back up'), true);
-check(
-  'Import past plays and Play tracking filter sit under a Tracking heading',
+  'Import scores and Play tracking filter sit under a Tracking heading',
   await evaluate(`(() => {
     const heading = [...document.querySelectorAll('#optionsMenu .menu__heading')]
       .find((h) => h.textContent.trim() === 'Tracking');
@@ -2262,40 +2280,59 @@ check(
   })()`),
   true,
 );
+// Launch on startup is in both places, and the two are one answer.
 check(
-  'Reset lives in Profiles, under Edit profile',
+  'Launch on startup is shown in the menu exactly where Settings offers it',
+  await evaluate(`(async () => {
+    const d = await (await fetch('/api/startup')).json();
+    return document.getElementById('optStartup').hidden === (d.available !== true) &&
+      document.getElementById('startupRow').hidden === (d.available !== true);
+  })()`),
+  true,
+);
+check(
+  'osu! folders, the filter, Auto-update and Launch on startup are in Settings',
+  await evaluate(`['folderList', 'settingsFilterOpen', 'autoUpdateSetting', 'startupSetting']
+    .every((id) => document.getElementById('settingsModal').contains(document.getElementById(id)))`),
+  true,
+);
+check(
+  'Open in browser, Export, Back up, Reset, Share and the settings that moved have left the menu',
+  await evaluate("['optOpenBrowser', 'optExport', 'optBackup', 'optReset', 'optShare', 'optFolders', 'optAutoUpdate'].filter((id) => document.getElementById(id)).length"),
+  0,
+);
+check(
+  'Reset lives in Settings -> Profile, under Edit profile',
   await evaluate("document.getElementById('profileEdit').contains(document.getElementById('profileReset'))"),
   true,
 );
 // Laid out as a share option, whose grey button style is more specific than the danger one.
+await openSettingsAt('profile');
 check(
   'and its button is red',
   await evaluate("parseInt(getComputedStyle(document.getElementById('profileReset')).backgroundColor.slice(4), 10) > 150"),
   true,
 );
-check(
-  'Open in browser on start lives in Other settings',
-  await evaluate("document.getElementById('settingsModal').contains(document.getElementById('openBrowserSetting'))"),
-  true,
-);
+await closeSettingsDialog();
 
-console.log('\nprofiles: edit profile');
-check('the profiles dialog is hidden on load', await shown('profilesModal'), 'none');
+console.log('\nsettings: profile');
+check('the settings dialog is hidden on load', await shown('settingsModal'), 'none');
 // The avatar and the name are the affordance -- osu!'s own header has no button here.
 check(
-  'the avatar opens Profiles',
+  'the avatar opens Settings',
   await evaluate(`(() => {
     document.getElementById('avatar').click();
-    return getComputedStyle(document.getElementById('profilesModal')).display;
+    return getComputedStyle(document.getElementById('settingsModal')).display;
   })()`),
   'grid',
 );
 check(
-  'scrolled to Edit profile',
+  'at Profile, with Edit profile in view',
   await evaluate(`(() => {
-    const m = document.querySelector('#profilesModal .modal').getBoundingClientRect();
+    const active = document.querySelector('#settingsNav .settings-nav__item--active')?.dataset.settingsPage;
+    const m = document.getElementById('settingsPages').getBoundingClientRect();
     const s = document.getElementById('profileEdit').getBoundingClientRect();
-    return s.top >= m.top - 1 && s.top < m.top + m.height / 2;
+    return active === 'profile' && s.top >= m.top - 1 && s.top < m.top + m.height / 2;
   })()`),
   true,
 );
@@ -2324,23 +2361,24 @@ check(
 // The file picker must never be visible: it is opened from script.
 check('the file picker stays out of the layout', await shown('identityFile'), 'none');
 check(
-  'its parts come in order: the list, Edit profile, Import from osu!, Every profile',
+  'its parts come in order: Edit profile, Import from osu!, Every profile',
   await evaluate(`(() => {
-    const tops = ['profileList', 'profileEdit', 'importSection', 'sharedSection']
+    const tops = ['profileEdit', 'importSection', 'sharedSection']
       .map((id) => document.getElementById(id).getBoundingClientRect().top);
     return tops.every((top, i) => i === 0 || top > tops[i - 1]);
   })()`),
   true,
 );
+check('Edit profile has no Save: a field applies as it is changed', await evaluate("!document.getElementById('identitySave')"), true);
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
-check('Escape closes Profiles', await shown('profilesModal'), 'none');
+check('Escape closes Settings', await shown('settingsModal'), 'none');
 
 await evaluate("document.getElementById('pname').click()");
-check('the name opens it too', await shown('profilesModal'), 'grid');
-await evaluate("document.getElementById('profilesClose').click()");
-check('Close closes it', await shown('profilesModal'), 'none');
+check('the name opens it too', await shown('settingsModal'), 'grid');
+await closeSettingsDialog();
+check('the close button closes it', await shown('settingsModal'), 'none');
 
 /*
  * The osu!stable note. Both halves of it were measured (roadmap 5.12): stable writes a score
@@ -2430,13 +2468,12 @@ check('and the switch reads as off while it is', switched.checked, 'false');
 check('switching back restores the totals', switched.restored, true);
 check('and the switch with them', switched.back, 'true');
 
-console.log('\nprofiles: import from osu!');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optProfiles').click()");
-check('Options -> Profiles opens it', await shown('profilesModal'), 'grid');
+console.log('\nsettings: import from osu!');
+await openSettingsAt('profile');
+check('Settings -> Profile opens it', await shown('settingsModal'), 'grid');
 check(
-  'with Import from osu! inside it',
-  await evaluate("document.getElementById('profilesModal').contains(document.getElementById('importSection'))"),
+  'with Import from osu! on it',
+  await evaluate("document.querySelector('#settingsModal [data-page=\"profile\"]').contains(document.getElementById('importSection'))"),
   true,
 );
 check(
@@ -2478,8 +2515,8 @@ check(
   true,
 );
 check(
-  'Keep Favorite Beatmaps the same is in Profiles',
-  await evaluate("document.getElementById('profilesModal').contains(document.getElementById('sharedFavorites'))"),
+  'Keep Favorite Beatmaps the same is on Settings -> Profile',
+  await evaluate("document.querySelector('#settingsModal [data-page=\"profile\"]').contains(document.getElementById('sharedFavorites'))"),
   true,
 );
 check(
@@ -2488,8 +2525,8 @@ check(
   true,
 );
 check('the welcome is not showing on an install that is not new', await shown('welcomeModal'), 'none');
-await evaluate("document.getElementById('profilesClose').click()");
-check('Close closes Profiles', await shown('profilesModal'), 'none');
+await closeSettingsDialog();
+check('the close button closes Settings', await shown('settingsModal'), 'none');
 check(
   'the favorites reminder only shows while the list is empty',
   await evaluate(`(() => {
@@ -2501,18 +2538,20 @@ check(
 
 console.log('\nsettings dialog');
 check('settings dialog is hidden on load', await shown('settingsModal'), 'none');
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optSettings').click()");
+await openSettingsAt('calculator');
 check('settings dialog opens', await shown('settingsModal'), 'grid');
-check('it is called Other settings', await evaluate("document.getElementById('settingsTitle').textContent"), 'Other settings');
+check('it is called Settings', await evaluate("document.getElementById('settingsTitle').textContent"), 'Settings');
 check(
-  'country, playstyle and shared favorites have moved to Profiles',
-  await evaluate(
-    "!document.getElementById('set-country') && !document.getElementById('set-tagline') && " +
-      "!document.getElementById('settingsModal').contains(document.getElementById('sharedFavorites'))",
-  ),
-  true,
+  'its sidebar has a page per topic',
+  await evaluate("JSON.stringify([...document.querySelectorAll('#settingsNav [data-settings-page]')].map((b) => b.dataset.settingsPage))"),
+  JSON.stringify(['profile', 'scores', 'appearance', 'tracking', 'calculator', 'removed', 'declined', 'share', 'system']),
 );
+check(
+  'only the chosen page shows',
+  await evaluate("JSON.stringify([...document.querySelectorAll('#settingsPages .settings-page')].filter((p) => !p.hidden).map((p) => p.dataset.page))"),
+  JSON.stringify(['calculator']),
+);
+check('there is no Save or Cancel: a change applies as it is made', await evaluate("!document.getElementById('settingsSave') && !document.getElementById('settingsCancel')"), true);
 check('options menu closed behind it', await shown('optionsMenu'), 'none');
 /*
  * Recalculating every score is offered whenever there is a calculator, not only when some
@@ -2556,27 +2595,36 @@ const dialogFit = await evaluate(`(() => {
   const r = el.getBoundingClientRect();
   return JSON.stringify({
     withinViewport: r.top >= -1 && r.bottom <= window.innerHeight + 1,
-    scrolls: getComputedStyle(el).overflowY,
+    scrolls: getComputedStyle(document.getElementById('settingsPages')).overflowY,
   });
 })()`);
 check('the settings dialog stays inside the window', JSON.parse(dialogFit).withinViewport, true);
-check('and scrolls its own content', JSON.parse(dialogFit).scrolls, 'auto');
-// The fields are generated from SETTINGS_FIELDS, so an empty list means the render broke.
+check('and the page scrolls its own content', JSON.parse(dialogFit).scrolls, 'auto');
+// Moving between pages never changes the dialog's size.
 check(
-  'every setting has a control and a hint',
+  'every page is the same height',
   await evaluate(`(() => {
-    const settings = document.querySelectorAll('#settingsFields .setting');
+    const heights = new Set();
+    for (const item of document.querySelectorAll('#settingsNav [data-settings-page]')) {
+      item.click();
+      heights.add(Math.round(document.querySelector('#settingsModal .modal').getBoundingClientRect().height));
+    }
+    return heights.size;
+  })()`),
+  1,
+);
+// The profile's fields are generated from SETTINGS_FIELDS into their slots, so an empty one means the render broke.
+check(
+  'every profile setting has a control, a hint and its This profile tag',
+  await evaluate(`(() => {
+    const settings = document.querySelectorAll('#settingsModal [data-setting]');
     if (settings.length === 0) return 'no settings rendered';
     return [...settings].every(
       (s) =>
-        s.querySelector('input, select') && s.querySelector('.setting__hint').textContent.trim(),
+        s.querySelector('input, select') && s.querySelector('.setting__hint').textContent.trim() &&
+        s.querySelector('.setting__scope')?.textContent === 'This profile',
     );
   })()`),
-  true,
-);
-check(
-  'the dialog says its settings belong to the current profile',
-  await evaluate("!!document.querySelector('#settingsModal [data-i18n=\"settingsModal.perProfile\"]')"),
   true,
 );
 check(
@@ -2590,9 +2638,9 @@ check(
  * would render empty if the hint function were ever called wrongly.
  */
 check(
-  'the unsubmitted-attempts toggle is a checkbox',
-  await evaluate("document.getElementById('set-countUnsubmittedAttempts').type"),
-  'checkbox',
+  'the unsubmitted-attempts toggle is a checkbox, on Tracking',
+  await evaluate("document.getElementById('set-countUnsubmittedAttempts').type + ' ' + document.getElementById('set-countUnsubmittedAttempts').closest('.settings-page').dataset.page"),
+  'checkbox tracking',
 );
 check(
   'and its hint says how many attempts have been recorded',
@@ -2611,6 +2659,7 @@ check(
   ),
   6,
 );
+await evaluate("document.querySelector('#settingsNav [data-settings-page=\"scores\"]').click()");
 check(
   'and that field stacks instead of squeezing into a row',
   await evaluate(`getComputedStyle(
@@ -2620,37 +2669,45 @@ check(
 );
 /*
  * The relax pricing choice only means anything while unranked mods are being counted, so it
- * follows the toggle. Dimmed rather than hidden: its hint is most of the reason to open
- * this dialog at all.
+ * follows the toggle. Dimmed rather than hidden: its hint is most of the reason to look at it.
+ * Each change is saved, so the toggle is put back as it was found, and the recalculation a
+ * change can offer is declined while it is.
  */
 check(
   'the relax pricing choice follows the toggle',
-  await evaluate(`(() => {
+  await evaluate(`(async () => {
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const realConfirm = window.confirm;
+    window.confirm = () => false;
     const toggle = document.getElementById('set-includeUnrankedMods');
-    const choice = document.getElementById('set-unrankedModPp');
-    const setTo = (on) => {
+    const choice = () => document.getElementById('set-unrankedModPp');
+    const was = toggle.checked;
+    const setTo = async (on) => {
       toggle.checked = on;
       toggle.dispatchEvent(new Event('change', { bubbles: true }));
-      return [choice.disabled, choice.closest('.setting').classList.contains('setting--inactive')];
+      const seen = [choice().disabled, choice().closest('.setting').classList.contains('setting--inactive')];
+      await wait(1500);
+      return seen;
     };
-    const off = setTo(false);
-    const on = setTo(true);
-    return JSON.stringify({ off, on });
+    const off = await setTo(false);
+    const on = await setTo(true);
+    if (!was) await setTo(false);
+    window.confirm = realConfirm;
+    const saved = (await (await fetch('/api/state')).json()).settings.includeUnrankedMods;
+    return JSON.stringify({ off, on, restored: saved === was });
   })()`),
-  JSON.stringify({ off: [true, true], on: [false, false] }),
+  JSON.stringify({ off: [true, true], on: [false, false], restored: true }),
 );
-await evaluate("document.getElementById('settingsCancel').click()");
-check('Cancel closes the settings dialog', await shown('settingsModal'), 'none');
+await closeSettingsDialog();
+check('the close button closes the settings dialog', await shown('settingsModal'), 'none');
 
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optSettings').click()");
+await openSettingsAt('system');
 await evaluate(
   "document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))",
 );
 check('Escape closes the settings dialog', await shown('settingsModal'), 'none');
 
-await evaluate("document.getElementById('optionsBtn').click()");
-await evaluate("document.getElementById('optSettings').click()");
+await openSettingsAt('system');
 await evaluate(`(() => {
   const el = document.getElementById('settingsModal');
   el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
@@ -2663,8 +2720,7 @@ check('backdrop click closes the settings dialog', await shown('settingsModal'),
  * never delete -- this runs against a real profile, and the second press would be real.
  */
 if (await evaluate('Number(document.getElementById("removedCount")?.textContent || 0) > 0 || true')) {
-  await evaluate("document.getElementById('optionsBtn').click()");
-  await evaluate("document.getElementById('optSettings').click()");
+  await openSettingsAt('removed');
   await sleep(700);
   const removed = JSON.parse(await evaluate(`(() => {
     const rows = [...document.querySelectorAll('#removedList .removed-row')];
@@ -2691,7 +2747,7 @@ if (await evaluate('Number(document.getElementById("removedCount")?.textContent 
     check('and deletes nothing', removed.still, removed.rows);
     check('there is a button to delete them all', removed.all, true);
   }
-  await evaluate("document.getElementById('settingsCancel').click()");
+  await closeSettingsDialog();
 }
 
 /*
@@ -2702,8 +2758,7 @@ if (await evaluate('Number(document.getElementById("removedCount")?.textContent 
  */
 console.log('\nplays not tracked');
 {
-  await evaluate("document.getElementById('optionsBtn').click()");
-  await evaluate("document.getElementById('optSettings').click()");
+  await openSettingsAt('declined');
   await sleep(900);
   const declined = JSON.parse(await evaluate(`(async () => {
     const state = await (await fetch('/api/state')).json();
@@ -2712,14 +2767,13 @@ console.log('\nplays not tracked');
     const all = rows();
     const out = {
       count: state.declinedPlays,
-      hidden: panel.hidden,
-      removedHidden: document.getElementById('removedScores').hidden,
+      hidden: panel.closest('.settings-page').hidden,
+      counted: Number(document.getElementById('navDeclinedCount').textContent.replace(/\\D/g, '')),
       empty: all.length === 0 ? document.getElementById('declinedList').textContent.trim() : null,
       rows: all.length,
       minus: all.filter((r) => r.querySelector('[data-delete-declined]')).length,
       label: Number(document.getElementById('declinedCount').textContent.replace(/\\D/g, '')),
       buttons: all.filter((r) => r.querySelector('[data-track]')).length,
-      scrolls: getComputedStyle(document.getElementById('declinedList')).overflowY,
       reasons: new Set(all.map((r) => r.querySelector('[data-track]')?.dataset.reason)).size,
       picker: !document.getElementById('declinedReasonField').hidden,
     };
@@ -2754,8 +2808,8 @@ console.log('\nplays not tracked');
     }
     return JSON.stringify(out);
   })()`));
-  check('Plays not tracked is always shown', declined.hidden, false);
-  check('and so is Removed scores', declined.removedHidden, false);
+  check('Plays not tracked is a page of its own', declined.hidden, false);
+  check('counted in the sidebar', declined.counted, declined.count);
   if (declined.count === 0) {
     check('an empty list says so', declined.empty, 'No plays have been turned away.');
   } else {
@@ -2763,7 +2817,6 @@ console.log('\nplays not tracked');
     check('and counted in the heading', declined.label, declined.count);
     check('each has Track anyway', declined.buttons, declined.rows);
     check('and a red minus, as a removed score has', declined.minus, declined.rows);
-    check('the list scrolls rather than growing the dialog', declined.scrolls, 'auto');
     check('the reason picker shows only when there is a choice', declined.picker, declined.reasons > 1);
     if (declined.narrowed !== undefined) {
       check('picking a reason narrows the list to it', declined.narrowedOnlyOthers, true);
@@ -2776,7 +2829,7 @@ console.log('\nplays not tracked');
     check('and it is red', declined.allRed, true);
     check('and neither deletes anything', declined.afterAsk2, declined.count);
   }
-  await evaluate("document.getElementById('settingsCancel').click()");
+  await closeSettingsDialog();
 }
 
 console.log('\nprofiles dialog');
@@ -2808,6 +2861,12 @@ check(
 );
 await evaluate("document.getElementById('profilesClose').click()");
 check('Close closes the profiles dialog', await shown('profilesModal'), 'none');
+
+await evaluate("document.getElementById('optionsBtn').click()");
+await evaluate("document.getElementById('optProfiles').click()");
+await evaluate("document.getElementById('profilesEdit').click()");
+check('Edit profile goes to Settings -> Profile', await evaluate("!document.getElementById('settingsModal').hidden && document.getElementById('profilesModal').hidden && document.querySelector('#settingsNav .settings-nav__item--active').dataset.settingsPage"), 'profile');
+await closeSettingsDialog();
 
 await evaluate("document.getElementById('optionsBtn').click()");
 await evaluate("document.getElementById('optProfiles').click()");

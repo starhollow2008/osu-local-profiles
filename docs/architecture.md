@@ -136,7 +136,7 @@ no working helper means no calculator (`startupCalculator`), never the release.
 built before a request was added (the pp calculator's `judgements`, and its slider ends and ticks)
 quietly can't answer it. `helper.json` records `program`, a hash of that file
 (`SourceHelper.ProgramStamp`, line endings aside). One without it, or with another, is outdated:
-Other settings says so and Rebuild builds it again, though the source's version is unchanged
+Settings says so and Rebuild builds it again, though the source's version is unchanged
 (`SourceHelper.IsCurrent`). The running helper can't be replaced in place, so the rebuild keeps its
 staging folder's name. Until then it still prices every score; only what it can't answer is missing.
 
@@ -158,7 +158,7 @@ release, where every request is answered, with the same fields.
 missing). It picks `outdatedPpSql` across every profile, hidden scores included, and runs once per
 release (`kv` `pp_recalculated_for`, written when it finishes): a score whose replay is gone stays
 on the old release rather than being retried and announced every launch. It's queued
-`RECALCULATE_BATCH` scores at a time, so a live play waits seconds, not minutes. Other settings'
+`RECALCULATE_BATCH` scores at a time, so a live play waits seconds, not minutes. Settings'
 Recalculate every score is the same run over every score. Progress goes to every page as tracker
 events, since nobody pressed a button for the automatic one.
 
@@ -498,7 +498,7 @@ Shared by default (`config.sharedFavorites`). `FavoriteScope` picks the table, a
 `syncFavoriteSharing` merges per-profile lists with the shared one once per switch (recorded in
 `kv`), so nothing is lost. Removing a shared favourite removes it from every profile's own list.
 
-Remove all favorite beatmaps (Options → Profiles, under the sharing switch) is `Favorites.Clear`,
+Remove all favorite beatmaps (Settings → Profile, under the sharing switch) is `Favorites.Clear`,
 `POST /api/favorites {"action":"clear","confirm":true}`: while shared, the shared list and every
 profile's own, so switching sharing off cannot bring them back; otherwise the current profile's
 alone. `beatmapset_details` is kept, so a set favourited again draws at once.
@@ -566,7 +566,7 @@ bands were 750 and 850 until the owner found them a little too heavy (2026-11-09
 everywhere else keeps osu-web's own weights. The one trade-off is large 400 text, like the 24px
 name, which comes out a little heavier than osu!'s.
 
-Other settings -> Font can switch to the system's own font instead (`config.font`, `web/js/font.js`),
+Settings -> Appearance -> Font can switch to the system's own font instead (`config.font`, `web/js/font.js`),
 kept in `config.json` and `localStorage` like the language: `data-font="system"` on `<html>` brings
 back the old font list at osu-web's weights as asked. The score page asks `/api/app-config` for it,
 so a score screenshot, rendered in a browser with no storage, agrees. Both pages wait for
@@ -574,7 +574,7 @@ so a score screenshot, rendered in a browser with no storage, agrees. Both pages
 drawn at all until it loads (`font-display: block`). A saved copy carries the font files, once per
 weight band.
 
-Other settings -> Show star rating on scores (`config.starRating`) adds `· 6.18★` after a score
+Settings -> Show star rating on scores (`config.starRating`) adds `· 6.18★` after a score
 row's difficulty. It is off by default, as osu! shows none there, and an older `config.json`
 without the key reads as off too. Every earlier version showed them, so an install that already
 had a database when this one first started is told once, in a note under Scores
@@ -1000,7 +1000,7 @@ wrappers, say).
 **Every folder added is tracked; a found one only for a client none was added for** (issue #35,
 `Discover.Run`). With nothing added, that is one of each client, as before. Adding a folder still
 stops the one found for that client, since the usual reason to add one is that the wrong one was
-found. Options -> osu! folders' **Track** (`OsuFolders.Track`) adds a found folder and keeps the one
+found. Options -> Settings -> Tracking -> osu! folders' **Track** (`OsuFolders.Track`) adds a found folder and keeps the one
 being tracked for that client, so two osu!stable folders are two clicks. The tracker already ran
 over every install, a replay in two folders is one score (`dedupe_key`), and lazer's realm is only
 detected, never read, so nothing past discovery is per client. One calculator still prices every

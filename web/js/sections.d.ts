@@ -17,7 +17,7 @@ export function countingNoteText(counting: {
   extraMapStatuses?: readonly number[];
 } | null | undefined): string;
 
-/** How Other settings asks score rows to look, as `playRow` options. */
+/** How Settings asks score rows to look, as `playRow` options. */
 export interface RowLooks {
   starRating: boolean;
   starBadge: boolean;

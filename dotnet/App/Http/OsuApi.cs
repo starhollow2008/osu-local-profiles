@@ -25,7 +25,7 @@ internal static partial class Server
     {
         var db = opts.Db;
         var action = Str(body, "action");
-        // Every favourite at once, from Options -> Profiles: confirmed, as a profile's deletion is.
+        // Every favourite at once, from Settings -> Profile: confirmed, as a profile's deletion is.
         if (action == "clear")
         {
             if (!IsTrue(body, "confirm"))

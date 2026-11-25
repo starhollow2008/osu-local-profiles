@@ -1,7 +1,7 @@
 /**
- * Options -> osu! folders: where the app looks for osu!, and how to correct it.
+ * Settings -> Tracking -> osu! folders: where the app looks for osu!, and how to correct it.
  *
- * This dialog exists because auto-detection missed. Somebody had osu!stable in
+ * This exists because auto-detection missed. Somebody had osu!stable in
  * `D:\Games\osu!\osu!`, the app found their lazer install, decided it was done, and told
  * them osu!stable was not installed. Detection is much better now -- the registry, lazer's
  * `storage.ini`, the Start Menu, and a search of every drive -- and it will still miss
@@ -13,7 +13,7 @@
  */
 
 import { escapeHtml } from './format.js';
-import { closeOnBackdrop, hint, postJson, toast } from './ui.js';
+import { hint, postJson, toast } from './ui.js';
 import { t } from './i18n.js';
 
 const $ = (id) => document.getElementById(id);
@@ -92,8 +92,8 @@ async function send(body, failure) {
   return result;
 }
 
-export async function openOsuFolders() {
-  $('foldersModal').hidden = false;
+/** Fetched each time the Tracking page is shown: a search or a restart may have changed it. */
+export async function loadOsuFolders() {
   setHint(' ');
   render();
   try {
@@ -104,19 +104,8 @@ export async function openOsuFolders() {
   }
 }
 
-export function closeOsuFolders() {
-  $('foldersModal').hidden = true;
-}
-
-export function osuFoldersOpen() {
-  return !$('foldersModal').hidden;
-}
-
-/** Wire the dialog up. Called once, from the page controller. */
+/** Wire the list up. Called once, from the page controller. */
 export function bindOsuFolders() {
-  closeOnBackdrop($('foldersModal'), closeOsuFolders);
-  $('foldersClose').onclick = closeOsuFolders;
-
   $('folderList').onclick = async (e) => {
     const button = e.target.closest('[data-remove], [data-track]');
     if (!button) return;

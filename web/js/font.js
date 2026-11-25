@@ -1,6 +1,6 @@
 /**
  * The page's typeface: Nunito, which ships with the app (web/css/fonts.css), or the system's
- * own font at osu-web's weights as asked. Other settings -> Font.
+ * own font at osu-web's weights as asked. Settings -> Appearance -> Font.
  *
  * Kept the way the language and original-language metadata are (web/js/metadata.js):
  * `localStorage`, so the page starts in it before the app has answered anything, and

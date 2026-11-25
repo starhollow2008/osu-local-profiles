@@ -133,7 +133,7 @@ const MOD_STATE_WORDS = {
 let draft = null;
 let context = {
   statusKnown: true, hasLazer: true, onSaved: null, found: null,
-  // Other clients' mods: the clients found, Other settings' switch, and whether the note saying so is still wanted.
+  // Other clients' mods: the clients found, Settings' switch, and whether the note saying so is still wanted.
   clientsWithOwnMods: [], otherClientMods: false, otherClientModsNote: true, onDismissClientModsNote: null,
 };
 
@@ -612,7 +612,7 @@ function datesSection(key, title, help, { unknown } = {}) {
 function modsSection() {
   // McOsu's MC and neomod's NEO among the Fun mods: every mod only one of them has, as one chip each.
   // Torii's and Ritsu's beside osu!'s, in their own types; Ritsu's Miss Challenge shares MC's chip.
-  // Only for the clients found here, unless Other settings shows them all (client-mods.js).
+  // Only for the clients found here, unless Settings shows them all (client-mods.js).
   const shown = shownClientMods({
     clients: context.clientsWithOwnMods,
     all: context.otherClientMods,

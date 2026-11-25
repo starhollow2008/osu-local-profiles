@@ -53,7 +53,7 @@ import {
 } from './language-picker.js';
 import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './metadata.js';
 import { applyConfigFont, pageFont, setPageFont } from './font.js';
-import { bindOsuFolders, closeOsuFolders, openOsuFolders, osuFoldersOpen } from './osu-folders.js';
+import { bindOsuFolders, loadOsuFolders } from './osu-folders.js';
 import { bbcodeHtml } from './bbcode.js';
 import { buildInteractiveHtml } from './share-copy.js';
 import { forgetAnnouncedMedals, renderMedals } from './medals.js';
@@ -120,7 +120,7 @@ const SECTIONS = [
 
 /* The five grades osu! counts on a profile. XH/X and SH/S are the silver variants. */
 const GRADE_ORDER = ['XH', 'X', 'SH', 'S', 'A'];
-/* The three it doesn't, which this app counts too (issue #31): Other settings shows them on hover, always, or not. */
+/* The three it doesn't, which this app counts too (issue #31): Settings shows them on hover, always, or not. */
 const LOWER_GRADES = ['B', 'C', 'D'];
 
 /**
@@ -156,10 +156,10 @@ function renderGradeCounts() {
 }
 
 /**
- * The Other settings dialog is generated from this list, so adding a setting is one entry here
- * plus one entry in `DEFS` in dotnet/App/Settings/. `key` matches the setting name exactly --
- * the dialog posts the whole field set as a patch and the server ignores anything it does
- * not recognise.
+ * The profile's own settings in the Settings dialog, generated from this list into the
+ * `data-setting` slot of the same key in web/index.html, which decides the page each is on.
+ * Adding a setting is one entry here, a slot, and one entry in `DEFS` in dotnet/App/Settings/.
+ * `key` matches the setting name exactly: a change posts that one key as a patch.
  */
 const SETTINGS_FIELDS = [
   {
@@ -244,8 +244,6 @@ const SETTINGS_FIELDS = [
     key: 'hiddenSections',
     type: 'checkboxes',
     invert: true,
-    // A rule above it: two lists of checkboxes in a row read as one.
-    divided: true,
     label: () => t('setting.sections'),
     options: SECTIONS,
     hint: () => t('setting.sectionsHint'),
@@ -256,7 +254,7 @@ const SETTINGS_FIELDS = [
  * The paged sections, and how far each is currently expanded.
  *
  * Five rows to begin with, as on osu!, then a jump to 25 and 25 at a time after that -- or
- * however many rows Other settings -> Show more says, or the whole list at once (roadmap
+ * however many rows Settings -> Show more says, or the whole list at once (roadmap
  * 5.67). The counts are sent with every profile request rather than the whole history being
  * fetched and sliced here, so a profile with thousands of plays costs the same to open as a
  * new one -- and expanding stays honest for however long the list actually is.
@@ -288,7 +286,7 @@ let modesWithPlays = [];
 /** What this build is, from /api/state. `version` is null if package.json was unreadable. */
 let app = { version: null };
 let profile = null;
-/** How many favourites the profile shows: what Remove all in Options -> Profiles would remove. */
+/** How many favourites the profile shows: what Remove all in Settings -> Profile would remove. */
 let favoriteCount = 0;
 let stats = null;
 let settings = {};
@@ -688,7 +686,7 @@ function renderStats(next, medalTotal, imported) {
  * number would be worse than an honest dash.
  */
 function renderRank(data) {
-  // osu-web's tier colour (issue #30), unless Other settings turned it off.
+  // osu-web's tier colour (issue #30), unless Settings turned it off.
   const tier = data.rank && app.config?.rankTiers !== false ? rankTier(data.rank.rank, data.rankSource?.players) : null;
   const title = data.rank
     ? t('rank.estimatedFrom', { dump: data.rankSource?.dump ?? data.rank.dump }) +
@@ -904,7 +902,7 @@ $('medalsNote').onclick = async (e) => {
 
 $('favoritesNote').onclick = async (e) => {
   if (e.target.closest('[data-import-favorites]')) {
-    openProfiles({ section: 'import', favoritesOnly: true });
+    openSettings('profile', { section: 'importSection', favoritesOnly: true });
     return;
   }
   if (!e.target.closest('[data-dismiss-note]')) return;
@@ -1020,7 +1018,7 @@ async function loadProfile() {
   // terms of positions in this list.
   pinnedIds = (data.pinned ?? []).map((p) => p.id);
   $('pinnedCount').textContent = fmt(pinnedIds.length);
-  // Other settings -> how score rows look: star rating, judgements and backgrounds, all off by default.
+  // Settings -> how score rows look: star rating, judgements and backgrounds, all off by default.
   const looks = rowLooks(app.config);
   // Nothing pinned leaves the space empty, as osu! does, rather than explaining itself.
   $('pinnedPlays').innerHTML = playList(data.pinned, {
@@ -1122,6 +1120,7 @@ async function loadState() {
   renderPpCalculator();
   hiddenScoreCount = s.hiddenScores ?? 0;
   declinedPlayCount = s.declinedPlays ?? 0;
+  renderSettingsNav();
   unsubmittedAttempts = s.unsubmittedAttempts ?? 0;
   sharing = s.sharing ?? sharing;
   modesWithPlays = s.modesWithPlays ?? [];
@@ -1413,7 +1412,10 @@ function osuImportText(state) {
 }
 
 /** Whether Import from osu! is on screen: in Profiles, or borrowed by the welcome. */
-const importSectionShowing = () => $('importSection').closest('.backdrop')?.hidden === false;
+/** Import from osu! on screen: in the welcome, or on Settings' Profile page while Settings is open. */
+const importSectionShowing = () =>
+  $('importSection').closest('.backdrop')?.hidden === false &&
+  $('importSection').closest('.settings-page')?.hidden !== true;
 
 function renderOsuImport(state) {
   if (!state) return;
@@ -1444,7 +1446,7 @@ function renderOsuImport(state) {
   if (running !== wasRunning) renderImportNote();
 }
 
-$('osuImportNotice').onclick = () => openProfiles({ section: 'import' });
+$('osuImportNotice').onclick = () => openSettings('profile', { section: 'importSection' });
 
 /* ---------------------------------------------------------- options menu */
 
@@ -1457,6 +1459,7 @@ $('optionsBtn').onclick = (e) => {
   e.stopPropagation();
   const open = $('optionsMenu').hidden;
   setMenuOpen(open);
+  // Asked each time: Task Manager can turn it off too.
   if (open) void loadStartup();
 };
 
@@ -1476,14 +1479,13 @@ document.addEventListener('keydown', (e) => {
   setMenuOpen(false);
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
-  if (trackingFilterOpen()) closeTrackingFilter();
+  // The filter opens over Settings: Escape closes the filter, and Settings stays.
+  if (trackingFilterOpen()) return closeTrackingFilter();
   if (ppCalculatorOpen()) closePpCalculator();
   if (!$('profilesModal').hidden) closeProfiles();
   if (!$('settingsModal').hidden) closeSettings();
-  if (osuFoldersOpen()) closeOsuFolders();
   if (!$('playMenu').hidden) closePlayMenu();
   if (!$('welcomeModal').hidden) closeWelcome();
-  if (!$('shareModal').hidden) closeShare();
   if (!$('updateModal').hidden) closeUpdate();
   if (!$('whatsNewModal').hidden) closeWhatsNew();
 });
@@ -1539,7 +1541,7 @@ function renderUpdate() {
   if (!$('updateBtn').hidden && u.latestVersion) {
     $('updateBtn').textContent = t('update.button', { version: u.latestVersion });
   }
-  $('optAutoUpdate').setAttribute('aria-checked', String(app.config?.autoUpdate === true));
+  $('autoUpdateSetting').checked = app.config?.autoUpdate === true;
   renderNudge();
   renderUpdateNotice();
   if (!$('updateModal').hidden) renderUpdateProgress();
@@ -1743,60 +1745,71 @@ $('whatsNewClose').onclick = closeWhatsNew;
 /* ------------------------------------------------------------- auto-update */
 
 /*
- * Options -> Auto-update: its own row, as the user asked, not a setting inside a dialog. Off
- * by default; on, a new version downloads in the background -- never on a metered connection
- * -- and installs when the app is quit or next starts (roadmap 5.66).
+ * Settings -> System -> Auto-update. Off by default; on, a new version downloads in the
+ * background -- never on a metered connection -- and installs when the app is quit or next
+ * starts (roadmap 5.66).
  */
-$('optAutoUpdate').onclick = async () => {
-  const next = app.config?.autoUpdate !== true;
+$('autoUpdateSetting').onchange = async () => {
+  const next = $('autoUpdateSetting').checked;
   app = { ...app, config: { ...app.config, autoUpdate: next } };
   renderUpdate();
   try {
     const c = await postJson('/api/app-config', { autoUpdate: next }, 'saving that failed');
     app = { ...app, config: c.config };
     renderUpdate();
-    toast(next ? t('autoUpdate.on') : t('autoUpdate.off'));
+    settingsHint(next ? t('autoUpdate.on') : t('autoUpdate.off'));
   } catch (err) {
     app = { ...app, config: { ...app.config, autoUpdate: !next } };
     renderUpdate();
-    toast(err.message);
+    settingsHint(err.message, true);
   }
 };
 
 /* -------------------------------------------------------- launch on startup */
 
 /*
- * Options -> Launch on startup, beside Auto-update: install-level, off by default (roadmap 5.77).
- * The system's own entry is the answer (dotnet/App/StartWithComputer.cs), so it is asked each time the menu opens:
- * Task Manager can turn it off too. Hidden where there is no tray launcher to start.
+ * Settings -> System -> Launch on startup: install-level, off by default (roadmap 5.77). The
+ * system's own entry is the answer (dotnet/App/StartWithComputer.cs), so it is asked each time
+ * the page opens: Task Manager can turn it off too. Hidden where there is no tray launcher to start.
  */
 async function loadStartup() {
   try {
     const r = await fetch('/api/startup');
     if (!r.ok) return;
     const d = await r.json();
-    $('optStartup').hidden = d.available !== true;
-    $('optStartup').setAttribute('aria-checked', String(d.enabled === true));
+    renderStartup(d.available === true, d.enabled === true);
   } catch {
-    /* the row keeps what it last showed */
+    /* the rows keep what they last showed */
   }
 }
 
-$('optStartup').onclick = async () => {
-  const next = $('optStartup').getAttribute('aria-checked') !== 'true';
-  $('optStartup').setAttribute('aria-checked', String(next));
+/** Both places it can be switched: Settings -> System, and its own row in the Options menu. */
+function renderStartup(available, enabled) {
+  $('startupRow').hidden = !available;
+  $('optStartup').hidden = !available;
+  $('startupSetting').checked = enabled;
+  $('optStartup').setAttribute('aria-checked', String(enabled));
+}
+
+/** From either place. `say` is where the result is told: Settings' status line, or a toast from the menu. */
+async function setStartup(next, say) {
+  renderStartup(true, next);
   try {
     const d = await postJson('/api/startup', { enabled: next }, 'saving that failed');
-    $('optStartup').setAttribute('aria-checked', String(d.enabled === true));
-    toast(d.enabled ? t('startup.on') : t('startup.off'));
+    renderStartup(true, d.enabled === true);
+    say(d.enabled ? t('startup.on') : t('startup.off'));
   } catch (err) {
-    $('optStartup').setAttribute('aria-checked', String(!next));
-    toast(err.message);
+    renderStartup(true, !next);
+    say(err.message, true);
   }
-};
+}
+
+$('startupSetting').onchange = () => void setStartup($('startupSetting').checked, settingsHint);
+$('optStartup').onclick = () => void setStartup($('optStartup').getAttribute('aria-checked') !== 'true', toast);
 
 // Once on load as well, so the row is already there the first time the menu opens.
 void loadStartup();
+
 
 /*
  * `?update=1` is where the tray icon's "Update to ..." item lands: straight into the dialog,
@@ -1970,20 +1983,15 @@ function applyExportMode() {
 const safeName = () =>
   `${(profile?.name ?? 'profile').replace(/[^\w.-]+/g, '-')}-${new Date().toISOString().slice(0, 10)}`;
 
-const shareHint = (message, isError) => hint('shareHint', message, isError);
+/** Settings -> Share & export says how it went in the dialog's status line. */
+const shareHint = (message, isError) => settingsHint(message, isError);
 
-function openShare() {
-  setMenuOpen(false);
-  shareHint(' ');
-
+/** Settings -> Share & export, when it is shown: whether an image can be made here. */
+function renderSharePage() {
   $('shareScreenshot').disabled = !sharing.canScreenshot;
   $('shareScreenshotNote').textContent = sharing.canScreenshot
     ? t('share.canRender')
     : t('share.needsBrowser');
-
-  $('shareModal').hidden = false;
-  $('shareClose').focus();
-  void showDataFolder();
 }
 
 /** Asked for each time rather than kept in /api/state, which the saved web page is built from. */
@@ -1995,12 +2003,6 @@ async function showDataFolder() {
     $('dataFolderPath').textContent = '';
   }
 }
-
-const closeShare = () => { $('shareModal').hidden = true; };
-
-$('optShare').onclick = openShare;
-$('shareClose').onclick = closeShare;
-closeOnBackdrop($('shareModal'), closeShare);
 
 $('shareHtml').onclick = async () => {
   $('shareHtml').disabled = true;
@@ -2057,7 +2059,7 @@ function currentOrder() {
   return reconcileOrder(settings.sectionOrder);
 }
 
-/** The sections Other settings has hidden: kept in the order, but not shown or moved past. */
+/** The sections Settings has hidden: kept in the order, but not shown or moved past. */
 function isHiddenSection(id) {
   return (settings.hiddenSections ?? []).includes(id);
 }
@@ -2145,7 +2147,7 @@ function moveSection(id, delta) {
 
 /*
  * Lengthen a paged section: five rows to twenty-five, then twenty-five at a time -- the step
- * being Other settings -> Show more -- or to the whole list, with All at once.
+ * being Settings -> Show more -- or to the whole list, with All at once.
  *
  * The button is disabled while the request is in flight rather than removed, so the page
  * does not jump under a cursor that is about to press it again.
@@ -2460,11 +2462,9 @@ $('aboutSave').onclick = async () => {
 /* ---------------------------------------------------------------- identity */
 
 /*
- * Options -> Profiles holds everything about a profile, in one dialog at the user's request:
- * which one is tracking, then Edit profile -- its name, flag, playstyle, picture and banner --
- * then Import from osu!, then how profiles share favorites. Those were once four places (Edit
- * profile, Import from osu!, Settings and Profiles). The avatar and the name open it at Edit
- * profile.
+ * Settings -> Profile holds who a profile is: Edit profile -- its name, flag, playstyle,
+ * picture and banner -- then Import from osu!, then how profiles share favorites. Options ->
+ * Profiles is only which one is tracking. The avatar and the name open Settings at Edit profile.
  *
  * Four sources for the picture and banner, in the order they cost the user anything: what osu!
  * is signed in as (read from its own config file, no network), a looked-up account, a file from
@@ -2536,12 +2536,12 @@ async function loadSuggestions() {
 }
 
 /*
- * From loadState, while Profiles is open. Switching, creating or deleting a profile in the list
- * changes which profile the rest of the dialog is about, so it is filled again. A rename of that
+ * From loadState, while Settings is open. A profile switched, created or deleted elsewhere
+ * changes which profile Settings -> Profile is about, so it is filled again. A rename of that
  * profile updates its name, unless the name field has been typed over.
  */
 function refreshOpenProfiles() {
-  if ($('profilesModal').hidden) return;
+  if ($('settingsModal').hidden) return;
   if (profile?.id !== editing.id) {
     renderProfileEdit();
     resetImport();
@@ -2555,22 +2555,22 @@ function refreshOpenProfiles() {
   }
 }
 
-$('avatar').onclick = () => openProfiles({ section: 'edit' });
-$('pname').onclick = () => openProfiles({ section: 'edit' });
+$('avatar').onclick = () => openSettings('profile', { section: 'profileEdit' });
+$('pname').onclick = () => openSettings('profile', { section: 'profileEdit' });
 $('pname').onkeydown = (e) => {
   if (e.key === 'Enter' || e.key === ' ') {
     e.preventDefault();
-    openProfiles({ section: 'edit' });
+    openSettings('profile', { section: 'profileEdit' });
   }
 };
 
 /*
- * One Save for the three text fields. The name is a rename -- the list's Rename does the same.
- * Country and playstyle are this profile's settings: the server cleans them and hands them back,
- * and that is what is shown, so a rejected country code comes back empty rather than appearing
- * to have saved.
+ * The three text fields apply as each is changed, as the rest of Settings does. The name is a
+ * rename -- the Profiles list's Rename does the same. Country and playstyle are this profile's
+ * settings: the server cleans them and hands them back, and that is what is shown, so a
+ * rejected country code comes back empty rather than appearing to have saved.
  */
-$('identitySave').onclick = async () => {
+async function saveIdentity() {
   const name = $('identityName').value.trim();
   if (!name) {
     identityHint(t('identity.needName'), true);
@@ -2579,13 +2579,15 @@ $('identitySave').onclick = async () => {
   const country = $('identityCountry').value.trim();
   const tagline = $('identityTagline').value.trim();
 
-  $('identitySave').disabled = true;
   try {
     if (name !== profile?.name) await profileAction({ action: 'rename', id: profile.id, name });
     const d = await postJson('/api/settings', { country, tagline }, 'saving failed');
     settings = d.settings;
     await Promise.all([loadState(), loadProfile()]);
-    renderProfileEdit();
+    // Only what the server may have changed: the other fields may be being typed in.
+    editing = { id: profile?.id ?? null, name: profile?.name ?? null };
+    $('importProfileName').textContent = profile?.name ?? '';
+    $('identityCountry').value = settings.country ?? '';
     if (country !== '' && !d.settings.country) {
       identityHint(
         t('identity.badCountry'),
@@ -2594,18 +2596,13 @@ $('identitySave').onclick = async () => {
     } else {
       identityHint(t('common.saved'));
     }
-    toast(t('identity.profileSaved'));
   } catch (err) {
     identityHint(err.message, true);
-  } finally {
-    $('identitySave').disabled = false;
   }
-};
+}
 
 for (const id of ['identityName', 'identityCountry', 'identityTagline']) {
-  $(id).onkeydown = (e) => {
-    if (e.key === 'Enter') $('identitySave').click();
-  };
+  $(id).onchange = () => void saveIdentity();
 }
 
 /* --- images ------------------------------------------------------------- */
@@ -3095,18 +3092,18 @@ function applySettingDependencies() {
 function renderSettingsFields() {
   // A `rows` field holds a label of its own (All at once), and labels cannot nest.
   const wrapper = (f) => (f.type === 'rows' ? 'div' : 'label');
-  $('settingsFields').innerHTML = SETTINGS_FIELDS.map(
-    (f) => `<div class="setting${f.divided ? ' setting--divided' : ''}">
-      <${wrapper(f)} class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
-        <span>${escapeHtml(f.label())}</span>
+  // Every one of these is kept per profile, which the tag says; the rest of the dialog is the install's.
+  const scope = `<span class="setting__scope">${escapeHtml(t('settings.thisProfile'))}</span>`;
+  for (const f of SETTINGS_FIELDS) {
+    const slot = document.querySelector(`#settingsModal [data-setting="${f.key}"]`);
+    if (!slot) continue;
+    slot.innerHTML = `<${wrapper(f)} class="field${f.type === 'checkboxes' ? ' field--stacked' : ''}">
+        <span>${escapeHtml(f.label())}${scope}</span>
         ${settingControl(f)}
       </${wrapper(f)}>
-      <div class="setting__hint">${escapeHtml(f.hint?.() ?? '')}</div>
-    </div>`,
-  ).join('');
-
+      <div class="setting__hint">${escapeHtml(f.hint?.() ?? '')}</div>`;
+  }
   applySettingDependencies();
-  $('settingsFields').onchange = applySettingDependencies;
 }
 
 /**
@@ -3120,6 +3117,7 @@ const emptyList = (message) => `<div class="setting__hint">${escapeHtml(message)
 
 async function renderRemovedScores() {
   $('removedCount').textContent = fmt(hiddenScoreCount);
+  renderSettingsNav();
   $('removedDeleteAll').hidden = hiddenScoreCount === 0;
   if (hiddenScoreCount === 0) {
     $('removedList').innerHTML = emptyList(t('removedScores.none'));
@@ -3326,6 +3324,7 @@ function renderDeclinedList() {
 
 function showDeclinedCount() {
   $('declinedCount').textContent = fmt(declinedPlayCount);
+  renderSettingsNav();
   $('declinedDeleteAll').hidden = declinedPlayCount === 0;
   if (declinedPlayCount > 0) return false;
   $('declinedReasonField').hidden = true;
@@ -3434,12 +3433,12 @@ $('declinedList').onclick = async (e) => {
   }
 };
 
-function openSettings() {
-  setMenuOpen(false);
-  void renderRemovedScores();
-  void renderDeclinedPlays();
-  renderSettingsFields();
-  void loadPpSource();
+/** The page Settings shows, kept while the page is open so the dialog reopens where it was left. */
+let settingsPage = 'profile';
+const SETTINGS_PAGES = ['profile', 'scores', 'appearance', 'tracking', 'calculator', 'removed', 'declined', 'share', 'system'];
+
+/** The install's settings, from config.json: what the controls show, and what a failed save goes back to. */
+function fillInstallSettings() {
   $('openBrowserSetting').checked = app.config?.openBrowser !== false;
   $('originalMetadataSetting').checked = preferOriginalMetadata();
   $('starRatingSetting').value = app.config?.starRating !== true ? 'off' : app.config?.starRatingBadge === true ? 'badge' : 'text';
@@ -3449,134 +3448,172 @@ function openSettings() {
   $('rankTiersSetting').checked = app.config?.rankTiers !== false;
   $('lowerGradesSetting').value = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
   $('fontSetting').value = pageFont();
-  settingsHint(' ');
-  $('settingsModal').hidden = false;
-  $('settingsCancel').focus();
+  $('autoUpdateSetting').checked = app.config?.autoUpdate === true;
 }
 
-const closeSettings = () => { $('settingsModal').hidden = true; };
+/** The counts beside Removed scores and Plays not tracked, and the mark beside Tracking. */
+function renderSettingsNav() {
+  $('navRemovedCount').textContent = fmt(hiddenScoreCount);
+  $('navDeclinedCount').textContent = fmt(declinedPlayCount);
+  $('navFilterMark').hidden = !filterNarrowing;
+}
 
-$('optFolders').onclick = () => {
-  setMenuOpen(false);
-  void openOsuFolders();
-};
-$('optSettings').onclick = openSettings;
-$('settingsCancel').onclick = closeSettings;
-closeOnBackdrop($('settingsModal'), closeSettings);
-
-$('settingsSave').onclick = async () => {
-  // The whole field set goes up as one patch: the server coerces each value and hands the
-  // cleaned result back, which is what gets rendered -- so a rejected country code shows
-  // as empty here rather than appearing to have saved.
-  const patch = {};
-  for (const f of SETTINGS_FIELDS) {
-    patch[f.key] = readSettingControl(f);
-    if (f.allKey) patch[f.allKey] = $(`set-${f.allKey}`).checked;
+/** Each page fetches what it shows when it is shown, so a page nobody opens costs nothing. */
+function showSettingsPage(page) {
+  settingsPage = SETTINGS_PAGES.includes(page) ? page : 'profile';
+  for (const item of $('settingsNav').querySelectorAll('[data-settings-page]')) {
+    const active = item.dataset.settingsPage === settingsPage;
+    item.classList.toggle('settings-nav__item--active', active);
+    if (active) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
   }
+  for (const section of $('settingsPages').querySelectorAll('.settings-page')) {
+    section.hidden = section.dataset.page !== settingsPage;
+  }
+  $('settingsPages').scrollTop = 0;
+  // The cover's import notice shows whenever Import from osu! is out of sight.
+  renderOsuImport(osuImportState);
+  if (settingsPage === 'tracking') void loadOsuFolders();
+  if (settingsPage === 'calculator') void loadPpSource();
+  if (settingsPage === 'removed') void renderRemovedScores();
+  if (settingsPage === 'declined') void renderDeclinedPlays();
+  if (settingsPage === 'share') renderSharePage();
+  if (settingsPage === 'system') {
+    void loadStartup();
+    void showDataFolder();
+  }
+}
+
+/**
+ * `page` is one of SETTINGS_PAGES. `section`, an element id, is scrolled to: the avatar and the
+ * name open Profile at Edit profile, the favorites reminder at Import from osu! with only
+ * favorites ticked.
+ */
+function openSettings(page = settingsPage, { section = null, favoritesOnly = false } = {}) {
+  // A shared copy is read-only.
+  if (isStatic) return;
+  setMenuOpen(false);
+  renderSettingsFields();
+  fillInstallSettings();
+  renderSettingsNav();
+  renderFilterStatus();
+  renderProfileEdit();
+  // An import from osu! that is running is left as it is, with its bar showing.
+  if (!osuImportRunning()) resetImport({ favoritesOnly });
+  $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
+  renderFavoritesClear();
+  void loadSuggestions();
+  settingsHint(' ');
+  $('settingsModal').hidden = false;
+  showSettingsPage(page);
+  if (section) $(section).scrollIntoView({ block: 'start' });
+  $('settingsNav').querySelector('.settings-nav__item--active')?.focus({ preventScroll: true });
+}
+
+/** Closing only hides it. An import from osu! that is running carries on, shown in the cover's corner. */
+const closeSettings = () => {
+  $('settingsModal').hidden = true;
+  renderOsuImport(osuImportState);
+};
+
+$('optSettings').onclick = () => openSettings();
+$('settingsClose').onclick = closeSettings;
+closeOnBackdrop($('settingsModal'), closeSettings);
+$('settingsNav').onclick = (e) => {
+  const item = e.target.closest('[data-settings-page]');
+  if (item) showSettingsPage(item.dataset.settingsPage);
+};
+
+/** Said in the dialog's status line, not as a toast: a change is made often, and the line is where the eye is. */
+const settingSaved = () => settingsHint(t('setting.saved'));
+
+/** The settings that change which scores count and what they are worth, and so may leave some to recalculate. */
+const PRICING_SETTINGS = new Set(['includeUnrankedMods', 'unrankedModPp', 'includeUnrankedMaps']);
+
+/*
+ * A profile setting applies as it is changed: that one key goes up, the server coerces it and
+ * hands every setting back, and the page is drawn again with it.
+ */
+$('settingsPages').addEventListener('change', async (e) => {
+  const slot = e.target.closest('[data-setting]');
+  if (!slot) return;
+  const f = SETTINGS_FIELDS.find((field) => field.key === slot.dataset.setting);
+  if (!f) return;
+  applySettingDependencies();
 
   // A number of rows the server would quietly put back to 25 is said here instead.
-  const rows = $('set-showMoreRows');
-  if (!rows.disabled && !rows.checkValidity()) {
+  const control = $(`set-${f.key}`);
+  if (f.type === 'rows' && !control.disabled && !control.checkValidity()) {
     settingsHint(t('setting.showMoreInvalid', { max: fmt(PAGE_ALL) }), true);
-    rows.focus();
     return;
   }
 
-  $('settingsSave').disabled = true;
+  const patch = { [f.key]: readSettingControl(f) };
+  if (f.allKey) patch[f.allKey] = $(`set-${f.allKey}`).checked;
   try {
     const d = await postJson('/api/settings', patch, 'saving failed');
-
-    // Only free text can be rejected; a checkbox or a select cannot hold a bad value.
-    const rejected = SETTINGS_FIELDS.filter(
-      (f) =>
-        (f.type ?? 'text') === 'text' &&
-        String(patch[f.key]).trim() !== '' &&
-        String(d.settings[f.key] ?? '') === '',
-    );
     settings = d.settings;
-
-    /*
-     * "Open in browser on start" belongs to the install rather than the profile -- it decides
-     * what happens before any profile is on screen -- so it goes to data/config.json, and only
-     * when it changed.
-     */
-    const openBrowser = $('openBrowserSetting').checked;
-    if (openBrowser !== (app.config?.openBrowser !== false)) {
-      const c = await postJson('/api/app-config', { openBrowser }, 'saving that failed');
-      app = { ...app, config: c.config };
-    }
-
-    /*
-     * The same install-level answer as the switch in the flag menu, saved the same way. The
-     * reload below redraws every title, so nothing here has to ask for a redraw of its own.
-     */
-    const originalMetadata = $('originalMetadataSetting').checked;
-    if (setPreferOriginalMetadata(originalMetadata)) {
-      refreshLanguageButton();
-      const c = await postJson('/api/app-config', { originalMetadata }, 'saving that failed');
-      app = { ...app, config: c.config };
-    }
-
-    // Star ratings on score rows, install-level too. The reload below redraws the rows.
-    const starChoice = $('starRatingSetting').value;
-    const starRating = starChoice !== 'off';
-    if (starRating !== (app.config?.starRating === true)) {
-      const c = await postJson('/api/app-config', { starRating }, 'saving that failed');
-      app = { ...app, config: c.config };
-      // The note said where this is; changing it is as good as closing the note.
-      dismissStarRatingNotice();
-    }
-
-    // The rest of how score rows look (issues #37 and #38): the star rating as osu!'s badge, the
-    // judgements and the beatmap's background. A hidden star rating keeps how it would be shown.
-    // Other clients' mods where mods are picked go with them.
-    const rows = {};
-    const starRatingBadge = starRating ? starChoice === 'badge' : app.config?.starRatingBadge === true;
-    if (starRatingBadge !== (app.config?.starRatingBadge === true)) rows.starRatingBadge = starRatingBadge;
-    for (const key of ['judgements', 'scoreBackgrounds', 'otherClientMods']) {
-      const on = $(`${key}Setting`).checked;
-      if (on !== (app.config?.[key] === true)) rows[key] = on;
-    }
-    if (Object.keys(rows).length) {
-      const c = await postJson('/api/app-config', rows, 'saving that failed');
-      app = { ...app, config: c.config };
-    }
-
-    // The global rank's tier colour (issue #30) and the B, C and D counts (issue #31), install-level
-    // too. The reload below redraws both.
-    const rankTiers = $('rankTiersSetting').checked;
-    const lowerGrades = $('lowerGradesSetting').value;
-    const looks = {};
-    if (rankTiers !== (app.config?.rankTiers !== false)) looks.rankTiers = rankTiers;
-    if (lowerGrades !== (app.config?.lowerGrades ?? 'hover')) looks.lowerGrades = lowerGrades;
-    if (Object.keys(looks).length) {
-      const c = await postJson('/api/app-config', looks, 'saving that failed');
-      app = { ...app, config: c.config };
-    }
-
-    // The typeface, install-level too. Switching it restyles the page at once.
-    const font = $('fontSetting').value;
-    if (setPageFont(font)) {
-      const c = await postJson('/api/app-config', { font }, 'saving that failed');
-      app = { ...app, config: c.config };
-    }
-
-    closeSettings();
     // The eligibility settings change every number on the page, not just the header.
     await Promise.all([loadState(), loadProfile()]);
-    toast(
-      rejected.length
-        ? t('setting.savedRejected', {
-            fields: rejected.map((f) => f.label().toLowerCase()).join(' and '),
-          })
-        : t('setting.saved'),
-    );
-    offerRecompute();
+    settingSaved();
+    if (PRICING_SETTINGS.has(f.key)) offerRecompute();
   } catch (err) {
     settingsHint(err.message, true);
-  } finally {
-    $('settingsSave').disabled = false;
+    renderSettingsFields();
   }
+});
+
+/**
+ * An install setting, saved to data/config.json as it is changed. `redraw` reloads the page's
+ * data, for the settings that change how scores and the profile are drawn.
+ */
+async function saveInstallSetting(patch, { redraw = true } = {}) {
+  try {
+    const c = await postJson('/api/app-config', patch, 'saving that failed');
+    app = { ...app, config: c.config };
+    if (redraw) await Promise.all([loadState(), loadProfile()]);
+    settingSaved();
+  } catch (err) {
+    settingsHint(err.message, true);
+    fillInstallSettings();
+  }
+}
+
+/*
+ * "Open in browser on start" belongs to the install rather than the profile: it decides what
+ * happens before any profile is on screen.
+ */
+$('openBrowserSetting').onchange = () =>
+  void saveInstallSetting({ openBrowser: $('openBrowserSetting').checked }, { redraw: false });
+
+// The same answer as the switch in the flag menu, saved and redrawn the same way.
+$('originalMetadataSetting').onchange = () => {
+  chooseOriginalMetadata($('originalMetadataSetting').checked);
+  settingSaved();
+};
+
+// The star rating on score rows: hidden, or shown as text or as osu!'s badge (issue #38). A hidden
+// star rating keeps how it would be shown.
+$('starRatingSetting').onchange = () => {
+  const choice = $('starRatingSetting').value;
+  const starRating = choice !== 'off';
+  const patch = { starRating };
+  if (starRating) patch.starRatingBadge = choice === 'badge';
+  // The note said where this is; changing it is as good as closing the note.
+  if (starRating !== (app.config?.starRating === true)) dismissStarRatingNotice();
+  void saveInstallSetting(patch);
+};
+
+// How score rows and the profile look (issues #30, #31 and #37), and other clients' mods where mods are picked.
+for (const key of ['judgements', 'scoreBackgrounds', 'otherClientMods', 'rankTiers']) {
+  $(`${key}Setting`).onchange = () => void saveInstallSetting({ [key]: $(`${key}Setting`).checked });
+}
+$('lowerGradesSetting').onchange = () => void saveInstallSetting({ lowerGrades: $('lowerGradesSetting').value });
+
+// The typeface. Switching it restyles the page at once.
+$('fontSetting').onchange = () => {
+  const font = $('fontSetting').value;
+  if (setPageFont(font)) void saveInstallSetting({ font }, { redraw: false });
 };
 
 /* ------------------------------------------------------------ score actions */
@@ -4175,41 +4212,30 @@ async function profileAction(payload) {
   return data;
 }
 
-/**
- * `section` opens it scrolled to Edit profile ('edit') or Import from osu! ('import'): the
- * avatar and the name open it at the first, the favorites reminder at the second, with only
- * favorites ticked.
- */
-function openProfiles({ section = null, favoritesOnly = false } = {}) {
+/** The profiles, to switch between, create, rename and delete. Who one is, is Settings -> Profile. */
+function openProfiles() {
   // A shared copy is read-only.
   if (isStatic) return;
   setMenuOpen(false);
   $('newProfileName').value = '';
-  profileHint(' ');
+  profileHint(' ');
   renderProfiles();
-  renderProfileEdit();
-  // An import from osu! that is running is left as it is, with its bar showing.
-  if (!osuImportRunning()) resetImport({ favoritesOnly });
-  $('sharedFavorites').checked = app.config?.sharedFavorites !== false;
-  renderFavoritesClear();
   $('profilesModal').hidden = false;
-  renderOsuImport(osuImportState);
-  $('profilesModal').querySelector('.modal').scrollTop = 0;
-  $('profilesClose').focus({ preventScroll: true });
-  if (section) $(section === 'import' ? 'importSection' : 'profileEdit').scrollIntoView({ block: 'start' });
-  void loadSuggestions();
+  $('profilesClose').focus();
 }
 
-
-/** Closing only hides it. An import from osu! that is running carries on, shown in the cover's corner. */
 const closeProfiles = () => {
   $('profilesModal').hidden = true;
-  renderOsuImport(osuImportState);
 };
 
 $('optProfiles').onclick = () => openProfiles();
 $('profilesClose').onclick = closeProfiles;
+$('profilesEdit').onclick = () => {
+  closeProfiles();
+  openSettings('profile');
+};
 closeOnBackdrop($('profilesModal'), closeProfiles);
+
 
 $('profileList').onclick = async (e) => {
   const button = e.target.closest('[data-act]');
@@ -4285,7 +4311,7 @@ $('newProfileName').onkeydown = (e) => {
 /* ------------------------------------------------------- export and backup */
 
 /*
- * Both are plain downloads, from Share & back up. Navigating rather than fetching lets the browser handle the
+ * Both are plain downloads, from Share & export and Settings -> System. Navigating rather than fetching lets the browser handle the
  * save dialog and the filename from content-disposition, and keeps a 20MB database out
  * of the page's memory.
  */
@@ -4314,7 +4340,7 @@ $('openDataFolder').onclick = async () => {
   try {
     await postJson('/api/data-folder/open', {}, t('backup.openFailed'));
   } catch (err) {
-    shareHint(err.message, true);
+    settingsHint(err.message, true);
   }
 };
 
@@ -4332,7 +4358,7 @@ $('restoreFile').onchange = async () => {
   const file = $('restoreFile').files?.[0];
   if (!file) return;
   $('shareRestore').disabled = true;
-  shareHint(t('restore.checking'));
+  settingsHint(t('restore.checking'));
   try {
     const r = await fetch('/api/restore', { method: 'PUT', body: file });
     const staged = await r.json().catch(() => ({}));
@@ -4349,20 +4375,20 @@ $('restoreFile').onchange = async () => {
     });
     if (!confirm(`${t('restore.ask')}\n\n${lines.join('\n')}\n\n${t('restore.nothingDeleted')}`)) {
       await fetch('/api/restore', { method: 'DELETE' });
-      shareHint(t('restore.cancelled'));
+      settingsHint(t('restore.cancelled'));
       return;
     }
 
     const before = await (await fetch('/api/app')).json();
     const applied = await postJson('/api/restore/apply', {}, t('restore.failed'));
     if (!applied.restarting) {
-      shareHint(t('restore.restartYourself'));
+      settingsHint(t('restore.restartYourself'));
       return;
     }
-    shareHint(t('restore.restarting'));
+    settingsHint(t('restore.restarting'));
     await reloadWhenRestarted(before.pid);
   } catch (err) {
-    shareHint(err.message, true);
+    settingsHint(err.message, true);
   } finally {
     $('shareRestore').disabled = false;
   }
@@ -4382,7 +4408,7 @@ async function reloadWhenRestarted(pid) {
       /* not back yet */
     }
   }
-  shareHint(t('restore.restartYourself'));
+  settingsHint(t('restore.restartYourself'));
 }
 
 /* ------------------------------------------------------ import past plays */
@@ -4520,7 +4546,7 @@ $('backfillFiltered').onchange = () => {
 /* The way to the filter itself. One dialog at a time, so this closes on the way. */
 $('backfillOpenFilter').onclick = () => {
   closeBackfill();
-  $('optFilter').click();
+  void openFilter();
 };
 
 /** A preset: the last `hours` up to now, or with 'all' every play there is. */
@@ -5017,24 +5043,29 @@ $('backfillManual').onclick = () =>
 /* ---------------------------------------------------- play tracking filter */
 
 /*
- * Options -> Play tracking filter. The dialog itself lives in web/js/tracking-filter.js; this
- * is only the wiring, and the marker on the menu entry.
+ * Options -> Play tracking filter, and Settings -> Tracking. The dialog itself lives in
+ * web/js/tracking-filter.js; this is only the wiring, and the marks that say a filter is on.
  *
- * The marker matters more than it looks: the filter is the one setting whose effect cannot be
- * undone later, so a profile that has one on must be able to see that from the menu rather
- * than by wondering where a play went. `filterNarrowing` comes from the server, which asks
- * dotnet/App/Settings/TrackingFilter.cs -- the page does not decide that for itself.
+ * The marks matter more than they look: the filter is the one setting whose effect cannot be
+ * undone later, so a profile that has one on must be able to see that from the Options menu
+ * rather than by wondering where a play went. `filterNarrowing` comes from the server, which
+ * asks dotnet/App/Settings/TrackingFilter.cs -- the page does not decide that for itself.
  */
 function renderFilterMenu() {
   const button = $('optFilter');
   button.classList.toggle('menu__marked', Boolean(filterNarrowing));
-  button.title = filterNarrowing
-    ? t('filter.menuOn')
-    : t('filter.menuOff');
+  button.title = filterNarrowing ? t('filter.menuOn') : t('filter.menuOff');
+  renderFilterStatus();
 }
 
-$('optFilter').onclick = async () => {
-  setMenuOpen(false);
+/** Under the filter's name in Settings -> Tracking, and the mark beside Tracking. */
+function renderFilterStatus() {
+  $('filterStatus').textContent = filterNarrowing ? t('filter.menuOn') : t('filter.menuOff');
+  $('navFilterMark').hidden = !filterNarrowing;
+}
+
+/** Over Settings, which stays open beneath it. */
+async function openFilter() {
   // The names its Player names lists (roadmap 5.84). Without them it still opens, with the
   // names already ticked or added.
   const found = await identityAction({ action: 'names' }).catch(() => null);
@@ -5060,7 +5091,15 @@ $('optFilter').onclick = async () => {
       await loadState();
     },
   });
+}
+
+$('settingsFilterOpen').onclick = () => void openFilter();
+// The quicker way to it, alone rather than over Settings.
+$('optFilter').onclick = () => {
+  setMenuOpen(false);
+  void openFilter();
 };
+
 
 /* Options -> pp calculator. The dialog lives in web/js/pp-calculator.js. */
 
@@ -5130,10 +5169,10 @@ function closeReset() {
   $('resetModal').hidden = true;
 }
 
-// From Profiles, under Edit profile, since it only touches the profile being tracked. Profiles
-// closes first, so the question is not asked from behind it.
+// From Settings -> Profile, under Edit profile, since it only touches the profile being tracked.
+// Settings closes first, so the question is not asked from behind it.
 $('profileReset').onclick = () => {
-  closeProfiles();
+  closeSettings();
   openReset();
 };
 $('resetCancel').onclick = closeReset;
@@ -5399,7 +5438,7 @@ on('update', (e) => {
     toast(t('update.installsOnQuit', { version: update.ready }));
   }
 });
-// Every profile's scores recalculated: from Other settings, or by itself after an update.
+// Every profile's scores recalculated: from Settings, or by itself after an update.
 /*
  * A build of the player's osu! source, and the switch after it: every open page follows along.
  * Once it has finished -- built and in use, or not -- the calculator the page names is read again.

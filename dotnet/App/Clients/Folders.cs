@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 namespace OsuLocalProfiles.Clients;
 
 /// <summary>
-/// Options -> osu! folders: src/clients/folders.ts. The page's answer to "it did not find my osu!
+/// Options -> Settings -> Tracking -> osu! folders: src/clients/folders.ts. The page's answer to "it did not find my osu!
 /// folder", with three verbs that are deliberately not symmetrical.
 /// </summary>
 /// <remarks>

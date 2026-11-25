@@ -146,7 +146,7 @@
 }
 
 /*
- * Other settings -> Font -> System font (web/js/font.js): the stack as it was before Nunito,
+ * Settings -> Appearance -> Font -> System font (web/js/font.js): the stack as it was before Nunito,
  * at osu-web's weights as asked, since only Nunito's faces are drawn heavier.
  */
 :root[data-font="system"] {

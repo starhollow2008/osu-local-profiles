@@ -186,18 +186,18 @@ internal static class Startup
         if (settings.ImportPlaysWhileClosed)
         {
             Console.WriteLine("  Plays set while this app was closed are brought in when it opens.");
-            Console.WriteLine("  Options -> Other settings turns that off.");
+            Console.WriteLine("  Options -> Settings turns that off.");
         }
         else
         {
             Console.WriteLine("  Plays set while this app is closed are not tracked.");
             Console.WriteLine("  Options -> Import scores brings them in if you want them,");
-            Console.WriteLine("  and Other settings can have every launch do it for you.");
+            Console.WriteLine("  and Settings can have every launch do it for you.");
         }
         if (tracker.FilterNarrowing)
         {
             Console.WriteLine("  A play tracking filter is on -- plays it declines are not tracked.");
-            Console.WriteLine("  They are listed in Options -> Other settings -> Plays not tracked.");
+            Console.WriteLine("  They are listed in Options -> Settings -> Plays not tracked.");
         }
         var identity = tracker.PlayerIdentity;
         if (identity.Source == "unknown")
@@ -235,7 +235,7 @@ internal static class Startup
             var named = string.Join(", ", sweep.ByPlayer.Take(4).Select(p => $"{p.Name} ({p.Count})"));
             Console.WriteLine($"  Removed {sweep.Hidden} play(s) set by someone else -- replays you watched: {named}"
                 + $"{(sweep.ByPlayer.Count > 4 ? $", and {sweep.ByPlayer.Count - 4} more" : "")}");
-            Console.WriteLine("  They are in Options -> Other settings -> Removed scores if any are yours.\n");
+            Console.WriteLine("  They are in Options -> Settings -> Removed scores if any are yours.\n");
         }
     }
 }

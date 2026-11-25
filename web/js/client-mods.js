@@ -4,7 +4,7 @@
  * Someone who plays only osu!stable and lazer has no use for McOsu's, neomod's, Torii's or
  * Ritsu's mods, so a picker shows a client's mods only when the app found that client
  * (`clientsWithOwnMods` in `/api/state`, `Torii.ClientsWithOwnMods` in dotnet/App/Clients/Torii.cs),
- * or when Other settings asks for all of them. A mod the saved filter already names is shown
+ * or when Settings asks for all of them. A mod the saved filter already names is shown
  * either way, so no rule in it is out of sight.
  */
 import { MCOSU_DEFINITIONS } from './mcosu-mods.js';

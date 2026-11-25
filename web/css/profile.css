@@ -2110,7 +2110,7 @@
 }
 
 /*
- * Other settings: a score's judgements between its mods and its accuracy (issue #37), each in
+ * Settings: a score's judgements between its mods and its accuracy (issue #37), each in
  * osu!'s colour for it, and its beatmap's cover behind the row (issue #38), under the row's own
  * colours made see-through.
  */
@@ -4433,9 +4433,8 @@
 }
 
 /*
- * Profiles is several dialogs' worth of controls in one -- the list, Edit profile, Import from
- * osu! and Every profile -- so each part is set off with a rule, as Other settings sets off its
- * own groups.
+ * Settings -> Profile is several dialogs' worth of controls in one -- Edit profile, Import from
+ * osu! and Every profile -- so each part is set off with a rule.
  */
 .profile-section {
   margin-top: 16px;
@@ -7506,6 +7505,204 @@ s.bbcode-editor__glyph {
   margin-right: auto;
 }
 
+/*
+ * A dialog opened from inside another, above it: the play tracking filter, from Settings ->
+ * Tracking. Without this the one earlier in the page would sit underneath.
+ */
+.backdrop--over {
+  z-index: 60;
+}
+
+/* --- Settings: a sidebar of pages, and the page chosen ------------------- */
+
+/*
+ * One height whichever page is showing, so moving between pages never makes the dialog jump;
+ * only the page scrolls. The sidebar becomes a row of tabs on a phone.
+ */
+.modal--settings {
+  display: flex;
+  flex-direction: column;
+  max-width: 880px;
+  height: 720px;
+  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.settings__head {
+  position: relative;
+  flex: none;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid hsl(var(--hsl-b3));
+}
+
+.modal--settings .settings__head h3 {
+  margin: 0;
+}
+
+.settings__body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 10px;
+  border-right: 1px solid hsl(var(--hsl-b3));
+  background-color: hsl(var(--hsl-b5));
+  overflow-y: auto;
+}
+
+.settings-nav__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: var(--radius-base);
+  color: hsl(var(--hsl-l1));
+  text-align: left;
+}
+
+.settings-nav__item:hover {
+  background-color: hsl(var(--hsl-b4));
+  color: hsl(var(--hsl-c1));
+}
+
+.settings-nav__item--active,
+.settings-nav__item--active:hover {
+  background-color: hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-c1));
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 hsl(var(--hsl-h2));
+}
+
+/* How many are in Removed scores and Plays not tracked, as the pages' own headings count them. */
+.settings-nav__count {
+  margin-left: auto;
+  padding: 0 7px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b6));
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small);
+  font-weight: 400;
+}
+
+/* A play tracking filter is on: seen from the sidebar, as it is from the Options menu. */
+.settings-nav__mark {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background-color: hsl(var(--hsl-h2));
+}
+
+.settings__pages {
+  min-height: 0;
+  padding: 16px 22px 20px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.settings-page__title {
+  margin: 0 0 6px;
+  font-size: var(--fs-title-small);
+  font-weight: 700;
+}
+
+/* A group inside a page: a rule above, and its name. */
+.settings-group {
+  margin: 20px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid hsl(var(--hsl-b3));
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-normal);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Kept per profile rather than for the whole install. */
+.setting__scope {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 10000px;
+  background-color: hsl(var(--hsl-b5));
+  color: hsl(var(--hsl-f1));
+  font-size: var(--fs-small);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* Each page is the whole of what used to be a section: no rule above its first part. */
+.settings-page > .removed-scores,
+.settings-page > .profile-section:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-page > .profile-section:first-child .identity-heading {
+  margin-top: 0;
+}
+
+/* A list with a page to itself can use the page's height. */
+.settings-page .removed-list {
+  max-height: none;
+}
+
+/* The group's heading already has the rule. */
+.settings-group + .share-option {
+  border-top: 0;
+}
+
+.settings__status {
+  flex: none;
+  margin: 0;
+  padding: 8px 22px 10px;
+  border-top: 1px solid hsl(var(--hsl-b3));
+}
+
+@media (max-width: 640px) {
+  .modal--settings {
+    height: calc(100dvh - 40px);
+  }
+
+  .settings__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    padding: 8px 10px;
+    border-right: 0;
+    border-bottom: 1px solid hsl(var(--hsl-b3));
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .settings-nav__item {
+    width: auto;
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .settings-nav__item--active,
+  .settings-nav__item--active:hover {
+    box-shadow: inset 0 -3px 0 hsl(var(--hsl-h2));
+  }
+
+  .settings__pages {
+    padding: 14px 16px 18px;
+  }
+}
+
 .tfilter {
   margin-top: 6px;
 }
@@ -8069,7 +8266,7 @@ s.bbcode-editor__glyph {
 /* ----------------------------------------------------------------- osu! folders */
 
 /*
- * Options -> osu! folders. Each row is one osu! install the app knows about: which client it
+ * Options -> Settings -> Tracking -> osu! folders. Each row is one osu! install the app knows about: which client it
  * is, where, and whether it is the one being read right now.
  */
 .folder-list {

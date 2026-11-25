@@ -50,7 +50,7 @@
             <!--
               Above the list, and outside the part that scrolls: forty languages do not fit on a
               screen, and a switch under them would be reachable only by scrolling past all of
-              them. It is here rather than only in Other settings because which script a beatmap
+              them. It is here rather than only in Settings because which script a beatmap
               reads in is the same question as which language the page is in.
             -->
             <div class="menu lang-menu" id="langMenu" role="menu" aria-label="Language" hidden data-i18n-attr="aria-label:langMenu.label">
@@ -68,32 +68,28 @@
             <button id="optionsBtn" type="button" aria-haspopup="true" aria-expanded="false" data-i18n="optionsBtn">Options &#9662;</button>
             <div class="menu" id="optionsMenu" hidden>
               <button id="optProfiles" type="button" data-i18n="optProfiles">Profiles</button>
-              <button id="optFolders" type="button" data-i18n="optFolders">osu! folders</button>
-              <button id="optSettings" type="button" data-i18n="optSettings">Other settings</button>
               <button id="optPpCalc" type="button" data-i18n="optPpCalc">pp calculator</button>
               <div class="sep"></div>
-              <div class="menu__heading" data-i18n="optionsMenu.tracking">Tracking</div>
+              <div class="menu__heading" data-i18n="settingsPage.tracking">Tracking</div>
               <button id="optBackfill" type="button" data-i18n="optBackfill">Import scores</button>
-              <button id="optFilter" type="button" data-i18n="optFilter">Play tracking filter</button>
+              <!-- Also in Settings -> Tracking: here as well because it is changed often, and a filter that is on shows from here. -->
+              <button id="optFilter" type="button" data-i18n="filterTitle">Play tracking filter</button>
               <div class="sep"></div>
               <button id="optLazerScoring" class="menu__toggle" type="button" role="menuitemcheckbox"
                       aria-checked="true" title="Show scores on osu!lazer's scale, where a nomod SS is 1,000,000. Off shows the classic, uncapped scale." data-i18n-attr="title:optLazerScoring.title">
                 <span data-i18n="optLazerScoring.lazerScoring">Lazer scoring</span><span class="menu__switch" aria-hidden="true"></span>
               </button>
-              <!-- Install-level, in config.json: see autoUpdate in dotnet/App/AppConfig.cs (roadmap 5.66). -->
-              <button id="optAutoUpdate" class="menu__toggle" type="button" role="menuitemcheckbox"
-                      aria-checked="false" title="Download new versions in the background and install them when you quit the app, or when it next starts. Never on a metered connection." data-i18n-attr="title:optAutoUpdate.title">
-                <span data-i18n="optAutoUpdate.autoUpdate">Auto-update</span><span class="menu__switch" aria-hidden="true"></span>
-              </button>
               <!--
-                Kept by the system, not config.json: see dotnet/App/StartWithComputer.cs (roadmap 5.77). Hidden in a
-                copy with no tray launcher to start, a source checkout.
+                The same switch as Settings -> System's, kept by the system (dotnet/App/StartWithComputer.cs,
+                roadmap 5.77). Hidden in a copy with no tray launcher to start, a source checkout.
               -->
               <button id="optStartup" class="menu__toggle" type="button" role="menuitemcheckbox" hidden
-                      aria-checked="false" title="Start in the tray when you sign in to your computer, without opening this page." data-i18n-attr="title:optStartup.title">
-                <span data-i18n="optStartup.label">Launch on startup</span><span class="menu__switch" aria-hidden="true"></span>
+                      aria-checked="false" title="Start in the tray when you sign in to your computer, without opening this page." data-i18n-attr="title:installSettings.startupHint">
+                <span data-i18n="installSettings.startup">Launch on startup</span><span class="menu__switch" aria-hidden="true"></span>
               </button>
-              <button id="optShare" type="button" data-i18n="optShare">Share &amp; back up</button>
+              <div class="sep"></div>
+              <!-- Every setting, one page per topic (#settingsModal). -->
+              <button id="optSettings" type="button" data-i18n="optSettings">Settings</button>
               <div class="sep"></div>
               <div class="note" id="optInfo">&nbsp;</div>
             </div>
@@ -760,7 +756,7 @@
     <!--
       Beside the language because it is the same kind of answer -- how you read the page --
       and because this is the one moment somebody is already thinking about it. Off by
-      default, as on osu!, and changeable later from the flag menu or Other settings.
+      default, as on osu!, and changeable later from the flag menu or Settings.
     -->
     <label class="field welcome-lang__original" for="welcomeOriginal">
       <span data-i18n="welcomeOriginal.label">Show beatmap metadata in original language</span>
@@ -778,7 +774,7 @@
       </p>
       <p data-i18n-html="welcomeModal.youDonTNeedTo">
         <b>You don't need to.</b> Your plays are tracked either way. Press Skip and this won't
-        show again - it stays under Options &rarr; Profiles if you change your mind.
+        show again - it stays under Settings &rarr; Profile if you change your mind.
       </p>
     </div>
     <div id="welcomeSlot"></div>
@@ -789,167 +785,18 @@
 </div>
 
 <!--
-  Where the app looks for osu!, and how to correct it.
-
-  This exists because auto-detection missed: somebody's osu!stable was in
-  D:\Games\osu!\osu!, the app found their lazer install, stopped looking, and told them
-  osu!stable was not installed. Detection is much better now and will still miss sometimes,
-  so the page has to be able to be told. See web/js/osu-folders.js.
--->
-<div class="backdrop" id="foldersModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="foldersTitle">
-    <h3 id="foldersTitle" data-i18n="foldersTitle">osu! folders</h3>
-    <p data-i18n="foldersModal.theFoldersThisAppReads">Installation locations</p>
-
-    <div class="folder-list" id="folderList"></div>
-
-    <div class="folder-add">
-      <label class="field field--wide">
-        <span data-i18n="foldersModal.addAFolder">Add a folder</span>
-        <input type="text" id="folderPath" spellcheck="false" autocomplete="off"
-               placeholder="D:\Games\osu!\osu!" data-i18n-attr="placeholder:folderPath.placeholder">
-      </label>
-      <button type="button" id="folderAdd" data-i18n="folderAdd">Add</button>
-    </div>
-    <div class="setting__hint" data-i18n-html="foldersModal.pickTheFolderThatHas">
-      Pick the folder that has <code>osu!.exe</code> in it for osu!stable, the one with
-      <code>client.realm</code> for osu!lazer, the one with <code>McEngine.exe</code> for
-      McOsu, or the one with <code>neomod.exe</code> for neomod - not the folder above it.
-    </div>
-
-    <div class="folder-search">
-      <button type="button" id="folderRescan">Search again</button>
-      <span class="setting__hint" id="folderSearchNote" data-i18n="folderSearchNote">
-        Your drives have not been searched yet. It takes a few seconds.
-      </span>
-    </div>
-
-    <div class="folder-restart" id="folderRestart" hidden data-i18n="folderRestart">
-      Restart the app for this to take effect - it reads your plays from the folders it
-      was started with.
-    </div>
-
-    <div class="profile-hint" id="foldersHint">&nbsp;</div>
-
-    <div class="actions">
-      <button id="foldersClose" type="button" data-i18n="foldersClose">Close</button>
-    </div>
-  </div>
-</div>
-
-<div class="backdrop" id="shareModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="shareTitle">
-    <h3 id="shareTitle" data-i18n="shareTitle">Share &amp; back up</h3>
-
-    <h4 class="identity-heading" data-i18n="shareModal.share">Share</h4>
-
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.saveAsAWebPage">Save as a web page</b>
-        <div class="setting__hint" data-i18n-html="shareModal.thisPageAsOneHtml">
-          This page as a <code>.html</code> file that can be opened anywhere without the app,
-          sent to others as a file, or hosted as a web page.
-        </div>
-      </div>
-      <button type="button" id="shareHtml" class="primary" data-i18n="shareHtml">Save&hellip;</button>
-    </div>
-
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.saveAsAnImage">Save as an image</b>
-        <div class="setting__hint" id="shareScreenshotNote">&nbsp;</div>
-      </div>
-      <button type="button" id="shareScreenshot" data-i18n="shareScreenshot">Save&hellip;</button>
-    </div>
-
-    <h4 class="identity-heading" data-i18n="shareModal.backUp">Back up</h4>
-
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.backUpEverything">Back up everything</b>
-        <div class="setting__hint" data-i18n="shareModal.backUpEverythingHint">
-          Back up all profiles into one .zip file, can be restored below.
-        </div>
-      </div>
-      <button type="button" id="shareBackup" data-i18n="shareBackup">Download</button>
-    </div>
-
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.restore">Restore from backup</b>
-        <div class="setting__hint" data-i18n="shareModal.restoreHint">
-          Replaces every profile here with the backup's. Nothing is deleted: what is here now is
-          moved to a before-restore folder inside the data folder.
-        </div>
-      </div>
-      <button type="button" id="shareRestore" data-i18n="shareRestore">Restore&hellip;</button>
-      <input type="file" id="restoreFile" accept=".zip,.db" hidden>
-    </div>
-
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.dataFolder">The data folder</b>
-        <div class="setting__hint" data-i18n="shareModal.dataFolderHint">
-          Everything is kept in this one folder. With the app closed, copying it somewhere else is
-          a complete backup too, and putting it back restores it.
-        </div>
-        <code class="data-folder-path" id="dataFolderPath"></code>
-      </div>
-      <button type="button" id="openDataFolder" data-i18n="openDataFolder">Open folder</button>
-    </div>
-
-    <h4 class="identity-heading" data-i18n="shareModal.export">Export</h4>
-
-    <!--
-      For a spreadsheet: the scores alone as .csv, the file almost anything opens, or the whole
-      profile as an .xlsx workbook, one sheet per table. See dotnet/App/Export/.
-    -->
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.exportSpreadsheet">Export to a spreadsheet</b>
-        <div class="setting__hint" data-i18n="shareModal.exportSpreadsheetHint">
-          List of every score in this profile. The .xlsx file contains multiple sheets for more
-          info.
-        </div>
-      </div>
-      <div class="share-option__buttons">
-        <button type="button" id="shareCsv" data-i18n="shareCsv">.csv</button>
-        <button type="button" id="shareXlsx" data-i18n="shareXlsx">.xlsx</button>
-      </div>
-    </div>
-
-    <div class="share-option">
-      <div class="share-option__detail">
-        <b data-i18n="shareModal.exportScores">Export this profile's scores (JSON)</b>
-        <div class="setting__hint" data-i18n="shareModal.exportScoresHint">
-          Contains scores, totals, and rank. Note: this file cannot be restored from, use Back up
-          instead.
-        </div>
-      </div>
-      <button type="button" id="shareExport" data-i18n="shareExport">Download</button>
-    </div>
-
-    <div class="profile-hint" id="shareHint">&nbsp;</div>
-
-    <div class="actions">
-      <button id="shareClose" type="button" data-i18n="shareClose">Close</button>
-    </div>
-  </div>
-</div>
-
-<!--
-  Options -> Play tracking filter. The only dialog here whose settings decide whether a play is
+  Options -> Play tracking filter, or Settings -> Tracking. The only dialog here whose settings decide whether a play is
   *written*: a play it turns away is not a score and counts toward nothing, and comes back only
-  by Track anyway, one play at a time, from Other settings -> Plays not tracked. That is why
+  by Track anyway, one play at a time, from Settings -> Plays not tracked. That is why
   it opens switched off and, when switched on, starts with every criterion at its widest. The
   criteria themselves are generated by web/js/tracking-filter.js; see dotnet/App/Settings/TrackingFilter.cs
   for what each one is matched against.
 -->
-<div class="backdrop" id="filterModal" hidden>
+<div class="backdrop backdrop--over" id="filterModal" hidden>
   <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="filterTitle">
     <h3 id="filterTitle" data-i18n="filterTitle">Play tracking filter</h3>
     <p data-i18n="filterModal.filteredOutPlays">
-      Plays that are filtered out can be found under Other settings.
+      Plays that are filtered out are listed in Settings, under Plays not tracked.
     </p>
 
     <div class="setting">
@@ -996,167 +843,484 @@
 
 <div class="toast" id="toast"></div>
 
+<!--
+  Options -> Settings: every setting, one page per topic, chosen from the sidebar. A change
+  applies as it is made: there is no Save. A setting kept per profile says so with its tag;
+  the rest are kept in data/config.json for the whole install. The profile's fields are
+  generated from SETTINGS_FIELDS in web/js/main.js into their `data-setting` slots.
+-->
 <div class="backdrop" id="settingsModal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <h3 id="settingsTitle" data-i18n="settingsTitle">Other settings</h3>
-    <p data-i18n="settingsModal.perProfile">
-      Note: Settings only apply to current profile and can differ across profiles.
-    </p>
+  <div class="modal modal--settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings__head">
+      <h3 id="settingsTitle" data-i18n="settingsTitle">Settings</h3>
+      <button type="button" class="modal__dismiss settings__close" id="settingsClose" aria-label="Close" title="Close"
+              data-i18n-attr="title:settingsClose.title;aria-label:settingsClose.title">&times;</button>
+    </div>
 
-    <div id="settingsFields"></div>
+    <div class="settings__body">
+      <nav class="settings-nav" id="settingsNav" aria-label="Settings pages" data-i18n-attr="aria-label:settingsNav.label">
+        <button type="button" class="settings-nav__item" data-settings-page="profile" data-i18n="settingsPage.profile">Profile</button>
+        <button type="button" class="settings-nav__item" data-settings-page="scores" data-i18n="settingsPage.scores">Scores &amp; pp</button>
+        <button type="button" class="settings-nav__item" data-settings-page="appearance" data-i18n="settingsPage.appearance">Appearance</button>
+        <button type="button" class="settings-nav__item" data-settings-page="tracking"><span data-i18n="settingsPage.tracking">Tracking</span><span class="settings-nav__mark" id="navFilterMark" hidden></span></button>
+        <button type="button" class="settings-nav__item" data-settings-page="calculator" data-i18n="settingsPage.calculator">Calculator</button>
+        <button type="button" class="settings-nav__item" data-settings-page="removed"><span data-i18n="heading.removedScores">Removed scores</span><span class="settings-nav__count" id="navRemovedCount">0</span></button>
+        <button type="button" class="settings-nav__item" data-settings-page="declined"><span data-i18n="heading.declinedPlays">Plays not tracked</span><span class="settings-nav__count" id="navDeclinedCount">0</span></button>
+        <button type="button" class="settings-nav__item" data-settings-page="share" data-i18n="shareTitle">Share &amp; export</button>
+        <button type="button" class="settings-nav__item" data-settings-page="system" data-i18n="settingsPage.system">System</button>
+      </nav>
 
-    <div class="removed-scores" id="installSettings">
-      <h4 data-i18n="installSettings.thisInstall">This install</h4>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.openInBrowserOnStart">Open in browser on start</span>
-          <input type="checkbox" id="openBrowserSetting">
-        </label>
-      </div>
-      <!--
-        The same switch as the one in the flag menu, and the same stored answer. Here as well
-        because this is where settings are looked for, and nobody thinks to open a language
-        menu to find out how titles are written.
-      -->
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.originalLanguage">Show beatmap metadata in original language</span>
-          <input type="checkbox" id="originalMetadataSetting">
-        </label>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.starRating">Star rating on scores</span>
-          <select id="starRatingSetting">
-            <option value="off" data-i18n="installSettings.starRatingOff">Hidden</option>
-            <option value="text" data-i18n="installSettings.starRatingText">As text</option>
-            <option value="badge" data-i18n="installSettings.starRatingBadge">As a badge</option>
-          </select>
-        </label>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.judgements">Show judgements on scores</span>
-          <input type="checkbox" id="judgementsSetting">
-        </label>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.scoreBackgrounds">Show beatmap backgrounds on scores</span>
-          <input type="checkbox" id="scoreBackgroundsSetting">
-        </label>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.rankTiers">Colour the global rank by tier</span>
-          <input type="checkbox" id="rankTiersSetting">
-        </label>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.lowerGrades">B, C and D grade counts</span>
-          <select id="lowerGradesSetting">
-            <option value="off" data-i18n="installSettings.lowerGradesOff">Hidden</option>
-            <option value="hover" data-i18n="installSettings.lowerGradesHover">On hover</option>
-            <option value="always" data-i18n="installSettings.lowerGradesAlways">Always shown</option>
-          </select>
-        </label>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.otherClientMods">Show mods from custom clients</span>
-          <input type="checkbox" id="otherClientModsSetting">
-        </label>
-        <div class="setting__hint" data-i18n="installSettings.otherClientModsHint">McOsu, neomod, Torii and Ritsu. A client found on this computer has its mods shown anyway.</div>
-      </div>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="installSettings.font">Font</span>
-          <select id="fontSetting">
-            <option value="nunito" data-i18n="installSettings.fontNunito">Nunito</option>
-            <option value="system" data-i18n="installSettings.fontSystem">System font</option>
-          </select>
-        </label>
+      <div class="settings__pages" id="settingsPages">
+        <!-- Who this profile is. Import from osu! is lent to the one-time welcome while that shows (#welcomeModal). -->
+        <section class="settings-page" data-page="profile" hidden>
+          <section class="profile-section" id="profileEdit">
+            <h4 class="identity-heading" data-i18n="profileEdit.editProfile">Edit profile</h4>
+            <p class="setting__hint" data-i18n="profileEdit.optional">Optional</p>
+
+            <label class="field">
+              <span data-i18n="profileEdit.name">Name</span>
+              <input type="text" id="identityName" maxlength="60">
+            </label>
+            <label class="field">
+              <span data-i18n="profileEdit.country">Country</span>
+              <input type="text" id="identityCountry" maxlength="2" placeholder="e.g. US" data-i18n-attr="placeholder:identityCountry.placeholder">
+            </label>
+            <div class="setting__hint" data-i18n="profileEdit.twoLetterCodeShownBeside">Two-letter code</div>
+            <label class="field">
+              <span data-i18n="profileEdit.playstyle">Playstyle</span>
+              <input type="text" id="identityTagline" maxlength="120" placeholder="e.g. left hand, mouse only" data-i18n-attr="placeholder:identityTagline.placeholder">
+            </label>
+            <div class="setting__hint" data-i18n="profileEdit.whatThisProfileIsTracking">Short description next to name - e.g. mod, playstyle</div>
+
+            <div class="identity-images">
+              <div class="identity-image">
+                <div class="identity-image__label" data-i18n="profileEdit.picture">Picture</div>
+                <div class="identity-image__preview identity-image__preview--avatar" id="identityAvatar"></div>
+                <div class="identity-image__actions">
+                  <button type="button" data-upload="avatar" data-i18n="profileEdit.upload">Upload&hellip;</button>
+                  <button type="button" data-clear="avatar" data-i18n="profileEdit.remove">Remove</button>
+                </div>
+              </div>
+              <div class="identity-image">
+                <div class="identity-image__label" data-i18n="profileEdit.banner">Banner</div>
+                <div class="identity-image__preview identity-image__preview--cover" id="identityCover"></div>
+                <div class="identity-image__actions">
+                  <button type="button" data-upload="cover" data-i18n="profileEdit.upload">Upload&hellip;</button>
+                  <button type="button" data-clear="cover" data-i18n="profileEdit.remove">Remove</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="identity-found" id="identityFound"></div>
+            <div class="profile-hint" id="identityHint">&nbsp;</div>
+            <div class="share-option profile-danger">
+              <div class="share-option__detail">
+                <b data-i18n="profileEdit.resetThisProfile">Reset this profile</b>
+              </div>
+              <button type="button" class="danger-button" id="profileReset" data-i18n="profileReset">Reset</button>
+            </div>
+          </section>
+          <section class="profile-section" id="importSection">
+            <h4 class="identity-heading" id="importHeading" data-i18n="importHeading">Import from osu!</h4>
+            <p class="setting__hint">
+              Copies what you choose from an osu! account's public profile into
+              <b id="importProfileName">this profile</b>, and links the two. Nothing is ever written
+              to osu!.
+            </p>
+
+            <div class="identity-link">
+              <input type="text" id="importQuery" placeholder="username, user id, or profile link" data-i18n-attr="placeholder:importQuery.placeholder">
+              <button type="button" id="importLookup" data-i18n="importLookup">Look up</button>
+            </div>
+            <div class="identity-found" id="importFound"></div>
+
+            <div class="checkgroup import-choices" id="importChoices">
+              <label class="checkgroup__item"><input type="checkbox" data-import="avatar"> Avatar</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="cover"> Banner</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="country"> Flag</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="aboutMe"> me!</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="profileHue"> Colour</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="favorites"> Favorite beatmaps</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="bestPerformances"> Best performances</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="pinnedScores"> Pinned scores</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="firstPlaces"> First place ranks</label>
+              <label class="checkgroup__item"><input type="checkbox" data-import="medals"> Medals</label>
+            </div>
+            <p class="setting__hint" id="importNote"></p>
+            <!-- Here rather than beside the welcome: this section is the welcome's, moved in while it is open. -->
+            <p class="setting__hint" data-i18n-html="importSection.localScoresHint">
+              To import scores from your osu! client, go to <b>Options → Import scores</b>.
+            </p>
+            <p class="setting__hint" data-i18n-html="importSection.oneRequestToOsuPpy">
+              One request to <code>osu.ppy.sh</code> to find the account, one per picture, one per
+              hundred favorites, and a few per game mode for scores, no login and no API key needed.
+            </p>
+
+            <div class="profile-hint" id="importHint">&nbsp;</div>
+            <!-- While an import runs. Closing Profiles leaves it running, and the cover shows it. -->
+            <div class="backfill-progress" id="importProgress" role="status" aria-live="polite" hidden>
+              <div class="backfill-progress__head">
+                <span id="importProgressText"></span>
+                <span class="backfill-progress__percent" id="importProgressPercent"></span>
+              </div>
+              <div class="bar backfill-progress__bar"><div class="bar__fill" id="importProgressFill"></div></div>
+              <div class="setting__hint" data-i18n="backfillModal.keepsRunning">You can close this, the import keeps going.</div>
+            </div>
+            <div class="actions actions--inline">
+              <button id="importGo" class="primary" type="button" data-i18n="importGo">Import</button>
+            </div>
+          </section>
+          <section class="profile-section" id="sharedSection">
+            <h4 class="identity-heading" data-i18n="sharedSection.everyProfile">Every profile</h4>
+            <div class="setting">
+              <label class="field">
+                <span data-i18n="sharedSection.keepFavoriteBeatmapsTheSame">Keep Favorite Beatmaps the same on every profile</span>
+                <input type="checkbox" id="sharedFavorites">
+              </label>
+            </div>
+            <!-- Every favourite at once: every profile's while they are shared, this profile's otherwise. -->
+            <div class="share-option profile-danger">
+              <div class="share-option__detail">
+                <b data-i18n="favorites.clearTitle">Remove all favorite beatmaps</b>
+                <div class="setting__hint" id="favoritesClearHint">From every profile.</div>
+              </div>
+              <button type="button" class="danger-button" id="favoritesClear" data-i18n="favorites.clear">Remove all</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="settings-page" data-page="scores" hidden>
+          <h4 class="settings-page__title" data-i18n="settingsPage.scores">Scores &amp; pp</h4>
+          <div class="setting" data-setting="includeUnrankedMods"></div>
+          <div class="setting" data-setting="unrankedModPp"></div>
+          <div class="setting" data-setting="includeUnrankedMaps"></div>
+          <div class="setting" data-setting="showCountingNote"></div>
+        </section>
+
+        <section class="settings-page" data-page="appearance" hidden>
+          <h4 class="settings-page__title" data-i18n="settingsPage.appearance">Appearance</h4>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.font">Font</span>
+              <select id="fontSetting">
+                <option value="nunito" data-i18n="installSettings.fontNunito">Nunito</option>
+                <option value="system" data-i18n="installSettings.fontSystem">System font</option>
+              </select>
+            </label>
+          </div>
+          <!--
+            The same switch as the one in the flag menu, and the same stored answer. Here as well
+            because this is where settings are looked for, and nobody thinks to open a language
+            menu to find out how titles are written.
+          -->
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.originalLanguage">Show beatmap metadata in original language</span>
+              <input type="checkbox" id="originalMetadataSetting">
+            </label>
+          </div>
+
+          <h5 class="settings-group" data-i18n="settingsGroup.profilePage">Profile page</h5>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.rankTiers">Colour the global rank by tier</span>
+              <input type="checkbox" id="rankTiersSetting">
+            </label>
+          </div>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.lowerGrades">B, C and D grade counts</span>
+              <select id="lowerGradesSetting">
+                <option value="off" data-i18n="installSettings.lowerGradesOff">Hidden</option>
+                <option value="hover" data-i18n="installSettings.lowerGradesHover">On hover</option>
+                <option value="always" data-i18n="installSettings.lowerGradesAlways">Always shown</option>
+              </select>
+            </label>
+          </div>
+          <div class="setting" data-setting="hiddenSections"></div>
+
+          <h5 class="settings-group" data-i18n="settingsGroup.scoreLists">Score lists</h5>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.starRating">Star rating on scores</span>
+              <select id="starRatingSetting">
+                <option value="off" data-i18n="installSettings.starRatingOff">Hidden</option>
+                <option value="text" data-i18n="installSettings.starRatingText">As text</option>
+                <option value="badge" data-i18n="installSettings.starRatingBadge">As a badge</option>
+              </select>
+            </label>
+          </div>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.judgements">Show judgements on scores</span>
+              <input type="checkbox" id="judgementsSetting">
+            </label>
+          </div>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.scoreBackgrounds">Show beatmap backgrounds on scores</span>
+              <input type="checkbox" id="scoreBackgroundsSetting">
+            </label>
+          </div>
+          <div class="setting" data-setting="showIncompleteInRecent"></div>
+          <div class="setting" data-setting="showMoreRows"></div>
+        </section>
+
+        <section class="settings-page" data-page="tracking" hidden>
+          <h4 class="settings-page__title" data-i18n="settingsPage.tracking">Tracking</h4>
+
+          <h5 class="settings-group" data-i18n="settingsGroup.plays">Plays</h5>
+          <!--
+            The filter keeps its own dialog and its own Save: it is the one setting whose effect
+            cannot be undone later, so a half-edited filter must never apply.
+          -->
+          <div class="setting share-option" id="filterRow">
+            <div class="share-option__detail">
+              <b data-i18n="filterTitle">Play tracking filter</b><span class="setting__scope" data-i18n="settings.thisProfile">This profile</span>
+              <div class="setting__hint" id="filterStatus"></div>
+            </div>
+            <button type="button" id="settingsFilterOpen" data-i18n="settingsFilterOpen">Edit&hellip;</button>
+          </div>
+          <div class="setting" data-setting="countUnsubmittedAttempts"></div>
+          <div class="setting" data-setting="importPlaysWhileClosed"></div>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.otherClientMods">Show mods from custom clients</span>
+              <input type="checkbox" id="otherClientModsSetting">
+            </label>
+            <div class="setting__hint" data-i18n="installSettings.otherClientModsHint">McOsu, neomod, Torii and Ritsu. A client found on this computer has its mods shown anyway.</div>
+          </div>
+
+          <h5 class="settings-group" data-i18n="foldersTitle">osu! folders</h5>
+          <div class="folder-list" id="folderList"></div>
+
+          <div class="folder-add">
+            <label class="field field--wide">
+              <span data-i18n="foldersModal.addAFolder">Add a folder</span>
+              <input type="text" id="folderPath" spellcheck="false" autocomplete="off"
+                     placeholder="D:\Games\osu!\osu!" data-i18n-attr="placeholder:folderPath.placeholder">
+            </label>
+            <button type="button" id="folderAdd" data-i18n="folderAdd">Add</button>
+          </div>
+          <div class="setting__hint" data-i18n-html="foldersModal.pickTheFolderThatHas">
+            Pick the folder that has <code>osu!.exe</code> in it for osu!stable, the one with
+            <code>client.realm</code> for osu!lazer, the one with <code>McEngine.exe</code> for
+            McOsu, or the one with <code>neomod.exe</code> for neomod - not the folder above it.
+          </div>
+
+          <div class="folder-search">
+            <button type="button" id="folderRescan">Search again</button>
+            <span class="setting__hint" id="folderSearchNote" data-i18n="folderSearchNote">
+              Your drives have not been searched yet. It takes a few seconds.
+            </span>
+          </div>
+
+          <div class="folder-restart" id="folderRestart" hidden data-i18n="folderRestart">
+            Restart the app for this to take effect - it reads your plays from the folders it
+            was started with.
+          </div>
+
+          <div class="profile-hint" id="foldersHint">&nbsp;</div>
+        </section>
+
+        <section class="settings-page" data-page="calculator" hidden>
+          <div class="removed-scores pp-calculator" id="ppCalculator">
+            <h4 class="settings-page__title" data-i18n="ppCalculator.ppCalculator">pp calculator</h4>
+            <p class="setting__hint" id="ppCalculatorVersion"></p>
+            <p class="setting__hint" id="ppCalculatorOutdated" hidden></p>
+            <div class="pp-calculator__row" id="ppCalculatorAll">
+              <p class="setting__hint" data-i18n="ppCalculator.recalculateHint">
+                New pp reworks are automatically recalculated on launch, click to manually recalculate
+                now.
+              </p>
+              <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate every score</button>
+            </div>
+
+            <!--
+              The player's own osu! source, in place of the release (roadmap 5.70). The same helper,
+              built against their clone of ppy/osu, so their pp changes and their own mods are priced.
+              For every profile at once, and every score recalculated each way: pp from two formulas
+              never share a total. Filled in by renderPpSource; hidden where the app cannot offer it.
+            -->
+            <div class="pp-source" id="ppSource" hidden>
+              <p class="setting__hint" data-i18n="ppSource.hint">
+                Run osu! from source? Build this app's calculator against your clone of ppy/osu, and
+                every score in every profile is priced by your code - your pp changes and your own mods
+                included. Needs git and the .NET 10 SDK. Switching recalculates every score, and so
+                does switching back.
+              </p>
+              <div class="identity-link">
+                <input type="text" id="ppSourcePath" placeholder="the folder you cloned ppy/osu into" data-i18n-attr="placeholder:ppSourcePath.placeholder">
+                <button type="button" id="ppSourceUse" data-i18n="ppSourceUse">Build and use</button>
+              </div>
+              <p class="setting__hint pp-source__status" id="ppSourceStatus" hidden></p>
+              <button type="button" id="ppSourceRelease" data-i18n="ppSourceRelease" hidden>Use the release calculator again</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-page" data-page="removed" hidden>
+          <div class="removed-scores" id="removedScores">
+            <h4 class="settings-page__title"><span data-i18n="heading.removedScores">Removed scores</span><span class="title__count" id="removedCount">0</span></h4>
+            <div class="removed-list" id="removedList"></div>
+            <div class="removed-scores__actions">
+              <button type="button" class="danger-button" id="removedDeleteAll" data-i18n="removedDeleteAll">Delete all permanently</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-page" data-page="declined" hidden>
+          <!--
+            Plays the app turned away: the play tracking filter, a replay somebody else set, one that
+            could not be read -- live, by an import, or by the catch-up at launch. The answer to "why
+            is my play missing?", and Track anyway for one turned away by mistake. See
+            dotnet/App/Tracker/Declined.cs.
+          -->
+          <div class="removed-scores" id="declinedPlays">
+            <h4 class="settings-page__title"><span data-i18n="heading.declinedPlays">Plays not tracked</span><span class="title__count" id="declinedCount">0</span></h4>
+            <p class="setting__hint" data-i18n="declinedPlays.hint">
+              Plays that were declined by the play tracking filter, or replays set by another player.
+            </p>
+            <label class="field declined-reason" id="declinedReasonField" hidden>
+              <span data-i18n="declinedPlays.show">Show</span>
+              <select id="declinedReason"></select>
+            </label>
+            <div class="removed-list" id="declinedList"></div>
+            <div class="removed-scores__actions">
+              <button type="button" class="danger-button" id="declinedDeleteAll" data-i18n="declinedDeleteAll">Delete all permanently</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="settings-page" data-page="share" hidden>
+          <h4 class="settings-page__title" data-i18n="shareTitle">Share &amp; export</h4>
+          <h5 class="settings-group" data-i18n="shareModal.share">Share</h5>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.saveAsAWebPage">Save as a web page</b>
+              <div class="setting__hint" data-i18n-html="shareModal.thisPageAsOneHtml">
+                This page as a <code>.html</code> file that can be opened anywhere without the app,
+                sent to others as a file, or hosted as a web page.
+              </div>
+            </div>
+            <button type="button" id="shareHtml" class="primary" data-i18n="shareHtml">Save&hellip;</button>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.saveAsAnImage">Save as an image</b>
+              <div class="setting__hint" id="shareScreenshotNote">&nbsp;</div>
+            </div>
+            <button type="button" id="shareScreenshot" data-i18n="shareScreenshot">Save&hellip;</button>
+          </div>
+
+          <h5 class="settings-group" data-i18n="shareModal.export">Export</h5>
+
+          <!--
+            For a spreadsheet: the scores alone as .csv, the file almost anything opens, or the whole
+            profile as an .xlsx workbook, one sheet per table. See dotnet/App/Export/.
+          -->
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.exportSpreadsheet">Export to a spreadsheet</b>
+              <div class="setting__hint" data-i18n="shareModal.exportSpreadsheetHint">
+                List of every score in this profile. The .xlsx file contains multiple sheets for more
+                info.
+              </div>
+            </div>
+            <div class="share-option__buttons">
+              <button type="button" id="shareCsv" data-i18n="shareCsv">.csv</button>
+              <button type="button" id="shareXlsx" data-i18n="shareXlsx">.xlsx</button>
+            </div>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.exportScores">Export this profile's scores (JSON)</b>
+              <div class="setting__hint" data-i18n="shareModal.exportScoresHint">
+                Contains scores, totals, and rank. Note: this file cannot be restored from, use Back up
+                instead.
+              </div>
+            </div>
+            <button type="button" id="shareExport" data-i18n="shareExport">Download</button>
+          </div>
+        </section>
+
+        <section class="settings-page" data-page="system" hidden>
+          <h4 class="settings-page__title" data-i18n="settingsPage.system">System</h4>
+          <!--
+            Kept by the system, not config.json: see dotnet/App/StartWithComputer.cs (roadmap 5.77).
+            Hidden in a copy with no tray launcher to start, a source checkout.
+          -->
+          <div class="setting" id="startupRow" hidden>
+            <label class="field">
+              <span data-i18n="installSettings.startup">Launch on startup</span>
+              <input type="checkbox" id="startupSetting">
+            </label>
+            <div class="setting__hint" data-i18n="installSettings.startupHint">Start in the tray when you sign in to your computer, without opening this page.</div>
+          </div>
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.openInBrowserOnStart">Open in browser on start</span>
+              <input type="checkbox" id="openBrowserSetting">
+            </label>
+          </div>
+          <!-- In config.json: see autoUpdate in dotnet/App/AppConfig.cs (roadmap 5.66). -->
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.autoUpdate">Auto-update</span>
+              <input type="checkbox" id="autoUpdateSetting">
+            </label>
+            <div class="setting__hint" data-i18n="installSettings.autoUpdateHint">Download new versions in the background and install them when you quit the app, or when it next starts. Never on a metered connection.</div>
+          </div>
+
+          <h5 class="settings-group" data-i18n="shareModal.backUp">Back up</h5>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.backUpEverything">Back up everything</b>
+              <div class="setting__hint" data-i18n="shareModal.backUpEverythingHint">
+                Back up all profiles into one .zip file, can be restored below.
+              </div>
+            </div>
+            <button type="button" id="shareBackup" data-i18n="shareBackup">Download</button>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.restore">Restore from backup</b>
+              <div class="setting__hint" data-i18n="shareModal.restoreHint">
+                Replaces every profile here with the backup's. Nothing is deleted: what is here now is
+                moved to a before-restore folder inside the data folder.
+              </div>
+            </div>
+            <button type="button" id="shareRestore" data-i18n="shareRestore">Restore&hellip;</button>
+            <input type="file" id="restoreFile" accept=".zip,.db" hidden>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="shareModal.dataFolder">The data folder</b>
+              <div class="setting__hint" data-i18n="shareModal.dataFolderHint">
+                Everything is kept in this one folder. With the app closed, copying it somewhere else is
+                a complete backup too, and putting it back restores it.
+              </div>
+              <code class="data-folder-path" id="dataFolderPath"></code>
+            </div>
+            <button type="button" id="openDataFolder" data-i18n="openDataFolder">Open folder</button>
+          </div>
+        </section>
       </div>
     </div>
 
-    <div class="removed-scores" id="removedScores">
-      <h4><span data-i18n="heading.removedScores">Removed scores</span><span class="title__count" id="removedCount">0</span></h4>
-      <div class="removed-list" id="removedList"></div>
-      <div class="removed-scores__actions">
-        <button type="button" class="danger-button" id="removedDeleteAll" data-i18n="removedDeleteAll">Delete all permanently</button>
-      </div>
-    </div>
-
-    <!--
-      Plays the app turned away: the play tracking filter, a replay somebody else set, one that
-      could not be read -- live, by an import, or by the catch-up at launch. The answer to "why
-      is my play missing?", and Track anyway for one turned away by mistake. See
-      dotnet/App/Tracker/Declined.cs.
-    -->
-    <div class="removed-scores" id="declinedPlays">
-      <h4><span data-i18n="heading.declinedPlays">Plays not tracked</span><span class="title__count" id="declinedCount">0</span></h4>
-      <p class="setting__hint" data-i18n="declinedPlays.hint">
-        Plays that were declined by the play tracking filter, or replays set by another player.
-      </p>
-      <label class="field declined-reason" id="declinedReasonField" hidden>
-        <span data-i18n="declinedPlays.show">Show</span>
-        <select id="declinedReason"></select>
-      </label>
-      <div class="removed-list" id="declinedList"></div>
-      <div class="removed-scores__actions">
-        <button type="button" class="danger-button" id="declinedDeleteAll" data-i18n="declinedDeleteAll">Delete all permanently</button>
-      </div>
-    </div>
-
-    <div class="removed-scores pp-calculator" id="ppCalculator">
-      <h4 data-i18n="ppCalculator.ppCalculator">pp calculator</h4>
-      <p class="setting__hint" id="ppCalculatorVersion"></p>
-      <p class="setting__hint" id="ppCalculatorOutdated" hidden></p>
-      <div class="pp-calculator__row" id="ppCalculatorAll">
-        <p class="setting__hint" data-i18n="ppCalculator.recalculateHint">
-          New pp reworks are automatically recalculated on launch, click to manually recalculate
-          now.
-        </p>
-        <button type="button" id="ppRecalculate" data-i18n="ppRecalculate">Recalculate every score</button>
-      </div>
-
-      <!--
-        The player's own osu! source, in place of the release (roadmap 5.70). The same helper,
-        built against their clone of ppy/osu, so their pp changes and their own mods are priced.
-        For every profile at once, and every score recalculated each way: pp from two formulas
-        never share a total. Filled in by renderPpSource; hidden where the app cannot offer it.
-      -->
-      <div class="pp-source" id="ppSource" hidden>
-        <p class="setting__hint" data-i18n="ppSource.hint">
-          Run osu! from source? Build this app's calculator against your clone of ppy/osu, and
-          every score in every profile is priced by your code - your pp changes and your own mods
-          included. Needs git and the .NET 10 SDK. Switching recalculates every score, and so
-          does switching back.
-        </p>
-        <div class="identity-link">
-          <input type="text" id="ppSourcePath" placeholder="the folder you cloned ppy/osu into" data-i18n-attr="placeholder:ppSourcePath.placeholder">
-          <button type="button" id="ppSourceUse" data-i18n="ppSourceUse">Build and use</button>
-        </div>
-        <p class="setting__hint pp-source__status" id="ppSourceStatus" hidden></p>
-        <button type="button" id="ppSourceRelease" data-i18n="ppSourceRelease" hidden>Use the release calculator again</button>
-      </div>
-    </div>
-
-    <div class="profile-hint" id="settingsHint">&nbsp;</div>
-
-    <div class="actions">
-      <button id="settingsCancel" type="button" data-i18n="settingsCancel">Cancel</button>
-      <button id="settingsSave" class="primary" type="button" data-i18n="settingsSave">Save</button>
-    </div>
+    <div class="profile-hint settings__status" id="settingsHint" role="status" aria-live="polite">&nbsp;</div>
   </div>
 </div>
 
 <!--
-  Options -> Profiles: which profile is tracking and who it is, in one dialog at the user's
-  request -- the profile list, Edit profile, Import from osu!, and the one setting about how
-  profiles relate. The avatar and the name open it at Edit profile. Import from osu! is lent to
-  the one-time welcome while that shows (#welcomeModal).
+  Options -> Profiles: which profile is tracking, and switching, creating, renaming and deleting
+  them. Who a profile is (Edit profile, Import from osu!) is Settings -> Profile.
 -->
 <div class="backdrop" id="profilesModal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="profilesTitle">
@@ -1174,127 +1338,8 @@
     </div>
     <div class="profile-hint" id="profileHint">&nbsp;</div>
 
-    <section class="profile-section" id="profileEdit">
-      <h4 class="identity-heading" data-i18n="profileEdit.editProfile">Edit profile</h4>
-      <p class="setting__hint" data-i18n="profileEdit.optional">Optional</p>
-
-      <label class="field">
-        <span data-i18n="profileEdit.name">Name</span>
-        <input type="text" id="identityName" maxlength="60">
-      </label>
-      <label class="field">
-        <span data-i18n="profileEdit.country">Country</span>
-        <input type="text" id="identityCountry" maxlength="2" placeholder="e.g. US" data-i18n-attr="placeholder:identityCountry.placeholder">
-      </label>
-      <div class="setting__hint" data-i18n="profileEdit.twoLetterCodeShownBeside">Two-letter code</div>
-      <label class="field">
-        <span data-i18n="profileEdit.playstyle">Playstyle</span>
-        <input type="text" id="identityTagline" maxlength="120" placeholder="e.g. left hand, mouse only" data-i18n-attr="placeholder:identityTagline.placeholder">
-      </label>
-      <div class="setting__hint" data-i18n="profileEdit.whatThisProfileIsTracking">Short description next to name - e.g. mod, playstyle</div>
-      <div class="actions actions--inline">
-        <button id="identitySave" class="primary" type="button" data-i18n="identitySave">Save</button>
-      </div>
-
-      <div class="identity-images">
-        <div class="identity-image">
-          <div class="identity-image__label" data-i18n="profileEdit.picture">Picture</div>
-          <div class="identity-image__preview identity-image__preview--avatar" id="identityAvatar"></div>
-          <div class="identity-image__actions">
-            <button type="button" data-upload="avatar" data-i18n="profileEdit.upload">Upload&hellip;</button>
-            <button type="button" data-clear="avatar" data-i18n="profileEdit.remove">Remove</button>
-          </div>
-        </div>
-        <div class="identity-image">
-          <div class="identity-image__label" data-i18n="profileEdit.banner">Banner</div>
-          <div class="identity-image__preview identity-image__preview--cover" id="identityCover"></div>
-          <div class="identity-image__actions">
-            <button type="button" data-upload="cover" data-i18n="profileEdit.upload">Upload&hellip;</button>
-            <button type="button" data-clear="cover" data-i18n="profileEdit.remove">Remove</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="identity-found" id="identityFound"></div>
-      <div class="profile-hint" id="identityHint">&nbsp;</div>
-      <div class="share-option profile-danger">
-        <div class="share-option__detail">
-          <b data-i18n="profileEdit.resetThisProfile">Reset this profile</b>
-        </div>
-        <button type="button" class="danger-button" id="profileReset" data-i18n="profileReset">Reset</button>
-      </div>
-    </section>
-
-    <section class="profile-section" id="importSection">
-      <h4 class="identity-heading" id="importHeading" data-i18n="importHeading">Import from osu!</h4>
-      <p class="setting__hint">
-        Copies what you choose from an osu! account's public profile into
-        <b id="importProfileName">this profile</b>, and links the two. Nothing is ever written
-        to osu!.
-      </p>
-
-      <div class="identity-link">
-        <input type="text" id="importQuery" placeholder="username, user id, or profile link" data-i18n-attr="placeholder:importQuery.placeholder">
-        <button type="button" id="importLookup" data-i18n="importLookup">Look up</button>
-      </div>
-      <div class="identity-found" id="importFound"></div>
-
-      <div class="checkgroup import-choices" id="importChoices">
-        <label class="checkgroup__item"><input type="checkbox" data-import="avatar"> Avatar</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="cover"> Banner</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="country"> Flag</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="aboutMe"> me!</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="profileHue"> Colour</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="favorites"> Favorite beatmaps</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="bestPerformances"> Best performances</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="pinnedScores"> Pinned scores</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="firstPlaces"> First place ranks</label>
-        <label class="checkgroup__item"><input type="checkbox" data-import="medals"> Medals</label>
-      </div>
-      <p class="setting__hint" id="importNote"></p>
-      <!-- Here rather than beside the welcome: this section is the welcome's, moved in while it is open. -->
-      <p class="setting__hint" data-i18n-html="importSection.localScoresHint">
-        To import scores from your osu! client, go to <b>Options → Import scores</b>.
-      </p>
-      <p class="setting__hint" data-i18n-html="importSection.oneRequestToOsuPpy">
-        One request to <code>osu.ppy.sh</code> to find the account, one per picture, one per
-        hundred favorites, and a few per game mode for scores, no login and no API key needed.
-      </p>
-
-      <div class="profile-hint" id="importHint">&nbsp;</div>
-      <!-- While an import runs. Closing Profiles leaves it running, and the cover shows it. -->
-      <div class="backfill-progress" id="importProgress" role="status" aria-live="polite" hidden>
-        <div class="backfill-progress__head">
-          <span id="importProgressText"></span>
-          <span class="backfill-progress__percent" id="importProgressPercent"></span>
-        </div>
-        <div class="bar backfill-progress__bar"><div class="bar__fill" id="importProgressFill"></div></div>
-        <div class="setting__hint" data-i18n="backfillModal.keepsRunning">You can close this, the import keeps going.</div>
-      </div>
-      <div class="actions actions--inline">
-        <button id="importGo" class="primary" type="button" data-i18n="importGo">Import</button>
-      </div>
-    </section>
-
-    <section class="profile-section" id="sharedSection">
-      <h4 class="identity-heading" data-i18n="sharedSection.everyProfile">Every profile</h4>
-      <div class="setting">
-        <label class="field">
-          <span data-i18n="sharedSection.keepFavoriteBeatmapsTheSame">Keep Favorite Beatmaps the same on every profile</span>
-          <input type="checkbox" id="sharedFavorites">
-        </label>
-      </div>
-      <!-- Every favourite at once: every profile's while they are shared, this profile's otherwise. -->
-      <div class="share-option profile-danger">
-        <div class="share-option__detail">
-          <b data-i18n="favorites.clearTitle">Remove all favorite beatmaps</b>
-          <div class="setting__hint" id="favoritesClearHint">From every profile.</div>
-        </div>
-        <button type="button" class="danger-button" id="favoritesClear" data-i18n="favorites.clear">Remove all</button>
-      </div>
-    </section>
-
     <div class="actions">
+      <button id="profilesEdit" class="actions__aside primary" type="button" data-i18n="profileEdit.editProfile">Edit profile</button>
       <button id="profilesClose" type="button" data-i18n="profilesClose">Close</button>
     </div>
   </div>
@@ -1307,7 +1352,7 @@
       Import plays from osu! client, including from before this app was installed.
     </p>
     <p class="setting__hint" data-i18n-html="backfillModal.onlineScoresHint">
-      To import scores from your online osu! profile, go to <b>Options → Profiles</b>.
+      To import scores from your online osu! profile, go to <b>Settings → Profile</b>.
     </p>
 
     <div class="presets" id="backfillPresets">
@@ -1543,7 +1588,7 @@
         <div class="manual-grid" id="ppCalcModSettings"></div>
         <div class="manual-counts" id="ppCalcCounts"></div>
         <!-- A calculator that can't count a perfect play: a source build by an earlier version of the app. -->
-        <p class="setting__hint" id="ppCalcRebuild" data-i18n="ppCalc.rebuildSource" hidden>Rebuild your osu! source in Other settings to fill in the judgements and use accuracy.</p>
+        <p class="setting__hint" id="ppCalcRebuild" data-i18n="ppCalc.rebuildSource" hidden>Rebuild your osu! source in Settings to fill in the judgements and use accuracy.</p>
         <!-- Typed, or dragged: a slider prices the play again as it moves. -->
         <div class="pp-calc__totals">
           <div class="field">
@@ -1618,7 +1663,7 @@
       aside until the new version is in place, so an update that is interrupted can be
       undone rather than leaving a half-installed app.
     </p>
-    <p class="update-auto" id="updateAuto" data-i18n="updateModal.autoHint">To have new versions installed by themselves, turn on Options → Auto-update.</p>
+    <p class="update-auto" id="updateAuto" data-i18n="updateModal.autoHint">To have new versions installed by themselves, turn on Settings → System → Auto-update.</p>
     <!-- While it downloads. Closing the dialog leaves it downloading, and the cover shows it. -->
     <div class="backfill-progress" id="updateProgress" role="status" aria-live="polite" hidden>
       <div class="backfill-progress__head">

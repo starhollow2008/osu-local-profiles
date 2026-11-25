@@ -111,7 +111,7 @@ takes from about 15 minutes (taiko) to the better part of an hour (osu!) per mod
 ## Recalculating
 
 Replays on disk are the source of truth, so any calculation fix can be applied to old scores:
-Options -> Other settings -> Recalculate every score, with the app running, reprices every score
+Options -> Settings -> Calculator -> Recalculate every score, with the app running, reprices every score
 from its replay and keeps its row.
 
 The app can also re-ingest replays from scratch, as tracking would but with no play tracking

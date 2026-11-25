@@ -81,10 +81,10 @@ function countingNoteRest(counting) {
   // does not put "and" between two nouns the way English does still reads correctly.
   let text = t('note.countsUnranked', { what: included.join(t('note.and')) });
   // On by default for a new profile (roadmap 5.59), so say so and where to turn it off -- by
-  // the names the menu and the dialog go by in this language.
+  // the names the menu, the dialog and its page go by in this language.
   text += ` ${t('note.turnOff', {
     options: t('optionsBtn').replace('▾', '').trim(),
-    settings: t('optSettings'),
+    settings: `${t('optSettings')} → ${t('settingsPage.scores')}`,
   })}`;
   // The * on a score priced as if the mod were off needs saying; osu!'s own pricing does not.
   if (counting.includeUnrankedMods && counting.preferStrippedPp) text += ` ${t('note.strippedPp')}`;
@@ -215,7 +215,7 @@ export function playMenuButton(play) {
 }
 
 /**
- * How Other settings asks score rows to look, as `playRow` options: the star rating as text or
+ * How Settings asks score rows to look, as `playRow` options: the star rating as text or
  * as osu!'s badge, the judgements, and the beatmap's background. All off unless asked for.
  */
 export function rowLooks(config) {
@@ -263,13 +263,13 @@ export function playRow(play, {
 
   const pp = ppCell(play);
 
-  // Other settings -> Star rating on scores. osu! shows none here, so off by default; as text
+  // Settings -> Star rating on scores. osu! shows none here, so off by default; as text
   // after the difficulty's name, or as osu!'s badge before it.
   const shown = starRating && play.stars != null;
   const stars = shown && !starBadge ? ` &middot; ${fmt(play.stars, 2)}&#9733;` : '';
   const badge = shown && starBadge ? difficultyBadge(play.stars) : '';
 
-  // Other settings -> Show beatmap backgrounds on scores: the set's cover behind the row.
+  // Settings -> Show beatmap backgrounds on scores: the set's cover behind the row.
   const cover = background && onlineId(play.beatmapsetId) ? coverUrl(play.beatmapsetId, 'cover') : null;
 
   /*
@@ -403,7 +403,7 @@ export function showMore(section, returned, requested, total, all = false) {
   const complete = returned < requested || (Number.isFinite(total) && total <= returned);
   if (complete) return '';
 
-  // "show all" when a press shows the whole list (Other settings -> Show more -> All at once).
+  // "show all" when a press shows the whole list (Settings -> Show more -> All at once).
   return `<button class="show-more-link" type="button" data-show-more="${escapeHtml(section)}">
   ${CHEVRON}
   <span class="show-more-link__text">${escapeHtml(all ? t('section.showAll') : t('section.showMore'))}</span>

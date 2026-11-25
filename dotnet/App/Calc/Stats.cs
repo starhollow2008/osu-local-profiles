@@ -191,7 +191,7 @@ internal static partial class Stats
             // Which mods an acronym stands for can depend on it: MC is McOsu's or Ritsu's.
             Client = client,
             Mode = r["mode"],
-            // A row shows its judgements when the profile asks (Other settings).
+            // A row shows its judgements when the profile asks (Settings).
             Statistics = Scores.ParseStatistics(r.Str("statistics_json")) ?? Scores.LegacyStatistics(r["mode"], r),
             Accuracy = r["accuracy"],
             MaxCombo = r["max_combo"],

@@ -62,7 +62,7 @@ affiliated with or endorsed by ppy.
 The **Torus** and **Venera** typefaces osu! uses are commercial (Paulo Goode / Monotype), licensed
 by MyFonts to osu!'s website alone, and are **not bundled**. They're named first in the page's
 font stack, so a machine that already has them uses them; others use Nunito, which ships with the
-app, or the system's own font when Other settings -> Font says so.
+app, or the system's own font when Settings -> Appearance -> Font says so.
 
 ## Code first released under the MIT licence
 

@@ -103,7 +103,7 @@ config.RememberDiscovery(discovery, paths.DataDir);
 if (installs.Count == 0)
 {
     Console.WriteLine("\n  No osu! installation found.");
-    Console.WriteLine("  The page opens anyway: use Options -> osu! folders to point at it.");
+    Console.WriteLine("  The page opens anyway: use Options -> Settings -> Tracking -> osu! folders to point at it.");
     /*
      * "osu! is not where I looked" and "the pp calculator will not load" are separate faults, so
      * --check-only reports both from one run, which also lets CI, where there is never an osu!
@@ -122,7 +122,7 @@ foreach (var install in installs)
     Console.WriteLine($"  found {kind,-6} {install.Root}{(install.OnlineDb is null ? "" : "  (+ online.db)")}");
 }
 var extra = discovery.Candidates.Count - installs.Count;
-if (extra > 0) Console.WriteLine($"  ({extra} other osu! folder(s) found -- Options -> osu! folders to switch)");
+if (extra > 0) Console.WriteLine($"  ({extra} other osu! folder(s) found -- Options -> Settings -> Tracking -> osu! folders to switch)");
 
 /*
  * A backup restored from the page is swapped in here, before anything opens the database it

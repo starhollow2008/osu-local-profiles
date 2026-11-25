@@ -20,7 +20,7 @@ On Linux, a desktop with no tray (GNOME without the AppIndicator extension) gets
 app still runs; start it again to open the page. With no desktop, `./start.sh` runs it in the
 terminal.
 
-**Options -> Launch on startup** starts the app in the tray when you sign in to your computer,
+**Options -> Launch on startup** (also in **Settings -> System**) starts the app in the tray when you sign in to your computer,
 without opening the page; open it from the icon when you want it. It's off by default, and kept by
 your system (Windows' startup apps, a macOS login agent, a Linux autostart entry), so turning it off
 in Task Manager shows in the menu too. If you move the app's folder, turn it on again from the new
@@ -60,7 +60,7 @@ whether osu! was found and whether the pp calculator starts. If osu! isn't found
 `~/.wine` prefixes, CrossOver bottles and osu-winello are all checked. Anything else needs
 `installRoots`.
 
-**Options -> osu! folders** shows what was found and lets you add a folder by hand. If no osu!
+**Options -> Settings -> Tracking -> osu! folders** shows what was found and lets you add a folder by hand. If no osu!
 install is found, the page still opens so you can point at one.
 
 **osu!'s development client** (a Debug build of [ppy/osu](https://github.com/ppy/osu) run from
@@ -89,7 +89,7 @@ name in the log, so this works without lazer's online beatmap database.
 
 These count by default toward the play count, monthly play counts, Most Played, Recent Plays (as
 **Not submitted**) and Total Play Time. osu! never received them, so counting them doesn't
-contradict your osu! profile. To match your osu! profile exactly, turn off **Other settings ->
+contradict your osu! profile. To match your osu! profile exactly, turn off **Settings -> Tracking ->
 Count plays osu! could not submit**; they're still recorded, so turning it back on loses nothing.
 The log can't say whether osu! would have counted an attempt (it ignores a play with no hits), so
 an attempt quit before hitting anything counts here.
@@ -143,7 +143,7 @@ in its own folder since neki 1.2.0. It's found wherever it was installed
 
 [neomod](https://github.com/neomodnet/neomod) is a folder you unzip anywhere. On Windows it's found
 wherever you've run it from, the next time the app starts. Otherwise add the folder with
-`neomod.exe` in it under **Options -> osu! folders**. Its plays are tracked as
+`neomod.exe` in it under **Options -> Settings -> Tracking -> osu! folders**. Its plays are tracked as
 **neomod**. Only the Windows x64 build has been looked at.
 
 - **Plays are scored as osu!stable scores them**, with the Classic mod.
@@ -190,15 +190,16 @@ Hover a section and use the arrows in its top right corner, or drag it by the gr
 saved with the profile. A new profile starts as osu!'s does: me!, Recent, Scores, Historical, then
 Recent Plays, Beatmaps and Medals. A profile from before 1.31.0 keeps the order it had. The arrows also work from the keyboard and on a touchscreen.
 
-To hide a section, untick it under **Options -> Other settings -> Profile sections**. It disappears
+To hide a section, untick it under **Options -> Settings -> Appearance -> Profile sections**. It disappears
 from the page, its tab and saved web pages, and comes back where it was when ticked again.
 
 ## Profiles
 
 **Options -> Profiles** manages several playstyles side by side ("left hand", "mouse only"), each
 with its own scores, pp, level and start date. Only the selected one records plays. A new profile
-starts empty and tracks from the moment you create it. The same dialog edits and resets the current
-profile, imports from an osu! account, and has **Keep Favorite Beatmaps the same on every profile**.
+starts empty and tracks from the moment you create it. **Options -> Settings -> Profile** (or a
+click on the avatar or the name) edits and resets the current profile, imports from an osu!
+account, and has **Keep Favorite Beatmaps the same on every profile**.
 
 Deleting a profile deletes its scores and asks for confirmation. The last profile can't be deleted;
 use **Reset this profile** at the end of Edit profile instead.
@@ -311,7 +312,7 @@ Every score row has a **⋯** menu.
 - **Remove from profile** takes the score out of every section and every total: pp, play count,
   ranked score, level, the charts and Most Played.
 
-Removing never deletes anything. Removed scores can be put back from **Options -> Other settings ->
+Removing never deletes anything. Removed scores can be put back from **Options -> Settings ->
 Removed scores**. (If the row were deleted, the replay still in osu!'s folder would be imported again
 next time, as a new play.)
 
@@ -410,9 +411,9 @@ While a preview plays, osu!'s audio bar appears in the bottom right corner: prev
 play/pause, seeking, volume, and autoplay of the next favourite. Your browser remembers the volume,
 mute and autoplay.
 
-**Every profile shares one list** by default. Turn that off under **Options -> Profiles -> Every
-profile** and each profile keeps its own copy; turning it back on merges them. You can **Import**
-any account's favorites from **Options -> Profiles**.
+**Every profile shares one list** by default. Turn that off under **Options -> Settings -> Profile
+-> Every profile** and each profile keeps its own copy; turning it back on merges them. You can
+**Import** any account's favorites from **Options -> Settings -> Profile**.
 
 Favorites are never sent to osu!. Favouriting makes one request to `osu.ppy.sh` for the beatmap's
 details, which are kept so the card works offline. With no connection the favourite is still saved,
@@ -420,7 +421,7 @@ and the card shows what your machine knows until it can be filled in.
 
 ## Play tracking filter
 
-**Options -> Play tracking filter** decides which plays this profile records at all.
+**Options -> Play tracking filter** (also in **Settings -> Tracking**) decides which plays this profile records at all.
 
 It's **off by default**, and switching it on changes nothing by itself, since every criterion starts
 wide open. There are eleven:
@@ -523,7 +524,7 @@ count.
 
 ### Plays not tracked
 
-**Options -> Other settings -> Plays not tracked** lists every play this profile turned away and
+**Options -> Settings -> Plays not tracked** lists every play this profile turned away and
 why: declined by the filter (naming the criterion), set by another player, or a replay that couldn't
 be read. Each shows who set it and whether it was turned away while tracking, by Import scores,
 or by the import at launch. It's the first place to look when a play never appeared.
@@ -583,11 +584,15 @@ A score you typed in is marked **Manually entered by hand** on every row, card a
 Scores from osu! (by link, or with an account's best performances) carry no mark. None of these can
 be downloaded as a replay. Any score osu! has gets **View osu! score link** in its ⋯ menu.
 
-## Other settings
+## Settings
 
-Everything in **Options -> Other settings** belongs to the current profile, except the settings under
-*This install* (**Open in browser on start**, **Show beatmap metadata in original language** and
-**Font**), which are saved to `data/config.json`.
+**Options -> Settings** has a page per topic: **Profile**, **Scores & pp**, **Appearance**,
+**Tracking**, **Calculator**, **Removed scores**, **Plays not tracked**, **Share & export** and
+**System**. A change applies as soon as you make it. A setting marked **This profile** belongs to
+the current profile; the rest are saved to `data/config.json` for every profile.
+
+The settings below are on **Scores & pp**, except **Unfinished plays in Recent Plays** and
+**Show more** (**Appearance**) and **Count plays osu! could not submit** (**Tracking**).
 
 ### Include pp for unranked mods
 
@@ -693,20 +698,21 @@ needs git and the .NET 10 SDK.
 |---|---|---|
 | `profileName` | `Local Profile` | name of the *first* profile only; after that, manage profiles from the page |
 | `port` | `7272` | local web server port |
-| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Other settings -> Open in browser on start** |
+| `openBrowser` | `true` | open the page in your default browser on start -- also **Options -> Settings -> System -> Open in browser on start** |
 | `checkForUpdates` | `true` | ask GitHub at startup and once a day while running whether a newer release exists |
 | `installRoots` | `[]` | explicit osu! paths if auto-detection fails |
 | `country` | `""` | two-letter ISO code shown beside the profile name, as osu! shows one |
 | `tagline` | `""` | what to call the playstyle, e.g. `left hand, mouse only` |
 | `language` | `""` | the page's language, as one of osu!'s own codes (`de`, `pt-br`, `zh-tw`). Empty means never chosen, which is what lets the first launch ask |
-| `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Other settings** |
-| `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Other settings -> Font** |
-| `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Auto-update** |
+| `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Settings** |
+| `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Settings -> Appearance -> Font** |
+| `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Settings -> System -> Auto-update** |
 | `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
 
 ## Sharing and backing up
 
-**Options -> Share & back up.**
+**Options -> Settings -> Share & export** saves the page and exports scores. Backing up and
+restoring are in **Options -> Settings -> System**.
 
 - **Save as a web page** saves the page as one `.html` file that works like it: show more, the mode
   tabs, View Details, medals, charts and previews all respond. It opens anywhere with no app. Nothing
@@ -762,7 +768,7 @@ one:
 - After an update, the first start shows what it brought, once.
 - An update waiting two weeks, or one marked important, is also mentioned at the foot of the page.
 
-**Options -> Auto-update** downloads new versions in the background and installs them when you quit
+**Options -> Settings -> System -> Auto-update** downloads new versions in the background and installs them when you quit
 or next start, never mid-session. It's off until you turn it on, and never downloads on a
 connection Windows or Linux reports as metered (macOS isn't asked).
 
