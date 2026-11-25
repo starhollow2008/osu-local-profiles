@@ -605,12 +605,12 @@ check(
   await evaluate("document.querySelectorAll('#filterBody .tfilter-section').length"),
   9,
 );
-// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod
-// and McOsu's MC.
+// Every mod in all four rulesets, less Autoplay, Cinema and ScoreV2, plus this app's own nomod,
+// McOsu's MC, neomod's NEO, and Torii's and Ritsu's 16 (their Miss Challenge shares MC's chip).
 check(
   'every mod in the game has a chip',
   await evaluate("document.querySelectorAll('#tf-mods .mod-chip').length"),
-  68,
+  85,
 );
 check(
   "McOsu's own mods are one chip, among the Fun mods",
