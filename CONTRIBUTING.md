@@ -65,8 +65,28 @@ shows in English.
 
 ## README
 
-Please don't edit `README.md` in a pull request. If your change should be mentioned there, suggest
-the text in the pull request's description.
+Please don't edit `README.md` in a pull request unless a maintainer has requested a README change.
+If your change should be mentioned there, suggest the text in the pull request's description.
+
+### README diagrams
+
+GitHub renders [Mermaid](https://mermaid.js.org/) diagrams directly in Markdown. Use Mermaid
+instead of ASCII-art diagrams when showing a workflow, decision tree or interaction.
+
+- Use a fenced code block with the `mermaid` language identifier.
+- Prefer `flowchart TD` for pipelines and decision flows; use `flowchart LR` only when the
+  diagram is short enough to remain readable on narrow screens.
+- Use `sequenceDiagram` when the important detail is which component sends a message to another.
+- Give nodes short, descriptive labels. Put implementation details and long explanations in the
+  surrounding README text rather than cramming them into nodes.
+- Label decision branches (for example, `Yes` and `No`) and make offline/online boundaries
+  explicit when they matter.
+- Keep diagrams consistent with the implementation. Update them when the corresponding code path
+  changes; remove obsolete nodes rather than leaving stale architecture behind.
+- Keep each diagram focused on one workflow. Split unrelated flows into separate diagrams with a
+  short heading and introductory sentence.
+- Preview Mermaid rendering on GitHub before merging. Keep a plain-text explanation nearby so
+  the README remains understandable when diagrams cannot be rendered.
 
 ## Licence and third-party material
 
