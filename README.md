@@ -135,14 +135,14 @@ flowchart TB
 
     E --> F{"Replay header?"}
     F -->|No| G["Ignore file"]
-    F -->|Yes| H["Replay accepted"]
+    F -->|Yes| H["Parse replay"]
 ```
 
 After a replay passes the header check, the app processes it:
 
 ```mermaid
 flowchart TB
-    A["Parse replay"] --> B["Read mods, hits, combo, score, time"]
+    A["Read mods, hits, combo, score, time"]
     B --> C["Match beatmap"]
     C --> D["Resolve ID and ranked status offline"]
     D --> E["Find local beatmap file"]
