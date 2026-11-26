@@ -138,8 +138,7 @@ After a replay passes the header check, the app processes it:
 
 ```mermaid
 flowchart LR
-    A["Read mods, hits, combo, score, time"] --> B["Match beatmap"]
-    B --> C["Resolve beatmap"]
+    A["Read mods, hits, combo, score, time"] --> C["Match beatmap"]
     C --> D["Resolve ID and ranked status offline"]
     D --> E["Find local beatmap file"]
     E --> F["Calculate difficulty and pp offline"]
