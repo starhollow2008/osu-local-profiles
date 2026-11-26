@@ -133,23 +133,22 @@ flowchart TB
         D --> E
     end
 
-    subgraph R["After header check"]
-        direction TB
-        F{"Replay header?"}
-        F -->|No| G["Ignore file"]
-        F -->|Yes| H["Parse replay"]
-        H --> I["Read mods, hits, combo, score, time"]
-        I --> J["Match beatmap"]
-        J --> K["Resolve ID and ranked status offline"]
-        K --> L["Find local beatmap file"]
-        L --> M["Calculate difficulty and pp offline"]
-        M --> N["Calculate pp"]
-        N --> O["Store play"]
-        O --> P["Recompute profile"]
-        P --> Q(["Live update"])
-    end
+    E --> F{"Replay header?"}
+    F -->|No| G["Ignore file"]
+    F -->|Yes| H["Parse replay"]
 
-    E --> F
+    %% Keep both header-check outcomes on the same horizontal row.
+    G ~~~ H
+
+    H --> I["Read mods, hits, combo, score, time"]
+    I --> J["Match beatmap"]
+    J --> K["Resolve ID and ranked status offline"]
+    K --> L["Find local beatmap file"]
+    L --> M["Calculate difficulty and pp offline"]
+    M --> N["Calculate pp"]
+    N --> O["Store play"]
+    O --> P["Recompute profile"]
+    P --> Q(["Live update"])
 ```
 
 Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
