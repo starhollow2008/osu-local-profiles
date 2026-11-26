@@ -74,8 +74,9 @@ GitHub renders [Mermaid](https://mermaid.js.org/) diagrams directly in Markdown.
 instead of ASCII-art diagrams when showing a workflow, decision tree or interaction.
 
 - Use a fenced code block with the `mermaid` language identifier.
-- Prefer `flowchart TD` for pipelines and decision flows; use `flowchart LR` only when the
-  diagram is short enough to remain readable on narrow screens.
+- Prefer `flowchart LR` so workflows read horizontally and fit typical README viewing layouts.
+  Keep labels concise and split a very large workflow into focused diagrams rather than making
+  readers scroll through a tall or excessively wide chart.
 - Use `sequenceDiagram` when the important detail is which component sends a message to another.
 - Give nodes short, descriptive labels. Put implementation details and long explanations in the
   surrounding README text rather than cramming them into nodes.
