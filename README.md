@@ -135,20 +135,22 @@ flowchart TB
 
     E --> F{"Replay header?"}
     F -->|No| G["Ignore file"]
-    F -->|Yes| H["Parse replay"]
+    F -->|Yes| H["Replay accepted"]
+```
 
-    %% Keep both header-check outcomes on the same horizontal row.
-    G ~~~ H
+After a replay passes the header check, the app processes it:
 
-    H --> I["Read mods, hits, combo, score, time"]
-    I --> J["Match beatmap"]
-    J --> K["Resolve ID and ranked status offline"]
-    K --> L["Find local beatmap file"]
-    L --> M["Calculate difficulty and pp offline"]
-    M --> N["Calculate pp"]
-    N --> O["Store play"]
-    O --> P["Recompute profile"]
-    P --> Q(["Live update"])
+```mermaid
+flowchart TB
+    A["Parse replay"] --> B["Read mods, hits, combo, score, time"]
+    B --> C["Match beatmap"]
+    C --> D["Resolve ID and ranked status offline"]
+    D --> E["Find local beatmap file"]
+    E --> F["Calculate difficulty and pp offline"]
+    F --> G["Calculate pp"]
+    G --> H["Store play"]
+    H --> I["Recompute profile"]
+    I --> J(["Live update"])
 ```
 
 Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
