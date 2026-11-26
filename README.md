@@ -130,17 +130,21 @@ flowchart LR
     C --> E["Watch folders recursively"]
     D --> E
     E --> F{"Replay header?"}
-    F -->|No| G["Ignore file"]
-    F -->|Yes| H["Parse replay"]
-    H --> I["Read mods, hits, combo, score, time"]
-    I --> J["Match beatmap"]
-    J --> K["Resolve ID and ranked status offline"]
-    K --> L["Find local beatmap file"]
-    L --> M["Calculate difficulty and pp offline"]
-    M --> N["Calculate pp"]
-    N --> O["Store play"]
-    O --> P["Recompute profile"]
-    P --> Q(["Live update"])
+    subgraph R["After header check"]
+        direction TB
+        G["Ignore file"]
+        H["Parse replay"] --> I["Read mods, hits, combo, score, time"]
+        I --> J["Match beatmap"]
+        J --> K["Resolve ID and ranked status offline"]
+        K --> L["Find local beatmap file"]
+        L --> M["Calculate difficulty and pp offline"]
+        M --> N["Calculate pp"]
+        N --> O["Store play"]
+        O --> P["Recompute profile"]
+        P --> Q(["Live update"])
+    end
+    F -->|No| G
+    F -->|Yes| H
 ```
 
 Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
