@@ -123,16 +123,12 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 App watches for a new `.osr` replay file:
 
 ```mermaid
-flowchart TB
-    subgraph W["Replay detection"]
-        direction LR
-        A["Replay detected"] --> B["Source"]
-        B --> C["lazer replay folder"]
-        B --> D["stable replay folder"]
-        C --> E["Watch folders recursively"]
-        D --> E
-    end
-
+flowchart LR
+    A["Replay detected"] --> B["Source"]
+    B --> C["lazer replay folder"]
+    B --> D["stable replay folder"]
+    C --> E["Watch folders recursively"]
+    D --> E
     E --> F{"Replay header?"}
     F -->|No| G["Ignore file"]
     F -->|Yes| H["Parse replay"]
@@ -141,9 +137,9 @@ flowchart TB
 After a replay passes the header check, the app processes it:
 
 ```mermaid
-flowchart TB
-    A["Read mods, hits, combo, score, time"]
-    B --> C["Match beatmap"]
+flowchart LR
+    A["Read mods, hits, combo, score, time"] --> B["Match beatmap"]
+    B --> C["Resolve beatmap"]
     C --> D["Resolve ID and ranked status offline"]
     D --> E["Find local beatmap file"]
     E --> F["Calculate difficulty and pp offline"]
