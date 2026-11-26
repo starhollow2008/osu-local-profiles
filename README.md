@@ -122,19 +122,25 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 
 App watches for a new `.osr` replay file:
 
-```
-  lazer:  %APPDATA%/osu/files/**        ─┐
-  stable: <osu!>/Data/r/*.osr           ─┴─→ new file detected (recursive fs.watch)
-                                                     │
-                            first bytes look like a replay?
-                                                     ▼
-                   parse .osr  →  mods, hits, combo, score, timestamp
-                                                     ▼
-                  beatmap MD5  →  beatmap id + ranked status   (offline)
-                                                     ▼
-         local .osu  →  osu!'s own difficulty/pp calculator  →  pp   (offline)
-                                                     ▼
-                          store → recompute profile → live update
+```mermaid
+flowchart TD
+    A["Replay file detected"] --> B["Source"]
+    B --> C["lazer: `%APPDATA%/osu/files/**`"]
+    B --> D["stable: `<osu!>/Data/r/*.osr`"]
+    C --> E["Recursive `fs.watch`"]
+    D --> E
+    E --> F{"Do the first bytes look like a replay?"}
+    F -->|No| G["Ignore file"]
+    F -->|Yes| H["Parse `.osr`"]
+    H --> I["Extract mods, hits, combo, score and timestamp"]
+    I --> J["Match beatmap MD5"]
+    J --> K["Resolve beatmap ID and ranked status<br/>(offline)"]
+    K --> L["Find local `.osu` file"]
+    L --> M["Run osu!'s difficulty / pp calculator<br/>(offline)"]
+    M --> N["Calculate pp"]
+    N --> O["Store play"]
+    O --> P["Recompute profile"]
+    P --> Q(["Live update"])
 ```
 
 Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
@@ -143,15 +149,14 @@ Stable's `Songs` folder is watched to detect beatmaps downloaded while the app i
 
 App reads from lazer's session log to track incomplete plays:
 
-```
-  lazer:  %APPDATA%/osu/logs/<session>.runtime.log  ──→ osu! accepted a submission
-                             <session>.network.log  ──→ ...for this beatmap
-                                        │
-                    did it reach a results screen?  ──yes──→ it is a pass; its replay
-                                        │                    is already being tracked
-                                        no
-                                        ▼
-                   an unfinished play: counted, with no score attached
+```mermaid
+flowchart TD
+    A["lazer session logs"] --> B["`.runtime.log`<br/>osu! accepted a submission"]
+    A --> C["`.network.log`<br/>submission is for this beatmap"]
+    B --> D{"Did the play reach a results screen?"}
+    C --> D
+    D -->|Yes| E["Passed play<br/>Replay is tracked by the completed-play flow"]
+    D -->|No| F["Unfinished play<br/>Count it without an attached score"]
 ```
 
 ## Limitations
