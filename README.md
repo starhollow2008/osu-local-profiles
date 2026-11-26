@@ -126,7 +126,7 @@ App watches for a new `.osr` replay file:
 flowchart TD
     A["Replay file detected"] --> B["Source"]
     B --> C["lazer: `%APPDATA%/osu/files/**`"]
-    B --> D["stable: `<osu!>/Data/r/*.osr`"]
+    B --> D["stable: &lt;osu!&gt;/Data/r/*.osr"]
     C --> E["Recursive `fs.watch`"]
     D --> E
     E --> F{"Do the first bytes look like a replay?"}
