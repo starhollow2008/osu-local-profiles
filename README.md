@@ -123,20 +123,20 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 App watches for a new `.osr` replay file:
 
 ```mermaid
-flowchart TD
-    A["Replay file detected"] --> B["Source"]
-    B --> C["lazer: `%APPDATA%/osu/files/**`"]
-    B --> D["stable: &lt;osu!&gt;/Data/r/*.osr"]
-    C --> E["Recursive `fs.watch`"]
+flowchart LR
+    A["Replay detected"] --> B["Source"]
+    B --> C["lazer replay folder"]
+    B --> D["stable replay folder"]
+    C --> E["Watch folders recursively"]
     D --> E
-    E --> F{"Do the first bytes look like a replay?"}
+    E --> F{"Replay header?"}
     F -->|No| G["Ignore file"]
-    F -->|Yes| H["Parse `.osr`"]
-    H --> I["Extract mods, hits, combo, score and timestamp"]
-    I --> J["Match beatmap MD5"]
-    J --> K["Resolve beatmap ID and ranked status<br/>(offline)"]
-    K --> L["Find local `.osu` file"]
-    L --> M["Run osu!'s difficulty / pp calculator<br/>(offline)"]
+    F -->|Yes| H["Parse replay"]
+    H --> I["Read mods, hits, combo, score, time"]
+    I --> J["Match beatmap"]
+    J --> K["Resolve ID and ranked status offline"]
+    K --> L["Find local beatmap file"]
+    L --> M["Calculate difficulty and pp offline"]
     M --> N["Calculate pp"]
     N --> O["Store play"]
     O --> P["Recompute profile"]
@@ -150,13 +150,13 @@ Stable's `Songs` folder is watched to detect beatmaps downloaded while the app i
 App reads from lazer's session log to track incomplete plays:
 
 ```mermaid
-flowchart TD
-    A["lazer session logs"] --> B["`.runtime.log`<br/>osu! accepted a submission"]
-    A --> C["`.network.log`<br/>submission is for this beatmap"]
-    B --> D{"Did the play reach a results screen?"}
+flowchart LR
+    A["lazer session logs"] --> B["runtime log: submission accepted"]
+    A --> C["network log: beatmap match"]
+    B --> D{"Results screen reached?"}
     C --> D
-    D -->|Yes| E["Passed play<br/>Replay is tracked by the completed-play flow"]
-    D -->|No| F["Unfinished play<br/>Count it without an attached score"]
+    D -->|Yes| E["Passed: completed-play flow tracks replay"]
+    D -->|No| F["Unfinished: count without a score"]
 ```
 
 ## Limitations
