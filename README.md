@@ -105,7 +105,7 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 | Microsoft.Data.Sqlite              | profiles database              |
 | Vanilla DOM, ES modules and CSS    | profile page                   |
 | Official `ppy.osu.Game.Rulesets.*` | official pp calculator         |
-| Go + `fyne.io/systray`             | tray and menu bar launcher     |
+| Go + `fyne.io/systray`              | tray and menu bar launcher     |
 | GitHub Actions                     | CI and cross-platform releases |
 
 ## Online fetches (optional)
@@ -123,17 +123,22 @@ Go is only needed to build the tray launcher. Node.js 24 runs the packaging scri
 App watches for a new `.osr` replay file:
 
 ```mermaid
-flowchart LR
-    A["Replay detected"] --> B["Source"]
-    B --> C["lazer replay folder"]
-    B --> D["stable replay folder"]
-    C --> E["Watch folders recursively"]
-    D --> E
-    E --> F{"Replay header?"}
+flowchart TB
+    subgraph W["Replay detection"]
+        direction LR
+        A["Replay detected"] --> B["Source"]
+        B --> C["lazer replay folder"]
+        B --> D["stable replay folder"]
+        C --> E["Watch folders recursively"]
+        D --> E
+    end
+
     subgraph R["After header check"]
         direction TB
-        G["Ignore file"]
-        H["Parse replay"] --> I["Read mods, hits, combo, score, time"]
+        F{"Replay header?"}
+        F -->|No| G["Ignore file"]
+        F -->|Yes| H["Parse replay"]
+        H --> I["Read mods, hits, combo, score, time"]
         I --> J["Match beatmap"]
         J --> K["Resolve ID and ranked status offline"]
         K --> L["Find local beatmap file"]
@@ -143,8 +148,8 @@ flowchart LR
         O --> P["Recompute profile"]
         P --> Q(["Live update"])
     end
-    F -->|No| G
-    F -->|Yes| H
+
+    E --> F
 ```
 
 Stable's `Songs` folder is watched to detect beatmaps downloaded while the app is running
