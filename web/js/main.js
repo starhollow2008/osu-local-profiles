@@ -94,8 +94,11 @@ import { closeManual, openManual, setManualMods } from './manual-entry.js';
 import { syncPlayers } from './audio-player.js';
 import {
   activityList,
+  applyCoverLook,
   beatmapPlaycountList,
   countingNoteText,
+  coverLook,
+  MAX_COVER_BLUR,
   playList,
   reconcileSectionOrder,
   rowLooks,
@@ -1134,6 +1137,7 @@ async function loadState() {
 
   app = s.app ?? app;
   setPpDecimals(app.config?.ppDecimals);
+  applyCoverLook(coverLook(app.config));
   // The app's own answer, which outranks what this browser remembered. Not awaited: the
   // rest of this render is in the language already on screen, and a change re-runs it.
   void applyConfigLanguage();
@@ -3498,6 +3502,8 @@ function fillInstallSettings() {
   $('starRatingSetting').value = app.config?.starRating !== true ? 'off' : app.config?.starRatingBadge === true ? 'badge' : 'text';
   $('judgementsSetting').checked = app.config?.judgements === true;
   $('scoreBackgroundsSetting').checked = app.config?.scoreBackgrounds === true;
+  $('scoreThumbnailsSetting').checked = app.config?.scoreThumbnails === true;
+  fillCoverLook(coverLook(app.config));
   $('otherClientModsSetting').checked = app.config?.otherClientMods === true;
   $('rankTiersSetting').checked = app.config?.rankTiers !== false;
   $('lowerGradesSetting').value = ['off', 'always'].includes(app.config?.lowerGrades) ? app.config.lowerGrades : 'hover';
@@ -3660,7 +3666,7 @@ $('starRatingSetting').onchange = () => {
 };
 
 // How score rows and the profile look (issues #30, #31 and #37), and other clients' mods where mods are picked.
-for (const key of ['judgements', 'scoreBackgrounds', 'otherClientMods', 'rankTiers']) {
+for (const key of ['judgements', 'scoreBackgrounds', 'scoreThumbnails', 'otherClientMods', 'rankTiers']) {
   $(`${key}Setting`).onchange = () => void saveInstallSetting({ [key]: $(`${key}Setting`).checked });
 }
 $('lowerGradesSetting').onchange = () => void saveInstallSetting({ lowerGrades: $('lowerGradesSetting').value });
@@ -3676,6 +3682,72 @@ $('ppDecimalsSetting').onchange = () => {
   setPpDecimals(box.valueAsNumber);
   void saveInstallSetting({ ppDecimals: box.valueAsNumber });
 };
+
+/*
+ * A score row's background (issue #45): its dim and blur, each a slider with its number beside
+ * it, shown only while the backgrounds are on. Rows follow the slider as it moves; the value is
+ * saved when it is let go or typed. Nothing is redrawn: the rows read both as variables.
+ */
+const COVER_CONTROLS = {
+  dim: { slider: 'scoreBackgroundDimSlider', box: 'scoreBackgroundDimSetting', key: 'scoreBackgroundDim' },
+  blur: { slider: 'scoreBackgroundBlurSlider', box: 'scoreBackgroundBlurSetting', key: 'scoreBackgroundBlur' },
+};
+
+/** The controls as `look` has them, and the dim and blur shown only with the backgrounds on. */
+function fillCoverLook(look) {
+  for (const [name, c] of Object.entries(COVER_CONTROLS)) {
+    $(c.slider).value = String(look[name]);
+    $(c.box).value = String(look[name]);
+    setSliderFill($(c.slider));
+  }
+  $('scoreBackgroundOptions').hidden = !$('scoreBackgroundsSetting').checked;
+}
+
+/** The track filled up to the thumb, as the pp calculator's sliders are. */
+function setSliderFill(slider) {
+  const span = Number(slider.max) - Number(slider.min);
+  slider.style.setProperty('--fill', `${span > 0 ? ((Number(slider.value) - Number(slider.min)) / span) * 100 : 0}%`);
+}
+
+/** What the controls say now, as a look; null when a box holds no number in range. */
+function coverLookShown() {
+  const look = {};
+  for (const [name, c] of Object.entries(COVER_CONTROLS)) {
+    if (!$(c.box).checkValidity()) return null;
+    look[name] = $(c.box).valueAsNumber;
+  }
+  return look;
+}
+
+for (const [name, c] of Object.entries(COVER_CONTROLS)) {
+  $(c.slider).oninput = () => {
+    $(c.box).value = $(c.slider).value;
+    setSliderFill($(c.slider));
+    const look = coverLookShown();
+    if (look) applyCoverLook(look);
+  };
+  // Arrow keys change a slider a step at a time: only the step it stops on is saved.
+  let saving = 0;
+  $(c.slider).onchange = () => {
+    clearTimeout(saving);
+    saving = setTimeout(() => void saveInstallSetting({ [c.key]: Number($(c.slider).value) }, { redraw: false }), 300);
+  };
+  $(c.box).onchange = () => {
+    const look = coverLookShown();
+    if (!look) {
+      settingsHint(name === 'dim' ? t('installSettings.scoreBackgroundDimInvalid') : t('installSettings.scoreBackgroundBlurInvalid', { max: fmt(MAX_COVER_BLUR) }), true);
+      return;
+    }
+    $(c.slider).value = String(look[name]);
+    setSliderFill($(c.slider));
+    applyCoverLook(look);
+    void saveInstallSetting({ [c.key]: look[name] }, { redraw: false });
+  };
+}
+
+$('scoreBackgroundsSetting').addEventListener('change', () => {
+  $('scoreBackgroundOptions').hidden = !$('scoreBackgroundsSetting').checked;
+});
 
 // The typeface. Switching it restyles the page at once.
 $('fontSetting').onchange = () => {
@@ -5492,9 +5564,10 @@ on('app-config', (e) => {
   const before = app.config ?? {};
   app = { ...app, config: JSON.parse(e.data) };
   applyConfigFont(app.config);
+  applyCoverLook(coverLook(app.config));
   renderUpdate();
   // Changed in another tab: redraw the score rows, the rank's colour and the grade counts.
-  const redraw = ['starRating', 'starRatingBadge', 'judgements', 'scoreBackgrounds', 'rankTiers', 'lowerGrades'].some((key) => before[key] !== app.config?.[key]);
+  const redraw = ['starRating', 'starRatingBadge', 'judgements', 'scoreBackgrounds', 'scoreThumbnails', 'rankTiers', 'lowerGrades'].some((key) => before[key] !== app.config?.[key]);
   if (redraw) void loadProfile();
 });
 // Pin, unpin and remove all change what the page should be showing.

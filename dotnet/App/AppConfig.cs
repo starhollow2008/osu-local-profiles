@@ -90,6 +90,11 @@ internal sealed class AppConfig
         ["lowerGrades"] = JsonText.From("hover"),
         // How many decimals pp is shown with (issue #42): whole numbers, as osu! shows it, up to MaxPpDecimals.
         ["ppDecimals"] = JsonText.From(0),
+        // A score row's beatmap background (issue #45): how dark, in percent, and how blurred, in pixels.
+        ["scoreBackgroundDim"] = JsonText.From(DefaultScoreBackgroundDim),
+        ["scoreBackgroundBlur"] = JsonText.From(0),
+        // The beatmap's square cover between a score row's grade and its title (issue #46).
+        ["scoreThumbnails"] = JsonText.From(false),
         ["country"] = JsonText.From(""),
         ["tagline"] = JsonText.From(""),
         ["checkForUpdates"] = JsonText.From(true),
@@ -104,20 +109,52 @@ internal sealed class AppConfig
     /// </summary>
     private static readonly string[] RetiredKeys = ["shareOnNetwork", "backfill"];
 
-    public static AppConfig Load(string dataDir)
+    /// <summary>
+    /// One reader or writer of config.json at a time in this process. Windows refuses to open a file
+    /// another thread is writing ("being used by another process"), and two changes read and written
+    /// back at once would lose one of them: a Settings slider saves at every step.
+    /// </summary>
+    private static readonly object FileGate = new();
+
+    /// <summary>
+    /// config.json read, changed and written back as one step, so no other change lands in between.
+    /// A file that is there but cannot be read (held by another program) throws rather than being
+    /// read as the defaults: written back, those would wipe every other setting in it.
+    /// </summary>
+    public static AppConfig Update(string dataDir, Action<AppConfig> change)
+    {
+        lock (FileGate)
+        {
+            var current = Read(dataDir, strict: true);
+            change(current);
+            current.Save(dataDir);
+            return current;
+        }
+    }
+
+    /// <summary>config.json over the defaults; the defaults alone when it is missing, unreadable or not JSON.</summary>
+    public static AppConfig Load(string dataDir) => Read(dataDir, strict: false);
+
+    private static AppConfig Read(string dataDir, bool strict)
     {
         var merged = Defaults();
         try
         {
-            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dataDir, "config.json")));
+            string text;
+            lock (FileGate) text = File.ReadAllText(Path.Combine(dataDir, "config.json"));
+            using var doc = JsonDocument.Parse(text);
             if (doc.RootElement.ValueKind == JsonValueKind.Object)
             {
                 foreach (var property in doc.RootElement.EnumerateObject()) merged[property.Name] = property.Value.Clone();
             }
         }
-        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
+        catch (Exception e) when (e is FileNotFoundException or DirectoryNotFoundException or JsonException)
         {
-            /* first run, or unreadable: fall back to defaults */
+            /* first run, or not JSON: the defaults */
+        }
+        catch (Exception e) when (!strict && e is IOException or UnauthorizedAccessException)
+        {
+            /* unreadable for now: the defaults, to read by, never to write back */
         }
         foreach (var key in RetiredKeys) merged.Remove(key);
         return new AppConfig(merged);
@@ -133,13 +170,16 @@ internal sealed class AppConfig
     /// <summary>Every setting in config.json back to its default: Reset settings (<see cref="AppReset"/>).</summary>
     public static void ResetToDefaults(string dataDir)
     {
-        var current = Load(dataDir);
-        var reset = new AppConfig(Defaults());
-        foreach (var key in KeptByReset)
+        lock (FileGate)
         {
-            if (current[key] is { } value) reset[key] = value;
+            var current = Load(dataDir);
+            var reset = new AppConfig(Defaults());
+            foreach (var key in KeptByReset)
+            {
+                if (current[key] is { } value) reset[key] = value;
+            }
+            reset.Save(dataDir);
         }
-        reset.Save(dataDir);
     }
 
     /// <summary>A value as stored, or null when the key is not there at all.</summary>
@@ -171,7 +211,7 @@ internal sealed class AppConfig
         {
             JsonSerializer.Serialize(writer, values, JsonText.Options);
         }
-        File.WriteAllText(Path.Combine(dataDir, "config.json"), System.Text.Encoding.UTF8.GetString(output.ToArray()) + "\n");
+        lock (FileGate) File.WriteAllText(Path.Combine(dataDir, "config.json"), System.Text.Encoding.UTF8.GetString(output.ToArray()) + "\n");
     }
 
     /// <summary>A config list of text, as the Node app reads one: an array's strings.</summary>
@@ -218,8 +258,22 @@ internal sealed class AppConfig
     public const int MaxPpDecimals = 3;
 
     /// <summary>A number of pp decimals, or null when <paramref name="value"/> is not a whole number from 0 to <see cref="MaxPpDecimals"/>.</summary>
-    public static int? PpDecimals(JsonElement? value) =>
-        value is { ValueKind: JsonValueKind.Number } number && number.TryGetInt32(out var n) && n is >= 0 and <= MaxPpDecimals ? n : null;
+    public static int? PpDecimals(JsonElement? value) => WholeNumber(value, MaxPpDecimals);
+
+    /// <summary>How dark a score row's background starts, in percent: about as dark as rows were before it could be set.</summary>
+    public const int DefaultScoreBackgroundDim = 60;
+
+    /// <summary>The most a score row's background can be blurred, in pixels.</summary>
+    public const int MaxScoreBackgroundBlur = 20;
+
+    /// <summary>A background dim from 0 to 100 percent, or null when <paramref name="value"/> is not one.</summary>
+    public static int? ScoreBackgroundDim(JsonElement? value) => WholeNumber(value, 100);
+
+    /// <summary>A background blur from 0 to <see cref="MaxScoreBackgroundBlur"/> pixels, or null when <paramref name="value"/> is not one.</summary>
+    public static int? ScoreBackgroundBlur(JsonElement? value) => WholeNumber(value, MaxScoreBackgroundBlur);
+
+    private static int? WholeNumber(JsonElement? value, int max) =>
+        value is { ValueKind: JsonValueKind.Number } number && number.TryGetInt32(out var n) && n >= 0 && n <= max ? n : null;
 
     /// <summary>What the page may read and change of the install: <c>appConfig.get()</c> in src/main.ts.</summary>
     public Dictionary<string, object?> PageView() => new()
@@ -241,6 +295,10 @@ internal sealed class AppConfig
         ["lowerGrades"] = Js.IsString(this["lowerGrades"], out var lower) && lower is "off" or "always" ? lower : "hover",
         // A hand-edited value that is not a whole number from 0 to MaxPpDecimals is the default.
         ["ppDecimals"] = PpDecimals(this["ppDecimals"]) ?? 0,
+        // The same for the background's dim and blur, and the thumbnails are off unless turned on.
+        ["scoreBackgroundDim"] = ScoreBackgroundDim(this["scoreBackgroundDim"]) ?? DefaultScoreBackgroundDim,
+        ["scoreBackgroundBlur"] = ScoreBackgroundBlur(this["scoreBackgroundBlur"]) ?? 0,
+        ["scoreThumbnails"] = this["scoreThumbnails"] is { ValueKind: JsonValueKind.True },
         ["autoUpdate"] = this["autoUpdate"] is { ValueKind: JsonValueKind.True },
     };
 

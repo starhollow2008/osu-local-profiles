@@ -709,6 +709,9 @@ needs git and the .NET 10 SDK.
 | `originalMetadata` | `false` | show beatmap metadata in original language -- also the switch in the flag menu and **Options -> Settings** |
 | `font` | `nunito` | the page's font: `nunito`, or `system` for your computer's own -- also **Options -> Settings -> Appearance -> Font** |
 | `ppDecimals` | `0` | decimal places on every pp shown, from `0` (whole numbers, as on osu!) to `3` -- also **Options -> Settings -> Appearance -> Decimal places on pp** |
+| `scoreBackgroundDim` | `60` | how dark a score row's beatmap background is, `0` to `100` percent -- also **Background dim** under **Show beatmap backgrounds on scores** |
+| `scoreBackgroundBlur` | `0` | how blurred it is, `0` to `20` pixels -- also **Background blur** there |
+| `scoreThumbnails` | `false` | the beatmap's square cover between a score's grade and its title -- also **Show beatmap thumbnails on scores** |
 | `autoUpdate` | `false` | download new versions in the background and install them when you quit or next start -- also **Options -> Settings -> System -> Auto-update** |
 | `sharedFavorites` | `true` | one Favorite Beatmaps list for every profile |
 

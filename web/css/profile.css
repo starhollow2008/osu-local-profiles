@@ -2130,7 +2130,7 @@
 .play-detail__hits {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   gap: 1px;
 }
@@ -2154,20 +2154,66 @@
 }
 
 /*
- * A background colour paints under its own image, so the dimming is a layer over the cover. It
- * is the page's darkest colour rather than the row's own grey, which laid over the art at 80%
- * washed its colours out: dark keeps them, and the row's text stays readable on bright art.
+ * The beatmap's cover behind the whole row (issues #38, #45 and #46), one picture rather than a
+ * box behind each part: the row's own parts go see-through, and the pp's notch with them. Over it
+ * is the page's darkest colour at Settings' dim (the row's own grey washed the art's colours out),
+ * fading into the row's own colour towards the pp, as the pp calculator fades its beatmaps the
+ * other way. The cover is blurred as Settings says, and grown by the blur so its soft edge falls
+ * outside the row.
  */
-.play-detail--cover {
-  --bg: hsla(var(--hsl-b6), 0.55);
-  --bg-main: hsla(var(--hsl-b6), 0.62);
-  background-image: linear-gradient(hsla(var(--hsl-b6), 0.62), hsla(var(--hsl-b6), 0.62)), var(--cover);
-  background-size: cover;
-  background-position: center;
+.play-detail.play-detail--cover,
+.play-detail.play-detail--cover:hover {
+  --bg: transparent;
+  --bg-main: transparent;
+  --cover-fade: var(--hsl-b3);
+  --cover-alpha: var(--cover-dim, 0.6);
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Hovered, a little more of the art shows, and the row lightens as any other does. */
+.play-detail.play-detail--cover:hover {
+  --cover-fade: var(--hsl-b2);
+  --cover-alpha: max(0, calc(var(--cover-dim, 0.6) - 0.1));
+}
+
+.play-detail--cover::before,
+.play-detail--cover::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.play-detail--cover::before {
+  z-index: -2;
+  inset: calc(var(--cover-blur, 0px) * -2);
+  background: var(--cover) center / cover;
+  filter: blur(var(--cover-blur, 0px));
+}
+
+.play-detail--cover::after {
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(to right, hsla(var(--hsl-b6), var(--cover-alpha)) 20%, hsl(var(--cover-fade)) 85%);
 }
 
 .play-detail--cover .play-detail__group--top {
   background-color: transparent;
+}
+
+/*
+ * Settings -> Show beatmap thumbnails on scores (issue #46): the set's square cover after the
+ * grade, as the pp calculator lists a beatmap.
+ */
+.play-detail__thumb.beatmapset-cover {
+  position: relative;
+  inset: auto;
+  flex: none;
+  align-self: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: var(--radius-base);
 }
 
 /*
@@ -2257,21 +2303,6 @@
     order: -1;
     padding: 5px 10px;
     background-color: var(--bg-main);
-  }
-
-  /* On a wide page each part of the row dims the cover under it itself. */
-  .play-detail--cover {
-    background-image: var(--cover);
-  }
-
-  .play-detail--cover .play-detail__group--top {
-    background-color: var(--bg-main);
-  }
-
-  /* Hovered, a little more of the art shows, in the same dark. */
-  .play-detail--cover:hover {
-    --bg: hsla(var(--hsl-b6), 0.45);
-    --bg-main: hsla(var(--hsl-b6), 0.5);
   }
 
   /*
@@ -4271,6 +4302,51 @@
   width: 64px;
 }
 
+/* Options of the setting above, shown only while it is on, set in under it (issue #45). */
+.setting__sub {
+  margin: 2px 0 0 14px;
+  padding-left: 12px;
+  border-left: 2px solid hsl(var(--hsl-b4));
+}
+
+.setting__sub .field {
+  margin-top: 8px;
+}
+
+/* A slider with its value typed beside it. */
+.setting__range {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 1 260px;
+  min-width: 0;
+}
+
+.setting__range input[type="number"] {
+  flex: none;
+  width: 64px;
+}
+
+.setting__unit {
+  flex: none;
+  min-width: 2ch;
+  color: hsl(var(--hsl-f1));
+}
+
+.setting__slider {
+  --fill: 0%;
+  flex: 1;
+  min-width: 80px;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
 .rows-setting input[type="number"]:disabled {
   opacity: 0.45;
 }
@@ -4995,19 +5071,22 @@
   cursor: pointer;
 }
 
-.pp-calc__slider::-webkit-slider-runnable-track {
+.pp-calc__slider::-webkit-slider-runnable-track,
+.setting__slider::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 2px;
   background: linear-gradient(to right, hsl(var(--hsl-h2)) var(--fill), hsl(var(--hsl-b6)) var(--fill));
 }
 
-.pp-calc__slider::-moz-range-track {
+.pp-calc__slider::-moz-range-track,
+.setting__slider::-moz-range-track {
   height: 4px;
   border-radius: 2px;
   background: linear-gradient(to right, hsl(var(--hsl-h2)) var(--fill), hsl(var(--hsl-b6)) var(--fill));
 }
 
-.pp-calc__slider::-webkit-slider-thumb {
+.pp-calc__slider::-webkit-slider-thumb,
+.setting__slider::-webkit-slider-thumb {
   appearance: none;
   -webkit-appearance: none;
   width: 14px;
@@ -5018,7 +5097,8 @@
   background-color: hsl(var(--hsl-c1));
 }
 
-.pp-calc__slider::-moz-range-thumb {
+.pp-calc__slider::-moz-range-thumb,
+.setting__slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
   border-radius: 50%;
@@ -5026,11 +5106,13 @@
   background-color: hsl(var(--hsl-c1));
 }
 
-.pp-calc__slider:focus-visible {
+.pp-calc__slider:focus-visible,
+.setting__slider:focus-visible {
   outline: none;
 }
 
-.pp-calc__slider:focus-visible::-webkit-slider-thumb {
+.pp-calc__slider:focus-visible::-webkit-slider-thumb,
+.setting__slider:focus-visible::-webkit-slider-thumb {
   outline: 2px solid hsl(var(--hsl-h1));
   outline-offset: 1px;
 }

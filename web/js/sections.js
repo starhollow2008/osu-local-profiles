@@ -224,7 +224,31 @@ export function rowLooks(config) {
     starBadge: config?.starRatingBadge === true,
     judgements: config?.judgements === true,
     background: config?.scoreBackgrounds === true,
+    thumbnail: config?.scoreThumbnails === true,
   };
+}
+
+/** A row background's dim when none is set, in percent, and the most it can be blurred: `AppConfig`'s. */
+export const DEFAULT_COVER_DIM = 60;
+export const MAX_COVER_BLUR = 20;
+
+/** A whole number from 0 to `max`, or `fallback` for anything else. */
+const wholeUpTo = (value, max, fallback) => (Number.isInteger(value) && value >= 0 && value <= max ? value : fallback);
+
+/**
+ * How dark and how blurred a score row's beatmap background is (issue #45), as the variables the
+ * rows' stylesheet reads: `--cover-dim` from 0 to 1, `--cover-blur` in pixels.
+ */
+export function coverLook(config) {
+  return {
+    dim: wholeUpTo(config?.scoreBackgroundDim, 100, DEFAULT_COVER_DIM),
+    blur: wholeUpTo(config?.scoreBackgroundBlur, MAX_COVER_BLUR, 0),
+  };
+}
+
+export function applyCoverLook({ dim, blur }, root = document.documentElement) {
+  root.style.setProperty('--cover-dim', String(dim / 100));
+  root.style.setProperty('--cover-blur', `${blur}px`);
 }
 
 /**
@@ -259,7 +283,7 @@ function judgementsCell(play) {
  */
 export function playRow(play, {
   showWeight = false, actions = false, reorderable = false,
-  starRating = false, starBadge = false, judgements = false, background = false,
+  starRating = false, starBadge = false, judgements = false, background = false, thumbnail = false,
 } = {}) {
   const artist = playArtist(play);
   const title = maybeLink(
@@ -288,6 +312,13 @@ export function playRow(play, {
   // Settings -> Show beatmap backgrounds on scores: the set's cover behind the row.
   const cover = background && onlineId(play.beatmapsetId) ? coverUrl(play.beatmapsetId, 'cover') : null;
 
+  // Settings -> Show beatmap thumbnails on scores (issue #46): its square cover after the grade, as
+  // the pp calculator lists a beatmap. A beatmap osu! has no set for keeps the empty square.
+  const set = onlineId(play.beatmapsetId) ? play.beatmapsetId : null;
+  const thumb = !thumbnail
+    ? ''
+    : `<span class="beatmapset-cover play-detail__thumb"${set == null ? '' : ` style="--bg: url('${coverUrl(set, 'list')}'); --bg-2x: url('${coverUrl(set, 'list@2x')}')"`}></span>`;
+
   /*
    * One shared popover does the menu (see #playMenu), so a row only carries the button and
    * the state the menu needs. Rendering a menu per row would put 100 hidden dialogs on the
@@ -306,6 +337,7 @@ export function playRow(play, {
   ${grip}
   <div class="play-detail__group play-detail__group--top">
     <div class="play-detail__icon">${gradeBadge(play.grade)}</div>
+    ${thumb}
     <div class="play-detail__detail">
       ${title}
       <div class="play-detail__beatmap-and-time">

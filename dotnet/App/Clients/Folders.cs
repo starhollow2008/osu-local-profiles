@@ -168,10 +168,8 @@ internal sealed partial class OsuFolders(AppConfig config, Action<AppConfig> sav
     /// What a folder change writes: only these three keys, into config.json read afresh, so a hand
     /// edit made while the app runs survives.
     /// </summary>
-    public static Action<AppConfig> SaveInto(string dataDir) => next =>
+    public static Action<AppConfig> SaveInto(string dataDir) => next => AppConfig.Update(dataDir, current =>
     {
-        var current = AppConfig.Load(dataDir);
         foreach (var key in new[] { "installRoots", "discoveredRoots", "searchedForInstalls" }) current[key] = next[key];
-        current.Save(dataDir);
-    };
+    });
 }

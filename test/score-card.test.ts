@@ -7,7 +7,7 @@ import {
   rankCutoffs,
   scoreCard,
 } from '../web/js/score-card.js';
-import { playRow, rowLooks } from '../web/js/sections.js';
+import { coverLook, DEFAULT_COVER_DIM, MAX_COVER_BLUR, playRow, rowLooks } from '../web/js/sections.js';
 import { statisticsFor } from '../web/js/statistics.js';
 
 /*
@@ -204,9 +204,31 @@ test("a score row can show the star rating as osu!'s badge, its judgements and i
   assert.doesNotMatch(playRow({ ...play, beatmapsetId: null }, { background: true }), /play-detail--cover/);
 
   // Each from its own setting, and all off until asked for.
-  assert.deepEqual(rowLooks(undefined), { starRating: false, starBadge: false, judgements: false, background: false });
+  assert.deepEqual(rowLooks(undefined), { starRating: false, starBadge: false, judgements: false, background: false, thumbnail: false });
   assert.deepEqual(
-    rowLooks({ starRating: true, starRatingBadge: true, judgements: true, scoreBackgrounds: true }),
-    { starRating: true, starBadge: true, judgements: true, background: true },
+    rowLooks({ starRating: true, starRatingBadge: true, judgements: true, scoreBackgrounds: true, scoreThumbnails: true }),
+    { starRating: true, starBadge: true, judgements: true, background: true, thumbnail: true },
   );
+});
+
+test("a score row can show its beatmap's thumbnail after the grade, and its background's dim and blur are Settings'", () => {
+  // Issue #46: the set's square cover between the grade and the title, as the pp calculator lists a beatmap.
+  const play = { id: 1, title: 'Heart no Shuchou', version: 'Insane', grade: 'S', mods: [], mode: 0, beatmapsetId: 1830679 };
+  assert.doesNotMatch(playRow(play), /play-detail__thumb/);
+  const thumbed = playRow(play, { thumbnail: true });
+  assert.ok(
+    thumbed.includes(
+      `class="beatmapset-cover play-detail__thumb" style="--bg: url('https://assets.ppy.sh/beatmaps/1830679/covers/list.jpg'); --bg-2x: url('https://assets.ppy.sh/beatmaps/1830679/covers/list@2x.jpg')"`,
+    ),
+  );
+  assert.ok(thumbed.indexOf('play-detail__icon') < thumbed.indexOf('play-detail__thumb'));
+  assert.ok(thumbed.indexOf('play-detail__thumb') < thumbed.indexOf('play-detail__detail'));
+  // A beatmap osu! has no set for keeps the empty square, so the titles still line up.
+  assert.ok(playRow({ ...play, beatmapsetId: null }, { thumbnail: true }).includes('class="beatmapset-cover play-detail__thumb"></span>'));
+
+  // Issue #45: whole numbers, the dim in percent and the blur in pixels; anything else is the default.
+  assert.deepEqual(coverLook(undefined), { dim: DEFAULT_COVER_DIM, blur: 0 });
+  assert.deepEqual(coverLook({ scoreBackgroundDim: 0, scoreBackgroundBlur: MAX_COVER_BLUR }), { dim: 0, blur: MAX_COVER_BLUR });
+  assert.deepEqual(coverLook({ scoreBackgroundDim: 101, scoreBackgroundBlur: 2.5 }), { dim: DEFAULT_COVER_DIM, blur: 0 });
+  assert.deepEqual(coverLook({ scoreBackgroundDim: '80', scoreBackgroundBlur: -1 }), { dim: DEFAULT_COVER_DIM, blur: 0 });
 });

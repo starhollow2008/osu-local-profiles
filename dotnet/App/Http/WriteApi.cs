@@ -158,7 +158,7 @@ internal static partial class Server
         });
     }
 
-    private static readonly string[] AppConfigSwitches = ["openBrowser", "sharedFavorites", "originalMetadata", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "autoUpdate"];
+    private static readonly string[] AppConfigSwitches = ["openBrowser", "sharedFavorites", "originalMetadata", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "autoUpdate", "scoreThumbnails"];
 
     /// <summary>
     /// The install's own options. Only these keys, each only to a value of the right type: this
@@ -247,36 +247,53 @@ internal static partial class Server
             }
             patch["ppDecimals"] = ppDecimals;
         }
+        // A score row's background (issue #45): whole numbers, the dim in percent and the blur in pixels.
+        if (Js.Get(body, "scoreBackgroundDim") is { } dim)
+        {
+            if (AppConfig.ScoreBackgroundDim(dim) is null)
+            {
+                await Json(context, new { error = "scoreBackgroundDim must be a whole number from 0 to 100" }, 400);
+                return;
+            }
+            patch["scoreBackgroundDim"] = dim;
+        }
+        if (Js.Get(body, "scoreBackgroundBlur") is { } blur)
+        {
+            if (AppConfig.ScoreBackgroundBlur(blur) is null)
+            {
+                await Json(context, new { error = $"scoreBackgroundBlur must be a whole number from 0 to {AppConfig.MaxScoreBackgroundBlur}" }, 400);
+                return;
+            }
+            patch["scoreBackgroundBlur"] = blur;
+        }
         if (patch.Count == 0)
         {
             await Json(context, new { error = "openBrowser must be true or false" }, 400);
             return;
         }
 
-        var dataDir = opts.Paths.DataDir;
-        var current = AppConfig.Load(dataDir);
-        void Set(string key, JsonElement value)
+        // Read, changed and written back as one step: two saves at once (a slider's steps) would
+        // otherwise collide on the file, or one would undo the other's change.
+        AppConfig.Update(opts.Paths.DataDir, current =>
         {
-            current[key] = value;
-            opts.Config[key] = value;
-        }
-        foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "lowerGrades", "ppDecimals" })
-        {
-            if (patch.TryGetValue(key, out var value)) Set(key, value);
-        }
-        if (patch.TryGetValue("sharedFavorites", out var shared))
-        {
-            Set("sharedFavorites", shared);
-            // Merge or copy the lists now, so the next request already reads the right one.
-            Favorites.SyncSharing(opts.Db, shared.ValueKind == JsonValueKind.True);
-        }
-        // Auto-update needs the check it acts on, so switching it on turns checking back on too.
-        if (patch.TryGetValue("autoUpdate", out var autoUpdate))
-        {
-            Set("autoUpdate", autoUpdate);
-            if (autoUpdate.ValueKind == JsonValueKind.True) Set("checkForUpdates", autoUpdate);
-        }
-        current.Save(dataDir);
+            void Set(string key, JsonElement value)
+            {
+                current[key] = value;
+                opts.Config[key] = value;
+            }
+            foreach (var key in new[] { "openBrowser", "language", "originalMetadata", "font", "starRating", "starRatingBadge", "judgements", "scoreBackgrounds", "otherClientMods", "otherClientModsNote", "rankTiers", "lowerGrades", "ppDecimals", "scoreBackgroundDim", "scoreBackgroundBlur", "scoreThumbnails", "sharedFavorites" })
+            {
+                if (patch.TryGetValue(key, out var value)) Set(key, value);
+            }
+            // Auto-update needs the check it acts on, so switching it on turns checking back on too.
+            if (patch.TryGetValue("autoUpdate", out var autoUpdate))
+            {
+                Set("autoUpdate", autoUpdate);
+                if (autoUpdate.ValueKind == JsonValueKind.True) Set("checkForUpdates", autoUpdate);
+            }
+        });
+        // Merge or copy the lists now, so the next request already reads the right one.
+        if (patch.TryGetValue("sharedFavorites", out var shared)) Favorites.SyncSharing(opts.Db, shared.ValueKind == JsonValueKind.True);
         if (patch.ContainsKey("autoUpdate")) opts.Updater?.AutoUpdateChanged();
         var config = opts.Config.PageView();
         opts.Events.Broadcast("app-config", config);

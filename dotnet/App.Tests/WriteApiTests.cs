@@ -246,6 +246,69 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Saves_that_arrive_together_each_land_and_none_undoes_another()
+    {
+        // A Settings slider saves at every step: on Windows two writes at once failed with "being
+        // used by another process", and one read before the other's write lost the other's key.
+        var saves = Enumerable.Range(0, 40).Select(i => i % 2 == 0
+            ? Post("/api/app-config", new { scoreBackgroundDim = i })
+            : Post("/api/app-config", new { scoreBackgroundBlur = i % 21 }));
+        var answers = await Task.WhenAll(saves);
+        Assert.All(answers, a => Assert.Equal(HttpStatusCode.OK, a.Status));
+
+        // Each key ends as one of its own saves left it, and a third key saved between them survives.
+        await Post("/api/app-config", new { scoreThumbnails = true });
+        await Task.WhenAll(Post("/api/app-config", new { scoreBackgroundDim = 5 }), Post("/api/app-config", new { ppDecimals = 2 }));
+        var config = AppConfig.Load(DataDir).PageView();
+        Assert.Equal((5, 2, true), (config["scoreBackgroundDim"], config["ppDecimals"], config["scoreThumbnails"]));
+    }
+
+    [Fact]
+    public void A_config_file_another_program_holds_is_never_written_over_with_the_defaults()
+    {
+        // Read as the defaults and written back, it would lose the port, the osu! folders and the rest.
+        var file = Path.Combine(DataDir, "config.json");
+        File.WriteAllText(file, """{"port": 7391, "installRoots": ["D:\\osu"], "font": "system"}""");
+        using (new FileStream(file, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            Assert.ThrowsAny<IOException>(() => AppConfig.Update(DataDir, c => c["ppDecimals"] = JsonText.From(2)));
+            // Reading for display still falls back, as it always has.
+            Assert.Equal(AppConfig.DefaultPort, AppConfig.Load(DataDir).Port);
+        }
+        var kept = AppConfig.Load(DataDir);
+        Assert.Equal((7391, "system"), (kept.Port, kept["font"]!.Value.GetString()));
+        // And the change that could not be made was not made.
+        Assert.Equal(0, kept.PageView()["ppDecimals"]);
+    }
+
+    [Fact]
+    public async Task A_score_rows_background_dim_and_blur_take_whole_numbers_and_thumbnails_are_a_switch()
+    {
+        // Issues #45 and #46: about as dark as rows were before, not blurred, and no thumbnails.
+        var config = (await client.GetFromJson("/api/app-config")).GetProperty("config");
+        Assert.Equal((60, 0, false), (config.GetProperty("scoreBackgroundDim").GetInt32(), config.GetProperty("scoreBackgroundBlur").GetInt32(),
+            config.GetProperty("scoreThumbnails").GetBoolean()));
+
+        var saved = (await Post("/api/app-config", new { scoreBackgroundDim = 0, scoreBackgroundBlur = 20, scoreThumbnails = true })).Body.GetProperty("config");
+        Assert.Equal((0, 20, true), (saved.GetProperty("scoreBackgroundDim").GetInt32(), saved.GetProperty("scoreBackgroundBlur").GetInt32(),
+            saved.GetProperty("scoreThumbnails").GetBoolean()));
+        Assert.Equal(100, (await Post("/api/app-config", new { scoreBackgroundDim = 100 })).Body.GetProperty("config").GetProperty("scoreBackgroundDim").GetInt32());
+
+        const string dim = "scoreBackgroundDim must be a whole number from 0 to 100";
+        Assert.Equal(dim, Error((await Post("/api/app-config", new { scoreBackgroundDim = 101 })).Body));
+        Assert.Equal(dim, Error((await Post("/api/app-config", new { scoreBackgroundDim = 50.5 })).Body));
+        const string blur = "scoreBackgroundBlur must be a whole number from 0 to 20";
+        Assert.Equal(blur, Error((await Post("/api/app-config", new { scoreBackgroundBlur = -1 })).Body));
+        Assert.Equal(blur, Error((await Post("/api/app-config", new { scoreBackgroundBlur = "5" })).Body));
+        Assert.Equal("scoreThumbnails must be true or false", Error((await Post("/api/app-config", new { scoreThumbnails = 1 })).Body));
+
+        // A hand edit that is not one reads as the default.
+        File.WriteAllText(Path.Combine(DataDir, "config.json"), """{"port": 7272, "scoreBackgroundDim": 300, "scoreBackgroundBlur": 99}""");
+        var view = AppConfig.Load(DataDir).PageView();
+        Assert.Equal((60, 0), (view["scoreBackgroundDim"], view["scoreBackgroundBlur"]));
+    }
+
+    [Fact]
     public async Task How_score_rows_look_starts_off_and_takes_only_a_switch()
     {
         // Issues #37 and #38: the judgements, the background and the star badge, off by default.

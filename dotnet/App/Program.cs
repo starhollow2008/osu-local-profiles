@@ -230,12 +230,7 @@ Startup.Announce(db, tracker);
 var ppSources = new PpSource(PpSourceTracker.Of(tracker), paths.DataDir,
     NodePath.Join(paths.InstallDir, "tools", "PpCalculator", "Program.cs"),
     () => Js.IsString(config["ppSource"], out var current) ? current : "",
-    chosen =>
-    {
-        var current = AppConfig.Load(paths.DataDir);
-        current["ppSource"] = config["ppSource"] = JsonText.From(chosen);
-        current.Save(paths.DataDir);
-    },
+    chosen => AppConfig.Update(paths.DataDir, current => current["ppSource"] = config["ppSource"] = JsonText.From(chosen)),
     // Said on the page too, not only in the console: pp has stopped, and Settings is the fix.
     startupProblem: ppSource.Length > 0 ? calculatorProblem : null);
 

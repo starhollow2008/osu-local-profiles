@@ -1078,6 +1078,39 @@
               <span data-i18n="installSettings.scoreBackgrounds">Show beatmap backgrounds on scores</span>
               <input type="checkbox" id="scoreBackgroundsSetting">
             </label>
+            <!--
+              Issue #45: shown only while the backgrounds are on. In config.json, the dim 0 to 100
+              percent and the blur 0 to MaxScoreBackgroundBlur pixels (dotnet/App/AppConfig.cs).
+            -->
+            <div class="setting__sub" id="scoreBackgroundOptions" hidden>
+              <label class="field">
+                <span data-i18n="installSettings.scoreBackgroundDim">Background dim</span>
+                <span class="setting__range">
+                  <input type="range" class="setting__slider" id="scoreBackgroundDimSlider" min="0" max="100" step="1"
+                         aria-label="Background dim" data-i18n-attr="aria-label:installSettings.scoreBackgroundDim">
+                  <input type="number" id="scoreBackgroundDimSetting" min="0" max="100" step="1" required inputmode="numeric"
+                         aria-label="Background dim" data-i18n-attr="aria-label:installSettings.scoreBackgroundDim">
+                  <span class="setting__unit">%</span>
+                </span>
+              </label>
+              <label class="field">
+                <span data-i18n="installSettings.scoreBackgroundBlur">Background blur</span>
+                <span class="setting__range">
+                  <input type="range" class="setting__slider" id="scoreBackgroundBlurSlider" min="0" max="20" step="1"
+                         aria-label="Background blur" data-i18n-attr="aria-label:installSettings.scoreBackgroundBlur">
+                  <input type="number" id="scoreBackgroundBlurSetting" min="0" max="20" step="1" required inputmode="numeric"
+                         aria-label="Background blur" data-i18n-attr="aria-label:installSettings.scoreBackgroundBlur">
+                  <span class="setting__unit">px</span>
+                </span>
+              </label>
+            </div>
+          </div>
+          <!-- Issue #46: the beatmap's square cover between a row's grade and its title. -->
+          <div class="setting">
+            <label class="field">
+              <span data-i18n="installSettings.scoreThumbnails">Show beatmap thumbnails on scores</span>
+              <input type="checkbox" id="scoreThumbnailsSetting">
+            </label>
           </div>
           <div class="setting" data-setting="showIncompleteInRecent"></div>
           <div class="setting" data-setting="showMoreRows"></div>

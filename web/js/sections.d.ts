@@ -23,8 +23,15 @@ export interface RowLooks {
   starBadge: boolean;
   judgements: boolean;
   background: boolean;
+  thumbnail: boolean;
 }
 export function rowLooks(config: Record<string, unknown> | null | undefined): RowLooks;
+
+/** A row background's dim (percent) and blur (pixels), from config.json (issue #45). */
+export const DEFAULT_COVER_DIM: number;
+export const MAX_COVER_BLUR: number;
+export function coverLook(config: Record<string, unknown> | null | undefined): { dim: number; blur: number };
+export function applyCoverLook(look: { dim: number; blur: number }, root?: HTMLElement): void;
 
 /** One score row, as osu-web's `.play-detail`. */
 export function playRow(
