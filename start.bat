@@ -3,7 +3,7 @@ rem The app from this checkout, on its data folder. Builds it first, which takes
 rem the first time.
 setlocal
 cd /d "%~dp0"
-where dotnet >/dev/null 2>/dev/null || (
+where dotnet >nul 2>nul || (
   echo.
   echo  The .NET 10 SDK is needed to run the app from source:
   echo  https://dotnet.microsoft.com/download
