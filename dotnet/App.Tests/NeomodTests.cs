@@ -302,8 +302,13 @@ public sealed class NeomodTests : IDisposable
         Assert.Equal(("skipped", "not-passed"), ((await Ingest.ReplayFile(failed, ctx)).Status, (await Ingest.ReplayFile(failed, ctx)).Reason));
         Assert.Single(Neomod.FailedScores(File.ReadAllBytes(Neomod.ScoresFile(root))));
 
-        // The same entry as a pass is a pass.
-        File.WriteAllBytes(Neomod.ScoresFile(root), ScoresDb(facts, "Tangy", (long)(failedAt / 1000), 3));
+        // The same entry as a pass is a pass. Dated a second later, as neomod's next write would be: the
+        // file is read again when its time or size changes, this one is the same size, and Windows can
+        // give two writes this close together one timestamp.
+        var scores = Neomod.ScoresFile(root);
+        var before = File.GetLastWriteTimeUtc(scores);
+        File.WriteAllBytes(scores, ScoresDb(facts, "Tangy", (long)(failedAt / 1000), 3));
+        File.SetLastWriteTimeUtc(scores, before.AddSeconds(1));
         Assert.Equal("added", (await Ingest.ReplayFile(failed, ctx)).Status);
         Assert.Empty(Neomod.FailedScores([1, 2, 3]));
     }
