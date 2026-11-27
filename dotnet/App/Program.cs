@@ -67,6 +67,29 @@ if (running.Running)
 }
 
 /*
+ * A reset asked for from Settings -> System, applied here: after the check that no other copy is
+ * running on data/, and before config.json is read for good or the database is opened.
+ */
+var reset = checkOnly ? new HashSet<string>() : AppReset.ApplyToFiles(paths.DataDir);
+if (reset.Count > 0)
+{
+    config = AppConfig.Load(paths.DataDir);
+    url = $"http://localhost:{config.Port}";
+    if (reset.Contains(AppReset.Settings) || reset.Contains(AppReset.App))
+    {
+        try
+        {
+            await StartWithComputer.Set(false, StartWithComputer.Where.Of(paths.InstallDir));
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            /* a copy that cannot start with the computer has nothing to turn off */
+        }
+    }
+    Console.WriteLine($"\n  Reset: {string.Join(", ", AppReset.Parts.Where(reset.Contains))}");
+}
+
+/*
  * The update check and the update itself, reading config.json's switches on every use so a
  * change applies at once.
  */
@@ -136,6 +159,7 @@ else if (restored.Error is not null) Console.WriteLine($"\n  The backup could no
 // from a version that had no welcome.
 var firstRun = !File.Exists(dbFile);
 using var db = Database.Open(dbFile);
+AppReset.ApplyToDatabase(db, reset, config.ProfileName);
 OsuLocalProfiles.Update.Notes.SeedSeenVersion(db, paths.Version(), paths.DataDir);
 // A restored database remembers the app last running when the backup was made: without this,
 // importPlaysWhileClosed would read everything since as a gap the app was closed for.

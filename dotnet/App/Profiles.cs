@@ -97,6 +97,18 @@ internal static class Profiles
     }
 
     /// <summary>
+    /// Every profile deleted with everything it tracked, and the selection with them: Reset profiles
+    /// (<see cref="AppReset"/>). The ids stay remembered, so the profile that replaces them is new to
+    /// the page too (issue #34). Inside the caller's transaction.
+    /// </summary>
+    public static void DeleteAll(Database db)
+    {
+        RememberGiven(db, LastGiven(db));
+        db.Run("DELETE FROM profiles");
+        db.Run("DELETE FROM kv WHERE key = ?", ActiveKey);
+    }
+
+    /// <summary>
     /// A new profile starts empty and tracks from now, never from earlier plays. Its id is one no
     /// profile has had: SQLite would give a deleted profile's id out again, and the page tells
     /// profiles apart by id (issue #34).

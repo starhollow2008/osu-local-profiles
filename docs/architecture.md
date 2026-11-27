@@ -520,7 +520,7 @@ every non-loopback request, with no switch. `loadConfig` drops the old `shareOnN
 first, so the app would be unreachable from its own browser. It also makes `listen` async, which
 breaks `server.address()` in tests.
 
-`/api/quit`, `/api/update/*`, `PUT /api/restore`, `POST /api/restore/apply` and
+`/api/quit`, `/api/update/*`, `PUT /api/restore`, `POST /api/restore/apply`, `POST /api/reset` and
 `POST /api/data-folder/open` refuse any `Origin` but the app's own page (`isOwnPage`), or any
 website open in the browser could call them.
 
@@ -1239,6 +1239,27 @@ whatever process owns that pid now.
   undone, and staging is dropped either way so a bad backup isn't retried every launch.
 - **A restore marks the app as running now** (`markRunning`). Otherwise the restored `kv.lastRunAt`
   is the backup's, and `importPlaysWhileClosed` would import everything since as a gap.
+
+## Reset
+
+`dotnet/App/AppReset.cs` (issue #48): Settings -> System -> Reset settings, profiles, beatmap index,
+or app. Like a restore it never runs under a live database. `POST /api/reset` writes the parts to
+`data/reset.json` and restarts, and the next start applies them. The files half runs after the
+already-running check and before `config.json` is read for good, and the database half runs right
+after the database opens. The request is deleted before anything is cleared, so a reset that fails
+part way isn't tried again at every start. Nothing is set aside: a reset is meant.
+
+- **Settings**: `config.json` back to its defaults except what isn't a page setting (`port`,
+  `profileName`, `discoveredRoots`, `searchedForInstalls`, and the `country`/`tagline` fallbacks).
+  `profile_settings` loses every row but `SettingsStore.IdentityKeys`, which are who a profile is.
+  Launch on startup is turned off.
+- **Profiles**: `Profiles.DeleteAll` (the cascade takes every profile's rows), the shared favourites,
+  the pictures, `about-images/` and `replays/`, then one new profile through `Profiles.Create`, never
+  `SeedFirst`, which would hand out a deleted profile's id (issue #34).
+- **Index**: `osu_files` and `not_beatmaps` emptied and `beatmaps.osu_path` cleared. `beatmaps` itself
+  stays: scores whose beatmap is gone still need its name.
+- **App**: everything in `data/` but `logs/`, which the launcher holds open. A port set by hand in
+  `config.json` is written back, alone: the page waiting for the restart is on it.
 
 ## Score scales
 

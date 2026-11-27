@@ -469,6 +469,30 @@ public sealed class WriteApiTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_reset_is_asked_for_only_from_the_apps_own_page_and_only_when_confirmed()
+    {
+        var foreign = new HttpRequestMessage(HttpMethod.Post, "/api/reset")
+        {
+            Content = new StringContent("""{"parts": ["app"], "confirm": true}"""),
+        };
+        foreign.Headers.TryAddWithoutValidation("origin", "https://example.com");
+        Assert.Equal(HttpStatusCode.Forbidden, (await client.SendAsync(foreign)).StatusCode);
+
+        Assert.Equal("reset requires an explicit confirmation", Error((await Post("/api/reset", new { parts = new[] { "app" } })).Body));
+        Assert.Equal("parts must name one or more of settings, profiles, index, app",
+            Error((await Post("/api/reset", new { parts = new[] { "everything" }, confirm = true })).Body));
+        Assert.Equal("parts must name one or more of settings, profiles, index, app",
+            Error((await Post("/api/reset", new { parts = Array.Empty<string>(), confirm = true })).Body));
+        Assert.Empty(AppReset.Pending(DataDir));
+
+        var (status, staged) = await Post("/api/reset", new { parts = new[] { "settings", "index" }, confirm = true });
+        Assert.Equal(HttpStatusCode.OK, status);
+        // Nothing would start the app again here, so the page is told to ask for a restart.
+        Assert.False(staged.GetProperty("restarting").GetBoolean());
+        Assert.Equal(new[] { "index", "settings" }, AppReset.Pending(DataDir).Order().ToArray());
+    }
+
+    [Fact]
     public async Task The_welcome_ends_for_good_however_it_is_left()
     {
         ProfileData.OfferWelcome(data.Db);

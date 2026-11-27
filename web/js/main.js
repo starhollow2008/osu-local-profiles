@@ -4415,7 +4415,7 @@ $('restoreFile').onchange = async () => {
 };
 
 /** Reload once a different process answers, or say to restart by hand after a minute. */
-async function reloadWhenRestarted(pid) {
+async function reloadWhenRestarted(pid, notBack = () => t('restore.restartYourself')) {
   for (let waited = 0; waited < 60; waited += 1) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     try {
@@ -4428,7 +4428,50 @@ async function reloadWhenRestarted(pid) {
       /* not back yet */
     }
   }
-  settingsHint(t('restore.restartYourself'));
+  settingsHint(notBack());
+}
+
+/*
+ * Settings -> System -> Reset (issue #48). Each is asked once, then applied by restarting, as a
+ * restore is: it happens before the database opens (dotnet/App/AppReset.cs). The page's own
+ * state in this browser goes with the settings, so it starts as a new install's does.
+ */
+const APP_RESET_ASK = {
+  settings: () => t('appReset.askSettings'),
+  profiles: () => t('appReset.askProfiles'),
+  index: () => t('appReset.askIndex'),
+  app: () => t('appReset.askApp'),
+};
+
+for (const button of document.querySelectorAll('[data-app-reset]')) {
+  button.addEventListener('click', async () => {
+    const part = button.dataset.appReset;
+    if (!confirm(`${APP_RESET_ASK[part]()}\n\n${t('appReset.cannotBeUndone')}`)) return;
+    const buttons = document.querySelectorAll('[data-app-reset]');
+    for (const b of buttons) b.disabled = true;
+    try {
+      const before = await (await fetch('/api/app')).json();
+      const staged = await postJson('/api/reset', { parts: [part], confirm: true }, t('appReset.failed'));
+      if (part === 'settings' || part === 'app') {
+        try {
+          localStorage.clear();
+          sessionStorage.clear();
+        } catch {
+          /* storage blocked: nothing kept to clear */
+        }
+      }
+      if (!staged.restarting) {
+        settingsHint(t('appReset.restartYourself'));
+        return;
+      }
+      settingsHint(t('appReset.restarting'));
+      await reloadWhenRestarted(before.pid, () => t('appReset.restartYourself'));
+    } catch (err) {
+      settingsHint(err.message, true);
+    } finally {
+      for (const b of buttons) b.disabled = false;
+    }
+  });
 }
 
 /* ------------------------------------------------------ import past plays */

@@ -1318,6 +1318,41 @@
             </div>
             <button type="button" id="openDataFolder" data-i18n="openDataFolder">Open folder</button>
           </div>
+
+          <!-- Applied at the next start, so each one restarts the app (dotnet/App/AppReset.cs, issue #48). -->
+          <h5 class="settings-group" data-i18n="appReset.group">Reset</h5>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="appReset.settings">Reset settings</b>
+              <div class="setting__hint" data-i18n="appReset.settingsHint">Every setting back to its default. Profiles and scores are kept.</div>
+            </div>
+            <button type="button" class="danger-button" data-app-reset="settings" data-i18n="appReset.button">Reset</button>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="appReset.profiles">Reset profiles</b>
+              <div class="setting__hint" data-i18n="appReset.profilesHint">Deletes every profile and its scores, and starts again with one new profile.</div>
+            </div>
+            <button type="button" class="danger-button" data-app-reset="profiles" data-i18n="appReset.button">Reset</button>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="appReset.index">Reset beatmap index</b>
+              <div class="setting__hint" data-i18n="appReset.indexHint">The list of beatmap files is built again on the next start, which can take a while.</div>
+            </div>
+            <button type="button" class="danger-button" data-app-reset="index" data-i18n="appReset.button">Reset</button>
+          </div>
+
+          <div class="share-option">
+            <div class="share-option__detail">
+              <b data-i18n="appReset.app">Reset app</b>
+              <div class="setting__hint" data-i18n="appReset.appHint">Deletes everything in the data folder, as if the app was just installed.</div>
+            </div>
+            <button type="button" class="danger-button" data-app-reset="app" data-i18n="appReset.button">Reset</button>
+          </div>
         </section>
       </div>
     </div>

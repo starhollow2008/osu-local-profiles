@@ -728,6 +728,17 @@ restoring are in **Options -> Settings -> System**.
 - **The data folder** is shown with an **Open folder** button. With the app closed, copying the folder
   is a complete backup too. (While it runs, recent writes can sit in `profiles.db-wal`.) `config.json`
   in that folder holds this install's settings, which is why backups leave it out.
+- **Reset**, at the bottom of **System**, has four buttons. Each asks first, then restarts the app to
+  finish, and none of them keeps a copy of what it clears:
+  - **Reset settings** puts every setting back to its default, for the app and for each profile, and
+    turns off **Launch on startup**. Profiles keep their scores, pictures, me!, country, tagline and
+    linked osu! account.
+  - **Reset profiles** deletes every profile with its scores, pictures and me!, and starts again with
+    one new profile. The settings in `config.json` and the beatmap index are kept.
+  - **Reset beatmap index** clears the list of beatmap files, which the next start builds again. It
+    can take a while for a big library.
+  - **Reset app** deletes everything in the data folder except `logs`, as if the app was just
+    installed. A `port` you set in `config.json` is kept.
 - **Export** has **.csv** and **.xlsx** buttons. The .csv is every score in the profile, all modes,
   highest pp first, with over 40 columns; delete what you don't want. The .xlsx has the same scores,
   then a sheet per mode, **Summary**, **Most played**, **Favorite beatmaps** and **Medals**, each with

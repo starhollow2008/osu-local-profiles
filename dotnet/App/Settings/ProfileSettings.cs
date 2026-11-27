@@ -215,6 +215,13 @@ internal static partial class SettingsStore
 
     public static IEnumerable<string> Keys => Defs.Select(d => d.Key);
 
+    /// <summary>
+    /// The rows that are who a profile is rather than a setting, which Reset settings keeps: its
+    /// country, tagline, colour and me!, and the osu! account and names it is linked to.
+    /// </summary>
+    public static readonly string[] IdentityKeys =
+        ["country", "tagline", "profileHue", "aboutMe", "linkedUserId", "linkedUsername", "linkedNamesKnown", "linkedPreviousNames", "accountNames", "ownNames"];
+
     public static ProfileSettings Defaults() => new();
 
     /// <summary>

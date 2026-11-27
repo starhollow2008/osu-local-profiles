@@ -78,17 +78,55 @@ internal static partial class Server
                 await Json(context, new { error = e.Message }, 400);
                 return true;
             }
-            if (opts.OnRestart is { } restart)
-            {
-                context.Response.OnCompleted(async () =>
-                {
-                    await Task.Delay(250);
-                    restart();
-                });
-            }
-            await Json(context, new { ok = true, restarting = opts.OnRestart is not null });
+            await RestartToApply(context, opts);
             return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Settings -> System -> Reset: <c>{"parts": [...], "confirm": true}</c>, applied by restarting
+    /// as a restore is (<see cref="AppReset"/>). Only this app's own page may ask, or any website
+    /// open in the browser could wipe the profiles.
+    /// </summary>
+    private static async Task ResetRoute(HttpContext context, ServerOptions opts)
+    {
+        if (!FromOwnPage(context))
+        {
+            await Json(context, new { error = "only this app's own page can reset the app" }, 403);
+            return;
+        }
+        await WithBody(context, async body =>
+        {
+            if (Js.Get(body, "confirm") is not { ValueKind: System.Text.Json.JsonValueKind.True })
+            {
+                await Json(context, new { error = "reset requires an explicit confirmation" }, 400);
+                return;
+            }
+            var parts = Js.Get(body, "parts") is { ValueKind: System.Text.Json.JsonValueKind.Array } list
+                ? list.EnumerateArray().Select(e => e.ValueKind == System.Text.Json.JsonValueKind.String ? e.GetString()! : "").ToList()
+                : [];
+            if (parts.Count == 0 || parts.Any(part => !AppReset.Parts.Contains(part)))
+            {
+                await Json(context, new { error = $"parts must name one or more of {string.Join(", ", AppReset.Parts)}" }, 400);
+                return;
+            }
+            AppReset.Stage(opts.Paths.DataDir, parts);
+            await RestartToApply(context, opts);
+        });
+    }
+
+    /// <summary>Answer, then stop for the launcher to start the app again, when there is one to.</summary>
+    private static async Task RestartToApply(HttpContext context, ServerOptions opts)
+    {
+        if (opts.OnRestart is { } restart)
+        {
+            context.Response.OnCompleted(async () =>
+            {
+                await Task.Delay(250);
+                restart();
+            });
+        }
+        await Json(context, new { ok = true, restarting = opts.OnRestart is not null });
     }
 }

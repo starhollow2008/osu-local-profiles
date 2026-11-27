@@ -727,6 +727,12 @@ internal static partial class Server
 
         if (pathname is "/api/restore" or "/api/restore/apply" && await Restore(context, opts, pathname)) return;
 
+        if (pathname == "/api/reset" && method == "POST")
+        {
+            await ResetRoute(context, opts);
+            return;
+        }
+
         if (pathname == "/api/data-folder" && method == "GET")
         {
             await Json(context, new { path = opts.Paths.DataDir });

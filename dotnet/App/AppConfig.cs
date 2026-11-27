@@ -69,7 +69,7 @@ internal sealed class AppConfig
     private static Dictionary<string, JsonElement> Defaults() => new()
     {
         ["profileName"] = JsonText.From("Local Profile"),
-        ["port"] = JsonText.From(7272),
+        ["port"] = JsonText.From(DefaultPort),
         ["openBrowser"] = JsonText.From(true),
         ["installRoots"] = JsonText.From(Array.Empty<string>()),
         ["discoveredRoots"] = JsonText.From(Array.Empty<string>()),
@@ -121,6 +121,25 @@ internal sealed class AppConfig
         }
         foreach (var key in RetiredKeys) merged.Remove(key);
         return new AppConfig(merged);
+    }
+
+    /// <summary>
+    /// What Reset settings keeps of config.json: what is not a setting on the page. The port and the
+    /// first profile's name are only ever edited by hand, where osu! was found is the search's memory
+    /// rather than a choice, and the country and tagline are profiles' own (<see cref="SettingsFallbacks"/>).
+    /// </summary>
+    private static readonly string[] KeptByReset = ["port", "profileName", "discoveredRoots", "searchedForInstalls", "country", "tagline"];
+
+    /// <summary>Every setting in config.json back to its default: Reset settings (<see cref="AppReset"/>).</summary>
+    public static void ResetToDefaults(string dataDir)
+    {
+        var current = Load(dataDir);
+        var reset = new AppConfig(Defaults());
+        foreach (var key in KeptByReset)
+        {
+            if (current[key] is { } value) reset[key] = value;
+        }
+        reset.Save(dataDir);
     }
 
     /// <summary>A value as stored, or null when the key is not there at all.</summary>
@@ -183,13 +202,15 @@ internal sealed class AppConfig
 
     public string ProfileName => this["profileName"] is { } name ? Js.ToJsString(name) : "Local Profile";
 
+    public const int DefaultPort = 7272;
+
     /// <summary>The port, as <c>server.listen</c> would take it.</summary>
     public int Port
     {
         get
         {
             var port = Js.ToNumber(this["port"]);
-            return double.IsFinite(port) && port is >= 0 and <= 65535 && port == Math.Floor(port) ? (int)port : 7272;
+            return double.IsFinite(port) && port is >= 0 and <= 65535 && port == Math.Floor(port) ? (int)port : DefaultPort;
         }
     }
 
