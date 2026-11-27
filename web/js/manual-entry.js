@@ -291,7 +291,7 @@ function renderMods() {
   for (const acronym of [...mods.keys()]) if (!available.includes(acronym)) mods.delete(acronym);
   // A stable play's mods have no settings.
   if (client === 'stable') for (const acronym of mods.keys()) mods.set(acronym, {});
-  $('manualMods').innerHTML = modGrid(available.filter((a) => modDefinition(a)));
+  $('manualMods').innerHTML = modGrid(available.filter((a) => modDefinition(a)), ruleset);
   renderModState();
 }
 

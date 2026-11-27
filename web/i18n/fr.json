@@ -658,7 +658,6 @@
   "ppCalc.failed": "le calcul n'a pas abouti",
   "ppCalc.loadingMore": "Chargement de la suite...",
   "ppCalc.mods": "Mods",
-  "ppCalc.noPpChange": "{mod} ne change pas les pp",
   "ppCalc.opening": "Ouverture de {file}...",
   "ppCalc.ruleset": "Mode de jeu",
   "ppCalc.sliderEndsMissed": "Fins de slider manquées",

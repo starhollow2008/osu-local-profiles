@@ -139,9 +139,29 @@ for (const mode of Object.values(MODE_OF)) {
   }
 }
 
-const entries = Object.keys(mods)
-  .sort()
+/*
+ * osu-web's own order (issue #50), which is osu!'s: each ruleset lists its mods by type, and within
+ * a type in the order osu! offers them (EZ NF HT DC, then HR SD PF DT NC HD ...). Each ruleset's
+ * list is kept as it is (MOD_ORDER), since they do not all agree: osu! has DA before RD, taiko RD
+ * before DA. The table itself is in one order for lists that show every ruleset at once: osu!'s,
+ * with each mod another ruleset adds put straight after the mod before it there.
+ */
+const merged = [];
+for (const ruleset of sorted) {
+  let after = -1;
+  for (const { Acronym: acronym } of ruleset.Mods) {
+    const at = merged.indexOf(acronym);
+    if (at === -1) merged.splice(++after, 0, acronym);
+    else after = at;
+  }
+}
+const modOrder = Object.fromEntries(sorted.map((ruleset) => [MODE_OF[ruleset.Name], ruleset.Mods.map((m) => m.Acronym)]));
+
+const entries = merged
   .map((acronym) => `  ${JSON.stringify(acronym)}: ${JSON.stringify(mods[acronym])},`)
+  .join('\n');
+const orders = Object.entries(modOrder)
+  .map(([mode, list]) => `  ${mode}: ${JSON.stringify(list)},`)
   .join('\n');
 
 const body = `/**
@@ -153,9 +173,18 @@ const body = `/**
  * is the reason a badge is the right one rather than a guess. \`modes\` is which rulesets
  * offer the mod, numbered as this app numbers them, and \`playable\` is false for the three
  * a player cannot choose (Autoplay, Cinema, ScoreV2).
+ *
+ * Every list of mods to choose from follows osu-web's order, which is osu!'s (\`compareMods\` in
+ * badges.js): \`MOD_ORDER\` is each ruleset's as osu-web lists it, and this table is in one order
+ * for lists that show every ruleset at once.
  */
 export const MOD_DEFINITIONS = {
 ${entries}
+};
+
+/** Each ruleset's mods in osu-web's order, by this app's mode number. */
+export const MOD_ORDER = {
+${orders}
 };
 `;
 

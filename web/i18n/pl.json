@@ -665,7 +665,6 @@
   "ppCalc.failed": "obliczenie się nie powiodło",
   "ppCalc.loadingMore": "Wczytywanie kolejnych...",
   "ppCalc.mods": "Mody",
-  "ppCalc.noPpChange": "{mod} nie zmienia pp",
   "ppCalc.opening": "Otwieranie {file}...",
   "ppCalc.ruleset": "Tryb gry",
   "ppCalc.sliderEndsMissed": "Pominięte końce sliderów",

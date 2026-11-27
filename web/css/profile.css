@@ -4995,14 +4995,6 @@
   opacity: 1;
 }
 
-/* A mod that leaves the pp as it is: there, greyed past the unchosen ones, and never chosen. */
-.pp-calc .mod-chip--inert,
-.pp-calc .mod-chip--inert:hover {
-  background: none;
-  filter: grayscale(1);
-  opacity: 0.2;
-  cursor: not-allowed;
-}
 
 /* No beatmap yet: its empty slot at the top is what to fill in first. */
 .pp-calc--empty .pp-calc__find input {

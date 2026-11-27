@@ -18,7 +18,7 @@
  * combo breaks from (a stable score brings it). Nothing is stored.
  */
 import { escapeHtml, fmt, pct } from './format.js';
-import { gradeBadge, modDefinition } from './badges.js';
+import { gradeBadge } from './badges.js';
 import { difficultyBadge } from './beatmapsets.js';
 import {
   beatmapLine,
@@ -436,14 +436,17 @@ $('ppCalcFile').onchange = async () => {
 
 /* ------------------------------------------------------------------- mods */
 
-/** A mod that leaves this ruleset's pp as it is: shown, dimmed, and not chosen. */
-const inert = (acronym) => (noPp[mode()] ?? []).includes(acronym);
+/**
+ * The ruleset's mods that change its pp, in osu-web's order (issue #50). One that leaves the pp
+ * as osu! prices it is not offered at all (PpCalculation.NoPp, measured with osu!'s calculator).
+ */
+const pricedMods = () => lazerMods(mode()).filter((a) => !(noPp[mode()] ?? []).includes(a));
 
 function renderMods() {
-  const available = lazerMods(mode());
+  const available = pricedMods();
   // A mod the ruleset does not have, or one that changes nothing in it, goes when the ruleset changes.
-  for (const acronym of [...mods.keys()]) if (!available.includes(acronym) || inert(acronym)) mods.delete(acronym);
-  $('ppCalcMods').innerHTML = modGrid(available, (a) => (inert(a) ? t('ppCalc.noPpChange', { mod: modDefinition(a).name }) : null));
+  for (const acronym of [...mods.keys()]) if (!available.includes(acronym)) mods.delete(acronym);
+  $('ppCalcMods').innerHTML = modGrid(available, mode());
   renderModState();
 }
 
@@ -483,10 +486,6 @@ $('ppCalcMods').onclick = (e) => {
   const chip = e.target.closest('[data-mod]');
   if (!chip) return;
   const acronym = chip.dataset.mod;
-  if (chip.hasAttribute('data-inert')) {
-    say(t('ppCalc.noPpChange', { mod: modDefinition(acronym).name }));
-    return;
-  }
   if (acronym === 'CL') {
     setClassic(!classic);
     return;

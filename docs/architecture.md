@@ -811,8 +811,15 @@ described by its numbers and **stores nothing**. It is a hand entry that is neve
   the combo. A stable score's detail carries it (`stableScore`), so opening one prices it as stored.
 - **Combo is asked for in osu! and catch only.** Taiko's and mania's calculators never read it, so
   their combo field and slider are hidden and no combo is sent (`comboCounts`).
-- **Mods that change no pp** (`PpCalculation.NoPp`, measured and re-checked by a test) are shown
-  dimmed and can't be chosen.
+- **Mods that change no pp** (`PpCalculation.NoPp`, measured and re-checked by a test) aren't offered
+  (issue #50). Manual entry and the play tracking filter still offer every mod: there they are part
+  of a score, not of its pp.
+- **Mods are in osu-web's order everywhere they are picked** (issue #50), which is osu!'s:
+  `database/mods.json` lists each ruleset's by type and then as osu! offers them. The rulesets don't
+  all agree (osu! has DA before RD, taiko RD before DA), so `build-mod-table.mjs` keeps each one's
+  list as `MOD_ORDER`, and the table itself is in one merged order for the tracking filter, which
+  shows every ruleset at once. `inModOrder` in `badges.js` sorts by them. A score's own mods are
+  shown in the order the score has them, as osu-web does.
 - **A mod with a seed** (Random, Target Practice) always has one. Without it osu! rolls a new layout
   every time it prices, so the pp changed with every request. Choosing one picks a seed as osu! does,
   shown and editable beside the mod's other settings; a score opened brings its own, and a cleared one

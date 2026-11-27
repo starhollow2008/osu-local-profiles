@@ -17,7 +17,7 @@
  * edits the object and posts it back. Nothing here re-implements the matching rule.
  */
 import { escapeHtml, MODE_NAMES } from './format.js';
-import { modDefinition, modPill } from './badges.js';
+import { inModOrder, modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS } from './mcosu-mods.js';
 import { NEOMOD_DEFINITIONS } from './neomod-mods.js';
@@ -640,7 +640,8 @@ function modsSection() {
       : '';
   const groups = MOD_GROUPS.map(([type, label]) => {
     const heading = label();
-    const inGroup = acronyms.filter((a) => modDefinition(a, chipClient(a)).type === type).sort();
+    // osu-web's order for every ruleset at once (issue #50); other clients' mods after osu!'s.
+    const inGroup = inModOrder(acronyms.filter((a) => modDefinition(a, chipClient(a)).type === type));
     if (inGroup.length === 0) return '';
     return `<div class="mod-grid__group">
       <div class="mod-grid__label">${escapeHtml(heading)}</div>
@@ -855,8 +856,9 @@ function paintChip(chip) {
  * the grid, and the rule is the whole point of the section.
  */
 function modsReadout() {
-  const required = Object.keys(draft.mods).filter((a) => draft.mods[a] === 'required').sort();
-  const excluded = Object.keys(draft.mods).filter((a) => draft.mods[a] === 'excluded').sort();
+  // In the grid's order, osu-web's (issue #50).
+  const required = inModOrder(Object.keys(draft.mods).filter((a) => draft.mods[a] === 'required'));
+  const excluded = inModOrder(Object.keys(draft.mods).filter((a) => draft.mods[a] === 'excluded'));
 
   if (draft.noMod === 'required') {
     return required.length > 0

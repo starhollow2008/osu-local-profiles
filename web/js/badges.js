@@ -9,7 +9,7 @@
  */
 import { escapeHtml } from './format.js';
 import { t } from './i18n.js';
-import { MOD_DEFINITIONS } from './mod-definitions.js';
+import { MOD_DEFINITIONS, MOD_ORDER } from './mod-definitions.js';
 import { MCOSU_DEFINITIONS, mcosuModNames } from './mcosu-mods.js';
 import { NEOMOD_DEFINITIONS, neomodModNames } from './neomod-mods.js';
 import { MISS_CHALLENGE, TORII_DEFINITIONS } from './torii-mods.js';
@@ -28,6 +28,28 @@ export function modDefinition(acronym, client) {
   if (isMissChallenge(acronym, client)) return MISS_CHALLENGE;
   return MOD_DEFINITIONS[acronym] ?? MCOSU_DEFINITIONS[acronym] ?? NEOMOD_DEFINITIONS[acronym] ??
     TORII_DEFINITIONS[acronym] ?? null;
+}
+
+/** osu-web's order for every ruleset at once (mod-definitions.js). */
+const ALL_MODS_ORDER = Object.keys(MOD_DEFINITIONS);
+
+/**
+ * Mods to choose from, in osu-web's order, which is osu!'s (issue #50): `mode`'s own when given,
+ * otherwise the one order for every ruleset at once. A mod only other clients have keeps its place
+ * among those after osu!'s.
+ */
+export function inModOrder(acronyms, mode = null) {
+  const own = mode != null ? (MOD_ORDER[mode] ?? null) : null;
+  const rank = (acronym) => {
+    const mine = own ? own.indexOf(acronym) : -1;
+    if (mine >= 0) return mine;
+    const anywhere = ALL_MODS_ORDER.indexOf(acronym);
+    return anywhere >= 0 ? (own?.length ?? 0) + anywhere : Number.MAX_SAFE_INTEGER;
+  };
+  return acronyms
+    .map((acronym, i) => ({ acronym, i, rank: rank(acronym) }))
+    .sort((a, b) => a.rank - b.rank || a.i - b.i)
+    .map((m) => m.acronym);
 }
 
 /* Unique ids per generated SVG, since several appear on the page at once. */

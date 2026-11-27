@@ -655,7 +655,6 @@
   "ppCalc.fcTable": "pp of a full combo at each accuracy",
   "ppCalc.loadingMore": "Loading more...",
   "ppCalc.mods": "Mods",
-  "ppCalc.noPpChange": "{mod} doesn't change pp",
   "ppCalc.opening": "Opening {file}...",
   "ppCalc.rebuildSource": "Rebuild your osu! source in Settings to fill in the judgements and use accuracy.",
   "ppCalc.recentlyPlayed": "Recently played",

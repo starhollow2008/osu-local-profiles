@@ -658,7 +658,6 @@
   "ppCalc.failed": "beregningen lykkedes ikke",
   "ppCalc.loadingMore": "Henter flere...",
   "ppCalc.mods": "Mods",
-  "ppCalc.noPpChange": "{mod} ændrer ikke pp",
   "ppCalc.opening": "Åbner {file}...",
   "ppCalc.ruleset": "Spiltilstand",
   "ppCalc.sliderEndsMissed": "Missede sliderender",

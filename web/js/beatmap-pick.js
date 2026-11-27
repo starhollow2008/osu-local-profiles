@@ -8,7 +8,7 @@
  * rows are drawn: osu! works each one out, so the list never waits for them.
  */
 import { escapeHtml, MODE_NAMES } from './format.js';
-import { coverUrl, modDefinition, modPill } from './badges.js';
+import { coverUrl, inModOrder, modDefinition, modPill } from './badges.js';
 import { MOD_DEFINITIONS } from './mod-definitions.js';
 import { difficultyBadge } from './beatmapsets.js';
 import { original } from './metadata.js';
@@ -70,24 +70,20 @@ const MOD_GROUPS = [
 ];
 
 /**
- * Mods to choose from, grouped as osu!'s mod select groups them, each a chip to press.
- * `inertTitle(acronym)`, when it returns text, shows that mod dimmed and not to be chosen.
+ * Mods to choose from, grouped as osu!'s mod select groups them, each a chip to press, in
+ * `mode`'s order as osu-web lists it (issue #50).
  */
-export function modGrid(available, inertTitle = () => null) {
+export function modGrid(available, mode = null) {
   return MOD_GROUPS.map(([type, label]) => {
-    const inGroup = available.filter((a) => modDefinition(a)?.type === type).sort();
+    const inGroup = inModOrder(available.filter((a) => modDefinition(a)?.type === type), mode);
     if (inGroup.length === 0) return '';
     return `<div class="mod-grid__group">
       <div class="mod-grid__label">${escapeHtml(label())}</div>
       <div class="mod-grid__row">${inGroup
-        .map((a) => {
-          const inert = inertTitle(a);
-          return inert
-            ? `<button type="button" class="mod-chip mod-chip--inert" data-mod="${escapeHtml(a)}" data-inert
-                aria-disabled="true" title="${escapeHtml(inert)}">${modPill(a)}</button>`
-            : `<button type="button" class="mod-chip" data-mod="${escapeHtml(a)}" aria-pressed="false"
-                title="${escapeHtml(modDefinition(a)?.name ?? a)}">${modPill(a)}</button>`;
-        })
+        .map(
+          (a) => `<button type="button" class="mod-chip" data-mod="${escapeHtml(a)}" aria-pressed="false"
+                title="${escapeHtml(modDefinition(a)?.name ?? a)}">${modPill(a)}</button>`,
+        )
         .join('')}</div>
     </div>`;
   }).join('');
@@ -95,7 +91,7 @@ export function modGrid(available, inertTitle = () => null) {
 
 /** Light the chips that are on. */
 export function markMods(grid, isOn) {
-  for (const chip of grid.querySelectorAll('[data-mod]:not([data-inert])')) {
+  for (const chip of grid.querySelectorAll('[data-mod]')) {
     const on = isOn(chip.dataset.mod);
     chip.classList.toggle('mod-chip--required', on);
     chip.setAttribute('aria-pressed', String(on));

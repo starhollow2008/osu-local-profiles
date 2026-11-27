@@ -658,7 +658,6 @@
   "ppCalc.failed": "计算失败",
   "ppCalc.loadingMore": "正在加载更多...",
   "ppCalc.mods": "模组",
-  "ppCalc.noPpChange": "{mod} 不会改变 pp",
   "ppCalc.opening": "正在打开 {file}...",
   "ppCalc.ruleset": "游戏模式",
   "ppCalc.sliderEndsMissed": "漏掉的滑条尾",
