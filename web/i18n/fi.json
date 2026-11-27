@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Piilotettu",
   "installSettings.starRatingText": "Tekstinä",
   "installSettings.starRatingBadge": "Merkkinä",
-  "installSettings.judgements": "Näytä osumatulokset tuloksissa",
+  "installSettings.judgements": "Näytä osumatulokset ja combo tuloksissa",
   "installSettings.scoreBackgrounds": "Näytä beatmappien taustakuvat tuloksissa",
   "installSettings.otherClientMods": "Näytä mukautettujen asiakasohjelmien modit",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii ja Ritsu. Tältä tietokoneelta löytyneen ohjelman modit näytetään aina.",

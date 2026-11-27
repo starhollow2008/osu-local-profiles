@@ -227,14 +227,30 @@ export function rowLooks(config) {
   };
 }
 
-/** A score's judgements as osu! counts them for its ruleset, each in osu!'s colour for it. */
+/**
+ * A score's combo, out of its beatmap's when osu!'s calculator has priced it (issue #44). A full
+ * combo is green, as on the score card.
+ */
+function comboLine(play) {
+  if (play.maxCombo == null) return '';
+  const max = play.beatmapMaxCombo ?? null;
+  const full = max != null && play.maxCombo >= max;
+  const of = max == null ? '' : `<span class="play-detail__judgement-slash">/</span>${fmt(max)}`;
+  const title = `${t('score.maxCombo')}: ${fmt(play.maxCombo)}${max == null ? '' : `/${fmt(max)}`}`;
+  return `<div class="play-detail__combo" title="${escapeHtml(title)}"><span class="play-detail__combo-value${full ? ' play-detail__combo-value--full' : ''}">${fmt(play.maxCombo)}</span>${of}x</div>`;
+}
+
+/**
+ * A score's judgements as osu! counts them for its ruleset, each in osu!'s colour for it, with
+ * its combo under them.
+ */
 function judgementsCell(play) {
   const { basic } = statisticsFor({ mode: play.mode ?? 0, statistics: play.statistics ?? {} });
   const title = basic.map((s) => `${s.label}: ${fmt(s.value)}`).join(', ');
   const counts = basic
     .map((s) => `<span class="play-detail__judgement play-detail__judgement--${s.attribute}">${fmt(s.value)}</span>`)
     .join('<span class="play-detail__judgement-slash">/</span>');
-  return `<div class="play-detail__judgements" title="${escapeHtml(title)}">${counts}</div>`;
+  return `<div class="play-detail__hits"><div class="play-detail__judgements" title="${escapeHtml(title)}">${counts}</div>${comboLine(play)}</div>`;
 }
 
 /**

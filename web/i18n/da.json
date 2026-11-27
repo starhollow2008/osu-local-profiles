@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Skjult",
   "installSettings.starRatingText": "Som tekst",
   "installSettings.starRatingBadge": "Som mærkat",
-  "installSettings.judgements": "Vis bedømmelser på scores",
+  "installSettings.judgements": "Vis bedømmelser og combo på scores",
   "installSettings.scoreBackgrounds": "Vis beatmap-baggrunde på scores",
   "installSettings.otherClientMods": "Vis mods fra tilpassede klienter",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii og Ritsu. En klient fundet på denne computer får altid vist sine mods.",

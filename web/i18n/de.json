@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Ausgeblendet",
   "installSettings.starRatingText": "Als Text",
   "installSettings.starRatingBadge": "Als Abzeichen",
-  "installSettings.judgements": "Trefferwertungen bei Scores anzeigen",
+  "installSettings.judgements": "Trefferwertungen und Kombo bei Scores anzeigen",
   "installSettings.scoreBackgrounds": "Beatmap-Hintergründe bei Scores anzeigen",
   "installSettings.otherClientMods": "Mods von Custom-Clients anzeigen",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii und Ritsu. Die Mods eines auf diesem Computer gefundenen Clients werden immer angezeigt.",

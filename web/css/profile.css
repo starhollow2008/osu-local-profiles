@@ -2124,14 +2124,28 @@
 /*
  * Settings: a score's judgements between its mods and its accuracy (issue #37), each in
  * osu!'s colour for it, and its beatmap's cover behind the row (issue #38), under the row's own
- * colours made see-through.
+ * colours made see-through. The combo goes under the judgements (issue #44), its own beside the
+ * beatmap's, green for a full combo as on the score card.
  */
-.play-detail__judgements {
+.play-detail__hits {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.play-detail__judgements,
+.play-detail__combo {
   display: flex;
   align-items: center;
   gap: 4px;
   font-weight: 600;
   white-space: nowrap;
+}
+
+.play-detail__combo-value--full {
+  color: hsl(var(--hsl-lime-1));
 }
 
 .play-detail__judgement-slash {
@@ -2239,7 +2253,7 @@
   }
 
   /* After the mods, which come first on a wide page, and before the accuracy. */
-  .play-detail__judgements {
+  .play-detail__hits {
     order: -1;
     padding: 5px 10px;
     background-color: var(--bg-main);

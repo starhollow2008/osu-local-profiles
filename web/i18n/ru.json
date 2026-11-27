@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Скрыто",
   "installSettings.starRatingText": "Текстом",
   "installSettings.starRatingBadge": "Значком",
-  "installSettings.judgements": "Показывать попадания у результатов",
+  "installSettings.judgements": "Показывать попадания и комбо у результатов",
   "installSettings.scoreBackgrounds": "Показывать фоны карт у результатов",
   "installSettings.otherClientMods": "Показывать моды кастомных клиентов",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii и Ritsu. Моды клиента, найденного на этом компьютере, показываются всегда.",

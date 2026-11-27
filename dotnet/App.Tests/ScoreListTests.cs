@@ -322,4 +322,19 @@ public sealed class ScoreListTests : IDisposable
         // The misses the Scores view sorts by are still the row's own.
         Assert.Equal(2L, Convert.ToInt64(old.Misses));
     }
+
+    [Fact]
+    public void Each_row_carries_its_beatmaps_max_combo_once_the_calculator_has_given_one()
+    {
+        // Issue #44: the combo under the judgements is out of the beatmap's.
+        var priced = Score("aaa", 300);
+        var unpriced = Score("bbb", 200);
+        h.Db.Run("UPDATE scores SET beatmap_max_combo = 1245 WHERE id = ?", priced);
+        h.Db.Run("UPDATE scores SET beatmap_max_combo = 0 WHERE id = ?", unpriced);
+        var rows = List(View(new { })).ToDictionary(p => p.Id!);
+
+        Assert.Equal(1245L, Convert.ToInt64(rows[priced].BeatmapMaxCombo));
+        // 0 is no combo osu! reported: the row says nothing rather than "out of 0".
+        Assert.Null(rows[unpriced].BeatmapMaxCombo);
+    }
 }

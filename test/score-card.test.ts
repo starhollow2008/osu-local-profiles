@@ -185,6 +185,18 @@ test("a score row can show the star rating as osu!'s badge, its judgements and i
   // A taiko score has three.
   assert.equal(playRow({ ...play, mode: 1 }, { judgements: true }).match(/play-detail__judgement--/g)?.length, 3);
 
+  // Its combo under them, out of the beatmap's (issue #44), green only for a full combo.
+  const combo = (row: string) => /class="play-detail__combo"[^>]*>([\s\S]*?)<\/div>/.exec(row)?.[1]?.replace(/<[^>]+>/g, '');
+  assert.equal(combo(playRow({ ...play, maxCombo: 1101, beatmapMaxCombo: 1245 }, { judgements: true })), '1,101/1,245x');
+  assert.doesNotMatch(playRow({ ...play, maxCombo: 1101, beatmapMaxCombo: 1245 }, { judgements: true }), /combo-value--full/);
+  assert.match(playRow({ ...play, maxCombo: 1245, beatmapMaxCombo: 1245 }, { judgements: true }), /combo-value--full/);
+  const both = playRow({ ...play, maxCombo: 5 }, { judgements: true });
+  assert.ok(both.indexOf('play-detail__judgements') < both.indexOf('play-detail__combo'));
+  assert.ok(both.indexOf('play-detail__combo') < both.indexOf('play-detail__pp'));
+  // Before osu!'s calculator has priced it, the beatmap's is not known: the score's own alone.
+  assert.equal(combo(playRow({ ...play, maxCombo: 1101 }, { judgements: true })), '1,101x');
+  assert.doesNotMatch(playRow({ ...play, maxCombo: 1101, beatmapMaxCombo: 1245 }), /play-detail__combo/);
+
   const covered = playRow(play, { background: true });
   assert.match(covered, /class="play-detail play-detail--cover"/);
   assert.match(covered, /--cover: url\('https:\/\/assets\.ppy\.sh\/beatmaps\/1830679\/covers\/cover\.jpg'\)/);

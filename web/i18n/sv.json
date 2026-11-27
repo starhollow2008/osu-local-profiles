@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Dolt",
   "installSettings.starRatingText": "Som text",
   "installSettings.starRatingBadge": "Som märke",
-  "installSettings.judgements": "Visa träffbedömningar på resultat",
+  "installSettings.judgements": "Visa träffbedömningar och combo på resultat",
   "installSettings.scoreBackgrounds": "Visa beatmapbakgrunder på resultat",
   "installSettings.otherClientMods": "Visa moddar från anpassade klienter",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii och Ritsu. En klient som hittats på den här datorn får alltid sina moddar visade.",

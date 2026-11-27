@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "非表示",
   "installSettings.starRatingText": "テキスト",
   "installSettings.starRatingBadge": "バッジ",
-  "installSettings.judgements": "スコアに判定を表示",
+  "installSettings.judgements": "スコアに判定とコンボを表示",
   "installSettings.scoreBackgrounds": "スコアにビートマップの背景を表示",
   "installSettings.otherClientMods": "カスタムクライアントの Mod を表示",
   "installSettings.otherClientModsHint": "McOsu、neomod、Torii、Ritsu。このコンピューターで見つかったクライアントの Mod は常に表示されます。",

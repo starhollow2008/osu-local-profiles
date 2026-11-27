@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Oculto",
   "installSettings.starRatingText": "Como texto",
   "installSettings.starRatingBadge": "Como insignia",
-  "installSettings.judgements": "Mostrar los juicios en las puntuaciones",
+  "installSettings.judgements": "Mostrar los juicios y el combo en las puntuaciones",
   "installSettings.scoreBackgrounds": "Mostrar los fondos de los beatmaps en las puntuaciones",
   "installSettings.otherClientMods": "Mostrar los mods de clientes personalizados",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii y Ritsu. Los mods de un cliente encontrado en este equipo se muestran igualmente.",

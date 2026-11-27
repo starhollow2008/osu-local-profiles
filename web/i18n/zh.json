@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "隐藏",
   "installSettings.starRatingText": "文字",
   "installSettings.starRatingBadge": "徽章",
-  "installSettings.judgements": "在成绩上显示判定",
+  "installSettings.judgements": "在成绩上显示判定和连击",
   "installSettings.scoreBackgrounds": "在成绩上显示谱面背景",
   "installSettings.otherClientMods": "显示自定义客户端的 Mod",
   "installSettings.otherClientModsHint": "McOsu、neomod、Torii 和 Ritsu。在这台电脑上找到的客户端，其 Mod 始终显示。",

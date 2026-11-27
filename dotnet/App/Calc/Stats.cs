@@ -28,6 +28,8 @@ internal sealed class Play
     public Dictionary<string, object?> Statistics { get; init; } = [];
     public object? Accuracy { get; init; }
     public object? MaxCombo { get; init; }
+    /// <summary>The beatmap's own maximum combo, from osu!'s calculator; null until the score is priced.</summary>
+    public object? BeatmapMaxCombo { get; init; }
     public object? TotalScore { get; init; }
     public object? Grade { get; init; }
     public object? Stars { get; init; }
@@ -148,7 +150,7 @@ internal static partial class Stats
 
     /// <summary>The columns every play row needs, joined to its beatmap (<c>playColumns</c>).</summary>
     private static string PlayColumns(Eligibility e) => $"""
-        s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.client, s.accuracy, s.max_combo,
+        s.id, s.beatmap_md5, s.beatmap_id, s.mods_json, s.client, s.accuracy, s.max_combo, s.beatmap_max_combo,
                 {Eligibility.ScoreColumn(e)} AS total_score, s.grade, s.ranked, s.passed, s.played_at,
                 {Eligibility.StarsColumn(e)} AS stars,
                 {Eligibility.CountsSql(e)} AS counts,
@@ -195,6 +197,7 @@ internal static partial class Stats
             Statistics = Scores.ParseStatistics(r.Str("statistics_json")) ?? Scores.LegacyStatistics(r["mode"], r),
             Accuracy = r["accuracy"],
             MaxCombo = r["max_combo"],
+            BeatmapMaxCombo = r.Num("beatmap_max_combo") is > 0 ? r["beatmap_max_combo"] : null,
             TotalScore = r["total_score"],
             Grade = r["grade"],
             Stars = r["stars"],

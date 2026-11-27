@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "Nascosto",
   "installSettings.starRatingText": "Come testo",
   "installSettings.starRatingBadge": "Come badge",
-  "installSettings.judgements": "Mostra i giudizi sui punteggi",
+  "installSettings.judgements": "Mostra i giudizi e la combo sui punteggi",
   "installSettings.scoreBackgrounds": "Mostra gli sfondi delle beatmap sui punteggi",
   "installSettings.otherClientMods": "Mostra le mod dei client personalizzati",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii e Ritsu. Le mod di un client trovato su questo computer sono mostrate comunque.",

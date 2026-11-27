@@ -475,7 +475,7 @@
   "installSettings.starRatingOff": "Ukryte",
   "installSettings.starRatingText": "Jako tekst",
   "installSettings.starRatingBadge": "Jako odznaka",
-  "installSettings.judgements": "Pokazuj oceny trafień przy wynikach",
+  "installSettings.judgements": "Pokazuj oceny trafień i combo przy wynikach",
   "installSettings.scoreBackgrounds": "Pokazuj tła beatmap przy wynikach",
   "installSettings.otherClientMods": "Pokazuj mody niestandardowych klientów",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii i Ritsu. Mody klienta znalezionego na tym komputerze są pokazywane zawsze.",

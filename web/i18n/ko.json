@@ -471,7 +471,7 @@
   "installSettings.starRatingOff": "숨김",
   "installSettings.starRatingText": "텍스트",
   "installSettings.starRatingBadge": "배지",
-  "installSettings.judgements": "기록에 판정 표시",
+  "installSettings.judgements": "기록에 판정과 콤보 표시",
   "installSettings.scoreBackgrounds": "기록에 비트맵 배경 표시",
   "installSettings.otherClientMods": "커스텀 클라이언트의 모드 표시",
   "installSettings.otherClientModsHint": "McOsu, neomod, Torii, Ritsu. 이 컴퓨터에서 찾은 클라이언트의 모드는 항상 표시됩니다.",

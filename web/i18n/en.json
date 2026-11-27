@@ -474,7 +474,7 @@
   "installSettings.font": "Font",
   "installSettings.fontNunito": "Nunito",
   "installSettings.fontSystem": "System font",
-  "installSettings.judgements": "Show judgements on scores",
+  "installSettings.judgements": "Show judgements and combo on scores",
   "installSettings.lowerGrades": "B, C and D grade counts",
   "installSettings.lowerGradesAlways": "Always shown",
   "installSettings.lowerGradesHover": "On hover",
