@@ -520,7 +520,7 @@ every non-loopback request, with no switch. `loadConfig` drops the old `shareOnN
 first, so the app would be unreachable from its own browser. It also makes `listen` async, which
 breaks `server.address()` in tests.
 
-`/api/quit`, `/api/update/*`, `PUT /api/restore`, `POST /api/restore/apply`, `POST /api/reset` and
+`/api/quit`, `/api/restart`, `/api/update/*`, `PUT /api/restore`, `POST /api/restore/apply`, `POST /api/reset` and
 `POST /api/data-folder/open` refuse any `Origin` but the app's own page (`isOwnPage`), or any
 website open in the browser could call them.
 
@@ -1231,9 +1231,13 @@ is the one list of what that is, and a restore writes nothing else, whatever the
 and the `total_changes()`-stamped caches. The upload is checked (a read-only probe for `profiles`
 and `scores` before `openDb`, which would create them in any SQLite file) and staged in
 `data/restore/`. Applying writes `ready` and exits `RESTART_EXIT_CODE`, and `applyPendingRestore`
-swaps it in before `openDb`. Tray launcher only (`onRestart`), since `start.sh`'s loop would announce
-it as an update. A stale `update/swapper.pid` is removed first, or the launcher would wait on
-whatever process owns that pid now.
+swaps it in before `openDb`. Only when what started the app starts it again on that code (`OnRestart`,
+`Instance.LauncherRestarts`): the tray launcher, or the loops in `start.sh`, `start.bat` and
+`npm start` (`scripts/start.mjs`). `start.sh` says "Installing the update" only when a swapper pid is
+there. A stale `update/swapper.pid` is removed first, or the launcher would wait on whatever process
+owns that pid now. The page's Restart (issue #43, `/api/restart`) is the same exit with nothing to
+apply, and is offered only where `app.restarts` says so. The app never starts a copy of itself,
+which no terminal or tray icon could stop.
 
 - Nothing is deleted: replaced files move to `data/before-restore-<local time>/`, a failed move is
   undone, and staging is dropped either way so a bad backup isn't retried every launch.

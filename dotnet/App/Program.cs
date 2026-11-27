@@ -247,10 +247,12 @@ var app = Server.Build(new ServerOptions
     Port = config.Port,
     OnQuit = () => Shutdown(0, true),
     /*
-     * Only the tray launcher: it starts the app again on this exit code, and with no update in
-     * progress there is no swap to wait for. A restored backup is applied that way.
+     * Only when what started the app starts it again on this exit code: the tray launcher, or
+     * start.sh, start.bat and npm start's loops. With no update in progress there is no swap to
+     * wait for. Restart, a restored backup and a reset are applied that way. Never a copy of its
+     * own, which nothing could stop.
      */
-    OnRestart = fromTray ? () => Shutdown(RestartExitCode, false) : null,
+    OnRestart = Instance.LauncherRestarts(Env) ? () => Shutdown(RestartExitCode, false) : null,
     Folders = new OsuLocalProfiles.Clients.OsuFolders(config, OsuLocalProfiles.Clients.OsuFolders.SaveInto(paths.DataDir), installs,
         discovery, NodePath.Join(paths.DataDir, "mcosu")),
     FromTray = fromTray,

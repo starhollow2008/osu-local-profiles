@@ -12,8 +12,10 @@ works inside.
 | Linux | run `./osu-local-profiles` (or `./start.sh`) | the system tray |
 
 There's no console window. The icon's menu has **Open profile**, **Open log** and **Quit**, and on
-Windows and Linux clicking the icon opens the page. The page has **Quit** at the top right, and a
-pause button to stop recording without closing. Starting the app again while it runs just opens the
+Windows and Linux clicking the icon opens the page. The page has **Quit** at the top right, which
+opens **Restart** and **Quit**, and a pause button to stop recording without closing. Restart is there
+when the app was started from its icon, `start.sh`, or in a copy built from source, `start.bat` or
+`npm start`. Starting the app again while it runs just opens the
 page. Output goes to `data/logs/app.log`.
 
 On Linux, a desktop with no tray (GNOME without the AppIndicator extension) gets no icon, but the

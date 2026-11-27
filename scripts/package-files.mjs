@@ -140,9 +140,9 @@ function linuxStart(runtime, tray) {
     /*
      * No desktop, so no tray: the app runs in this terminal, where Ctrl+C stops it.
      *
-     * Run, not `exec`ed, so this shell is still here when the app exits for an update. It
-     * then waits for the swap and runs the new launcher, and the app comes back in this
-     * terminal. The variable, the code and the pid file are the app's `Instance.LauncherEnv`,
+     * Run, not `exec`ed, so this shell is still here when the app exits to restart: for an
+     * update, or Restart from the page. It then waits for any swap and runs itself again, and
+     * the app comes back in this terminal. The variable, the code and the pid file are the app's `Instance.LauncherEnv`,
      * `Updater.RestartExitCode` and `Updater.SwapperPidFile`.
      *
      * The swap replaces this file while it runs. The shell reads on from the file it
@@ -152,10 +152,15 @@ function linuxStart(runtime, tray) {
     'status=$?',
     '[ "$status" -eq 75 ] || exit "$status"',
     '',
-    'echo ""',
-    'echo "  Installing the update. The app starts again here when it is done."',
-    'echo ""',
+    // No swapper pid: Restart from the page (issue #43), or a restore or reset to apply.
     'pid=$(cat data/update/swapper.pid 2>/dev/null)',
+    'echo ""',
+    'if [ -n "$pid" ]; then',
+    '  echo "  Installing the update. The app starts again here when it is done."',
+    'else',
+    '  echo "  Restarting."',
+    'fi',
+    'echo ""',
     'waited=0',
     'while [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && [ "$waited" -lt 600 ]; do',
     '  sleep 1',

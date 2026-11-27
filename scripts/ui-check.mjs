@@ -998,8 +998,8 @@ check(
 );
 
 /*
- * Quit. Only ever armed here, never confirmed: the second press would stop the app this
- * check is driving.
+ * Quit's menu (issue #43). Only ever opened here, never chosen from: either item would stop the
+ * app this check is driving.
  */
 console.log('\nquit');
 check(
@@ -1008,15 +1008,18 @@ check(
   true,
 );
 check(
-  'the first press only asks',
-  await evaluate(`(() => {
+  'pressing it opens Restart and Quit, and stops nothing',
+  await evaluate(`(async () => {
     const button = document.getElementById('quitBtn');
     button.click();
-    const asked = button.dataset.armed === '1' && /quit the app/i.test(button.textContent);
-    button.dataset.armed = '0';
-    button.classList.remove('is-armed');
-    button.innerHTML = button.dataset.label;
-    return asked;
+    const menu = document.getElementById('quitMenu');
+    const opened = !menu.hidden && button.getAttribute('aria-expanded') === 'true'
+      && getComputedStyle(document.getElementById('quitConfirm')).display !== 'none';
+    // Restart only where the tray launcher can start the app again.
+    const state = await (await fetch('/api/state')).json();
+    const restart = !document.getElementById('quitRestart').hidden === Boolean(state.app?.restarts);
+    document.body.click();
+    return opened && restart && menu.hidden;
   })()`),
   true,
 );

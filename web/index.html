@@ -94,10 +94,19 @@
               <div class="note" id="optInfo">&nbsp;</div>
             </div>
           </div>
-          <!-- Stops the app. Asks once first: the page cannot bring it back. -->
-          <button class="quit-pill" id="quitBtn" type="button" title="Quit osu! local profiles" data-i18n-attr="title:quitBtn.title">
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="quitBtn.quit">Quit</span>
-          </button>
+          <!--
+            Restart or quit, each one press from this menu (issue #43). Restart shows only when what
+            started the app starts it again: the tray launcher, or start.sh, start.bat or npm start.
+          -->
+          <div class="quit-wrap">
+            <button class="quit-pill" id="quitBtn" type="button" aria-haspopup="true" aria-expanded="false">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5v6M4.6 3.9a5.5 5.5 0 1 0 6.8 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span data-i18n="quitBtn.quit">Quit</span><span class="quit-pill__caret" aria-hidden="true">&#9662;</span>
+            </button>
+            <div class="menu quit-menu" id="quitMenu" hidden>
+              <button id="quitRestart" type="button" data-i18n="quitMenu.restart" hidden>Restart</button>
+              <button id="quitConfirm" class="danger" type="button" title="Quit osu! local profiles" data-i18n="quitBtn.quit" data-i18n-attr="title:quitBtn.title">Quit</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

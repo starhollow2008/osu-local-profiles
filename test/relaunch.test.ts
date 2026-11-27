@@ -57,6 +57,23 @@ test('start.sh and the app agree on the variable, the exit code and the pid file
 });
 
 /*
+ * A source checkout has no tray launcher, so start.bat and `npm start` keep the loop themselves:
+ * the app offers Restart only to something that will start it again (issue #43).
+ */
+test('start.bat and npm start agree with the app on the variable and the exit code', () => {
+  const bat = fs.readFileSync(path.join(root, 'start.bat'), 'utf8');
+  assert.match(bat, new RegExp(`^set ${LAUNCHER_ENV}=restarts\\r?$`, 'm'));
+  assert.match(bat, new RegExp(`^if %errorlevel% equ ${RESTART_EXIT_CODE} \\($`, 'm'));
+  assert.match(bat, /^ {2}goto run\r?$/m);
+
+  const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
+  assert.equal(pkg.scripts['start'], 'node scripts/start.mjs');
+  const start = fs.readFileSync(path.join(root, 'scripts', 'start.mjs'), 'utf8');
+  assert.ok(start.includes(`${LAUNCHER_ENV}: 'restarts'`));
+  assert.ok(start.includes(`RESTART_EXIT_CODE = ${RESTART_EXIT_CODE};`));
+});
+
+/*
  * The script itself, run by `sh` against a stand-in app and a stand-in tray launcher. Git
  * Bash provides `sh` on Windows, and CI runs macOS and Linux.
  */
@@ -105,6 +122,31 @@ test('with no desktop, after an update start.sh waits for the swap, then starts 
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Installing the update/);
     assert.deepEqual(events(dir), ['app started (restarts)', 'swap finished', 'app started (restarts)']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('with no desktop, a restart with no update starts the app again and says only that', { skip: !hasSh }, () => {
+  // Restart from the page: 75, and no swapper (issue #43).
+  const dir = launcherFolder(
+    [
+      '#!/bin/sh',
+      'echo "app started ($OSU_LOCAL_PROFILES_LAUNCHER)" >> events.log',
+      'if [ ! -f restarted ]; then',
+      '  touch restarted',
+      '  exit 75',
+      'fi',
+      'exit 0',
+      '',
+    ].join('\n'),
+  );
+  try {
+    const result = spawnSync('sh', ['start.sh'], { cwd: dir, env: withoutDesktop(), encoding: 'utf8', timeout: 30_000 });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /Restarting/);
+    assert.doesNotMatch(result.stdout, /update/i);
+    assert.deepEqual(events(dir), ['app started (restarts)', 'app started (restarts)']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

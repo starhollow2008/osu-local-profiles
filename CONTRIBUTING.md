@@ -11,7 +11,7 @@ launcher's tests skip.
 
 ```
 npm install
-npm start            # builds and starts the app at http://localhost:7272
+npm start            # builds and starts the app at http://localhost:7272; Restart on the page rebuilds it
 ```
 
 The page has no build step, so edit `web/` and reload. The app needs an osu! installation (stable,

@@ -454,9 +454,21 @@
 }
 
 .quit-pill:hover,
-.quit-pill.is-armed {
-  background-color: var(--red);
-  color: #fff;
+.quit-pill[aria-expanded="true"] {
+  background-color: hsla(var(--hsl-b5), 0.9);
+}
+
+.quit-pill__caret {
+  margin-left: -2px;
+}
+
+/* Restart and Quit, under the pill: the Options menu's look, sized to its two items. */
+.quit-wrap {
+  position: relative;
+}
+
+.quit-menu {
+  min-width: 150px;
 }
 
 /* The app has stopped, or cannot be reached. Pinned to the top, over everything. */
@@ -3016,7 +3028,7 @@
  */
 .export-mode .menu-wrap,
 .export-mode .tracking-pill,
-.export-mode .quit-pill,
+.export-mode .quit-wrap,
 .export-mode .stopped-notice,
 .export-mode .update-nudge,
 .export-mode .section-order,
@@ -7461,7 +7473,7 @@ s.bbcode-editor__glyph {
 /* language picker: a copy carries the one language it was saved in.         */
 /* ======================================================================== */
 
-.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, #quitBtn, #stoppedNotice, #indexNotice, #importNotice, #favoritesNote,
+.static-copy :is(#optionsBtn, .menu-wrap, .lang-wrap, #toggle, #updateBtn, #updateNudge, .quit-wrap, #stoppedNotice, #indexNotice, #importNotice, #favoritesNote,
   #starRatingNotice, #aboutEdit, #aboutActions, #coverEdit, #coverToggle, .section-order, .play-detail__grip, .counting-note__actions, [data-unfavorite],
   [data-play-menu][data-context="card"], a[href*="/replay"], [data-pp-calc]) {
   display: none !important;

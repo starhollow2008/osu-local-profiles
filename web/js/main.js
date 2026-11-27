@@ -53,6 +53,7 @@ import {
   chooseLanguage,
   chooseOriginalMetadata,
   refreshLanguageButton,
+  setLanguageMenuOpen,
 } from './language-picker.js';
 import { original, preferOriginalMetadata, setPreferOriginalMetadata } from './metadata.js';
 import { applyConfigFont, pageFont, setPageFont } from './font.js';
@@ -1462,6 +1463,7 @@ function setMenuOpen(open) {
 $('optionsBtn').onclick = (e) => {
   e.stopPropagation();
   const open = $('optionsMenu').hidden;
+  setQuitMenuOpen(false);
   setMenuOpen(open);
   // Asked each time: Task Manager can turn it off too.
   if (open) void loadStartup();
@@ -1481,6 +1483,7 @@ document.addEventListener('keydown', (e) => {
   // The score card's own menu closes first; a second Escape closes the card.
   if (!$('scoreModal').hidden && $('playMenu').hidden) closeScoreCard();
   setMenuOpen(false);
+  setQuitMenuOpen(false);
   if (!$('resetModal').hidden) closeReset();
   if (!$('backfillModal').hidden) closeBackfill();
   // The filter opens over Settings: Escape closes the filter, and Settings stays.
@@ -1945,14 +1948,36 @@ function quitTitle() {
   return t('quit.titleTray', { where });
 }
 
-$('quitBtn').onmouseenter = () => {
-  $('quitBtn').title = quitTitle();
+/*
+ * The pill opens Restart and Quit (issue #43): opening the menu is the asking, so either is one
+ * press. Restart is only there when what started the app starts it again (`app.restarts`).
+ */
+function setQuitMenuOpen(open) {
+  $('quitMenu').hidden = !open;
+  $('quitBtn').setAttribute('aria-expanded', String(open));
+}
+
+$('quitBtn').onclick = (e) => {
+  e.stopPropagation();
+  const open = $('quitMenu').hidden;
+  setMenuOpen(false);
+  setLanguageMenuOpen(false);
+  $('quitRestart').hidden = !app.restarts;
+  setQuitMenuOpen(open);
 };
 
-$('quitBtn').onclick = async () => {
-  const button = $('quitBtn');
-  if (!armed(button, t('quit.confirm'))) return;
-  button.disabled = true;
+document.addEventListener('click', () => setQuitMenuOpen(false));
+// The language button keeps its click to itself, so it closes this menu on its own.
+$('langBtn').addEventListener('click', () => setQuitMenuOpen(false));
+$('quitMenu').onclick = (e) => e.stopPropagation();
+
+$('quitConfirm').onmouseenter = () => {
+  $('quitConfirm').title = quitTitle();
+};
+
+$('quitConfirm').onclick = async () => {
+  setQuitMenuOpen(false);
+  $('quitBtn').disabled = true;
   try {
     await postJson('/api/quit', {}, 'the app did not stop');
     quitHere = true;
@@ -1960,7 +1985,29 @@ $('quitBtn').onclick = async () => {
     showStopped(true);
   } catch (err) {
     toast(err.message);
-    button.disabled = false;
+    $('quitBtn').disabled = false;
+  }
+};
+
+$('quitRestart').onclick = async () => {
+  setQuitMenuOpen(false);
+  $('quitBtn').disabled = true;
+  try {
+    const before = await (await fetch('/api/app')).json();
+    await postJson('/api/restart', {}, t('quit.restartFailed'));
+    // The stream drops while it is away: this page says why, and reloads once it is back.
+    quitHere = true;
+    closeEvents();
+    toast(t('quit.restarting'));
+    await reloadWhenRestarted(before.pid, () => {
+      quitHere = false;
+      showStopped(false);
+      openEvents();
+    });
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    $('quitBtn').disabled = false;
   }
 };
 
@@ -4414,8 +4461,8 @@ $('restoreFile').onchange = async () => {
   }
 };
 
-/** Reload once a different process answers, or say to restart by hand after a minute. */
-async function reloadWhenRestarted(pid, notBack = () => t('restore.restartYourself')) {
+/** Reload once a different process answers, or call `notBack` after a minute. */
+async function reloadWhenRestarted(pid, notBack = () => settingsHint(t('restore.restartYourself'))) {
   for (let waited = 0; waited < 60; waited += 1) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
     try {
@@ -4428,7 +4475,7 @@ async function reloadWhenRestarted(pid, notBack = () => t('restore.restartYourse
       /* not back yet */
     }
   }
-  settingsHint(notBack());
+  notBack();
 }
 
 /*
@@ -4465,7 +4512,7 @@ for (const button of document.querySelectorAll('[data-app-reset]')) {
         return;
       }
       settingsHint(t('appReset.restarting'));
-      await reloadWhenRestarted(before.pid, () => t('appReset.restartYourself'));
+      await reloadWhenRestarted(before.pid, () => settingsHint(t('appReset.restartYourself')));
     } catch (err) {
       settingsHint(err.message, true);
     } finally {

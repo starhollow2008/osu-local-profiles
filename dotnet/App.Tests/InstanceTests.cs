@@ -13,15 +13,15 @@ namespace OsuLocalProfiles.Tests;
 /// <summary>test/instance.test.ts and the browser command from test/browser.test.ts.</summary>
 public class InstanceTests
 {
-    /// <summary>The app's server on a free port, with <paramref name="onQuit"/> as its Quit.</summary>
-    private static async Task WithServer(Action? onQuit, Func<int, Task> body)
+    /// <summary>The app's server on a free port, with <paramref name="onQuit"/> as its Quit and <paramref name="onRestart"/> as its Restart.</summary>
+    private static async Task WithServer(Action? onQuit, Func<int, Task> body, Action? onRestart = null)
     {
         var install = Directory.CreateTempSubdirectory("olp-cs-instance-").FullName;
         File.WriteAllText(Path.Combine(install, "package.json"), """{"version":"9.9.9"}""");
         Directory.CreateDirectory(Path.Combine(install, "web"));
         using var data = new TempDb();
         var paths = new AppPaths(install);
-        var app = Server.Build(new ServerOptions { Db = data.Db, Paths = paths, Config = AppConfig.Load(paths.DataDir), Port = 0, OnQuit = onQuit });
+        var app = Server.Build(new ServerOptions { Db = data.Db, Paths = paths, Config = AppConfig.Load(paths.DataDir), Port = 0, OnQuit = onQuit, OnRestart = onRestart });
         await app.StartAsync();
         try
         {
@@ -35,10 +35,12 @@ public class InstanceTests
         }
     }
 
-    private static async Task<HttpStatusCode> PostQuit(int port, string? origin)
+    private static Task<HttpStatusCode> PostQuit(int port, string? origin) => Post(port, "/api/quit", origin);
+
+    private static async Task<HttpStatusCode> Post(int port, string path, string? origin)
     {
         using var client = new HttpClient();
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{port}/api/quit") { Content = new StringContent("{}") };
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{port}{path}") { Content = new StringContent("{}") };
         if (origin is not null) request.Headers.Add("Origin", origin);
         using var response = await client.SendAsync(request);
         return response.StatusCode;
@@ -113,6 +115,43 @@ public class InstanceTests
     {
         // No Origin: not a web page, as the tray launcher or curl ask.
         await WithServer(null, async port => Assert.Equal(HttpStatusCode.BadRequest, await PostQuit(port, null)));
+    }
+
+    /* ----------------------------------------------------------------- restart */
+
+    [Fact]
+    public async Task Restart_from_the_apps_own_page_hands_the_app_to_its_launcher()
+    {
+        var restarted = 0;
+        var quit = 0;
+        var called = new TaskCompletionSource();
+        await WithServer(() => Interlocked.Increment(ref quit), async port =>
+        {
+            Assert.Equal(HttpStatusCode.OK, await Post(port, "/api/restart", $"http://localhost:{port}"));
+            await called.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }, () => { Interlocked.Increment(ref restarted); called.TrySetResult(); });
+        Assert.Equal(1, restarted);
+        Assert.Equal(0, quit);
+    }
+
+    [Fact]
+    public async Task Another_websites_page_cannot_restart_the_app()
+    {
+        var restarted = 0;
+        await WithServer(null, async port =>
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, await Post(port, "/api/restart", "https://example.com"));
+            Assert.Equal(HttpStatusCode.Forbidden, await Post(port, "/api/restart", $"http://evil.example:{port}"));
+            await Task.Delay(400);
+        }, () => Interlocked.Increment(ref restarted));
+        Assert.Equal(0, restarted);
+    }
+
+    [Fact]
+    public async Task A_copy_with_no_launcher_to_start_it_again_cannot_restart()
+    {
+        await WithServer(null, async port =>
+            Assert.Equal(HttpStatusCode.BadRequest, await Post(port, "/api/restart", $"http://localhost:{port}")));
     }
 
     /* ------------------------------------------------------------- the launcher */

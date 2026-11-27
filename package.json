@@ -8,7 +8,7 @@
     "node": ">=22.5.0"
   },
   "scripts": {
-    "start": "dotnet run --project dotnet/App -c Release",
+    "start": "node scripts/start.mjs",
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",

@@ -20,7 +20,7 @@ internal static class Instance
     /// <summary>The tray launcher started this process: it has no console, and stops when the launcher does.</summary>
     public static bool LaunchedFromTray(Func<string, string?> getenv) => getenv(LauncherEnv) == "tray";
 
-    /// <summary>The tray launcher or <c>start.sh</c>'s loop will start this process again after an update.</summary>
+    /// <summary>The tray launcher, or the loop in <c>start.sh</c>, <c>start.bat</c> or <c>npm start</c>, will start this process again when it exits to restart.</summary>
     public static bool LauncherRestarts(Func<string, string?> getenv) => getenv(LauncherEnv) is "restarts" or "tray";
 
     /// <summary>Started by the computer as the user signed in: nobody is there to see a page.</summary>

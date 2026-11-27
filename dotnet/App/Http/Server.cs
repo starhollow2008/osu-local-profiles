@@ -298,6 +298,29 @@ internal static partial class Server
             return;
         }
 
+        // Quit's menu -> Restart (issue #43): what started the app starts it again on this exit.
+        if (pathname == "/api/restart" && method == "POST")
+        {
+            var origin = request.Headers.Origin is { Count: > 0 } o ? o.ToString() : null;
+            if (!IsOwnPage(origin, context.Connection.LocalPort))
+            {
+                await Json(context, new { error = "only this app's own page can restart it" }, 403);
+                return;
+            }
+            if (opts.OnRestart is not { } restart)
+            {
+                await Json(context, new { error = "this copy was started by something that would not start it again" }, 400);
+                return;
+            }
+            context.Response.OnCompleted(async () =>
+            {
+                await Task.Delay(250);
+                restart();
+            });
+            await Json(context, new { ok = true });
+            return;
+        }
+
         if (pathname == "/api/state")
         {
             await Json(context, StateApi.Answer(opts, Current(), opts.FromTray));

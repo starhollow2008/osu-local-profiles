@@ -130,6 +130,8 @@ internal static class StateApi
                 whatsNew = Notes.WhatsNew(db, version, opts.Paths.InstallDir, opts.Paths.DataDir),
                 config = opts.Config.PageView(),
                 launcher = fromTray ? "tray" : "terminal",
+                // Whether Restart is offered: something started the app that will start it again.
+                restarts = opts.OnRestart is not null,
                 platform = Browser.Platform,
             },
             profile = new
